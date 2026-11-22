@@ -18,18 +18,30 @@ export function editorDocumentAssetIds(document: PersistedEditorDocument): strin
 }
 
 export async function replaceEditorDocumentAssetOwnership(args: {
-  nextDocument: PersistedEditorDocument;
+  nextDocument: Pick<PersistedEditorDocument, 'assets'>;
   nextRefs: readonly AssetRef[];
   ownerId: string;
   ownerKind: string;
-  previousDocument: PersistedEditorDocument | null;
+  previousDocument: Pick<PersistedEditorDocument, 'assets'> | null;
   physicalDelete: PhysicalDeleteAssetOperation;
   stores: EditorDocumentAssetStores;
 }): Promise<void> {
-  const nextRoles = new Set(args.nextDocument.assets.map((asset) => asset.role));
+  const nextByRole = new Map(args.nextDocument.assets.map((asset) => [asset.role, asset]));
+  const previousByRole = new Map(
+    (args.previousDocument?.assets ?? []).map((asset) => [asset.role, asset])
+  );
+  const previousAssetIds = new Set(
+    (args.previousDocument?.assets ?? []).map((asset) => asset.assetId)
+  );
+  if (nextByRole.size !== args.nextDocument.assets.length)
+    throw new Error('Editor asset owner roles must be unique.');
+  const refsById = new Map(args.nextRefs.map((ref) => [ref.assetId, ref]));
+  for (const asset of args.nextDocument.assets)
+    if (!refsById.has(asset.assetId))
+      throw new Error(`Prepared editor document ref is missing: ${asset.assetId}.`);
   const retainedAssetIds = new Set(args.nextDocument.assets.map((asset) => asset.assetId));
   for (const previous of args.previousDocument?.assets ?? []) {
-    if (nextRoles.has(previous.role)) continue;
+    if (nextByRole.get(previous.role)?.assetId === previous.assetId) continue;
     await removeEditorDocumentAssetOwner({
       assetId: previous.assetId,
       ownerId: args.ownerId,
@@ -40,24 +52,13 @@ export async function replaceEditorDocumentAssetOwnership(args: {
       stores: args.stores,
     });
   }
-  for (const previous of args.previousDocument?.assets ?? []) {
-    const replacement = args.nextDocument.assets.find((asset) => asset.role === previous.role);
-    if (!replacement || replacement.assetId === previous.assetId) continue;
-    await removeEditorDocumentAssetOwner({
-      assetId: previous.assetId,
-      ownerId: args.ownerId,
-      ownerKind: args.ownerKind,
-      physicalDelete: args.physicalDelete,
-      retainedAssetIds,
-      role: previous.role,
-      stores: args.stores,
-    });
-  }
-  const refsById = new Map(args.nextRefs.map((ref) => [ref.assetId, ref]));
+  const writtenRefs = new Set<string>();
   for (const asset of args.nextDocument.assets) {
-    const ref = refsById.get(asset.assetId);
-    if (!ref) throw new Error(`Prepared editor document ref is missing: ${asset.assetId}.`);
-    await args.stores.refs.put!(ref);
+    if (previousByRole.get(asset.role)?.assetId === asset.assetId) continue;
+    if (!previousAssetIds.has(asset.assetId) && !writtenRefs.has(asset.assetId)) {
+      await args.stores.refs.put!(refsById.get(asset.assetId)!);
+      writtenRefs.add(asset.assetId);
+    }
     await args.stores.owners.put!({
       assetId: asset.assetId,
       ownerId: args.ownerId,
@@ -68,7 +69,7 @@ export async function replaceEditorDocumentAssetOwnership(args: {
 }
 
 export async function removeEditorDocumentOwnership(args: {
-  document: PersistedEditorDocument;
+  document: Pick<PersistedEditorDocument, 'assets'>;
   ownerId: string;
   ownerKind: string;
   physicalDelete: PhysicalDeleteAssetOperation;

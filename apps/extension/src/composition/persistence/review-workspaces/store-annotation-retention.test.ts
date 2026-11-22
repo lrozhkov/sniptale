@@ -33,6 +33,8 @@ import {
   commitVideoWorkspace,
   moveVideoWorkspaceHistory,
   openVideoWorkspace,
+  readVideoWorkspace,
+  readVideoWorkspaceOpening,
   saveVideoWorkspaceSnapshot,
 } from './store';
 
@@ -54,8 +56,7 @@ beforeEach(() => {
   harness.database.mockResolvedValue(fixture.database);
 });
 
-async function installSourceOnlyAnnotation() {
-  const opened = await openVideoWorkspace(id, source);
+function sourceOnlyAnnotation(initial: VideoWorkspace) {
   const text = readFileSync(
     'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
@@ -63,9 +64,7 @@ async function installSourceOnlyAnnotation() {
   const result = parseAnimationTemplateSource(text);
   if (!result.ok || !result.template) throw new Error('Invalid self-contained source fixture');
   const hash = createHash('sha256').update(text).digest('hex');
-  // Independent existing asset ownership must never be inferred from annotation bytes.
-  const asset = { mimeType: 'image/png', byteLength: 1, sha256: 'b'.repeat(64) };
-  const before = reviewAdvancedContentBaseline(opened.workspace.advanced);
+  const before = reviewAdvancedContentBaseline(initial.advanced);
   const after = {
     ...before,
     annotationEffects: {
@@ -87,7 +86,7 @@ async function installSourceOnlyAnnotation() {
     },
   };
   const workspace = parseVideoWorkspace({
-    ...opened.workspace,
+    ...initial,
     cursor: 1,
     history: [{ id: 'apply-adopted', at: 1, target: 'advancedContent', before, after }],
     effectSnapshots: [
@@ -104,6 +103,14 @@ async function installSourceOnlyAnnotation() {
     ],
   });
   if (!workspace) throw new Error('Invalid adopted workspace fixture');
+  return workspace;
+}
+
+async function installSourceOnlyAnnotation() {
+  const opened = await openVideoWorkspace(id, source);
+  const workspace = sourceOnlyAnnotation(opened.workspace);
+  // Independent existing asset ownership must never be inferred from annotation bytes.
+  const asset = { mimeType: 'image/png', byteLength: 1, sha256: 'b'.repeat(64) };
   rows.get('video_workspaces')!.set(id, workspaceStorageHead(workspace, []));
   for (const row of workspaceStorageRows(workspace))
     rows.get('video_workspace_history')!.set(JSON.stringify([id, row.ordinal]), row);
@@ -130,6 +137,36 @@ async function installSourceOnlyAnnotation() {
   });
   return workspace;
 }
+
+it('publishes an annotation effect as the first edit without creating an empty head', async () => {
+  const projectId = 'recording:quick-project:first-effect';
+  const sourceAssetId = 'beta-v1-recording-asset';
+  const opening = await readVideoWorkspaceOpening({
+    aggregateId: projectId,
+    sourceMediaId: id,
+    source,
+    expectedSourceAssetId: sourceAssetId,
+  });
+  expect(await readVideoWorkspace(projectId)).toBeNull();
+  const authored = sourceOnlyAnnotation(opening.snapshot.workspace);
+  await saveVideoWorkspaceSnapshot({
+    aggregateId: projectId,
+    original: opening.original!,
+    expectedRevision: opening.snapshot.workspace.revision,
+    expectedSourceAssetId: sourceAssetId,
+    expectedDraftRevision: null,
+    workspace: authored,
+    draft: null,
+  });
+  expect(await readVideoWorkspace(projectId)).toMatchObject({
+    workspace: {
+      sourceMediaId: id,
+      history: authored.history,
+      effectSnapshots: authored.effectSnapshots,
+      cursor: 1,
+    },
+  });
+});
 
 it('retires source-only annotation bytes after branching without claiming an unrelated asset', async () => {
   const adopted = await installSourceOnlyAnnotation();
@@ -339,3 +376,9 @@ it.each(['append', 'paused-save'])(
     expect(completePhysicalDeleteOperation).not.toHaveBeenCalled();
   }
 );
+
+// Exercise rollover and refusal with a small budget; actual defaults have browser capacity proof.
+vi.mock('../../../features/editor-history/policy', async (load) => ({
+  ...(await load<typeof import('../../../features/editor-history/policy')>()),
+  EDITOR_HISTORY_LIMITS: Object.freeze({ maxActions: 50, maxBytes: 8 * 1024 * 1024 }),
+}));

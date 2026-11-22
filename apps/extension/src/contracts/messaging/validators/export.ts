@@ -170,7 +170,10 @@ export function isExportProgress(value: unknown): value is ExportProgress {
     hasExactKeys(
       value,
       ['phase', 'message', 'current', 'total', 'errors'],
-      ['activeStepKey', 'completedStepKeys', 'failedStepKeys']
+      ['activeStepKey', 'completedStepKeys', 'failedStepKeys', 'collectingPageTitle']
+    ) &&
+    hasOptionalField(value, 'collectingPageTitle', (entry) =>
+      isUtf8BoundedString(entry, MAX_POPUP_EXPORT_TAB_TITLE_BYTES, true)
     ) &&
     hasOptionalField(
       value,

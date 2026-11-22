@@ -1,8 +1,9 @@
+import { openNumericControl } from '../support/inspector-numeric';
 import { createGlTransitionSelection } from '../../../../apps/extension/src/features/video/project/transition/gl-catalog';
 import type { VideoProject } from '../../../../apps/extension/src/features/video/project/types';
 import { createQuickEditBorder } from '../../../../apps/extension/src/features/video/project/scene/focus-appearance';
 import { hydrateVideoProject } from '../../../../apps/extension/src/features/video/project/hydration';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import {
   createVideoProjectFromRecording,
   createVideoProjectTrack,
@@ -357,10 +358,7 @@ for (const [index, size] of [
       await expect
         .poll(async () => (await read()).motionRegions![0]!.border!.motion)
         .toBe('counterclockwise');
-      const speed = hold.getByRole('textbox', {
-        name: label('gallery.videoReview.borderSpeed'),
-        exact: true,
-      });
+      const speed = await openNumericControl(hold, label('gallery.videoReview.borderSpeed'));
       await speed.fill('2');
       await speed.press('Enter');
       await expect.poll(async () => (await read()).motionRegions![0]!.border!.period).toBe(1);

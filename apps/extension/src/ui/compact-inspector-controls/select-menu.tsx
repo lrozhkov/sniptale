@@ -156,7 +156,14 @@ function CompactSelectMenuOptionContent<T extends string>({
       ) : null}
       <span className="min-w-0 flex-1">
         <span className="sniptale-interface-label block truncate">{option.label}</span>
-        {option.description ? <CompactSelectMenuOptionDescription option={option} /> : null}
+        {option.description ? (
+          <span
+            className="block truncate text-[11px] font-medium text-[color:var(--sniptale-color-text-muted)]"
+            title={option.description}
+          >
+            {option.description}
+          </span>
+        ) : null}
       </span>
       <span
         className={cx(
@@ -168,18 +175,6 @@ function CompactSelectMenuOptionContent<T extends string>({
         <Check size={13} strokeWidth={2.3} />
       </span>
     </>
-  );
-}
-
-function CompactSelectMenuOptionDescription<T extends string>({
-  option,
-}: {
-  option: CompactSelectOption<T>;
-}) {
-  return (
-    <span className="block truncate text-[11px] font-medium text-[color:var(--sniptale-color-text-muted)]">
-      <span title={option.description}>{option.description}</span>
-    </span>
   );
 }
 

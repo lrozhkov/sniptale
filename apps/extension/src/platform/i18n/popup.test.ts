@@ -1,5 +1,19 @@
-import { expect, it } from 'vitest';
+import { beforeAll, expect, it, vi } from 'vitest';
+import { catalogs } from 'sniptale:i18n/popup';
+import { catalogFixtureMessages } from './catalog-fixture.test-support';
+import { prepareTranslations } from './locale/state';
+import type { AppLocale } from './types';
 import { createTranslator, translate } from './popup';
+
+vi.mock('./catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: AppLocale) =>
+    catalogFixtureMessages(locale, catalogs[locale])
+  ),
+}));
+
+beforeAll(async () => {
+  await prepareTranslations('popup', 'ru');
+});
 
 it('resolves every popup-owned message domain without loading unrelated dictionaries', () => {
   const translateEn = createTranslator('en');

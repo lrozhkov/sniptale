@@ -5,7 +5,7 @@ import { createVideoProjectMotionRegion } from '../../../../apps/extension/src/f
 import { expect } from '@playwright/test';
 import type { Locator, Page, TestInfo } from '@playwright/test';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { test } from '../support/extension-fixture';
 import { applyHarnessBootstrap, VIDEO_EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
 import { createVideoClipFromAsset } from '../../../../apps/extension/src/features/video/project/factories/clip';

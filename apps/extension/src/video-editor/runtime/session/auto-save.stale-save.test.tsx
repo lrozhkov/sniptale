@@ -4,18 +4,39 @@ import { EDITOR_AUTOSAVE_POLICY } from '../../../features/autosave/policy';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
+import { useVideoEditorStore } from '../../state/store';
+import type { VideoProject } from '../../../features/video/project/types';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 
 const getVideoProject = vi.fn();
 const saveVideoProject = vi.fn();
 
-vi.mock('../../../composition/persistence/projects/index-mutations', async (importOriginal) => ({
+const prepareWorkspace = vi.fn();
+let openingProject: VideoProject | null = null;
+let openingRevision = 4;
+vi.mock('../../../composition/persistence/projects/workspace-commit', async (importOriginal) => ({
   ...(await importOriginal<
-    typeof import('../../../composition/persistence/projects/index-mutations')
+    typeof import('../../../composition/persistence/projects/workspace-commit')
   >()),
-  commitVideoProjectMutation: saveVideoProject,
-  commitVideoProjectWorkspaceMutation: saveVideoProject,
+  prepareVideoProjectWorkspaceCommit: prepareWorkspace,
 }));
+
+function bindProject(project: VideoProject) {
+  if (useVideoEditorStore.getState().nativeWorkspace?.project.id !== project.id) {
+    useVideoEditorStore.getState().setProject(project, null, {
+      status: 'ready',
+      project: openingProject ?? project,
+      workspaceRevision: openingRevision,
+      history: { status: 'absent' },
+    });
+    const nativeWorkspace = useVideoEditorStore.getState().nativeWorkspace;
+    if (nativeWorkspace)
+      useVideoEditorStore.setState({
+        nativeWorkspace: { ...nativeWorkspace, savedRuntimeProject: project },
+      });
+  }
+  useVideoEditorStore.setState({ project });
+}
 
 vi.mock('../../../composition/persistence/projects/index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/projects/index')>()),
@@ -47,6 +68,16 @@ let root: Root | null = null;
 
 beforeEach(() => {
   vi.useFakeTimers();
+  useVideoEditorStore.setState(useVideoEditorStore.getInitialState(), true);
+  openingProject = null;
+  openingRevision = 4;
+  prepareWorkspace.mockReset().mockImplementation(async (input) => async () => ({
+    ...(await saveVideoProject(input.project, {
+      expectedWorkspaceRevision: input.expectedWorkspaceRevision,
+      expectedProject: input.expectedProject,
+    })),
+    historyAssetsByValue: new Map(),
+  }));
   getVideoProject.mockReset();
   saveVideoProject.mockReset();
   container = document.createElement('div');
@@ -83,7 +114,7 @@ it('rejects a stale autosave without rebasing it onto the latest persisted proje
 
   await flushAutoSaveTimers();
 
-  expect(getVideoProject).toHaveBeenCalledWith(project.id);
+  expect(getVideoProject).not.toHaveBeenCalled();
   expect(saveVideoProject).toHaveBeenCalledOnce();
   expect(saveVideoProject).toHaveBeenCalledWith(editedProject, {
     expectedWorkspaceRevision: 4,
@@ -104,6 +135,7 @@ function renderAutosaveHarness(
   useVideoEditorAutoSave: (typeof import('./auto-save'))['useVideoEditorAutoSave']
 ) {
   act(() => {
+    bindProject(project);
     root?.render(
       <AutosaveHarness
         project={project}
@@ -132,6 +164,7 @@ it('refuses a restored initial snapshot with the same timestamp before calling t
   const useVideoEditorAutoSave = await importAutoSaveHook();
   const project = createEmptyVideoProject('Initial voice project');
   const setSaveState = vi.fn();
+  prepareWorkspace.mockRejectedValueOnce(createStaleSaveError());
   getVideoProject.mockResolvedValue({
     status: 'ready',
     project: { ...project, name: 'Restored project' },
@@ -151,6 +184,7 @@ it('does not recreate a deleted initial project from a mounted buffer', async ()
   const useVideoEditorAutoSave = await importAutoSaveHook();
   const project = createEmptyVideoProject('Deleted voice project');
   const setSaveState = vi.fn();
+  prepareWorkspace.mockRejectedValueOnce(createStaleSaveError());
   getVideoProject.mockResolvedValue({ status: 'notFound' });
   renderAutosaveHarness(project, setSaveState, useVideoEditorAutoSave);
   renderAutosaveHarness({ ...project, name: 'Voice take' }, setSaveState, useVideoEditorAutoSave);
@@ -168,6 +202,7 @@ it('keeps the initial legacy label projection when the locale changes before the
   stored.tracks[0]!.name = 'Primary Video';
   const opened = hydrateVideoProject(stored);
   expect(opened.tracks[0]!.name).not.toBe('Primary Video');
+  openingProject = stored;
   getVideoProject.mockResolvedValue({ status: 'ready', project: stored, workspaceRevision: 4 });
   saveVideoProject.mockResolvedValue({
     project: { ...opened, name: 'Voice take', updatedAt: opened.updatedAt + 1 },
@@ -189,12 +224,14 @@ it('keeps the initial legacy label projection when the locale changes before the
 it('uses the last persisted revision for subsequent autosaves', async () => {
   const useVideoEditorAutoSave = await importAutoSaveHook();
   const project = createEmptyVideoProject('Autosave revision');
+  openingRevision = 0;
   const refreshProjects = vi.fn().mockResolvedValue(undefined);
   getVideoProject.mockResolvedValue({ status: 'ready', project, workspaceRevision: 0 });
   const setSaveState =
     vi.fn<(state: 'saved' | 'dirty' | 'saving' | 'error' | 'idle' | 'conflict') => void>();
   let currentProject = project;
   const Harness = () => {
+    bindProject(currentProject);
     useVideoEditorAutoSave(currentProject, 'rec-1', setSaveState, refreshProjects);
     return null;
   };

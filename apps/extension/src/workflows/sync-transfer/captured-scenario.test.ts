@@ -31,6 +31,12 @@ import {
   collectPreparedScenarioReplicaRefs,
 } from '../../composition/persistence/sync-capture/prepared-scenario';
 import { encodeCapturedScenarioRoot } from './captured-scenario';
+import {
+  detachScenarioHistory,
+  materializeDetachedScenarioHistory,
+} from '../../composition/persistence/sync-capture/scenario-history';
+import { readScenarioStorage } from '../../composition/persistence/scenario/storage';
+import { parseScenarioProjectEntry } from '../../composition/persistence/scenario/read-guards';
 import { preparePortableScenarioRoot } from './prepared-scenario';
 import { parsePortableSyncRoot, preparePortableReplica } from './prepared-root';
 import {
@@ -624,62 +630,125 @@ it('round trips a retained Scenario inventory above 64 objects through physical 
   expect(io.live).not.toHaveBeenCalled();
 });
 
-it('applies a document fallback without waiting for a later presentation', async () => {
-  const rows = await acceptedRows();
-  rows.presentation = null;
-  const frozen = structuredClone(rows);
-  const before = await wireRoundtrip(rows);
-  const { root } = await prepareOwned(rows);
-  const fixture = createScenarioReplicaFixture();
-  // The generic fixture lacks the native stepId key path. Adapt that store only.
-  io.live.mockResolvedValue({
-    ...fixture.database,
-    transaction(names: string[], mode: string) {
-      const tx = fixture.database.transaction(names, mode);
-      return {
-        ...tx,
-        objectStore(name: string) {
-          const store = tx.objectStore(name);
-          if (name !== 'scenario_step_editor_documents') return store;
-          return {
-            ...store,
-            put: (value: { stepId: string }) => store.put({ ...value, id: value.stepId }),
-          };
-        },
-      };
-    },
-  });
-  const input = {
-    ...fixture.input,
-    root,
-    operationId: before.wire.operationId,
-    sourceDigest: hashSyncText(before.text),
-  };
-  await expect(applyPreparedScenarioReplica(input)).resolves.toMatchObject({ status: 'applied' });
-  const native = await hydratePreparedScenarioReplicaRoot(root);
-  expect(native.entry.project.items).toEqual(rows.entry.project.items);
-  expect(native.stepDocuments[0]?.entry.document.sourceImage.assetId).toMatch(/^received-/u);
-  expect(native.presentation).toBeUndefined();
-  const stored = fixture.fixture.rows.get('scenario_projects')!.get(rows.entry.id) as {
-    workspaceRevision: number;
-  };
-  await commitProjectAggregatePresentation({
-    ref: { kind: 'scenario', id: rows.entry.id },
-    expectedWorkspaceRevision: stored.workspaceRevision,
-    previewBlob: new Blob(['late-preview'], { type: 'image/png' }),
-    thumbnailBlob: new Blob(['late-thumbnail'], { type: 'image/png' }),
-  });
-  expect(rows).toEqual(frozen);
-  expect((await wireRoundtrip(rows)).text).toBe(before.text);
-  expect(
-    [...fixture.fixture.rows.get('sync_capture')!.values()].filter(
-      (row) =>
-        (row as { kind?: string }).kind === 'sync-operation' ||
-        (row as { kind?: string }).kind === 'pending-checkpoint'
-    )
-  ).toEqual([]);
-  await expect(applyPreparedScenarioReplica(input)).resolves.toMatchObject({ status: 'duplicate' });
-});
+it.each([false, true])(
+  'applies a document fallback and replays it with editing checkpoint %s',
+  async (withCheckpoint) => {
+    const rows = await acceptedRows();
+    if (withCheckpoint) {
+      const legacy = materializeDetachedScenarioHistory(
+        rows.entry,
+        JSON.parse(await rows.history!.blob.text())
+      );
+      if (!legacy?.history?.[0]) throw new Error('Missing saved history fixture.');
+      const previous = { ...rows.entry.project, name: 'Past action' };
+      const future = { ...legacy.history[0].project, name: 'Future action' };
+      rows.entry = { ...rows.entry, project: { ...rows.entry.project, items: [] } };
+      const detached = detachScenarioHistory({
+        ...rows.entry,
+        history: [
+          {
+            ...legacy.history[0],
+            project: { ...legacy.history[0].project, items: [] },
+          },
+        ],
+        editingHistory: { version: 1, past: [previous], future: [future] },
+      });
+      const blob = new Blob([detached.text!], { type: 'application/json' });
+      rows.history = { blob, sha256: await streamedHash(blob) };
+    }
+    rows.presentation = null;
+    const frozen = structuredClone(rows);
+    const before = await wireRoundtrip(rows);
+    const { root } = await prepareOwned(rows);
+    if (withCheckpoint) {
+      const onlyInFuture = rows.assets.find((asset) => asset.id === 'historical-image')!;
+      await expect(
+        encodeCapturedScenarioRoot({
+          ...rows,
+          assets: rows.assets.filter((asset) => asset.id !== onlyInFuture.id),
+          refs: rows.refs.filter((ref) => ref.assetId !== onlyInFuture.assetId),
+        })
+      ).rejects.toThrow('history resource');
+      await expect(
+        hydratePreparedScenarioReplicaRoot({
+          ...root,
+          entry: { ...root.entry, workspaceRevision: root.entry.workspaceRevision + 1 },
+        })
+      ).rejects.toThrow('Invalid');
+    }
+    const fixture = createScenarioReplicaFixture();
+    // The generic fixture lacks the native stepId key path. Adapt that store only.
+    io.live.mockResolvedValue({
+      ...fixture.database,
+      transaction(names: string[], mode: string) {
+        const tx = fixture.database.transaction(names, mode);
+        return {
+          ...tx,
+          objectStore(name: string) {
+            const store = tx.objectStore(name);
+            if (name !== 'scenario_step_editor_documents') return store;
+            return {
+              ...store,
+              put: (value: { stepId: string }) => store.put({ ...value, id: value.stepId }),
+            };
+          },
+        };
+      },
+    });
+    const input = {
+      ...fixture.input,
+      root,
+      operationId: before.wire.operationId,
+      sourceDigest: hashSyncText(before.text),
+    };
+    await expect(applyPreparedScenarioReplica(input)).resolves.toMatchObject({ status: 'applied' });
+    const native = await hydratePreparedScenarioReplicaRoot(root);
+    expect(root.entry).not.toHaveProperty('editingHistory');
+    if (withCheckpoint) {
+      expect(native.entry.editingHistory?.past.map((project) => project.name)).toEqual([
+        'Past action',
+      ]);
+      expect(native.entry.editingHistory?.future.map((project) => project.name)).toEqual([
+        'Future action',
+      ]);
+      const tx = fixture.database.transaction(
+        ['scenario_projects', 'scenario_project_history', 'scenario_project_units'],
+        'readonly'
+      );
+      const restored = parseScenarioProjectEntry(
+        (await readScenarioStorage(tx, rows.entry.id)).logical
+      );
+      await tx.done;
+      expect(restored?.editingHistory).toEqual(native.entry.editingHistory);
+      expect(restored?.history).toEqual(native.entry.history);
+      expect(native.entry.history?.[0]?.project.name).toBe('Previous guide');
+    }
+    expect(native.entry.project.items).toEqual(rows.entry.project.items);
+    expect(native.stepDocuments[0]?.entry.document.sourceImage.assetId).toMatch(/^received-/u);
+    expect(native.presentation).toBeUndefined();
+    const stored = fixture.fixture.rows.get('scenario_projects')!.get(rows.entry.id) as {
+      workspaceRevision: number;
+    };
+    await commitProjectAggregatePresentation({
+      ref: { kind: 'scenario', id: rows.entry.id },
+      expectedWorkspaceRevision: stored.workspaceRevision,
+      previewBlob: new Blob(['late-preview'], { type: 'image/png' }),
+      thumbnailBlob: new Blob(['late-thumbnail'], { type: 'image/png' }),
+    });
+    expect(rows).toEqual(frozen);
+    expect((await wireRoundtrip(rows)).text).toBe(before.text);
+    expect(
+      [...fixture.fixture.rows.get('sync_capture')!.values()].filter(
+        (row) =>
+          (row as { kind?: string }).kind === 'sync-operation' ||
+          (row as { kind?: string }).kind === 'pending-checkpoint'
+      )
+    ).toEqual([]);
+    await expect(applyPreparedScenarioReplica(input)).resolves.toMatchObject({
+      status: 'duplicate',
+    });
+  }
+);
 
 async function unloadedHtml(rows: CapturedScenarioRows) {
   const exported = rows.exports[0]!;

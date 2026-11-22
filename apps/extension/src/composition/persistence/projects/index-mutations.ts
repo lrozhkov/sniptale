@@ -39,11 +39,21 @@ export async function commitVideoProjectWorkspaceMutation(
   options: {
     expectedWorkspaceRevision: number | null;
     expectedProject: VideoProject | null;
+    expectedReviewWorkspace?: SaveVideoProjectOptions['expectedReviewWorkspace'];
+    expectedReviewOriginal?: SaveVideoProjectOptions['expectedReviewOriginal'];
+    libraryBindings?: SaveVideoProjectOptions['libraryBindings'];
   }
 ): Promise<VideoProjectWorkspaceCommit> {
   const entry = await saveVideoProject(project, {
     expectedWorkspaceRevision: options.expectedWorkspaceRevision,
     expectedProject: structuredClone(options.expectedProject),
+    ...(options.expectedReviewWorkspace === undefined
+      ? {}
+      : { expectedReviewWorkspace: options.expectedReviewWorkspace }),
+    ...(options.expectedReviewOriginal
+      ? { expectedReviewOriginal: options.expectedReviewOriginal }
+      : {}),
+    ...(options.libraryBindings ? { libraryBindings: options.libraryBindings } : {}),
     storageClass: 'library',
   });
   return {

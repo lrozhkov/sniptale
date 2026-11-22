@@ -14,6 +14,11 @@ interface SnapshotHistoryOptions<T> {
   maxBytes?: number;
   /** Includes shared owner-held values once; an isolated current snapshot is always retained. */
   measureBytes?: (snapshots: readonly T[]) => number;
+  /** Monotone range costs for shared resources; enables an affordable full-window fast path. */
+  measureWindowBytes?: (
+    snapshots: readonly T[],
+    cursor: number
+  ) => (start: number, end: number) => number;
 }
 
 /**
@@ -26,12 +31,32 @@ function shouldTreatSnapshotsAsDistinct<T>(left: T, right: T): boolean {
 }
 
 export class SnapshotHistory<T> {
+  /** Restores a detached retained stack; the new runtime owns its own revision sequence. */
+  static restore<T>(
+    snapshots: readonly T[],
+    cursor: number,
+    options: SnapshotHistoryOptions<T> = {}
+  ): SnapshotHistory<T> {
+    const first = snapshots[0];
+    if (
+      first === undefined ||
+      !Number.isSafeInteger(cursor) ||
+      cursor < 0 ||
+      cursor >= snapshots.length
+    )
+      throw new RangeError('Invalid restored history cursor or stack.');
+    const history = new SnapshotHistory<T>(first, options);
+    history.retain(snapshots.map(cloneHistorySnapshot), cursor);
+    return history;
+  }
+
   private readonly limit: number;
   private stack: T[];
   private index: number;
   private revision = 0;
   private readonly maxBytes: number | undefined;
   private readonly measureBytes: ((snapshots: readonly T[]) => number) | undefined;
+  private readonly measureWindowBytes: SnapshotHistoryOptions<T>['measureWindowBytes'];
 
   constructor(initialSnapshot: T, options: SnapshotHistoryOptions<T> = {}) {
     this.limit = Math.max(1, options.limit ?? 80);
@@ -44,20 +69,37 @@ export class SnapshotHistory<T> {
       throw new RangeError('Snapshot byte limit needs an owner measurement.');
     this.maxBytes = options.maxBytes;
     this.measureBytes = options.measureBytes;
+    this.measureWindowBytes = options.measureWindowBytes;
   }
 
   private retain(stack: T[], cursor: number): void {
     const entries = stack.slice(0, -1).map(() => ({ actions: 1, bytes: 0 }));
     const measure = this.measureBytes;
+    const limits = {
+      maxActions: this.limit - 1,
+      maxBytes: this.maxBytes ?? Number.MAX_SAFE_INTEGER,
+    };
+    if (this.measureWindowBytes && this.maxBytes !== undefined && measure) {
+      const affordableActions = selectHistoryRetentionWindow(entries, cursor, {
+        ...limits,
+        maxBytes: Number.MAX_SAFE_INTEGER,
+      });
+      const bytes = measure(stack.slice(affordableActions.start, affordableActions.end + 1));
+      if (!Number.isSafeInteger(bytes) || bytes < 0)
+        throw new RangeError('Invalid history window cost.');
+      if (bytes <= this.maxBytes) {
+        this.stack = stack.slice(affordableActions.start, affordableActions.end + 1);
+        this.index = affordableActions.cursor;
+        return;
+      }
+    }
     const window = selectHistoryRetentionWindow(
       entries,
       cursor,
-      {
-        maxActions: this.limit - 1,
-        maxBytes: this.maxBytes ?? Number.MAX_SAFE_INTEGER,
-      },
+      limits,
       this.maxBytes !== undefined && measure
-        ? (start, end) => measure(stack.slice(start, end + 1))
+        ? (this.measureWindowBytes?.(stack, cursor) ??
+            ((start, end) => measure(stack.slice(start, end + 1))))
         : undefined
     );
     this.stack = stack.slice(window.start, window.end + 1);
@@ -95,6 +137,16 @@ export class SnapshotHistory<T> {
   /** Returns retained snapshots for owners that keep resources outside the snapshot stack. */
   getSnapshots(): T[] {
     return this.stack.map((snapshot) => cloneHistorySnapshot(snapshot));
+  }
+
+  /** Moves directly to a retained state in one revision, without applying intermediate steps. */
+  seek(index: number): SnapshotHistoryState<T> | null {
+    if (!Number.isSafeInteger(index) || index < 0 || index >= this.stack.length) return null;
+    if (index === this.index) return this.getState();
+    this.index = index;
+    this.revision += 1;
+    this.retain(this.stack, index);
+    return this.getState();
   }
 
   reset(snapshot: T): SnapshotHistoryState<T> {

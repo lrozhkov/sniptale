@@ -1,4 +1,10 @@
 import { readCheckpointInTransaction } from './checkpoints';
+import { removeEditorDocumentOwnership } from '../document-assets/ownership';
+import {
+  VIDEO_PROJECT_HISTORY_OWNER_KIND,
+  videoProjectHistoryAssetBindings,
+} from '../projects/history-contracts';
+import { collectProjectEntryOwnedAssetIds } from '../projects/asset-references';
 import { VideoProjectApplyConflictError } from './apply-video-project.contracts';
 import type {
   ApplyPreparedVideoProjectRevisionInput,
@@ -45,6 +51,7 @@ import {
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_EXPORT_INPUTS_STORE,
@@ -75,7 +82,11 @@ import {
   parseProjectExportEntry,
 } from '../projects/read-guards';
 import type { VideoProjectEntry } from '../projects/contracts';
-import { promoteProjectSourceLifecycles } from '../projects/new-reference-admission';
+import {
+  assertNewProjectSources,
+  promoteProjectSourceLifecycles,
+} from '../projects/new-reference-admission';
+import { createScenarioProjectStore } from '../scenario/storage';
 import { allocateVideoProjectRevisionInTransaction } from '../projects/revisions';
 import {
   assertPreparedProjectAssetSources,
@@ -216,8 +227,15 @@ class PreparedProjectClosure {
   }
 
   assertComplete(): void {
-    for (const id of collectCapturedProjectRecordingIds(this.project))
+    for (const id of collectCapturedProjectRecordingIds(
+      this.project,
+      this.input.root.entry.history
+    ))
       this.neededMedia.add(`recording:${id}`);
+    for (const source of this.input.root.entry.history?.sources ?? []) {
+      if (source.kind === 'project-asset') this.neededAssets.add(source.id);
+      if (source.kind === 'library-asset') this.neededMedia.add(source.id);
+    }
     for (const asset of this.project.assets) this.admitSource(asset);
     for (const item of this.input.root.exports ?? []) {
       if (item.videoReview)
@@ -285,15 +303,20 @@ class PreparedProjectClosure {
     );
     const roots = this.input.rootDependencies ?? [];
     const declaredChildren = roots.flatMap((item) => item.children);
-    const provenance =
-      this.project.source.kind === 'scenario' ? this.project.source.scenarioProjectId : undefined;
+    const provenance = new Set(
+      this.project.source.kind === 'scenario' ? [this.project.source.scenarioProjectId] : []
+    );
+    for (const source of this.input.root.entry.history?.sources ?? []) {
+      if (source.kind === 'scenario-asset') scenarioChildren.add(source.id);
+      if (source.kind === 'scenario-project') provenance.add(source.id);
+    }
     if (
       new Set(roots.map((item) => item.rootId)).size !== roots.length ||
       declaredChildren.length !== scenarioChildren.size ||
       new Set(declaredChildren.map((child) => child.entry.id)).size !== declaredChildren.length ||
       declaredChildren.some((child) => !scenarioChildren.has(child.entry.id)) ||
-      roots.some((item) => !item.children.length && item.rootId !== provenance) ||
-      (provenance && !roots.some((item) => item.rootId === provenance))
+      roots.some((item) => !item.children.length && !provenance.has(item.rootId)) ||
+      [...provenance].some((id) => !roots.some((item) => item.rootId === id))
     )
       throw new VideoProjectApplyConflictError('unsupported-project');
     const count = this.input.dependencies.length;
@@ -417,6 +440,7 @@ async function assertLocalPredecessor(
 
 function publicationStores(tx: ApplyTransaction) {
   return {
+    imageIdentities: tx.objectStore(IMAGE_WORKSPACE_IDENTITIES_STORE),
     assets: tx.objectStore(PROJECT_ASSETS_STORE),
     media: tx.objectStore(MEDIA_LIBRARY_STORE),
     refs: tx.objectStore(ASSET_REFS_STORE),
@@ -565,7 +589,28 @@ async function publishApplication(
   await stores.presentations.delete(
     createAggregatePresentationKey({ id: root.entry.id, kind: 'video-project' })
   );
+  if (context.current?.history)
+    await removeEditorDocumentOwnership({
+      document: { assets: videoProjectHistoryAssetBindings(context.current.history) },
+      ownerKind: VIDEO_PROJECT_HISTORY_OWNER_KIND,
+      ownerId: root.entry.id,
+      physicalDelete: operation,
+      stores,
+    });
   await publishPreparedVideoProjectRevisionInTransaction({ root, stores, workspaceRevision });
+  if (root.entry.history)
+    await assertNewProjectSources(
+      root.entry.project,
+      undefined,
+      {
+        mediaLibraryStore: stores.media,
+        projectAssetStore: stores.assets,
+        recordingStore: tx.objectStore(STORE_NAME),
+        scenarioAssetStore: tx.objectStore(SCENARIO_ASSETS_STORE),
+        scenarioProjectStore: createScenarioProjectStore(tx),
+      },
+      { next: root.entry.history }
+    );
   await publishPreparedVideoProjectSidecarsInTransaction({ root, stores, workspaceRevision });
   for (const item of root.exports ?? []) {
     const raw: unknown = await tx.objectStore(PROJECT_EXPORTS_STORE).get(item.entry.id);
@@ -626,13 +671,10 @@ async function publishApplication(
       scenarioAssetStore: tx.objectStore(SCENARIO_ASSETS_STORE),
       recordingStore: tx.objectStore(STORE_NAME),
     },
-    Date.now()
+    Date.now(),
+    root.entry.history
   );
-  const detached = new Set(
-    context.current?.project.assets.flatMap((asset) =>
-      asset.source.kind === 'project-asset' ? [asset.source.projectAssetId] : []
-    ) ?? []
-  );
+  const detached = new Set(collectProjectEntryOwnedAssetIds(context.current));
   await releaseUnpublishedProjectAssets(tx, detached, operation);
   if (operation.assetIds.length || operation.privateSources?.length)
     await tx.objectStore(ASSET_OPERATIONS_STORE).put(operation);
@@ -781,6 +823,7 @@ export async function applyPreparedVideoProjectRevision(
         ASSET_REFS_STORE,
         ASSET_OWNERS_STORE,
         ASSET_OPERATIONS_STORE,
+        IMAGE_WORKSPACE_IDENTITIES_STORE,
         IMAGE_WORKSPACES_STORE,
         SCENARIO_ASSETS_STORE,
         SYNC_CAPTURE_STORE,

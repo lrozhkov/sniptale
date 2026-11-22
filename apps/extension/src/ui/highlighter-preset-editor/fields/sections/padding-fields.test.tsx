@@ -63,3 +63,43 @@ it('updates padding with parsed numbers and falls back to zero for invalid input
   expect(updatePadding).toHaveBeenCalledWith('top', 7);
   expect(updatePadding).toHaveBeenCalledWith('right', 0);
 });
+
+it.each(['top', 'right', 'bottom', 'left'] as const)(
+  'steps focused %s padding only with Alt and the wheel',
+  async (side) => {
+    const updatePadding = vi.fn();
+    await renderUi(
+      <EditorPaddingFields
+        padding={{ top: 1, right: 2, bottom: 3, left: 4 }}
+        updatePadding={updatePadding}
+      />
+    );
+    const index = ['top', 'right', 'bottom', 'left'].indexOf(side);
+    const input = container!.querySelectorAll('input')[index]!;
+    const wheel = new WheelEvent('wheel', {
+      altKey: true,
+      deltaY: -100,
+      bubbles: true,
+      cancelable: true,
+    });
+    const unfocused = new WheelEvent('wheel', {
+      altKey: true,
+      deltaY: -100,
+      bubbles: true,
+      cancelable: true,
+    });
+    const scrolling = new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true });
+    await act(async () => input.dispatchEvent(unfocused));
+    expect(unfocused.defaultPrevented).toBe(false);
+    await act(async () => {
+      input.focus();
+      input.dispatchEvent(scrolling);
+    });
+    expect(scrolling.defaultPrevented).toBe(false);
+    expect(updatePadding).not.toHaveBeenCalled();
+    await act(async () => input.dispatchEvent(wheel));
+    expect(wheel.defaultPrevented).toBe(true);
+    expect(updatePadding).toHaveBeenCalledWith(side, index + 2);
+    expect(document.activeElement).toBe(input);
+  }
+);

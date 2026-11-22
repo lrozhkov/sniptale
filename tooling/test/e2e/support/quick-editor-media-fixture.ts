@@ -1,6 +1,6 @@
 import { readNativeReviewWorkspace } from './native-review-workspace';
 import { expect, type Page, type Locator } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from './catalog-fixture';
 import { readFile } from 'node:fs/promises';
 import {
   ALL_FORMATS,
@@ -351,11 +351,18 @@ export async function recordedAudioResources(page: Page, excludedKeys: string[] 
 }
 
 /** Create focus through its supported toolbar and ruler interval, including occupied lanes. */
-export async function addReviewFocus(page: Page, locale?: Parameters<typeof translate>[1]) {
+export async function addReviewFocus(
+  page: Page,
+  locale?: Parameters<typeof translate>[1],
+  kind: 'zoom' | 'border' = 'zoom'
+) {
   const dialog = page.locator('dialog');
   await dialog.locator('[data-review-header-track="zoom"] [data-review-track-select]').click();
   const tool = dialog.locator('[data-ui="gallery.videoReview.focusTools"]').getByRole('button', {
-    name: translate('gallery.videoReview.zoomRegionLabel', locale),
+    name: translate(
+      kind === 'border' ? 'gallery.videoReview.focusBorder' : 'gallery.videoReview.zoomRegionLabel',
+      locale
+    ),
     exact: true,
   });
   const plane = dialog.locator('[data-ui="gallery.videoReview.timePlane"]');

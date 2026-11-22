@@ -31,13 +31,7 @@ export function ClipOrderControls(props: {
     return null;
   return (
     <div data-ui="video-editor.inspector.clip-order" className="space-y-1">
-      <InspectorParameterRow
-        label={translate('videoEditor.app.clipOrder')}
-        valueOptions={[
-          translate('videoEditor.app.clipEarlier'),
-          translate('videoEditor.app.clipLater'),
-        ]}
-      >
+      <InspectorParameterRow label={translate('videoEditor.app.clipOrder')}>
         <div
           className="flex min-w-0 flex-wrap justify-end gap-1"
           title={translate('videoEditor.app.clipSwapLinkedHint')}

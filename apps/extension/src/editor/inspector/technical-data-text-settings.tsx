@@ -29,6 +29,10 @@ const quietPickerClassName = [
   "[&_[data-ui='shared.ui.color-selector.trigger']]:!border-transparent",
   "[&_[data-ui='shared.ui.color-selector.trigger']]:!shadow-none",
 ].join(' ');
+const compactBackgroundPalette = [
+  "[&_[data-ui='content.toolbar.drawing-options.quick-colors']]:!w-[88px]",
+  "[&_[data-ui='content.toolbar.drawing-options.quick-colors']]:!gap-0.5",
+].join(' ');
 
 export function EditorTechnicalDataTextSettings() {
   const scoped = useContext(CommandPressScope);
@@ -44,7 +48,6 @@ export function EditorTechnicalDataTextSettings() {
     >
       <InspectorParameterRow
         label={translate('editor.compact.font')}
-        valueMinimum={148}
         dataUi="editor.technical-data.font-row"
       >
         <div
@@ -76,7 +79,6 @@ export function EditorTechnicalDataTextSettings() {
       </InspectorParameterRow>
       <InspectorParameterRow
         label={translate('content.toolbar.drawingTextSize')}
-        valueMinimum={112}
         dataUi="editor.technical-data.size-row"
       >
         <div
@@ -101,10 +103,7 @@ export function EditorTechnicalDataTextSettings() {
           ))}
         </div>
       </InspectorParameterRow>
-      <InspectorParameterRow
-        label={translate('content.toolbar.drawingTextColor')}
-        valueMinimum={184}
-      >
+      <InspectorParameterRow label={translate('content.toolbar.drawingTextColor')}>
         <DrawingColorOptions
           colors={DEFAULT_DRAWING_COLORS}
           floatingBoundaryRef={boundaryRef}
@@ -117,7 +116,7 @@ export function EditorTechnicalDataTextSettings() {
       </InspectorParameterRow>
       <InspectorParameterRow
         label={translate('editor.compact.technicalDataBackground')}
-        valueMinimum={220}
+        className={compactBackgroundPalette}
       >
         <DrawingTextBackgroundOptions
           colors={DEFAULT_DRAWING_COLORS}

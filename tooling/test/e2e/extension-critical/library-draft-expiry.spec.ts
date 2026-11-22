@@ -3,7 +3,7 @@ import { parseMaintenanceLog } from '../../../../apps/extension/src/composition/
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { startHostServer } from '../support/host-server';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import {
   applyHarnessBootstrap,
   SETTINGS_HARNESS_PATH,

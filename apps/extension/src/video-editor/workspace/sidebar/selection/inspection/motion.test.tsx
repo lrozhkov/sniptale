@@ -103,9 +103,17 @@ describe('workspace-sidebar/selection/inspect-motion', () => {
     });
     first.motionBlur.link.enabled = true;
     act(() => root?.render(<InspectMotionConnectionPanel {...props} />));
-    expect(
-      container!.querySelector<HTMLInputElement>('[data-phase="link"] input[type="text"]')?.value
-    ).toContain('73.1');
+    const range = container!.querySelector<HTMLInputElement>(
+      '[data-phase="link"] input[type="range"]'
+    )!;
+    expect(range.value).toContain('73.1');
+    act(() => {
+      range.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      range.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true }));
+    });
+    expect(props.onUpdateMotionRegion).toHaveBeenLastCalledWith(first.id, {
+      motionBlurPhase: { phase: 'link', strength: 0.74 },
+    });
     expect(second.motionBlur.link.strength).toBe(0.2);
   });
   it('keeps the default zoom workflow together and moves timing and behavior to focused groups', () => {
@@ -118,7 +126,14 @@ describe('workspace-sidebar/selection/inspect-motion', () => {
     );
     expect(container?.textContent).toContain('videoEditor.sidebar.selectPointOnStage');
     expect(container?.textContent).not.toContain('videoEditor.sidebar.motionDurationLabel');
-    expect(container?.querySelector('input[type="range"]')).not.toBeNull();
+    expect(
+      container?.querySelector('input[aria-label="videoEditor.sidebar.motionScaleLabel"]')
+    ).not.toBeNull();
+    expect(
+      container?.querySelector(
+        'input[type="range"][aria-label="videoEditor.sidebar.motionScaleLabel"]'
+      )
+    ).not.toBeNull();
 
     clickGroup('videoEditor.sidebar.inspectorGroupTiming');
     expect(container?.textContent).toContain('videoEditor.sidebar.motionDurationLabel');
@@ -248,13 +263,13 @@ it('previews border width without history, cancels it and commits only accepted 
   act(() =>
     root?.render(<MotionFocusFields panel={props} motionRegion={props.selectedMotionRegion!} />)
   );
-  const width = container!.querySelector<HTMLInputElement>(
-    '[aria-label="gallery.videoReview.borderWidth range"]'
+  const increase = container!.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.videoReview.borderWidth increase"]'
   )!;
-  expect(width).toBeTruthy();
-  const key = (type: string, value: string) =>
-    act(() => width.dispatchEvent(new KeyboardEvent(type, { key: value, bubbles: true })));
-  key('keydown', 'ArrowRight');
+  const press = () =>
+    act(() => increase.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  const release = () => act(() => window.dispatchEvent(new MouseEvent('pointerup')));
+  press();
   expect(props.onPreviewMotion).toHaveBeenLastCalledWith({
     kind: 'focus',
     project: props.project,
@@ -262,12 +277,14 @@ it('previews border width without history, cancels it and commits only accepted 
     edit: { kind: 'border' as const, settings: { width: 4 } },
   });
   expect(props.onUpdateMotionRegion).not.toHaveBeenCalled();
-  key('keydown', 'Escape');
-  key('keyup', 'ArrowRight');
+  act(() =>
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))
+  );
+  release();
   expect(props.onPreviewMotion).toHaveBeenLastCalledWith(null);
   expect(props.onUpdateMotionRegion).not.toHaveBeenCalled();
-  key('keydown', 'ArrowRight');
-  key('keyup', 'ArrowRight');
+  press();
+  release();
   expect(props.onUpdateMotionRegion).toHaveBeenCalledExactlyOnceWith(
     props.selectedMotionRegion!.id,
     { focusEdit: { kind: 'border' as const, settings: { width: 4 } } }
@@ -330,12 +347,10 @@ it.each(['enter', 'exit'] as const)(
       },
       motionTransitionPhase: { phase, type: phase === 'enter' ? 'linear' : 'ease-out' },
     });
-    const slider = scope().querySelector<HTMLInputElement>(
-      '[aria-label="gallery.videoReview.zoomTransitionDuration range"]'
+    const stepper = scope().querySelector<HTMLButtonElement>(
+      'button[aria-label="gallery.videoReview.zoomTransitionDuration increase"]'
     )!;
-    act(() =>
-      slider.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-    );
+    act(() => stepper.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
     expect(props.onPreviewMotion).toHaveBeenLastCalledWith(
       expect.objectContaining({
         kind: 'focus',
@@ -343,9 +358,7 @@ it.each(['enter', 'exit'] as const)(
         transition: { phase, duration: expect.any(Number) },
       })
     );
-    act(() =>
-      slider.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true }))
-    );
+    act(() => window.dispatchEvent(new MouseEvent('pointerup')));
     expect(props.onUpdateMotionRegion).toHaveBeenLastCalledWith(props.selectedMotionRegion.id, {
       focusEdit: { kind: 'border' as const },
       motionTransitionPhase: { phase, duration: expect.any(Number) },
@@ -428,7 +441,7 @@ it('groups spotlight appearance and Native phases without dormant camera control
   expect(container?.textContent).not.toContain('gallery.videoReview.borderHold');
   expect(container?.textContent).not.toContain('gallery.videoReview.motionBlur');
   expect(
-    container?.querySelectorAll('[aria-label="gallery.videoReview.focusReveal"]')
+    container?.querySelectorAll('[aria-label="gallery.videoReview.spotlightRevealLabel"]')
   ).toHaveLength(2);
 });
 
@@ -442,13 +455,15 @@ it('previews spotlight strength, cancels and commits through the accepted Native
   act(() =>
     root?.render(<MotionFocusFields panel={props} motionRegion={props.selectedMotionRegion!} />)
   );
-  const slider = container!.querySelector<HTMLInputElement>(
-    '[aria-label="gallery.videoReview.focusStrength range"]'
+  const range = container!.querySelector<HTMLInputElement>(
+    'input[type="range"][aria-label="gallery.videoReview.focusStrength"]'
   )!;
-  expect(slider).toBeTruthy();
-  const key = (type: string, key: string) =>
-    act(() => slider.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true })));
-  key('keydown', 'ArrowRight');
+  expect(range).toBeTruthy();
+  const key = (type: 'keydown' | 'keyup', key: string) =>
+    act(() => range.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true })));
+  const press = () => key('keydown', 'ArrowRight');
+  const release = () => key('keyup', 'ArrowRight');
+  press();
   expect(props.onPreviewMotion).toHaveBeenLastCalledWith(
     expect.objectContaining({
       project: props.project,
@@ -458,11 +473,11 @@ it('previews spotlight strength, cancels and commits through the accepted Native
   );
   expect(props.onUpdateMotionRegion).not.toHaveBeenCalled();
   key('keydown', 'Escape');
-  key('keyup', 'ArrowRight');
+  release();
   expect(props.onPreviewMotion).toHaveBeenLastCalledWith(null);
   expect(props.onUpdateMotionRegion).not.toHaveBeenCalled();
-  key('keydown', 'ArrowRight');
-  key('keyup', 'ArrowRight');
+  press();
+  release();
   expect(props.onUpdateMotionRegion).toHaveBeenCalledExactlyOnceWith(
     props.selectedMotionRegion!.id,
     { focusEdit: { kind: 'spotlight', settings: { strength: expect.any(Number) } } }

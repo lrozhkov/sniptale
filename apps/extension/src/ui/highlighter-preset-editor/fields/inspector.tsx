@@ -199,6 +199,7 @@ function BorderShadowSection(props: BorderStyleInspectorProps) {
     <EditorCompactRangeField
       displaySuffix="%"
       label={translate('highlighter.editor.shadowLabel')}
+      scale
       max={100}
       min={0}
       onChange={(shadow) => props.onChange({ shadow })}
@@ -219,6 +220,8 @@ function BorderBlurSection(props: BorderStyleInspectorProps) {
     <div className={inspector ? 'sniptale-parameter-stack' : 'grid gap-3'}>
       <EditorCompactRangeField
         label={translate('highlighter.editor.blurStrengthLabel')}
+        displaySuffix="px"
+        scale
         max={25}
         min={1}
         onChange={(amount) =>
@@ -250,6 +253,7 @@ function BorderFocusSection(props: BorderStyleInspectorProps) {
       <EditorCompactRangeField
         displaySuffix="%"
         label={translate('highlighter.editor.focusDimmingLabel')}
+        scale
         max={100}
         min={0}
         onChange={(opacity) =>
@@ -262,6 +266,7 @@ function BorderFocusSection(props: BorderStyleInspectorProps) {
       <EditorCompactRangeField
         displaySuffix="px"
         label={translate('highlighter.editor.focusBlurLabel')}
+        scale
         max={25}
         min={0}
         onChange={(blurAmount) =>

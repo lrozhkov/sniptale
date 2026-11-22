@@ -1,5 +1,6 @@
 import type { PortableVideoReview } from '../../../../composition/persistence/review-workspaces/backup-restore';
 import { collectReviewAssetReferences } from '../../../../composition/persistence/review-workspaces/asset-refs';
+import type { VideoProjectHistorySourceReference } from '../../../../features/video/project/history-capture';
 
 const PROJECT_ASSET_PREFIX = 'project-asset:';
 const INVALID_PROJECT_ASSET_INVENTORY = 'Portable video project asset inventory is inconsistent.';
@@ -49,6 +50,7 @@ export function assertExactPortableVideoProjectAssetInventory(args: {
   project: Record<string, unknown>;
   projectAssets: readonly PortableProjectAssetIdentity[];
   projectExports: readonly PortableReviewOwner[];
+  historicalSources?: readonly VideoProjectHistorySourceReference[];
 }): void {
   const entryIds = args.projectAssets.map((asset) => asset.entry.id);
   const objectIds = args.projectAssets.map((asset) => asset.objectId);
@@ -56,6 +58,8 @@ export function assertExactPortableVideoProjectAssetInventory(args: {
     throw new Error(INVALID_PROJECT_ASSET_INVENTORY);
   }
   const expectedIds = collectProjectAssetSourceIds(args.project);
+  for (const source of args.historicalSources ?? [])
+    if (source.kind === 'project-asset') expectedIds.add(source.id);
   addReviewAssetIds(expectedIds, args.projectAssets);
   addReviewAssetIds(expectedIds, args.projectExports);
   const actualIds = new Set(entryIds);

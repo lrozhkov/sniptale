@@ -12,12 +12,15 @@ import {
   captureVideoProjectInTransaction,
   readEnabledCaptureProfile,
 } from '../sync-capture/capture';
+import { captureRootKey, SYNC_CAPTURE_PROFILE_KEY } from '../sync-capture/contracts';
+import { parseSyncCaptureRecord } from '../sync-capture/guards';
 import { createStrictRecordingTransaction } from '../recordings/recovery/transaction';
 import { recoverMediaSourcePublications } from './delete-cascade.recovery';
 import { createScenarioProjectStore } from '../scenario/storage';
 import { createVideoWorkspaceStore } from '../review-workspaces/storage';
 import { withVideoProjectUsage, withReviewWorkspaceUsage } from './usage-index-keys';
-import { sameMediaSource } from './dependencies';
+import { sameMediaSource, videoHistoryUsesMedia } from './dependencies';
+import { hasVideoProjectHistoryChanges } from '../projects/history-contracts';
 import {
   MediaAssetDeletionBlockedError,
   type MediaAssetGraphDomain,
@@ -35,6 +38,7 @@ import {
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
@@ -56,13 +60,16 @@ import {
   THUMBNAILS_STORE,
   VIDEO_PROJECTS_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_REVIEW_IDENTITIES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   initDB,
   type IndexedDbWriteTransaction,
 } from '../infrastructure/indexed-db/core';
 import { buildPhysicalDeleteOperation, completePhysicalDeleteOperation } from '../assets';
-import { parseMediaLibraryEntry } from './read-guards';
+import { tryAssetResourceCleanup } from '../assets/resource-sessions';
+import { fenceVideoReviewIdentity } from '../review-workspaces/identity';
+import { isCollectableProjectOriginal, parseMediaLibraryEntry } from './read-guards';
 import { parseVideoProjectEntry } from '../projects/read-guards';
 import { parseScenarioAssetEntry, parseScenarioProjectEntry } from '../scenario/read-guards';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
@@ -114,7 +121,8 @@ function assertExpectedUsage(
 export async function deleteMediaAssetWithProjectCascade(
   mediaId: string,
   expectedUsage: readonly MediaAssetProjectUsage[],
-  lifecyclePermit?: DurableAssetLifecyclePermit
+  lifecyclePermit?: DurableAssetLifecyclePermit,
+  projectRetainedOnly = false
 ): Promise<void> {
   const physicalDelete = buildPhysicalDeleteOperation([]);
   const scenarioIds = expectedUsage
@@ -122,9 +130,19 @@ export async function deleteMediaAssetWithProjectCascade(
     .map((usage) => usage.id)
     .sort();
   await withScenarioLocks(scenarioIds, () =>
-    runWithIndexedDbMutation((db) =>
-      commitCascadeTransaction(db, mediaId, expectedUsage, physicalDelete)
-    )
+    runWithIndexedDbMutation(async (db) => {
+      const commit = () =>
+        commitCascadeTransaction(
+          db,
+          mediaId,
+          expectedUsage,
+          physicalDelete,
+          undefined,
+          projectRetainedOnly
+        );
+      if (projectRetainedOnly) await tryAssetResourceCleanup(commit);
+      else await commit();
+    })
   );
   if (physicalDelete.assetIds.length > 0)
     await completePhysicalDeleteOperation(physicalDelete, lifecyclePermit);
@@ -248,17 +266,22 @@ async function detachVideoProjects(
   const affected: MediaAssetProjectUsage[] = [];
   const scenarioChildIds = new Set(graph.scenarioChildren.map((child) => child.id));
   for (const entry of graph.videos) {
+    if (videoHistoryUsesMedia(entry.history?.sources ?? [], graph.media, scenarioChildIds))
+      throw new MediaAssetDeletionBlockedError('retained-history');
     const primary = isVideoPrimaryMediaSource(entry.project, graph.media);
     const sources = entry.project.assets
       .filter((asset) => videoSourceUsesMedia(asset.source, graph.media, scenarioChildIds))
       .map((asset) => asset.source);
     if (!primary && sources.length === 0) continue;
+    if (hasVideoProjectHistoryChanges(entry.history))
+      throw new MediaAssetDeletionBlockedError('retained-history');
     affected.push({ id: entry.id, kind: 'video', name: entry.project.name, primary });
     if (primary) throw new PrimaryMediaAssetDeleteError();
     const project = removeVideoProjectLibrarySources(entry.project, sources);
+    const { historyPublicationId: _publicationId, ...independentEntry } = entry;
     await tx.objectStore(VIDEO_PROJECTS_STORE).put!(
       withVideoProjectUsage({
-        ...entry,
+        ...independentEntry,
         project: { ...project, updatedAt: now },
         updatedAt: now,
         workspaceRevision: (entry.workspaceRevision ?? 0) + 1,
@@ -324,12 +347,24 @@ async function detachReviewWorkspaces(
   return affected;
 }
 
+/** A peer may already hold this source as an independent original. */
+async function hasSyncedOriginal(tx: CascadeTransaction, mediaId: string): Promise<boolean> {
+  const capture = tx.objectStore(SYNC_CAPTURE_STORE);
+  const raw: unknown = await capture.get(SYNC_CAPTURE_PROFILE_KEY);
+  if (raw === undefined) return false;
+  const profile = parseSyncCaptureRecord(raw);
+  if (profile?.kind !== 'profile') return true;
+  const key = captureRootKey(profile.spaceId, 'media', mediaId);
+  return (await capture.get(JSON.stringify(['root-state', key]))) !== undefined;
+}
+
 async function commitCascadeTransaction(
   db: CascadeDatabase,
   mediaId: string,
   expectedUsage: readonly MediaAssetProjectUsage[],
   physicalDelete: PhysicalDelete,
-  expectedSource?: MediaDependencyTarget
+  expectedSource?: MediaDependencyTarget,
+  projectRetainedOnly = false
 ): Promise<void> {
   const tx = createStrictRecordingTransaction(db, [
     SYNC_CAPTURE_STORE,
@@ -341,6 +376,7 @@ async function commitCascadeTransaction(
     SCENARIO_PROJECT_UNITS_STORE,
     SCENARIO_ASSETS_STORE,
     VIDEO_WORKSPACES_STORE,
+    VIDEO_REVIEW_IDENTITIES_STORE,
     VIDEO_WORKSPACE_HISTORY_STORE,
     VIDEO_WORKSPACE_DRAFTS_STORE,
     PROJECT_ASSETS_STORE,
@@ -356,6 +392,7 @@ async function commitCascadeTransaction(
     RECORDING_RECOVERY_SESSIONS_STORE,
     RECORDING_RECOVERY_BLOCKS_STORE,
     THUMBNAILS_STORE,
+    IMAGE_WORKSPACE_IDENTITIES_STORE,
     IMAGE_WORKSPACES_STORE,
     AGGREGATE_PRESENTATIONS_STORE,
     ASSET_REFS_STORE,
@@ -363,11 +400,21 @@ async function commitCascadeTransaction(
     ASSET_OPERATIONS_STORE,
   ]);
   try {
+    if (
+      projectRetainedOnly &&
+      (!isCollectableProjectOriginal(
+        parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId))
+      ) ||
+        (await hasSyncedOriginal(tx, mediaId)))
+    ) {
+      await tx.done;
+      return;
+    }
     const graph = await loadCascadeGraph(tx, mediaId, expectedSource);
     const captureProfile = await readEnabledCaptureProfile(tx);
-    const currentMedia = captureProfile
-      ? parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId))
-      : null;
+    const currentMedia = parseMediaLibraryEntry(
+      await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId)
+    );
     const imageNativeRevision =
       currentMedia?.source.kind === 'screenshot' ||
       (currentMedia?.source.kind === 'stored-asset' &&
@@ -399,6 +446,9 @@ async function commitCascadeTransaction(
     if (captureProfile && affected.length !== affectedVideos.length)
       throw new Error('The experimental sync capture does not support this cascade graph.');
     const ownAuxiliaries = await deleteMediaSidecars(tx, mediaId, physicalDelete);
+    if (currentMedia?.mimeType.startsWith('video/')) {
+      await fenceVideoReviewIdentity(tx, 'original', mediaId);
+    }
     for (const id of ownAuxiliaries) detachedRepresentations.add(id);
     if (graph.media.source.kind === 'project-asset')
       detachedRepresentations.delete(graph.media.source.projectAssetId);
@@ -407,7 +457,7 @@ async function commitCascadeTransaction(
     physicalDelete.assetIds = [...new Set(physicalDelete.assetIds)];
     if (physicalDelete.assetIds.length > 0)
       await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
-    if (captureProfile) {
+    if (captureProfile && !projectRetainedOnly) {
       for (const entry of affectedVideos) await captureVideoProjectInTransaction(tx, entry.id);
       await captureDeletionInTransaction(tx, 'media', mediaId, 'local-edit', imageNativeRevision);
     }

@@ -8,7 +8,7 @@ import {
 } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { createVideoClipFromAsset } from '../../../../apps/extension/src/features/video/project/factories/clip';
 import { DEFAULT_WINDOW_HEADER } from '../../../../packages/runtime-contracts/src/window-header';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { readNativeVideoProject } from '../support/native-video-project';

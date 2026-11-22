@@ -13,17 +13,9 @@ import {
 } from './filter-preferences';
 import { useGallerySavedViewState } from './useGallerySavedViewState';
 import { useGallerySearchState } from './useGallerySearchState';
+import { SIDEBAR_FOLDERS } from '../library/constants';
 
-const GALLERY_FOLDERS = new Set<FolderFilter>([
-  'all',
-  'screenshot',
-  'recording',
-  'audio',
-  'export',
-  'web-snapshot',
-  'scenario',
-  'video-project',
-]);
+const GALLERY_FOLDERS = new Set(SIDEBAR_FOLDERS);
 
 const EMPTY_FACET_FILTERS: GalleryFacetFilters = {
   created: [],

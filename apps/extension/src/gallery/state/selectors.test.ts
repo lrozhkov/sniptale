@@ -4,6 +4,7 @@ import { formatDateTime } from '@sniptale/platform/i18n/format';
 import type { GalleryItem } from '../library/items';
 import { createGalleryDateFormatter, formatDate } from '../library/ui/date';
 import {
+  createImageProjectItem,
   createScenarioExportItem,
   createScenarioItem,
   createVideoProjectItem,
@@ -724,13 +725,17 @@ it('counts audio separately and filters out images and videos from Audio', () =>
   ).toEqual(['audio']);
 });
 
-it('keeps project folders disjoint from ready materials and counts the same results', () => {
+it('keeps project folders disjoint from originals and counts the same results', () => {
+  const image = createImageProjectItem();
   const video = createVideoProjectItem();
   const scenario = createScenarioItem();
+  const originalImage = createItem({ id: 'image-original' });
   const exported = createScenarioExportItem();
   const recording = createItem({ id: 'recording', kind: 'recording' });
-  const items = [video, scenario, exported, recording];
+  const items = [image, video, scenario, originalImage, exported, recording];
   for (const [folderFilter, expected] of [
+    ['image-project', [image.id]],
+    ['screenshot', [originalImage.id]],
     ['video-project', [video.id]],
     ['scenario', [scenario.id]],
     ['export', [exported.id]],

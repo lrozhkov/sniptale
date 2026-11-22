@@ -10,11 +10,8 @@ import {
   type TestInfo,
   type ViewportSize,
 } from '@playwright/test';
-import {
-  translate,
-  type AppLocale,
-  type TranslationKey,
-} from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
+import type { AppLocale, TranslationKey } from '../../../../apps/extension/src/platform/i18n';
 import {
   createGuideProject,
   createGuideStep,

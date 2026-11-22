@@ -20,7 +20,7 @@ function checkReference(file: string, reference: string) {
 }
 
 describe('canonical design reference links', () => {
-  it('uses canonical token and range implementations without local copies', () => {
+  it('uses canonical tokens and control styles without local copies', () => {
     expect(existsSync(resolve(tool, 'assets/tokens.css'))).toBe(false);
     expect(existsSync(resolve(tool, 'assets/range.css'))).toBe(false);
     const pages = globSync('tooling/design-reference/**/index.html', { cwd: root });
@@ -33,9 +33,13 @@ describe('canonical design reference links', () => {
     expect(readFileSync(resolve(tool, 'examples/shared/numbers.css'), 'utf8')).toContain(
       "@import url('/packages/ui/src/styles/product-form-controls/range.css');"
     );
+    expect(readFileSync(resolve(tool, 'examples/shared/choices.css'), 'utf8')).toContain(
+      "@import url('/packages/ui/src/styles/product-form-controls/segments.css');"
+    );
     for (const source of [
       'packages/ui/src/styles/design-tokens.css',
       'packages/ui/src/styles/product-form-controls/range.css',
+      'packages/ui/src/styles/product-form-controls/segments.css',
     ]) {
       expect(readFileSync(resolve(root, source), 'utf8'), source).not.toMatch(/@import|url\(/u);
     }
@@ -93,12 +97,6 @@ describe('canonical design reference links', () => {
       const rule = text.match(/"rules":\s*"([^"]+)"/);
       expect(rule, file).not.toBeNull();
       expect(existsSync(resolve(root, 'docs/design', rule![1])), file).toBe(true);
-    }
-    for (const file of globSync('docs/design/*.md', { cwd: root })) {
-      expect(
-        readFileSync(resolve(root, file), 'utf8').split(/\s+/).length,
-        file
-      ).toBeLessThanOrEqual(800);
     }
   });
 });

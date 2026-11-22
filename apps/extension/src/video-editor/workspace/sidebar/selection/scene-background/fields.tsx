@@ -25,7 +25,6 @@ export function SceneBackgroundFields(props: SceneBackgroundFieldProps) {
   return (
     <div className="sniptale-parameter-stack grid gap-3" data-ui="video-editor.scene-background">
       <OptionButtonsField
-        layout="stacked"
         label={translate('gallery.videoReview.backgroundZoom')}
         value={zoomBehavior}
         options={
@@ -75,7 +74,10 @@ export function SceneBackgroundFields(props: SceneBackgroundFieldProps) {
         !imageRequested &&
         props.sceneBackground.kind !== VideoSceneBackgroundKind.SOLID && (
           <NumericRow
+            appearance="plain"
             label={translate('editor.scene.backgroundBlurAmount')}
+            rangePresentation="field"
+            scrub={{ min: 0, max: 25, step: 1 }}
             value={blur}
             min={0}
             max={25}
@@ -83,7 +85,10 @@ export function SceneBackgroundFields(props: SceneBackgroundFieldProps) {
             precision={2}
             unit="px"
             normalizeValue={(value) => (value === Number(blur.toFixed(2)) ? blur : value)}
-            onPreviewValue={() => undefined}
+            onPreviewValue={(blur) =>
+              props.onPreviewSceneBackground({ ...props.sceneBackground, blur })
+            }
+            onCancelValue={props.onResetSceneBackgroundPreview}
             onCommitValue={(value) => {
               props.onSetSceneBackground({ blur: value });
               props.onResetSceneBackgroundPreview();
@@ -126,6 +131,9 @@ function SceneBackgroundMotionControls(props: SceneBackgroundFieldProps) {
         ? (['speed', 'intensity'] as const).map((key) => (
             <NumericRow
               key={key}
+              appearance="plain"
+              rangePresentation="field"
+              scrub={{ min: 0, max: 100, step: 1 }}
               label={translate(
                 key === 'speed'
                   ? 'editor.scene.backgroundMotionSpeed'
@@ -143,6 +151,7 @@ function SceneBackgroundMotionControls(props: SceneBackgroundFieldProps) {
                 })
               }
               onCommitValue={(number) => commit({ ...value, [key]: number })}
+              onCancelValue={props.onResetSceneBackgroundPreview}
             />
           ))
         : null}

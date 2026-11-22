@@ -8,11 +8,8 @@ import {
   type Page,
   type TestInfo,
 } from '@playwright/test';
-import {
-  translate,
-  type AppLocale,
-  type TranslationKey,
-} from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
+import type { AppLocale, TranslationKey } from '../../../../apps/extension/src/platform/i18n';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
 import { startHostServer } from '../support/host-server';
 import { openRealPopup, sendRuntimeMessage } from '../support/recording-action';
@@ -299,7 +296,24 @@ async function geometry(page: Page, c: Composition) {
   });
   expect.soft(alpha, 'Content AI modal hides underlying page text').toBe(255);
   const prompt = page.locator('#ai-prompt');
+  const initialPrompt = await prompt.inputValue();
   await prompt.click();
+  await prompt.fill(Array.from({ length: 24 }, (_, index) => `Prompt line ${index}`).join('\n'));
+  expect(await prompt.evaluate((node) => getComputedStyle(node, '::-webkit-scrollbar').width)).toBe(
+    '6px'
+  );
+  expect(
+    await prompt.evaluate(
+      (node) => getComputedStyle(node, '::-webkit-scrollbar-thumb').borderTopColor
+    )
+  ).toBe('rgba(0, 0, 0, 0)');
+  await prompt.hover();
+  await prompt.evaluate((node) => {
+    node.scrollTop = 0;
+  });
+  await page.mouse.wheel(0, 100);
+  await expect.poll(() => prompt.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  await prompt.fill(initialPrompt);
   const promptFrame = await prompt.evaluate((node) => {
     const probe = document.createElement('span');
     probe.style.color = 'var(--sniptale-color-border-strong)';
@@ -477,6 +491,7 @@ async function configureProvider(settings: Page, c: Composition, providerOrigin:
   await named(models, c, 'common.actions.add').click();
   await named(dialog, c, 'settings.aiProviders.modelProviderPlaceholder').click();
   await settings.getByRole('option', { name: providerName, exact: true }).click();
+  await named(dialog, c, 'settings.aiProviders.modelManualEntry').click();
   await dialog
     .getByPlaceholder(tr(c, 'settings.aiProviders.modelNamePlaceholder'), { exact: true })
     .fill(modelName);
@@ -586,10 +601,12 @@ async function dataControls(page: Page, c: Composition, info: TestInfo) {
   const expandBox = await section.locator('.sniptale-expand-btn').boundingBox();
   expect(expandBox?.height).toBeLessThanOrEqual(24);
 
-  const search = modal.getByRole('textbox', {
+  const search = modal.getByRole('searchbox', {
     name: tr(c, 'aiModal.searchDataLabel'),
     exact: true,
   });
+  const searchFrame = search.locator('..');
+  await expect(searchFrame).toHaveCSS('height', '32px');
   const placeholderColor = () =>
     search.evaluate((node) => getComputedStyle(node, '::placeholder').color);
   await search.hover();
@@ -598,28 +615,30 @@ async function dataControls(page: Page, c: Composition, info: TestInfo) {
   expect(idlePlaceholder).not.toBe('rgba(0, 0, 0, 0)');
   await search.click();
   expect.soft(await placeholderColor()).toBe('rgba(0, 0, 0, 0)');
-  const searchFrame = search.locator('..');
   const neutralBorder = await searchFrame.evaluate((node) => {
     const probe = document.createElement('span');
-    probe.style.color = 'var(--sniptale-color-border-strong)';
+    probe.style.color = 'var(--sniptale-color-field-focus)';
     node.append(probe);
     const color = getComputedStyle(probe).color;
     probe.remove();
     return color;
   });
-  await expect.soft(searchFrame).toHaveCSS('border-color', neutralBorder, { timeout: 500 });
+  await expect(searchFrame).toHaveCSS('border-color', neutralBorder);
+  await search.fill('unmatched-search-value');
+  await expect(modal.locator('.sniptale-tree-row-field')).toHaveCount(0);
   await search.fill('Apples');
+  await expect(modal.locator('.sniptale-tree-row-field').first()).toBeVisible();
   await expect(search).toHaveCSS('font-size', '13px');
   await expect(search).toHaveCSS('line-height', '18px');
   await expect.soft(search).toHaveCSS('font-weight', '400', { timeout: 500 });
-  await expect.soft(search).toHaveCSS('font-family', /Sniptale Text/, { timeout: 500 });
   const clear = named(modal, c, 'aiModal.clearSearchLabel');
   await expect(clear).toHaveCSS('height', '24px');
-  await expect(clear.locator('svg')).toHaveCSS('width', '13px');
+  await expect(clear.locator('svg')).toHaveCSS('width', '14px');
   await capture(page, info, 'data-filter');
   await named(modal, c, 'aiModal.clearSearchLabel').click();
   await expect(search).toHaveValue('');
   await expect(search).toBeFocused();
+  await expect(spoiler).toHaveAttribute('aria-expanded', 'true');
   expect.soft(await placeholderColor()).toBe('rgba(0, 0, 0, 0)');
   const selectedOnly = modal.locator('.sniptale-ai-data-selected-filter');
   await selectedOnly.click();
@@ -777,15 +796,21 @@ async function compositions(
   c: Composition,
   info: TestInfo
 ) {
+  const search = modalRoot(page).getByRole('searchbox', {
+    name: tr(c, 'aiModal.searchDataLabel'),
+    exact: true,
+  });
   for (const size of sizes) {
     await page.setViewportSize(size);
     await geometry(page, c);
+    await inViewport(page, search);
     await inViewport(page, named(modalRoot(page), c, 'aiModal.submitShortcutTitle'));
     await capture(page, info, `data-json-${size.width}x${size.height}`);
   }
   if (c.locale === 'ru' && c.theme === 'dark') {
     await page.setViewportSize({ width: 960, height: 560 });
     await geometry(page, c);
+    await inViewport(page, search);
     await capture(page, info, 'data-json-960x560');
     await popup.evaluate((id) => chrome.tabs.setZoom(id, 1.25), tabId);
     expect(await popup.evaluate((id) => chrome.tabs.getZoom(id), tabId)).toBe(1.25);

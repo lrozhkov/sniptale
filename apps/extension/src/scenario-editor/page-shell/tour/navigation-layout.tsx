@@ -79,7 +79,7 @@ export function TourNavigationLayoutSettings({
           },
         ] as const
       ).map(({ key, label, values }) => (
-        <InspectorParameterRow key={key} label={label} valueMinimum={104}>
+        <InspectorParameterRow key={key} label={label}>
           <div
             role="radiogroup"
             aria-label={label}
@@ -132,7 +132,7 @@ export function TourNavigationLayoutSettings({
           onChange={(value) => onChange({ ...slide, layout: { ...layout, [key]: value } })}
         />
       ))}
-      <InspectorParameterRow label={t('scenario.editor.tourButtonColumns')} valueMinimum={104}>
+      <InspectorParameterRow label={t('scenario.editor.tourButtonColumns')}>
         <div
           role="radiogroup"
           aria-label={t('scenario.editor.tourButtonColumns')}

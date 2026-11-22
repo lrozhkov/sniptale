@@ -5,7 +5,12 @@ import { useState, type ReactNode } from 'react';
 import { CompactSelect, NumericRow } from '../../../../../ui/compact-inspector-controls';
 import { formatPreciseTime } from '../../../../../composition/library-preview/time-format';
 import { Plus, Trash2, Maximize, EyeOff, Scan } from 'lucide-react';
-import { activeCameraPosition } from '../../../../../features/video/project/camera/animation';
+import {
+  activeCameraPosition,
+  cameraSourceTime,
+  cameraTimingRate,
+  cameraTimelineTime,
+} from '../../../../../features/video/project/camera/animation';
 import { OptionButtonsField } from '../shared/option-buttons';
 import { NumberInput } from './number';
 import type { CameraPositionEdit } from '../../../../../features/video/project/camera/animation';
@@ -224,7 +229,7 @@ export function CameraTimingOffsetControl(props: CameraLayoutControlsProps) {
 
 function CameraTransitionFields(props: CameraLayoutControlsProps) {
   const position = activeCameraPosition(props.clip, props.currentTime ?? props.clip.startTime);
-  const rate = props.clip.playbackRate ?? 1;
+  const rate = cameraTimingRate(props.clip);
   const edit = (value: CameraPositionEdit) => props.onEditCameraPosition?.(props.clip.id, value);
   return (
     <>
@@ -233,7 +238,10 @@ function CameraTransitionFields(props: CameraLayoutControlsProps) {
         <div className="space-y-1 border-t border-[var(--sniptale-color-border-soft)] pt-2">
           <NumberInput
             label={translate('videoEditor.sidebar.cameraPositionTime')}
-            value={Math.max(0, (position.sourceTime - props.clip.sourceStart) / rate)}
+            value={Math.max(
+              0,
+              cameraTimelineTime(props.clip, position.sourceTime) - props.clip.startTime
+            )}
             min={0}
             max={props.clip.duration}
             step={1 / props.project.fps}
@@ -243,7 +251,7 @@ function CameraTransitionFields(props: CameraLayoutControlsProps) {
               edit({
                 kind: 'update',
                 id: position.id,
-                sourceTime: props.clip.sourceStart + value * rate,
+                sourceTime: cameraSourceTime(props.clip, props.clip.startTime + value),
               })
             }
           />
@@ -291,7 +299,8 @@ function CameraTransitionFields(props: CameraLayoutControlsProps) {
 function CameraPositionNavigation(props: CameraLayoutControlsProps) {
   const position = activeCameraPosition(props.clip, props.currentTime ?? props.clip.startTime);
   const initial = activeCameraPosition(props.clip, props.clip.startTime);
-  const rate = props.clip.playbackRate ?? 1;
+  const start = cameraSourceTime(props.clip, props.clip.startTime);
+  const end = cameraSourceTime(props.clip, props.clip.startTime + props.clip.duration);
   const edit = (value: CameraPositionEdit) => props.onEditCameraPosition?.(props.clip.id, value);
   return (
     <div className="flex min-w-0 items-center gap-1" data-ui="video-editor.camera-positions">
@@ -308,15 +317,14 @@ function CameraPositionNavigation(props: CameraLayoutControlsProps) {
               label: translate('videoEditor.sidebar.cameraPositionInitial'),
             },
             ...(props.clip.cameraPositions ?? [])
-              .filter(
-                (item) =>
-                  item.sourceTime > props.clip.sourceStart &&
-                  item.sourceTime < props.clip.sourceStart + props.clip.sourceDuration
-              )
+              .filter((item) => item.sourceTime > start && item.sourceTime < end)
               .map((item) => ({
                 value: item.id,
                 label: formatPreciseTime(
-                  Math.max(0, (item.sourceTime - props.clip.sourceStart) / rate)
+                  Math.max(
+                    0,
+                    cameraTimelineTime(props.clip, item.sourceTime) - props.clip.startTime
+                  )
                 ),
               })),
           ]}

@@ -801,3 +801,63 @@ it('holds initial events for calibration and retries a refused packet after disa
   expect(await controller.flushEvents()).toBe(true);
   expect(publishEvents.mock.calls[1]?.[0]).toEqual(first);
 });
+
+it.each([false, true])(
+  'dispatches pagehide tails before an older ACK; phase change=%s',
+  async (phaseChange) => {
+    const acknowledgement = Promise.withResolvers<void>();
+    const eventsEntered = Promise.withResolvers<void>();
+    const cursorEntered = Promise.withResolvers<void>();
+    const publishFinalEvents = vi.fn(
+      async (
+        _packets: import('../../../contracts/video/event-observations').RecordingEventObservationPacket[]
+      ) => undefined
+    );
+    const publishFinalCursor = vi.fn(
+      async (_packets: RecordingCursorObservationPacket[]) => undefined
+    );
+    const controller = createVideoTelemetryController({
+      publishEvents: async () => {
+        eventsEntered.resolve();
+        await acknowledgement.promise;
+      },
+      publishCursor: async () => {
+        cursorEntered.resolve();
+        await acknowledgement.promise;
+      },
+      publishFinalEvents,
+      publishFinalCursor,
+    });
+    controller.enable('closing-packets', 0, null, 'blocks', 'blocks');
+    sendTrusted(createPointerLikeEvent(40, 60));
+    await Promise.all([eventsEntered.promise, cursorEntered.promise]);
+    try {
+      if (phaseChange) {
+        controller.pause();
+        controller.resume();
+        sendTrusted(createPointerLikeEvent(80, 90));
+      }
+      window.dispatchEvent(new Event('pagehide'));
+      expect(publishFinalEvents).toHaveBeenCalledOnce();
+      expect(publishFinalCursor).toHaveBeenCalledOnce();
+      for (const packets of [
+        publishFinalEvents.mock.calls[0]?.[0],
+        publishFinalCursor.mock.calls[0]?.[0],
+      ]) {
+        expect(new Set(packets?.map((packet) => packet.sourceInstanceId)).size).toBe(1);
+        if (phaseChange)
+          expect(new Set(packets?.map((packet) => packet.sourceClockId)).size).toBeGreaterThan(1);
+      }
+      expect(
+        publishFinalEvents.mock.calls[0]?.[0].flatMap((packet) => packet.records).at(-1)
+      ).toMatchObject({ kind: 'boundary', reason: 'visibility' });
+      expect(
+        publishFinalCursor.mock.calls[0]?.[0].flatMap((packet) => packet.records).at(-1)
+      ).toMatchObject({ kind: 'boundary', reason: 'observation' });
+    } finally {
+      acknowledgement.resolve();
+      await Promise.all([controller.flushEvents(), controller.flushCursor()]);
+      controller.disable();
+    }
+  }
+);

@@ -3,10 +3,82 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import { cx } from './shared';
 
 const InspectorLayoutContext = React.createContext(false);
+type RowMeasurement = () => (() => void) | null;
+
+/** Use the same option minimum before stacking and before replacing segments with a menu. */
+export function measureSegmentWidth(context: CanvasRenderingContext2D, labels: readonly string[]) {
+  return (
+    labels.reduce(
+      (width, label) => width + Math.max(32, context.measureText(label).width + 12),
+      0
+    ) +
+    2 * (labels.length - 1)
+  );
+}
+
+/** One mounted inspector batches connected layout reads before row writes. */
+function createInspectorRowFitting(invalidate: () => void) {
+  const pending = new Set<RowMeasurement>();
+  let frame: number | null = null;
+  let mounted = false;
+  let requested = false;
+  const flush = () => {
+    if (frame !== null) cancelAnimationFrame(frame);
+    frame = null;
+    requested = false;
+    const jobs = [...pending];
+    pending.clear();
+    const changes = jobs.map((measure) => measure());
+    for (const apply of changes) apply?.();
+  };
+  return {
+    beforePaint(measure: RowMeasurement) {
+      pending.add(measure);
+      // Descendant-only mounts do not run this provider's layout effect by themselves.
+      if (mounted && !requested) {
+        requested = true;
+        invalidate();
+      }
+    },
+    schedule(measure: RowMeasurement) {
+      pending.add(measure);
+      if (frame === null) frame = requestAnimationFrame(flush);
+    },
+    cancel(measure: RowMeasurement) {
+      pending.delete(measure);
+      if (!pending.size && frame !== null) {
+        cancelAnimationFrame(frame);
+        frame = null;
+      }
+    },
+    commit() {
+      mounted = true;
+      flush();
+    },
+    dispose() {
+      mounted = false;
+      pending.clear();
+      if (frame !== null) cancelAnimationFrame(frame);
+      frame = null;
+      requested = false;
+    },
+  };
+}
+const InspectorRowFittingContext = React.createContext<ReturnType<
+  typeof createInspectorRowFitting
+> | null>(null);
 
 /** Enables the canonical parameter construction for a migrated inspector owner. */
 export function InspectorLayout({ children }: { children: React.ReactNode }) {
-  return <InspectorLayoutContext value>{children}</InspectorLayoutContext>;
+  const [, invalidate] = React.useReducer((revision: number) => revision + 1, 0);
+  const [fitting] = React.useState(() => createInspectorRowFitting(invalidate));
+  React.useLayoutEffect(() => fitting.commit());
+  React.useLayoutEffect(() => () => fitting.dispose(), [fitting]);
+  return (
+    <InspectorLayoutContext value>
+      <InspectorRowFittingContext value={fitting}>{children}</InspectorRowFittingContext>
+    </InspectorLayoutContext>
+  );
 }
 
 /** Opts a surface into canonical inspector geometry and pointer-aware keyboard focus. */
@@ -72,107 +144,31 @@ export function useInspectorLayout() {
   return React.useContext(InspectorLayoutContext);
 }
 
-/** One geometry owner fits ordinary name/value rows before stacking the value. */
+/** Internal measurement port for controls in this mounted inspector. */
+export function useInspectorFitting() {
+  return React.useContext(InspectorRowFittingContext);
+}
+
+/** Keep the value in its column unless the field declares a stacked layout. */
 export function InspectorParameterRow(props: {
   label: string;
   labelAccessory?: React.ReactNode;
   labelModified?: boolean | undefined;
   children: React.ReactNode;
-  valueMinimum?: number;
-  valueText?: string | undefined;
-  valueOptions?: readonly string[] | undefined;
   stacked?: boolean;
-  keepInline?: boolean;
   className?: string | undefined;
   dataUi?: string;
   onActivate?(): void;
 }) {
-  const row = React.useRef<HTMLDivElement>(null);
-  const name = React.useRef<HTMLSpanElement>(null);
-  const hasLabelAccessory = Boolean(props.labelAccessory);
-  const valueOptionsKey = JSON.stringify(props.valueOptions ?? []);
-  const [stacked, setStacked] = React.useState(props.stacked ?? false);
-  const deferredFit = React.useRef<number | null>(null);
-  const fit = React.useCallback(() => {
-    const element = row.current;
-    const label = name.current;
-    if (!element || !label || !element.clientWidth || props.stacked || props.keepInline) return;
-    if (element.matches(':focus-within') || element.querySelector('[aria-expanded="true"]')) return;
-    // Blur can shrink a preceding row and move the pressed command before click.
-    if (element.ownerDocument.querySelector(':active')) {
-      if (deferredFit.current === null)
-        deferredFit.current = requestAnimationFrame(() => {
-          deferredFit.current = null;
-          fit();
-        });
-      return;
-    }
-    const context = document.createElement('canvas').getContext('2d');
-    if (!context) return;
-    context.font = getComputedStyle(label).font;
-    const available = element.clientWidth - 16;
-    const accessoryWidth = hasLabelAccessory
-      ? (label.querySelector('[data-parameter-label-accessory]')?.getBoundingClientRect().width ??
-        0)
-      : 0;
-    const labelWidth =
-      context.measureText(props.label).width + (accessoryWidth ? accessoryWidth + 4 : 0);
-    const valueOptions: unknown = JSON.parse(valueOptionsKey);
-    if (
-      !Array.isArray(valueOptions) ||
-      !valueOptions.every((value): value is string => typeof value === 'string')
-    )
-      return;
-    const valueWidth = Math.max(
-      props.valueMinimum ?? 100,
-      props.valueText ? context.measureText(props.valueText).width + 40 : 0,
-      valueOptions.length
-        ? valueOptions.reduce((width, text) => width + context.measureText(text).width + 12, 0) +
-            4 +
-            2 * (valueOptions.length - 1)
-        : 0
-    );
-    setStacked(labelWidth > (available - 8) * 0.45 || valueWidth > (available - 8) * 0.55);
-  }, [
-    props.label,
-    hasLabelAccessory,
-    props.stacked,
-    props.keepInline,
-    props.valueMinimum,
-    props.valueText,
-    valueOptionsKey,
-  ]);
-  React.useLayoutEffect(() => {
-    fit();
-    const element = row.current;
-    if (!element || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(fit);
-    observer.observe(element);
-    let disposed = false;
-    void document.fonts?.ready.then(() => {
-      if (!disposed) fit();
-    });
-    return () => {
-      disposed = true;
-      observer.disconnect();
-    };
-  }, [fit]);
-  React.useEffect(
-    () => () => {
-      if (deferredFit.current !== null) cancelAnimationFrame(deferredFit.current);
-    },
-    []
-  );
   const isActivation = (target: EventTarget) =>
     target instanceof Element && !target.closest('button,input,textarea,select,a,[role="slider"]');
   return (
     <div
-      ref={row}
       data-ui={props.dataUi}
-      data-layout={props.stacked || stacked ? 'stacked' : 'inline'}
+      data-compact-select-menu-bounds="parameter"
+      data-layout={props.stacked ? 'stacked' : 'inline'}
       data-activates={props.onActivate ? 'true' : undefined}
       className={cx('sniptale-parameter-row', props.className)}
-      onBlurCapture={() => queueMicrotask(fit)}
       onPointerDown={(event) => {
         if (props.onActivate && event.button === 0 && isActivation(event.target))
           event.preventDefault();
@@ -186,7 +182,7 @@ export function InspectorParameterRow(props: {
       }}
     >
       <span
-        ref={name}
+        data-compact-select-menu-label=""
         title={props.label}
         className={cx(
           'sniptale-parameter-name',

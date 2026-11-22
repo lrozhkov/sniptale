@@ -465,6 +465,14 @@ it('validates document closure and matches pending image publication by its nati
 it('updates shared image metadata only when original bytes match', async () => {
   const f = setup();
   await applyPreparedImageReplica(f.input);
+  const native = parseMediaLibraryEntry(f.table('media_library').get(f.input.media.id));
+  if (!native) throw new Error('Expected stored image.');
+  const originalSaveId = crypto.randomUUID();
+  f.table('media_library').set(f.input.media.id, {
+    ...native,
+    savedIndependently: false,
+    originalSaveId,
+  });
   const project = createVideoProjectEntryWithMediaClip({ id: 'dependent' });
   project.project.assets[0]!.source = { kind: 'library-asset', mediaId: f.input.media.id };
   f.table('video_projects').set(project.id, project);
@@ -490,6 +498,8 @@ it('updates shared image metadata only when original bytes match', async () => {
     filename: 'renamed.png',
     lifecycle: { trashedAt: 2 },
     workspaceRevision: 2,
+    savedIndependently: false,
+    originalSaveId,
   });
   expect(f.table('video_projects').get(project.id)).toEqual(project);
   const before = structuredClone(f.rows);
@@ -711,28 +721,54 @@ it('accepts unchanged unloaded originals borrowed by a project only after checki
   expect(f.table('asset_residency').has(f.copy.id)).toBe(false);
 });
 
-it('retains the replaceability guard when an unloaded borrowed original changes', async () => {
-  const f = await unloadedPredecessor();
-  const borrower = createVideoProjectEntryWithMediaClip({ id: 'borrower' });
-  borrower.project.assets[0]!.source = { kind: 'library-asset', mediaId: f.media.id };
-  f.table('video_projects').set(borrower.id, borrower);
-  io.read.mockImplementation(
-    async (ref: { size: number; mimeType: string; assetId: string }, filename: string) =>
-      new File(
-        [
-          ref.assetId === 'next-original'
-            ? new TextEncoder().encode('changed!')
-            : new Uint8Array(ref.size),
-        ],
-        filename,
-        { type: ref.mimeType }
-      )
-  );
-  const before = structuredClone(f.rows);
-  await expect(applyPreparedImageReplica(f.next)).rejects.toMatchObject({
-    name: 'MediaAssetDeletionBlockedError',
+it.each(['video', 'image'] as const)(
+  'retains the replaceability guard for an unloaded original borrowed by %s',
+  async (consumer) => {
+    const f = await unloadedPredecessor();
+    if (consumer === 'video') {
+      const borrower = createVideoProjectEntryWithMediaClip({ id: 'borrower' });
+      borrower.project.assets[0]!.source = { kind: 'library-asset', mediaId: f.media.id };
+      f.table('video_projects').set(borrower.id, borrower);
+    } else {
+      f.table('image_workspaces').set('borrower', {
+        ...f.next.workspace,
+        aggregateId: 'borrower',
+        sourceMediaId: f.media.id,
+      });
+    }
+    io.read.mockImplementation(
+      async (ref: { size: number; mimeType: string; assetId: string }, filename: string) =>
+        new File(
+          [
+            ref.assetId === 'next-original'
+              ? new TextEncoder().encode('changed!')
+              : new Uint8Array(ref.size),
+          ],
+          filename,
+          { type: ref.mimeType }
+        )
+    );
+    const before = structuredClone(f.rows);
+    await expect(applyPreparedImageReplica(f.next)).rejects.toMatchObject({
+      name: 'MediaAssetDeletionBlockedError',
+    });
+    expect(f.rows).toEqual(before);
+  }
+);
+
+it('rejects a linked workspace and ignores local Original claims on the legacy image replica', () => {
+  const { input } = setup();
+  const accepted = parseApplyPreparedImageReplicaInput({
+    ...input,
+    media: { ...input.media, savedIndependently: false },
   });
-  expect(f.rows).toEqual(before);
+  expect(accepted?.media).not.toHaveProperty('savedIndependently');
+  expect(
+    parseApplyPreparedImageReplicaInput({
+      ...input,
+      workspace: { ...input.workspace, sourceMediaId: 'another-original' },
+    })
+  ).toBeNull();
 });
 
 it('refuses delayed incoming completion after a controlled native generation replacement', async () => {

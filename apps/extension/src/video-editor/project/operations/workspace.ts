@@ -1,4 +1,5 @@
 import { ensureNativeEditingRootAvailable } from '../../../workflows/sync-transfer/editing-admission';
+import { loadVideoReviewSource } from '../../../workflows/video-review/source';
 import type { LibraryProjectBinding } from '../../../composition/persistence/projects/known-library-source';
 import {
   reviewProjectBookendReferences,
@@ -7,7 +8,10 @@ import {
 import { verifyReviewAnnotationEffectSnapshot } from '../../../features/video/review/annotation-effects/validation';
 import type { ReviewAnnotationEffectSnapshot } from '../../../features/video/review/annotation-effects/types';
 import type { VideoProjectEffectSnapshot } from '../../../features/video/project/effect-instance/types';
-import type { VideoWorkspaceSnapshot } from '../../../composition/persistence/review-workspaces/contracts';
+import type {
+  VideoReviewOriginalIdentity,
+  VideoWorkspaceSnapshot,
+} from '../../../composition/persistence/review-workspaces/contracts';
 import {
   replayReviewHistory,
   reviewDocumentBaseline,
@@ -43,9 +47,16 @@ import { parseHydratableVideoProject } from '../../../features/video/project/val
 import type { RecordingSidecarVideoProjectInput } from '../../../features/video/project/factories/recording-sidecar';
 import { getRecordingTelemetry } from '../../../composition/persistence/recordings/telemetry';
 import { getRecording } from '../../../composition/persistence/recordings/index';
-import { getVideoProject, getProjectAsset } from '../../../composition/persistence/projects/index';
-import { resolveVideoProjectReadResult } from '../../../composition/persistence/projects/contracts';
-import { commitVideoProjectMutation } from '../../../composition/persistence/projects/index-mutations';
+import {
+  getVideoProject,
+  getVideoProjectWorkspace,
+  getProjectAsset,
+} from '../../../composition/persistence/projects/index';
+import {
+  type VideoProjectWorkspaceReadResult,
+  resolveVideoProjectReadResult,
+} from '../../../composition/persistence/projects/contracts';
+import { commitVideoProjectWorkspaceMutation } from '../../../composition/persistence/projects/index-mutations';
 import { translate } from '../../../platform/i18n';
 import { buildWebcamRecordingId } from '@sniptale/runtime-contracts/video/types/sidecar';
 import {
@@ -58,6 +69,29 @@ import {
   normalizeRecordingActionEventsToProjectSpace,
   normalizeRecordingCursorTrackToProjectSpace,
 } from './telemetry';
+
+type OpenedVideoProjectWorkspace = Extract<VideoProjectWorkspaceReadResult, { status: 'ready' }>;
+
+/** New roots carry the exact publication ACK; no later read can adopt a replacement identity. */
+async function commitNewProject(
+  project: VideoProject,
+  options: Pick<
+    Parameters<typeof commitVideoProjectWorkspaceMutation>[1],
+    'expectedReviewWorkspace' | 'expectedReviewOriginal' | 'libraryBindings'
+  > = {}
+): Promise<OpenedVideoProjectWorkspace> {
+  const committed = await commitVideoProjectWorkspaceMutation(project, {
+    ...options,
+    expectedProject: null,
+    expectedWorkspaceRevision: null,
+  });
+  return {
+    status: 'ready',
+    project: committed.project,
+    workspaceRevision: committed.workspaceRevision,
+    history: { status: 'absent' },
+  };
+}
 
 /** Carries a safe refusal category across the operation-to-bootstrap boundary. */
 export class ReviewProjectTransferError extends Error {
@@ -167,7 +201,9 @@ function buildWebcamSidecarVideo(
 /**
  * Creates a new project seeded from an existing recording entry.
  */
-async function createProjectFromRecordingId(sourceRecordingId: string): Promise<VideoProject> {
+async function createProjectFromRecordingId(
+  sourceRecordingId: string
+): Promise<OpenedVideoProjectWorkspace> {
   const entry = await getRecording(sourceRecordingId);
 
   if (!entry) {
@@ -186,7 +222,7 @@ async function createProjectFromRecordingId(sourceRecordingId: string): Promise<
     .slice(1)
     .map((camera) => buildWebcamSidecarVideo(camera, sourceRecordingId));
   const nextProject = await buildRecordingProject(asset, entry, sourceRecordingId, sidecarVideos);
-  return commitVideoProjectMutation(nextProject, { baseRevision: null });
+  return commitNewProject(nextProject);
 }
 
 /** Resolve existing immutable media before the new root claims its references. */
@@ -449,11 +485,33 @@ async function createProjectFromReview(
   aggregateId: string,
   revision: number,
   createdAt: number,
-  sourceAssetId: string
-): Promise<VideoProject> {
-  const snapshot = await readVideoWorkspace(aggregateId);
-  if (!matchesReviewSnapshot(snapshot, aggregateId, revision, createdAt, sourceAssetId))
-    throw new Error('Review project changed before transfer.');
+  sourceAssetId: string,
+  original?: VideoReviewOriginalIdentity
+): Promise<OpenedVideoProjectWorkspace> {
+  let snapshot: VideoWorkspaceSnapshot;
+  if (original) {
+    await ensureNativeEditingRootAvailable({ rootKind: 'media', rootId: original.mediaId });
+    const loaded = await loadVideoReviewSource(
+      aggregateId,
+      new AbortController().signal,
+      original.mediaId
+    );
+    if (
+      loaded.original?.mediaId !== original.mediaId ||
+      loaded.original.createdAt !== original.createdAt ||
+      loaded.original.generation !== original.generation ||
+      loaded.snapshot.workspace.aggregateId !== aggregateId ||
+      loaded.snapshot.workspace.revision !== revision ||
+      loaded.snapshot.workspace.sourceAssetId !== sourceAssetId
+    )
+      throw new Error('Review original changed before transfer.');
+    snapshot = loaded.snapshot;
+  } else {
+    const saved = await readVideoWorkspace(aggregateId);
+    if (!matchesReviewSnapshot(saved, aggregateId, revision, createdAt, sourceAssetId))
+      throw new Error('Review project changed before transfer.');
+    snapshot = saved;
+  }
   const document = replayReviewHistory(
     snapshot.workspace.history,
     snapshot.workspace.cursor,
@@ -523,20 +581,15 @@ async function createProjectFromReview(
               : 'settings';
     throw new ReviewProjectTransferError(reason);
   }
-  const latest = await readVideoWorkspace(aggregateId);
-  if (
-    !matchesReviewSnapshot(
-      latest,
-      aggregateId,
-      revision,
-      createdAt,
-      snapshot.workspace.sourceAssetId
-    )
-  )
-    throw new Error('Review project changed before transfer.');
-  return commitVideoProjectMutation(result.project, {
-    baseRevision: null,
-    expectedReviewWorkspace: snapshot.workspace,
+  if (!original) {
+    const latest = await readVideoWorkspace(aggregateId);
+    if (!matchesReviewSnapshot(latest, aggregateId, revision, createdAt, sourceAssetId))
+      throw new Error('Review project changed before transfer.');
+  }
+  return commitNewProject(result.project, {
+    ...(original
+      ? { expectedReviewOriginal: { ...original, assetId: sourceAssetId } }
+      : { expectedReviewWorkspace: snapshot.workspace }),
     ...(libraryBindings.length ? { libraryBindings } : {}),
   });
 }
@@ -544,10 +597,10 @@ async function createProjectFromReview(
 /**
  * Creates and persists an empty project workspace.
  */
-export async function createBlankProject(name?: string): Promise<VideoProject> {
+export async function createBlankProject(name?: string): Promise<OpenedVideoProjectWorkspace> {
   const nextProject = createEmptyVideoProject(name);
 
-  return commitVideoProjectMutation(nextProject, { baseRevision: null });
+  return commitNewProject(nextProject);
 }
 
 /**
@@ -556,19 +609,20 @@ export async function createBlankProject(name?: string): Promise<VideoProject> {
 export async function loadInitialProjectFromLocation(): Promise<{
   project: VideoProject | null;
   recordingId: string | null;
+  workspace: OpenedVideoProjectWorkspace | null;
 }> {
   const params = new URLSearchParams(window.location.search);
   const projectId = params.get('project');
   const rootRecordingId = params.get('id');
   const reviewId = params.get('review');
-  let project: VideoProject | undefined;
+  let workspace: OpenedVideoProjectWorkspace | undefined;
   let recordingId = rootRecordingId;
 
   if (projectId) {
-    project = await openPersistedProject(projectId);
+    workspace = await openPersistedProject(projectId);
   }
 
-  if (!project && reviewId !== null) {
+  if (!workspace && reviewId !== null) {
     const revisionInput = params.get('reviewRevision');
     const createdInput = params.get('reviewCreatedAt');
     const sourceAssetId = params.get('reviewSourceAssetId');
@@ -585,28 +639,58 @@ export async function loadInitialProjectFromLocation(): Promise<{
       !Number.isSafeInteger(createdAt)
     )
       throw new Error('Review project transfer target is invalid.');
-    project = await createProjectFromReview(reviewId, revision, createdAt, sourceAssetId);
-    recordingId = project.baseRecordingId;
+    const originalId = params.get('reviewOriginalId');
+    const originalCreatedAtInput = params.get('reviewOriginalCreatedAt');
+    const originalGeneration = params.get('reviewOriginalGeneration');
+    let original: VideoReviewOriginalIdentity | undefined;
+    if (originalId !== null || originalCreatedAtInput !== null || originalGeneration !== null) {
+      const originalCreatedAt =
+        originalCreatedAtInput !== null && /^\d+$/.test(originalCreatedAtInput)
+          ? Number(originalCreatedAtInput)
+          : NaN;
+      if (
+        !originalId ||
+        originalId.length > 256 ||
+        originalId === reviewId ||
+        !Number.isSafeInteger(originalCreatedAt) ||
+        originalGeneration === null ||
+        originalGeneration.length > 200
+      )
+        throw new Error('Review original transfer target is invalid.');
+      original = {
+        mediaId: originalId,
+        createdAt: originalCreatedAt,
+        generation: originalGeneration || null,
+      };
+    }
+    workspace = await createProjectFromReview(
+      reviewId,
+      revision,
+      createdAt,
+      sourceAssetId,
+      original
+    );
+    recordingId = workspace.project.baseRecordingId;
   }
 
-  if (!project && rootRecordingId) {
-    project = await createProjectFromRecordingId(rootRecordingId);
+  if (!workspace && rootRecordingId) {
+    workspace = await createProjectFromRecordingId(rootRecordingId);
   }
 
   return {
-    project: project ?? null,
-    recordingId: recordingId ?? project?.baseRecordingId ?? null,
+    project: workspace?.project ?? null,
+    recordingId: recordingId ?? workspace?.project.baseRecordingId ?? null,
+    workspace: workspace ?? null,
   };
 }
 
-export async function openPersistedProject(projectId: string): Promise<VideoProject> {
-  const result = await getVideoProject(projectId);
-  if (result.status === 'ready' && result.lifecycle?.trashedAt !== undefined)
+export async function openPersistedProject(
+  projectId: string
+): Promise<OpenedVideoProjectWorkspace> {
+  const initial = await getVideoProject(projectId);
+  if (initial.status === 'ready' && initial.lifecycle?.trashedAt !== undefined)
     throw new Error('Video project is unavailable.');
-  const storedProject = resolveVideoProjectReadResult(result);
-  const persistedProject = storedProject ? parseHydratableVideoProject(storedProject) : null;
-
-  if (!persistedProject) {
+  if (!resolveVideoProjectReadResult(initial))
     throw new Error(
       [
         translate('videoEditor.app.projectNotFoundPrefix'),
@@ -614,26 +698,35 @@ export async function openPersistedProject(projectId: string): Promise<VideoProj
         translate('videoEditor.app.projectNotFoundSuffix'),
       ].join('')
     );
-  }
-
   await ensureNativeEditingRootAvailable({ rootKind: 'video-project', rootId: projectId });
-
-  const retainedProject =
-    result.status === 'ready' && result.lifecycle?.storageClass === 'temporary'
-      ? await commitVideoProjectMutation(persistedProject, {
-          baseRevision: persistedProject.updatedAt,
-          expectedWorkspaceRevision: result.workspaceRevision,
-        })
-      : persistedProject;
-  return retainedProject;
+  const result = await getVideoProjectWorkspace(projectId);
+  const storedProject = resolveVideoProjectReadResult(result);
+  const persistedProject = storedProject ? parseHydratableVideoProject(storedProject) : null;
+  if (result.status !== 'ready' || !persistedProject || result.lifecycle?.trashedAt !== undefined)
+    throw new Error('Video project is unavailable.');
+  if (result.lifecycle?.storageClass !== 'temporary')
+    return { ...result, project: persistedProject };
+  const committed = await commitVideoProjectWorkspaceMutation(persistedProject, {
+    expectedProject: result.project,
+    expectedWorkspaceRevision: result.workspaceRevision,
+  });
+  return {
+    status: 'ready',
+    project: committed.project,
+    workspaceRevision: committed.workspaceRevision,
+    history: result.history,
+  };
 }
 
 /** Copies the editable document; immutable media references remain shared and reference-counted. */
-export async function copyProject(project: VideoProject, name: string): Promise<VideoProject> {
+export async function copyProject(
+  project: VideoProject,
+  name: string
+): Promise<OpenedVideoProjectWorkspace> {
   const copy = structuredClone(project);
   copy.id = crypto.randomUUID();
   copy.name = name;
   copy.createdAt = Date.now();
   copy.updatedAt = copy.createdAt;
-  return commitVideoProjectMutation(copy, { baseRevision: null });
+  return commitNewProject(copy);
 }

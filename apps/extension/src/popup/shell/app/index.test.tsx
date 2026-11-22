@@ -34,6 +34,7 @@ vi.mock('../startup/resource', async (importOriginal) => ({
 vi.mock('../../../platform/i18n/locale/state', () => ({
   ensureLocaleHydrated: vi.fn().mockResolvedValue(undefined),
   getCurrentLocale: () => 'ru',
+  readPreparedTranslation: (_locale: string, key: string) => key,
   subscribeToLocaleChanges: () => () => undefined,
 }));
 vi.mock('../../../ui/theme', () => ({

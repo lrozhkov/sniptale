@@ -1,10 +1,25 @@
 // @vitest-environment jsdom
+
+import {
+  videoeditorFixtureMessages,
+  prepareVideoEditorTranslations,
+} from '../../testing/translations.test-support';
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: Parameters<typeof videoeditorFixtureMessages>[0]) =>
+    videoeditorFixtureMessages(locale)
+  ),
+}));
+
+beforeAll(async () => {
+  await prepareVideoEditorTranslations('ru');
+});
 import { createGlTransitionSelection } from '../../../features/video/project/transition/gl-catalog';
 
 import { act } from 'react';
 import { readFileSync } from 'node:fs';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import type { EffectBundleCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
 import { translate } from '../../../platform/i18n';

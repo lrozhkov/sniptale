@@ -41,6 +41,45 @@ export function createZodRuntimeFallbackPlugin(): Plugin {
   };
 }
 
+/** Keep the fixed effect sandbox worker inside its blob-only CSP. */
+export function createBlobOnlyInlineWorkerPlugin(): Plugin {
+  return {
+    name: 'sniptale:blob-only-effect-worker',
+    apply: 'build',
+    enforce: 'post',
+    transform(source, id) {
+      if (
+        !id
+          .replaceAll('\\', '/')
+          .endsWith('/apps/extension/src/effect-runtime-sandbox/worker/index.ts?worker&inline')
+      )
+        return null;
+      const firstLineEnd = source.indexOf('\n');
+      const declaration = source.slice(0, firstLineEnd).trimEnd();
+      const wrapper = source.slice(firstLineEnd);
+      if (
+        !declaration.startsWith('const jsContent = ') ||
+        !declaration.endsWith(';') ||
+        !wrapper.includes('export default function WorkerWrapper(options)') ||
+        wrapper.includes('type: "module"')
+      )
+        throw new Error('Fixed effect worker wrapper changed; review its blob-only build adapter.');
+      // Worker construction captures the local script before the URL is revoked. There is
+      // no data-URL retry: preserve the original failure under the existing sandbox CSP.
+      return {
+        code: `${declaration}
+        const blob = new Blob([jsContent], { type: 'text/javascript;charset=utf-8' });
+        export default function WorkerWrapper(options) {
+          const url = URL.createObjectURL(blob);
+          try { return new Worker(url, { name: options?.name }); }
+          finally { URL.revokeObjectURL(url); }
+        }`,
+        map: { mappings: '' },
+      };
+    },
+  };
+}
+
 export function createReleaseSafeDependencyAliasPlugin(repositoryRoot: string): EsbuildPlugin {
   const aliases = new Map([
     ['jszip', join(repositoryRoot, 'node_modules/jszip/lib/index.js')],
@@ -83,6 +122,54 @@ export function assertBundleHasNoImports(label: string, imports: Array<{ path: s
     `${label} bundle must be self-contained; unresolved imports: ${imports
       .map((importEntry) => importEntry.path)
       .join(', ')}`
+  );
+}
+
+/** Reject full project admission dependencies from the page content runtime. */
+export function assertContentRuntimeMessagingInputsAreCompact(
+  inputs: Record<string, unknown>
+): void {
+  const forbiddenInputs = Object.keys(inputs).filter((input) => {
+    const path = input.replaceAll('\\', '/');
+    return (
+      /(?:^|\/)features\/video\/project\/validation\/(?:index|root)\.ts$/u.test(path) ||
+      path.endsWith('/transition/gl-catalog.generated.json') ||
+      path.endsWith('/animation-template/lottie-schema.generated.js')
+    );
+  });
+  if (forbiddenInputs.length === 0) return;
+  throw new Error(
+    `Content runtime must not include full video project admission dependencies: ${forbiddenInputs.join(', ')}`
+  );
+}
+
+/** Keep authored catalogs and all-language projections out of injected startup JavaScript. */
+export function assertInjectedI18nInputsAreScoped(inputs: Record<string, unknown>): void {
+  const forbiddenInputs = Object.keys(inputs).filter((input) => {
+    const path = input.replaceAll('\\', '/');
+    return (
+      isAuthoredI18nCatalogInput(path) ||
+      ['sniptale-i18n:popup', 'sniptale-i18n:popup-shell', 'sniptale-i18n:content-shim'].includes(
+        path
+      )
+    );
+  });
+  if (forbiddenInputs.length === 0) return;
+  const description =
+    'Injected startup JavaScript must not import authored catalogs or all-language projections';
+  throw new Error(`${description}: ${forbiddenInputs.join(', ')}`);
+}
+
+/** Identify authored catalog modules in either bundler's normalized input paths. */
+export function isAuthoredI18nCatalogInput(input: string): boolean {
+  const path = input.replaceAll('\\', '/').split('?')[0] ?? '';
+  const [source, platform, i18n, catalogs, fileName] = path.split('/').slice(-5);
+  return (
+    source === 'src' &&
+    platform === 'platform' &&
+    i18n === 'i18n' &&
+    catalogs === 'catalogs' &&
+    fileName?.endsWith('.json') === true
   );
 }
 

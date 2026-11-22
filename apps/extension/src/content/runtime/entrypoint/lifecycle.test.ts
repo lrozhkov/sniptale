@@ -6,6 +6,7 @@ import {
   disposeExistingContentRuntime,
   hasRegisteredContentRuntimeCleanup,
   registerContentRuntimeCleanup,
+  registerContentRuntimePreparation,
   runWhenContentBodyReady,
 } from './lifecycle';
 import {
@@ -21,6 +22,7 @@ type ContentRuntimeGlobal = typeof globalThis & {
 const runtimeGlobal = globalThis as ContentRuntimeGlobal;
 
 beforeEach(() => {
+  disposeExistingContentRuntime();
   delete runtimeGlobal[CONTENT_RUNTIME_CLEANUP_KEY];
 });
 
@@ -141,4 +143,30 @@ describe('guarded full runtime handback', () => {
     expect(oldCleanup).not.toHaveBeenCalled();
     expect(newCleanup).not.toHaveBeenCalled();
   });
+});
+
+it('replaces pending preparation without disposing the current valid runtime', () => {
+  const activeCleanup = vi.fn();
+  registerContentRuntimeCleanup(activeCleanup);
+  const oldCancel = vi.fn();
+  const oldFinish = registerContentRuntimePreparation(oldCancel);
+  const nextCancel = vi.fn();
+  const nextFinish = registerContentRuntimePreparation(nextCancel);
+  expect(oldCancel).toHaveBeenCalledOnce();
+  expect(activeCleanup).not.toHaveBeenCalled();
+  expect(oldFinish()).toBe(false);
+  expect(nextFinish()).toBe(true);
+  expect(nextFinish()).toBe(false);
+  expect(hasRegisteredContentRuntimeCleanup()).toBe(true);
+  expect(nextCancel).not.toHaveBeenCalled();
+});
+
+it('cancels pending preparation before disposing active runtime', () => {
+  const pending = vi.fn();
+  const active = vi.fn(() => expect(pending).toHaveBeenCalledOnce());
+  registerContentRuntimeCleanup(active);
+  const finish = registerContentRuntimePreparation(pending);
+  disposeExistingContentRuntime();
+  expect(finish()).toBe(false);
+  expect(active).toHaveBeenCalledOnce();
 });

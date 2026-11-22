@@ -265,7 +265,7 @@ async function verifyArtifactPersistenceWithoutDocument() {
     stepDocument: null,
   });
 
-  expect(txPutMock).toHaveBeenCalledTimes(7 + project.items.length);
+  expect(txPutMock).toHaveBeenCalledTimes(8 + project.items.length);
 }
 
 async function verifyStaleArtifactPersistenceRejectsBeforeWrites() {

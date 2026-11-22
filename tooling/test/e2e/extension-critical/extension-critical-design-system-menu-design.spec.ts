@@ -1,6 +1,6 @@
 import { writeFile } from 'node:fs/promises';
 import { test, expect } from '../support/extension-fixture';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 const compositions = [
   { locale: 'ru', theme: 'light', viewport: { width: 1280, height: 560 } },
@@ -52,11 +52,62 @@ for (const composition of compositions) {
       'data-theme',
       composition.theme
     );
+    const search = page.getByPlaceholder(
+      translate('designSystem.page.searchPlaceholder', composition.locale),
+      { exact: true }
+    );
+    await search.fill('product.ui.toolbar-menu');
+    await page.screenshot({ path: info.outputPath('catalog-search.png'), fullPage: false });
+    const searchFrame = search.locator('..');
+    await expect(searchFrame).toHaveCSS('height', '32px');
+    await expect(searchFrame).toHaveCSS('border-top-width', '1px');
+    await expect(searchFrame).toHaveCSS('box-shadow', 'none');
+    const clearSearch = searchFrame.getByRole('button');
+    await expect(clearSearch).toHaveCSS('width', '24px');
+    await clearSearch.click();
+    await expect(search).toHaveValue('');
+    await expect(search).toBeFocused();
+    await search.fill('product.ui.toolbar-menu');
+
     await page
-      .getByPlaceholder(translate('designSystem.page.searchPlaceholder', composition.locale), {
+      .getByRole('button', {
+        name: translate('designSystem.page.filtersButton', composition.locale),
         exact: true,
       })
-      .fill('product.ui.toolbar-menu');
+      .click();
+    const usage = page.getByPlaceholder(
+      translate('designSystem.page.usageSearchPlaceholder', composition.locale),
+      { exact: true }
+    );
+    await usage.fill('missing-surface-9876');
+    const noUsages = page.getByText(
+      translate('designSystem.page.usageSearchEmpty', composition.locale),
+      { exact: true }
+    );
+    await expect(noUsages).toBeVisible();
+    await expect(usage.locator('..')).toHaveCSS('height', '32px');
+    await page.screenshot({ path: info.outputPath('catalog-usage-filter.png'), fullPage: false });
+    await usage.locator('..').getByRole('button').click();
+    await expect(usage).toHaveValue('');
+    await expect(usage).toBeFocused();
+    await expect(noUsages).toHaveCount(0);
+    await expect(search).toHaveValue('product.ui.toolbar-menu');
+    await page
+      .getByRole('button', {
+        name: translate('designSystem.page.hideFiltersButton', composition.locale),
+        exact: true,
+      })
+      .click();
+    if (composition.locale === 'ru' && composition.theme === 'light') {
+      for (const width of [1100, 1279, 1280, 1281]) {
+        await page.setViewportSize({ ...composition.viewport, width });
+        await expect(searchFrame).toHaveCSS('height', '32px');
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+          width
+        );
+      }
+      await page.setViewportSize(composition.viewport);
+    }
     const menus = page.locator('.sniptale-toolbar-menu');
     await expect(menus).toHaveCount(3);
     await expect(

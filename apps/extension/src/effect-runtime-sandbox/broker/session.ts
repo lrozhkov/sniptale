@@ -15,7 +15,8 @@ import { EffectRuntimePreparationError, prepareEffectRuntimeWorkerRequest } from
 import { createEffectRuntimeDocumentCache } from './cache/documents';
 import { createEffectRuntimeAssetSelectionCache } from './cache/asset-selections';
 import { parseEffectRuntimeRenderRequest } from './request-boundary';
-import { createEffectRuntimeWorkerSession, type EffectRuntimeWorkerLike } from './worker-request';
+import { createEffectRuntimeWorkerSession } from './worker-request';
+import type { EffectRuntimeWorkerLike } from './worker-startup';
 
 export interface EffectRuntimeBrokerSession {
   execute(value: unknown): Promise<EffectRuntimeSceneResult>;
@@ -52,18 +53,24 @@ export function createEffectRuntimeBrokerSession(
   )
     workerSession.preload();
   return {
-    execute: (value) =>
-      executeSessionRequest(
+    execute: (value) => {
+      if (workerSession.unavailable) {
+        closeEffectRuntimeBitmaps(value);
+        return Promise.resolve(workerSession.takeUnavailableFailure(value));
+      }
+      return executeSessionRequest(
         value,
         dependencies,
         state,
         workerSession.execute,
         documentCache,
         assetSelectionCache
-      ),
+      );
+    },
     snapshot: () => ({
       activeRequests: state.activeRequests,
       circuitOpen:
+        workerSession.unavailable ||
         state.consecutiveFailures >= EFFECT_RUNTIME_RESOURCE_LIMITS.maxConsecutiveFailures,
       consecutiveFailures: state.consecutiveFailures,
     }),

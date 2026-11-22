@@ -10,7 +10,7 @@ import {
   parsePhysicalDeleteAssetOperation,
   parseArchiveRestoreSession,
 } from './guards';
-import type { AssetOwner, AssetRef, ArchiveRestoreSession } from './contracts';
+import type { ArchiveRestoreSession, AssetOwner, AssetRetentionSnapshot } from './contracts';
 import { collectBackupRollbackAssetIds } from './retention-claims';
 import {
   SYNC_CAPTURE_STORE,
@@ -26,6 +26,7 @@ import {
   STORE_NAME,
   WEB_SNAPSHOTS_STORE,
   MEDIA_LIBRARY_STORE,
+  VIDEO_PROJECTS_STORE,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 
@@ -34,19 +35,7 @@ const logger = createLogger({ namespace: 'AssetRetention' });
 export async function collectDurableAssetSnapshot(
   db?: Awaited<ReturnType<typeof import('../infrastructure/indexed-db/core').initDB>>,
   signal?: AbortSignal
-): Promise<{
-  authorityValid: boolean;
-  archiveSessions: ArchiveRestoreSession[];
-  embeddedBinaryMetadata: string[];
-  expectedOwnerAssets: Map<string, string>;
-  expectedOwners: AssetOwner[];
-  owners: AssetOwner[];
-  operationIds: Set<string>;
-  protectedRollbackAssetIds: Set<string>;
-  protectedSyncCaptureAssetIds: Set<string>;
-  publishedProjectAssetIds: Set<string>;
-  refs: AssetRef[];
-}> {
+): Promise<AssetRetentionSnapshot> {
   if (!db)
     return runWithIndexedDbMutation((connection) =>
       collectDurableAssetSnapshot(connection, signal)
@@ -69,6 +58,7 @@ export async function collectDurableAssetSnapshot(
   for (const store of [
     'editor_vector_library',
     STORE_NAME,
+    VIDEO_PROJECTS_STORE,
     PROJECT_ASSETS_STORE,
     PROJECT_EXPORTS_STORE,
     SCENARIO_ASSETS_STORE,

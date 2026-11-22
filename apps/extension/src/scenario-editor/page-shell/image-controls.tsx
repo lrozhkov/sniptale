@@ -352,7 +352,6 @@ function GuideImageGeometryFields({
           unit="px"
           min={1}
           max={GUIDE_LIMITS.maxDimension}
-          sliderMax={2000}
           disabled={geometryDisabled}
           value={Math.round(block.frame[dimension])}
           onChange={(value) =>
@@ -460,7 +459,7 @@ function GuideImageRangeField({
   unit: 'px' | '%';
   min: number;
   max: number;
-  sliderMax: number;
+  sliderMax?: number;
   step?: number;
   value: number;
   disabled: boolean;
@@ -473,7 +472,7 @@ function GuideImageRangeField({
       min={min}
       max={max}
       step={step}
-      scrub={{ min, max: sliderMax, step }}
+      {...(sliderMax === undefined ? {} : { scrub: { min, max: sliderMax, step } })}
       disabled={disabled}
       value={value}
       onChange={onChange}

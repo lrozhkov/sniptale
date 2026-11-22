@@ -1,3 +1,6 @@
+import { fingerprintNativeCapture } from '../../composition/persistence/sync-capture/guards';
+import { createPersistedEditorDocumentFixture } from '../../composition/persistence/document-assets/test-support';
+import { createEditorDocumentFixture } from '../../editor/document/page-session/document.test-support';
 import { createNativeCapture } from '../../composition/persistence/sync-capture/test-support/frozen-snapshot-database';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
@@ -686,4 +689,71 @@ it('refuses a corrupt known native SHA before preparation can read or write remo
   expect(dav.reads).toEqual([]);
   expect(dav.writes).toEqual([]);
   expect(io.prepared.size).toBe(0);
+});
+
+it('publishes two independent image projects with one confirmed remote original', async () => {
+  const original = capture();
+  if (original.change.kind !== 'media' || !('projectAsset' in original.change.rows))
+    throw new Error('Expected a project asset original.');
+  const { media, projectAsset, ref } = original.change.rows;
+  const dav = remote();
+  const signal = new AbortController().signal;
+  await prepareCapturedOutgoing(original);
+  const first = await dispatchPreparedOutgoing('space', original.operationId, dav.adapter, signal);
+
+  for (const rootId of ['first-image', 'second-image']) {
+    const linked = createNativeCapture({
+      ...original,
+      key: JSON.stringify(['change', rootId]),
+      operationId: rootId,
+      rootKind: 'image-project',
+      rootId,
+      rootKey: captureRootKey('space', 'image-project', rootId),
+      change: {
+        kind: 'image',
+        rows: {
+          media,
+          projectAsset,
+          originalRef: ref,
+          workspace: {
+            aggregateId: rootId,
+            sourceMediaId: media.id,
+            revision: 1,
+            createdAt: 1,
+            updatedAt: 1,
+            lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+            document: createPersistedEditorDocumentFixture(
+              createEditorDocumentFixture(),
+              ref.assetId
+            ),
+            sourceTitle: null,
+            sourceUrl: null,
+          },
+          presentation: null,
+          refs: [ref],
+        },
+      },
+    });
+    if (linked.change.kind !== 'image') throw new Error('Expected a native image project.');
+    linked.change.mediaDependencies = [
+      { mediaId: media.id, generation: 1, basis: [original.operationId] },
+    ];
+    linked.sourceSha256 = fingerprintNativeCapture(linked);
+    const prepared = await prepareCapturedOutgoing(linked);
+    const operation = await parseSyncOperationText(prepared.recordText);
+    expect(operation).toMatchObject({
+      version: 4,
+      rootKind: 'image-project',
+      rootId,
+      dependencies: [{ mediaId: media.id, basis: [original.operationId] }],
+    });
+    const writesBefore = dav.writes.length;
+    const sent = await dispatchPreparedOutgoing('space', rootId, dav.adapter, signal);
+    const metadata = await parsePortableSyncRoot(operation.envelope);
+    if (metadata.kind !== 'image') throw new Error('Expected a portable image project.');
+    expect(
+      sent.objects.find((item) => item.objectId === metadata.metadata.originalObjectId)?.remoteKey
+    ).toBe(first.objects[0]?.remoteKey);
+    expect(dav.writes.slice(writesBefore)).toEqual([sent.recordKey]);
+  }
 });

@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { startHostServer } from '../support/host-server';
 import { openRealPopup, sendRuntimeMessage } from '../support/recording-action';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
@@ -36,7 +36,20 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
           | 'settings.voiceInput.backendModel'
       ) => backend.getByRole('button', { name: translate(key, locale), exact: true });
       const draft = `${CORRECTION_PROMPT} Draft kept across recognition changes.`;
-      await ui(page, 'settings.voice.correction-prompt').fill(draft);
+      const prompt = ui(page, 'settings.voice.correction-prompt');
+      await prompt.fill(draft);
+      const clear = page.getByRole('button', {
+        name: translate('shared.ui.clearField', locale).replace(
+          '{field}',
+          translate('settings.voiceInput.correctionPrompt', locale)
+        ),
+        exact: true,
+      });
+      await expect(clear).toBeVisible();
+      await clear.click();
+      await expect(prompt).toHaveValue('');
+      await expect(prompt).toBeFocused();
+      await prompt.fill(draft);
       await expect(
         page.getByLabel(translate('settings.voiceInput.modeLabel', locale), { exact: true })
       ).toHaveCount(0);

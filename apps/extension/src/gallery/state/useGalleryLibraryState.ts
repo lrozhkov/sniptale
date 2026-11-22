@@ -234,6 +234,8 @@ function areGalleryItemsUiEquivalent(left: GalleryItem, right: GalleryItem | und
   if (isGalleryMediaItem(left)) {
     return (
       isGalleryMediaItem(right) &&
+      left.savedIndependently === right.savedIndependently &&
+      left.originalSaveId === right.originalSaveId &&
       areMediaSourcesEqual(left.source, right.source) &&
       areRecordingGroupMembersEqual(left.recordingGroup, right.recordingGroup) &&
       areRecordingGroupViewsEqual(left.recordingGroupView, right.recordingGroupView)
@@ -242,6 +244,13 @@ function areGalleryItemsUiEquivalent(left: GalleryItem, right: GalleryItem | und
   if (left.type === 'quick-edit-project') {
     return (
       right.type === 'quick-edit-project' && left.unavailableReason === right.unavailableReason
+    );
+  }
+  if (left.type === 'image-project') {
+    return (
+      right.type === 'image-project' &&
+      left.sourceAvailable === right.sourceAvailable &&
+      left.project.sourceMediaId === right.project.sourceMediaId
     );
   }
   if (isGalleryScenarioItem(left)) {

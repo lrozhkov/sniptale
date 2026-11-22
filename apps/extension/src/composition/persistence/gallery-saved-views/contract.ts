@@ -13,6 +13,7 @@ export type GallerySavedViewFolder =
   | 'recording'
   | 'scenario'
   | 'video-project'
+  | 'image-project'
   | 'export'
   | 'screenshot'
   | 'web-snapshot';

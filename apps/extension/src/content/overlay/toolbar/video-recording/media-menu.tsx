@@ -294,7 +294,7 @@ function RecordingMediaDeviceMenu(props: {
             <div className="px-1 pb-1" onMouseDown={(event) => event.preventDefault()}>
               <SegmentedSwitch
                 activeId={props.cameraPlacement.mode}
-                appearance="neutral"
+                appearance="property"
                 density="compact"
                 ariaLabel={translate('popup.video.webcamPresentationModeLabel')}
                 dataAttribute={{ 'data-ui': 'content.toolbar.video-recording.camera.placement' }}

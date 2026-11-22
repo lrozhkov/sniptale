@@ -220,6 +220,33 @@ describe('aggregate lifecycle promotion replay', () => {
     );
   });
 
+  it('saves a project-retained original independently and replays the request', async () => {
+    const media = {
+      ...createMediaLibraryEntry({
+        id: 'image-1',
+        lifecycle: createLibraryLifecycle('library', 10),
+        source: { kind: 'screenshot' },
+      }),
+      imageContentState: 'original' as const,
+      savedIndependently: false,
+      workspaceRevision: 0,
+    };
+    let row = media;
+    const put = vi.fn(async (value: typeof media) => {
+      row = value;
+    });
+    const target = { id: media.id, kind: 'media' as const };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      installTransaction({ media_library: { get: async () => row, put } });
+      await promoteStoredItem(target);
+    }
+    expect(put).toHaveBeenCalledExactlyOnceWith({
+      ...media,
+      savedIndependently: true,
+      originalSaveId: expect.any(String),
+    });
+  });
+
   it('requires an image presentation at the same revision and keeps the aggregate id', async () => {
     const media = {
       ...createMediaLibraryEntry({
@@ -244,6 +271,7 @@ describe('aggregate lifecycle promotion replay', () => {
     expect(put).toHaveBeenCalledWith(
       expect.objectContaining({
         id: media.id,
+        savedIndependently: true,
         lifecycle: expect.objectContaining({ storageClass: 'library' }),
       })
     );

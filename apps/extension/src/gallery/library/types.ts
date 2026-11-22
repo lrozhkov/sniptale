@@ -4,23 +4,17 @@ import type {
   LibraryFilterScope,
 } from '../../features/media-hub/library-filters';
 import type { GalleryItem } from './items';
+import type { GallerySavedViewFolder } from '../../composition/persistence/gallery-saved-views';
 
-export type FolderFilter =
-  | 'all'
-  | 'audio'
-  | 'screenshot'
-  | 'recording'
-  | 'export'
-  | 'web-snapshot'
-  | 'video-project'
-  | 'scenario';
+export type FolderFilter = GallerySavedViewFolder;
 
 export type GalleryFolderCounts = Record<
-  Exclude<FolderFilter, 'web-snapshot' | 'video-project'>,
+  Exclude<FolderFilter, 'web-snapshot' | 'video-project' | 'image-project'>,
   number
 > & {
   'web-snapshot'?: number;
   'video-project'?: number;
+  'image-project'?: number;
 };
 
 export type SortMode =
@@ -70,6 +64,7 @@ export interface GalleryGridMetrics {
 }
 
 export interface GalleryPreviewSessionState {
+  imageProjectPickerRequest?: string | undefined;
   requestRevision?: number | undefined;
   initialMode?: 'edit';
   inspectorCollapsed: boolean;

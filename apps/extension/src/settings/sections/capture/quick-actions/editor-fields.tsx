@@ -195,8 +195,10 @@ export function QuickActionsEditorSecondaryCaptureFields(props: {
       <SettingsControlRow label={translate('settings.quickActions.screenEmulationLabel')}>
         <ProductSelect
           controlSize="sm"
-          menuClassName="!max-h-52"
+          containerClassName="settings-compact-select-shell"
+          menuClassName="settings-viewport-preset-options !max-h-52"
           menuPlacement="auto"
+          menuWidth={304}
           menuScrollable
           value={props.state.editForm?.viewportPresetId ?? ''}
           onChange={(value) => props.state.updateFormField('viewportPresetId', value || null)}

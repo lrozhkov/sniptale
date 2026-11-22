@@ -11,6 +11,7 @@ import {
 } from './preview';
 import { createBusyActionRunner } from './shared';
 import { translate } from '../../../platform/i18n';
+import { createImageProjectItem } from '../test-support/items';
 import {
   createController,
   createMediaItem,
@@ -28,6 +29,7 @@ const {
   getAggregatePreviewBlobMock,
   copyImageAggregateMock,
   restoreImageAggregateOriginalMock,
+  readImageOriginalSourceMock,
   browserTabsCreateMock,
   writeBrowserClipboardItemsMock,
   buildEditorUrlMock,
@@ -43,6 +45,7 @@ const {
   getAggregatePreviewBlobMock: vi.fn(),
   copyImageAggregateMock: vi.fn(),
   restoreImageAggregateOriginalMock: vi.fn(),
+  readImageOriginalSourceMock: vi.fn(),
   browserTabsCreateMock: vi.fn(),
   writeBrowserClipboardItemsMock: vi.fn(),
   buildEditorUrlMock: vi.fn((options: { assetId?: string | null; sessionId?: string | null }) => {
@@ -81,6 +84,11 @@ vi.mock('../../../composition/persistence/image-aggregates', async (importOrigin
   ...(await importOriginal<typeof import('../../../composition/persistence/image-aggregates')>()),
   copyImageAggregate: copyImageAggregateMock,
   restoreImageAggregateOriginal: restoreImageAggregateOriginalMock,
+}));
+
+vi.mock('../../../composition/persistence/image-workspaces', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/image-workspaces')>()),
+  readImageOriginalSource: readImageOriginalSourceMock,
 }));
 
 vi.mock('@sniptale/platform/browser/tabs', () => ({
@@ -126,6 +134,10 @@ let originalCreateElement: typeof document.createElement;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  readImageOriginalSourceMock.mockReset().mockResolvedValue({
+    asset: { workspaceRevision: 4 },
+    sourceGeneration: 'preview-lifetime',
+  });
   anchorClickSpy = vi.fn();
   readHtmlMock.mockReset();
   ensureHtmlMock.mockReset();
@@ -269,12 +281,12 @@ async function verifyOriginalAndCopyActions() {
   copyImageAggregateMock.mockResolvedValue('session-1');
 
   await downloadOriginalPreviewItem(controller, runBusy);
-  createRestoreOriginalAction(controller, runBusy)();
+  await createRestoreOriginalAction(controller, runBusy)();
   await getState().storage.confirmDialog?.onConfirm();
   await createSaveImageCopyAction(controller, runBusy)();
 
   expect(anchorClickSpy).toHaveBeenCalledTimes(1);
-  expect(restoreImageAggregateOriginalMock).toHaveBeenCalledWith('image-1', 4);
+  expect(restoreImageAggregateOriginalMock).toHaveBeenCalledWith('image-1', 4, 'preview-lifetime');
   expect(copyImageAggregateMock).toHaveBeenCalledWith({
     aggregateId: 'image-1',
     expectedWorkspaceRevision: 5,
@@ -301,6 +313,76 @@ async function verifyOriginalActionsIgnorePristineImages() {
   expect(getState().storage.confirmDialog).toBeNull();
   expect(restoreImageAggregateOriginalMock).not.toHaveBeenCalled();
 }
+
+it.each([null, 'preview-lifetime'])(
+  'retains the observed lifetime across Restore Original confirmation: %s',
+  async (observedGeneration) => {
+    const { controller, getState } = createController({
+      previewItem: createMediaItem({
+        id: 'image-1',
+        imageContentState: 'edited',
+        workspaceRevision: 4,
+      }),
+    });
+    const banner = vi.fn();
+    let currentGeneration = observedGeneration;
+    readImageOriginalSourceMock.mockResolvedValue({
+      asset: { workspaceRevision: 4 },
+      sourceGeneration: observedGeneration,
+    });
+    restoreImageAggregateOriginalMock.mockImplementation(async (_id, _revision, generation) => {
+      // An omitted native generation observes the current lifetime when the command starts.
+      const expected = generation === undefined ? currentGeneration : generation;
+      if (expected !== currentGeneration) throw new Error('Image lifetime changed');
+      return { revision: 5, updatedAt: 10 };
+    });
+    await createRestoreOriginalAction(controller, createRunBusy(banner))();
+    const confirm = getState().storage.confirmDialog;
+    expect(confirm).not.toBeNull();
+    const before = structuredClone(getState().preview.session.item);
+    currentGeneration = 'replacement-lifetime';
+    await confirm?.onConfirm();
+    expect(getState().preview.session.item).toEqual(before);
+    expect(restoreImageAggregateOriginalMock).toHaveBeenCalledExactlyOnceWith(
+      'image-1',
+      4,
+      observedGeneration
+    );
+    expect(readImageOriginalSourceMock).toHaveBeenCalledExactlyOnceWith('image-1', {
+      includeBlob: false,
+    });
+    expect(banner).toHaveBeenCalledOnce();
+  }
+);
+
+it.each(['missing', 'revision', 'read-failed'] as const)(
+  'keeps Restore Original closed after %s source observation',
+  async (condition) => {
+    const { controller, getState } = createController({
+      previewItem: createMediaItem({
+        id: 'image-1',
+        imageContentState: 'edited',
+        workspaceRevision: 4,
+      }),
+    });
+    const banner = vi.fn();
+    if (condition === 'read-failed')
+      readImageOriginalSourceMock.mockRejectedValueOnce(new Error('Source observation failed'));
+    else
+      readImageOriginalSourceMock.mockResolvedValueOnce({
+        asset: condition === 'missing' ? undefined : { workspaceRevision: 5 },
+        sourceGeneration: 'preview-lifetime',
+      });
+    await createRestoreOriginalAction(controller, createRunBusy(banner))();
+    expect(getState().storage.confirmDialog).toBeNull();
+    expect(restoreImageAggregateOriginalMock).not.toHaveBeenCalled();
+    expect(getState().preview.session.item).toMatchObject({
+      imageContentState: 'edited',
+      workspaceRevision: 4,
+    });
+    expect(banner).toHaveBeenCalledOnce();
+  }
+);
 
 function verifyOpenInEditorFlow() {
   openInEditor(createMediaItem({ id: 'asset-1', kind: 'image' }));
@@ -490,6 +572,17 @@ it('opens the saved quick-edit identity and refuses unavailable or trashed cards
   expect(openGalleryPageMock).toHaveBeenCalledTimes(1);
 });
 
+it('opens a saved image project by project ID and refuses unavailable or trashed cards', () => {
+  const item = createImageProjectItem();
+  openInEditor(item);
+  expect(buildEditorUrlMock).toHaveBeenCalledExactlyOnceWith({ assetId: item.entityId });
+  expect(browserTabsCreateMock).toHaveBeenCalledOnce();
+
+  openInEditor({ ...item, sourceAvailable: false });
+  openInEditor({ ...item, lifecycle: { ...item.project.lifecycle, trashedAt: 2 } });
+  expect(browserTabsCreateMock).toHaveBeenCalledOnce();
+});
+
 it('does not write unchanged quick-edit project metadata', async () => {
   const { createQuickEditProjectGalleryItem } = await import('../items/adapters');
   const { persistPreviewMetadata } = await import('./preview');
@@ -571,4 +664,25 @@ it('renames and downloads a chosen saved HTML without preparing the entire Scena
     exportId: item.entityId,
   });
   expect(preparePublicationMock).not.toHaveBeenCalled();
+});
+
+it('downloads and copies the exact inline original when no aggregate preview exists', async () => {
+  const previewItem = createMediaItem({
+    id: 'inline-original',
+    filename: 'original.png',
+    imageContentState: 'original',
+  });
+  const original = new Blob(['original'], { type: 'image/png' });
+  getAggregatePreviewBlobMock.mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined);
+  getMediaAssetBlobMock.mockResolvedValueOnce(original).mockResolvedValueOnce(original);
+  const { controller } = createController({ previewItem });
+
+  await expect(downloadPreviewItem(controller, createRunBusy())).resolves.toBe(true);
+  await expect(copyPreviewItem(controller, createRunBusy())).resolves.toBe(true);
+  expect(getMediaAssetBlobMock.mock.calls).toEqual([['inline-original'], ['inline-original']]);
+  expect(URL.createObjectURL).toHaveBeenCalledExactlyOnceWith(original);
+  expect(clickedFilename).toBe('original.png');
+  expect(writeBrowserClipboardItemsMock).toHaveBeenCalledWith([
+    expect.objectContaining({ data: { 'image/png': original } }),
+  ]);
 });

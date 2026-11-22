@@ -121,6 +121,7 @@ export function createVideoProjectRestoreTransaction(
     project_assets: stores.assets,
     project_exports: stores.exports,
     media_library: stores.media,
+    image_workspace_identities: stores.imageIdentities,
     video_workspaces: stores.videoWorkspaces,
     video_workspace_history: empty,
     video_workspace_drafts: stores.videoDrafts,

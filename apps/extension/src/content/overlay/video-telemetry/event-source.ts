@@ -1,8 +1,11 @@
+import { createObservationDelivery } from './delivery';
+import { createClosingObservationDrain } from './closing-batch';
 import {
   RECORDING_EVENTS_INPUT_QUEUE_CAPACITY,
   RECORDING_EVENTS_PACKET_MAX_BYTES,
   RECORDING_EVENTS_PACKET_MAX_RECORDS,
   isRecordingEventObservationPacket,
+  isFinalRecordingEventPackets,
   type RecordingEventObservationPacket,
 } from '../../../contracts/video/event-observations';
 import {
@@ -55,13 +58,13 @@ export function createRecordingEventSource(options: {
   recordingId: string;
   project(moment: EventSourceMoment): Projection;
   send(packet: RecordingEventObservationPacket): Promise<void>;
+  sendFinal?(packets: RecordingEventObservationPacket[]): Promise<void>;
 }) {
+  const sourceInstanceId = crypto.randomUUID();
   const queue: Pending[] = [];
   let pendingProtected: Pending | null = null;
   let loss: Pending | null = null;
   let terminal: Pending | null = null;
-  let retry: RecordingEventObservationPacket | null = null;
-  let running: Promise<boolean> | null = null;
   let barrier: Promise<void> = Promise.resolve();
   let sequence = 0;
   let batch = 0;
@@ -216,6 +219,7 @@ export function createRecordingEventSource(options: {
     ]);
     const header = {
       version: 1 as const,
+      sourceInstanceId,
       recordingId: options.recordingId,
       batchSequence: batch,
       sourceClockId: first.moment.sourceClockId,
@@ -255,35 +259,27 @@ export function createRecordingEventSource(options: {
     batch++;
     return result;
   }
-  function pump(): Promise<boolean> {
-    if (running) return running;
-    const work = (async () => {
-      try {
-        for (;;) {
-          let waited: Promise<void>;
-          do {
-            waited = barrier;
-            await waited;
-          } while (waited !== barrier);
-          retry ??= packet();
-          if (!retry) return true;
-          await options.send(structuredClone(retry));
-          retry = null;
-        }
-      } catch {
-        return false;
-      }
-    })();
-    running = work;
-    void work.then((drained) => {
-      if (running !== work) return;
-      running = null;
-      if (drained && (queue.length || loss || terminal)) void pump();
-    });
-    return work;
-  }
+  const { pump, inFlight } = createObservationDelivery({
+    takeNext: packet,
+    send: (value) => options.send(value),
+    hasPending: () => !!(queue.length || loss || terminal),
+    packetBarrier: () => barrier,
+  });
+  const flushClosing = options.sendFinal
+    ? createClosingObservationDrain({
+        inFlight,
+        takeNext: packet,
+        isValid: isFinalRecordingEventPackets,
+        send: options.sendFinal,
+      })
+    : pump;
   return {
     open,
+    flushClosing() {
+      flushProtected();
+      closed = true;
+      return flushClosing();
+    },
     emit(moment: EventSourceMoment, fact: RecordingEventSourceFact): boolean {
       if (closed || failed || paused) return false;
       const isProtected =
@@ -382,7 +378,7 @@ export function createRecordingEventSource(options: {
         () => undefined
       );
     },
-    flush: () => pump(),
+    flush: () => (closed && options.sendFinal ? flushClosing() : pump()),
     close() {
       flushProtected();
       closed = true;

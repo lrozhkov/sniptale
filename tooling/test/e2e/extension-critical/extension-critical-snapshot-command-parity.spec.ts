@@ -1,5 +1,5 @@
 import type { Locator } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { test, expect } from '../support/extension-fixture';
 import { withViewer, capture } from './web-snapshot-viewer-design.spec.fixture';

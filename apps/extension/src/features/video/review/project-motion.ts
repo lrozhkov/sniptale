@@ -1,3 +1,5 @@
+import { projectReviewFocusGroups } from './focus-edits';
+import type { ReviewTimeSegment } from './timeline';
 import { requiresExtendedBorderSchema } from '../project/scene/focus-appearance';
 import {
   resolveQuickEditFocusLink,
@@ -16,10 +18,12 @@ import type { QuickEditAdvancedContent, QuickEditZoomRegion } from './advanced/t
 export function planReviewProjectMotion(
   project: VideoProject,
   content: QuickEditAdvancedContent,
-  applied: boolean
+  applied: boolean,
+  segments?: readonly ReviewTimeSegment[]
 ): VideoProject | null {
   if (!content.zoom.regions.length) return project;
-  if (content.zoom.regions.some((r) => r.effect === '3d')) project = { ...project, version: 55 };
+  if (project.version < 55 && content.zoom.regions.some((r) => r.effect === '3d'))
+    project = { ...project, version: 55 };
   if (content.zoom.regions.some((region) => region.border && region.spotlight)) return null;
   const clips = project.clips.filter(
     (clip): clip is VideoProjectVideoClip =>
@@ -36,29 +40,18 @@ export function planReviewProjectMotion(
   );
   const regions: VideoProjectMotionRegion[] = [];
   const groups = new Map<string, VideoProjectMotionRegion[]>();
+  const retained =
+    segments && authored.some((region) => region.visualAnchor)
+      ? new Map(
+          projectReviewFocusGroups(authored, segments).map(({ region, slices }) => [
+            region.id,
+            slices,
+          ])
+        )
+      : undefined;
   for (const region of authored) {
-    const anchor = region.sourceAnchor;
-    let targets = clips.filter((clip) =>
-      anchor
-        ? clip.sourceStart < anchor.end && clip.sourceStart + clip.sourceDuration > anchor.start
-        : clip.startTime < region.end && clip.startTime + clip.duration > region.start
-    );
-    if (!targets.length) {
-      const distance = (clip: VideoProjectVideoClip) =>
-        Math.max(
-          0,
-          anchor ? clip.sourceStart - anchor.end : clip.startTime - region.end,
-          anchor
-            ? anchor.start - clip.sourceStart - clip.sourceDuration
-            : region.start - clip.startTime - clip.duration
-        );
-      targets = [
-        clips.toSorted((a, b) => distance(a) - distance(b) || a.sourceStart - b.sourceStart)[0]!,
-      ];
-    }
-    const mapped = targets.map((clip) =>
-      projectMotionSourceBinding(project, mappedRegion(project, content, region, clip))
-    );
+    const slices = region.visualAnchor && retained ? (retained.get(region.id) ?? []) : [region];
+    const mapped = slices.flatMap((slice) => mapReviewMotionSlice(project, content, slice, clips));
     regions.push(...mapped);
     groups.set(region.id, mapped);
   }
@@ -81,8 +74,10 @@ export function planReviewProjectMotion(
         ?.filter((item) => item.duration > 0)
         .at(-1) ?? groups.get(region.id)?.at(-1);
     const targets = groups.get(link.target.id);
-    if (!source || !targets) return null;
-    for (const target of targets)
+    if (!targets) return null;
+    if (!source || !targets.length) continue;
+    const connectionTargets = link.target.visualAnchor ? targets.slice(0, 1) : targets;
+    for (const target of connectionTargets)
       target.incomingConnection = {
         fromRegionId: source.id,
         easing: region.linkEasing === 'linear' ? 'LINEAR' : 'EASE_IN_OUT',
@@ -104,6 +99,36 @@ export function planReviewProjectMotion(
   };
 }
 
+function mapReviewMotionSlice(
+  project: VideoProject,
+  content: QuickEditAdvancedContent,
+  region: QuickEditZoomRegion,
+  clips: readonly VideoProjectVideoClip[]
+) {
+  const anchor = region.sourceAnchor;
+  let targets = clips.filter((clip) =>
+    anchor
+      ? clip.sourceStart < anchor.end && clip.sourceStart + clip.sourceDuration > anchor.start
+      : clip.startTime < region.end && clip.startTime + clip.duration > region.start
+  );
+  if (!targets.length) {
+    const distance = (clip: VideoProjectVideoClip) =>
+      Math.max(
+        0,
+        anchor ? clip.sourceStart - anchor.end : clip.startTime - region.end,
+        anchor
+          ? anchor.start - clip.sourceStart - clip.sourceDuration
+          : region.start - clip.startTime - clip.duration
+      );
+    targets = [
+      clips.toSorted((a, b) => distance(a) - distance(b) || a.sourceStart - b.sourceStart)[0]!,
+    ];
+  }
+  return targets.map((clip) =>
+    projectMotionSourceBinding(project, mappedRegion(project, content, region, clip))
+  );
+}
+
 function mappedRegion(
   project: VideoProject,
   content: QuickEditAdvancedContent,
@@ -116,9 +141,18 @@ function mappedRegion(
   const virtualStart = clip.sourceStart + (region.start - clip.startTime) * rate;
   const sourceStart = anchor?.start ?? Math.max(0, virtualStart);
   const sourceEnd = anchor?.end ?? virtualStart + duration * rate;
-  const clock = anchor
-    ? { start: 0, end: anchor.end - anchor.start, duration: anchor.end - anchor.start }
-    : { start: (sourceStart - virtualStart) / rate, end: duration, duration };
+  const phase = region.phaseClock;
+  const enter = phase?.enter ?? region.enter;
+  const exit = phase?.exit ?? region.exit;
+  const clock = phase
+    ? {
+        start: phase.offset + (Math.max(0, sourceStart - virtualStart) * phase.rate) / rate,
+        end: Math.min(phase.duration, phase.offset + duration * phase.rate),
+        duration: phase.duration,
+      }
+    : anchor
+      ? { start: 0, end: anchor.end - anchor.start, duration: anchor.end - anchor.start }
+      : { start: (sourceStart - virtualStart) / rate, end: duration, duration };
   return {
     id: `${project.id}:motion:${region.id}:${clip.id}`,
     startTime: 0,
@@ -138,11 +172,11 @@ function mappedRegion(
       : {}),
     targetAction: null,
     scale: region.transform.scale,
-    zoomInDuration: region.enter.duration,
-    zoomOutDuration: region.exit.duration,
+    zoomInDuration: enter.duration,
+    zoomOutDuration: exit.duration,
     phaseTransitions: {
-      enter: region.enter.type,
-      exit: region.exit.type,
+      enter: enter.type,
+      exit: exit.type,
       ...(region.linkEasing !== undefined
         ? { link: region.linkEasing === 'linear' ? ('LINEAR' as const) : ('EASE_IN_OUT' as const) }
         : {}),

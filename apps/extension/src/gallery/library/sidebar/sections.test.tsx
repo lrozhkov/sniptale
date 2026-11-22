@@ -2,7 +2,18 @@
 
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadGalleryCatalogFixture,
+  prepareGalleryTranslations,
+} from '../../test-support/translations.test-support';
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadGalleryCatalogFixture>[0]) =>
+    loadGalleryCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareGalleryTranslations('ru'));
 import { translate } from '../../../platform/i18n';
 import { GallerySavedViewError } from '../../../composition/persistence/gallery-saved-views';
 import { GalleryFacetFilters, GalleryFolderList } from './sections';
@@ -411,12 +422,23 @@ it('opens a compact saved-view name field, reports a conflict, and confirms crea
     )?.disabled
   ).toBe(true);
   act(() => updateInputValue(input!, 'Review PNG'));
+  act(() => {
+    for (const key of ['Enter', 'Escape']) {
+      input!.dispatchEvent(new KeyboardEvent('keydown', { key, isComposing: true, bubbles: true }));
+    }
+  });
+  expect(input?.isConnected).toBe(true);
+  expect(onCreateSavedView).not.toHaveBeenCalled();
   click(container?.querySelector(`[aria-label="${translate('gallery.app.savedViewConfirm')}"]`));
 
   await vi.waitFor(() => expect(onCreateSavedView).toHaveBeenCalledWith('Review PNG'));
   await vi.waitFor(() =>
     expect(container?.textContent).toContain(translate('gallery.app.savedViewNameConflict'))
   );
+  expect(input?.getAttribute('aria-invalid')).toBe('true');
+  const error = document.getElementById(input!.getAttribute('aria-describedby')!);
+  expect(error?.getAttribute('role')).toBe('alert');
+  expect(error?.textContent).toContain(translate('gallery.app.savedViewNameConflict'));
   click(container?.querySelector(`[aria-label="${translate('gallery.app.savedViewConfirm')}"]`));
   await vi.waitFor(() => expect(onCreateSavedView).toHaveBeenCalledTimes(2));
 });
@@ -574,18 +596,19 @@ it('shows search and scrolling only for facet lists with more than ten values', 
   );
   if (!searchInput) throw new Error('Expected facet search input');
 
-  expect(
-    container?.querySelector(`[aria-label="${translate('gallery.app.facetClearSearch')}"]`)
-  ).toBeNull();
+  const fieldLabel = `${translate('gallery.app.facetSearch')} ${translate('gallery.app.facetTitle.tags')}`;
+  const clearLabel = translate('shared.ui.clearField').replace('{field}', fieldLabel);
+  expect(container?.querySelector(`[aria-label="${clearLabel}"]`)).toBeNull();
   expect(container?.querySelector('.max-h-56')?.className).toContain('overflow-y-auto');
   expect(findButton(translate('gallery.app.facetResetAll'))).toBeUndefined();
 
   act(() => updateInputValue(searchInput, 'tag-10'));
 
   expect(container?.querySelectorAll('input[type="checkbox"]')).toHaveLength(1);
-  click(container?.querySelector(`[aria-label="${translate('gallery.app.facetClearSearch')}"]`));
+  click(container?.querySelector(`[aria-label="${clearLabel}"]`));
 
   expect(searchInput.value).toBe('');
+  expect(document.activeElement).toBe(searchInput);
   expect(container?.querySelectorAll('input[type="checkbox"]')).toHaveLength(11);
   click(
     Array.from(container?.querySelectorAll('label') ?? []).find((label) =>
@@ -758,7 +781,7 @@ it('shows the Audio count and selects its section', () => {
 it('preserves the Find query and accessible name through focus and blur', () => {
   render(<GalleryFacetFilters {...createFacetProps(true)} />);
   click(container?.querySelector('summary'));
-  const input = container!.querySelector<HTMLInputElement>('input[type="text"],input:not([type])')!;
+  const input = container!.querySelector<HTMLInputElement>('input[type="search"]')!;
   const label = `${translate('gallery.app.facetSearch')} ${translate('gallery.app.facetTitle.format')}`;
   expect(input.getAttribute('aria-label')).toBe(label);
   act(() => input.focus());

@@ -10,6 +10,7 @@ it.each([
   { files: [catalog] },
   { files: [catalog, consumer] },
   { files: ['packages/platform/src/i18n/config.ts'] },
+  { files: ['packages/runtime-contracts/src/i18n.ts'] },
   { files: ['tooling/qa/guards/product-contracts/verify-i18n.catalogs.mjs'] },
   { files: ['tooling/qa/guards/product-contracts/i18n-catalog-format.mjs'] },
   { files: ['apps/extension/src/platform/i18n/catalog-subsets.ts'] },

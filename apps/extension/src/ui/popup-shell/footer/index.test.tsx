@@ -3,6 +3,10 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import {
+  loadUiCatalogFixture,
+  prepareUiTranslations,
+} from '../../test-support/translations.test-support';
 import { PopupFooter, type PopupFooterProps } from './index';
 
 let root: Root | null = null;
@@ -233,3 +237,10 @@ it('keeps the status slot inside the utility row without an additional footer ro
     footer?.querySelector('[data-ui="popup.footer.actions"] [data-ui="test.sync-control"]')
   ).not.toBeNull();
 });
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadUiCatalogFixture>[0]) =>
+    loadUiCatalogFixture(locale),
+}));
+
+beforeEach(() => prepareUiTranslations('popup', 'ru'));

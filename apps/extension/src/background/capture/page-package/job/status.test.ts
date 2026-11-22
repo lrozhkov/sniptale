@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import type { ExportOptions } from '@sniptale/runtime-contracts/export';
+import { MAX_POPUP_EXPORT_TAB_TITLE_BYTES } from '@sniptale/runtime-contracts/export';
 import {
   createEffectiveComponentPlan,
   parsePagePackageJobStatusV1,
@@ -52,6 +53,29 @@ it('rejects extra fields and page outcomes that are not bound to ordered tabs', 
       pageOutcomes: [{ ordinal: 0, status: 'pending', tabId: 8 }],
     })
   ).toBeNull();
+});
+
+it('accepts optional collection context and rejects malformed or oversized titles', () => {
+  const original = status();
+  expect(parsePagePackageJobStatusV1(original)).toEqual(original);
+  const withTitle = {
+    ...original,
+    progress: { ...original.progress, collectingPageTitle: 'Example page' },
+  };
+  expect(parsePagePackageJobStatusV1(withTitle)).toEqual(withTitle);
+  for (const collectingPageTitle of [
+    null,
+    3,
+    {},
+    'x'.repeat(MAX_POPUP_EXPORT_TAB_TITLE_BYTES + 1),
+  ]) {
+    expect(
+      parsePagePackageJobStatusV1({
+        ...original,
+        progress: { ...original.progress, collectingPageTitle },
+      })
+    ).toBeNull();
+  }
 });
 
 it('rejects malformed or unbounded fields throughout the private status graph', () => {

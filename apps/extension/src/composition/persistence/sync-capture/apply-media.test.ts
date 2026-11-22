@@ -1,8 +1,15 @@
 import { deferCheckpointInTransaction, consumeCheckpointInTransaction } from './checkpoints';
 import { applyPreparedVideoReviewReplica } from './apply-review';
+import { deleteVideoWorkspaceProject } from '../review-workspaces/project-commands';
+import { deleteMediaAssetWithProjectCascade } from '../media-library/delete-cascade';
+import {
+  readVideoWorkspace,
+  readVideoWorkspaceOpening,
+  saveVideoWorkspaceSnapshot,
+} from '../review-workspaces/store';
 import { workspace as reviewTemplate } from '../review-workspaces/backup-restore.test-support';
 import { materializeVideoWorkspaceProject } from '../review-workspaces/project-metadata';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { createVideoProjectEntryWithMediaClip } from '../projects/index.test-support';
 
@@ -21,26 +28,69 @@ vi.mock('../infrastructure/indexed-db/core', async (original) => ({
   ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
   initDB: io.database,
 }));
+vi.mock('../assets/opfs-store', async (original) => ({
+  ...(await original<typeof import('../assets/opfs-store')>()),
+  listReadyJournals: async () => [],
+}));
 vi.mock('../assets', async (original) => ({
   ...(await original<typeof import('../assets')>()),
   completePhysicalDeleteOperation: vi.fn().mockResolvedValue(undefined),
   listReadyJournals: vi.fn().mockResolvedValue([]),
   readAssetFile: io.read,
 }));
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.stubGlobal('navigator', {});
+});
+afterEach(() => vi.unstubAllGlobals());
 
 function setup() {
   const fixture = createMediaReplicaFixture();
-  io.database.mockResolvedValue(fixture.database);
+  io.database.mockResolvedValue({
+    ...fixture.database,
+    transaction(stores: string[], mode: string, options?: { durability?: string }) {
+      return Object.assign(fixture.database.transaction(stores, mode), {
+        durability: options?.durability ?? 'default',
+      });
+    },
+  });
   return fixture;
 }
+
+it('applies explicit visibility once and renews the independent-save fence', async () => {
+  const f = setup();
+  const input = { ...f.input, rows: { ...f.input.rows, savedIndependently: false } };
+  const mediaId = input.rows.media.id;
+  await applyPreparedMediaReplica(input);
+  const initial = parseMediaLibraryEntry(f.table('media_library').get(mediaId));
+  expect(initial).toMatchObject({ savedIndependently: false, originalSaveId: expect.any(String) });
+  const next = {
+    ...input,
+    operationId: 'save-independent',
+    sourceDigest: 'b'.repeat(64),
+    expectedLocalGeneration: 1,
+    expectedBasis: [input.operationId],
+    rows: { ...input.rows, savedIndependently: true },
+  };
+  expect(await applyPreparedMediaReplica(next)).toEqual({ status: 'applied', generation: 2 });
+  const saved = parseMediaLibraryEntry(f.table('media_library').get(mediaId));
+  expect(saved).toMatchObject({ savedIndependently: true, originalSaveId: expect.any(String) });
+  expect(saved?.originalSaveId).not.toBe(initial?.originalSaveId);
+  expect(await applyPreparedMediaReplica(next)).toEqual({ status: 'duplicate', generation: 2 });
+  expect(f.table('media_library').get(mediaId)).toEqual(saved);
+  await expect(
+    applyPreparedMediaReplica({ ...next, operationId: 'stale-hide', rows: input.rows })
+  ).rejects.toThrow('source-changed');
+  expect(f.table('media_library').get(mediaId)).toEqual(saved);
+});
 
 it('admits a Library source with a real causal head and no outgoing echo', async () => {
   const f = setup();
   expect(await applyPreparedMediaReplica(f.input)).toEqual({ status: 'applied', generation: 1 });
-  expect(f.table('media_library').get(f.input.rows.media.id)).toEqual(
-    parseMediaLibraryEntry(f.input.rows.media)
-  );
+  expect(f.table('media_library').get(f.input.rows.media.id)).toEqual({
+    ...parseMediaLibraryEntry(f.input.rows.media),
+    originalSaveId: expect.any(String),
+  });
   expect(f.table('project_assets').get('source')).toEqual(f.input.rows.projectAsset);
   expect(f.table('asset_refs').get('local-body')).toEqual(f.input.rows.ref);
   expect(f.table('sync_capture').get(f.stateKey)).toMatchObject({
@@ -485,14 +535,131 @@ it('keeps a soft Trash original eligible and refuses a delayed metadata predeces
   expect(f.rows).toEqual(before);
 });
 
-async function setupWithIndependentReview() {
+it.each(['soft Trash', 'permanent deletion'] as const)(
+  'fences an unpublished original after remote restoration from %s',
+  async (removal) => {
+    const f = setup();
+    const { input } = f;
+    input.rows.media.kind = 'video';
+    input.rows.media.mimeType = 'video/webm';
+    input.rows.projectAsset.mimeType = 'video/webm';
+    input.rows.ref.mimeType = 'video/webm';
+    await applyPreparedMediaReplica(input);
+    const mediaId = input.rows.media.id;
+    const originalSaveId = crypto.randomUUID();
+    f.table('media_library').set(mediaId, {
+      ...input.rows.media,
+      savedIndependently: false,
+      originalSaveId,
+    });
+    const source = {
+      duration: 2,
+      width: 640,
+      height: 360,
+      size: input.rows.ref.size,
+      mimeType: input.rows.ref.mimeType,
+    };
+    const projectId = 'project-asset:quick-project:pending';
+    const open = () =>
+      readVideoWorkspaceOpening({
+        aggregateId: projectId,
+        sourceMediaId: mediaId,
+        expectedSourceAssetId: input.rows.ref.assetId,
+        source,
+      });
+    const opening = await open();
+    const next = (operationId: string, basis: string, generation: number, trashedAt?: number) => ({
+      ...input,
+      operationId,
+      expectedLocalGeneration: generation,
+      expectedBasis: [basis],
+      rows: {
+        ...input.rows,
+        media: {
+          ...input.rows.media,
+          filename: 'Updated.webm',
+          lifecycle: {
+            storageClass: 'library' as const,
+            savedAt: 1,
+            updatedAt: generation + 2,
+            ...(trashedAt === undefined ? {} : { trashedAt }),
+          },
+        },
+      },
+    });
+    const changed = next('rename', input.operationId, 1);
+    await applyPreparedMediaReplica(changed);
+    expect(f.table('media_library').get(mediaId)).toMatchObject({
+      savedIndependently: false,
+      originalSaveId,
+    });
+    expect((await open()).original).toEqual(opening.original);
+
+    const removalId = 'remote-removal';
+    if (removal === 'soft Trash') {
+      await applyPreparedMediaReplica(next(removalId, changed.operationId, 2, 4));
+    } else {
+      await applyCatalogDeletionNative({
+        rootKind: 'media',
+        rootId: mediaId,
+        operationId: removalId,
+        sourceDigest: 'e'.repeat(64),
+        spaceId: input.spaceId,
+        profileCreatedAt: input.profileCreatedAt,
+        connectionGeneration: input.connectionGeneration,
+        expectedLocalGeneration: 2,
+        expectedBasis: [changed.operationId],
+        expectedWorkspaceRevision: null,
+      });
+    }
+    const restored = next('restored-video', removalId, 3);
+    await applyPreparedMediaReplica(restored);
+    const afterRestore = structuredClone(f.rows);
+    await expect(applyPreparedMediaReplica(restored)).resolves.toMatchObject({
+      status: 'duplicate',
+    });
+    expect(f.rows).toEqual(afterRestore);
+    if (removal === 'soft Trash')
+      expect(f.table('media_library').get(mediaId)).toMatchObject({ savedIndependently: false });
+    await expect(
+      saveVideoWorkspaceSnapshot({
+        aggregateId: projectId,
+        original: opening.original!,
+        expectedRevision: opening.snapshot.workspace.revision,
+        expectedDraftRevision: null,
+        expectedSourceAssetId: input.rows.ref.assetId,
+        workspace: {
+          ...opening.snapshot.workspace,
+          history: [
+            {
+              id: 'first',
+              at: 1,
+              target: 'annotation',
+              before: null,
+              after: { id: 'first', text: 'First', anchor: { kind: 'point', time: 1 } },
+            },
+          ],
+          cursor: 1,
+        },
+        draft: null,
+      })
+    ).rejects.toMatchObject({ code: 'conflict' });
+    expect(f.rows).toEqual(afterRestore);
+  }
+);
+
+async function setupWithIndependentReview(includeLegacy = true) {
   const f = setup();
   f.input.rows.media.kind = 'video';
   f.input.rows.media.mimeType = 'video/webm';
   f.input.rows.projectAsset.mimeType = 'video/webm';
   f.input.rows.ref.mimeType = 'video/webm';
   await applyPreparedMediaReplica(f.input);
-  for (const id of [f.input.rows.media.id, 'project-asset:quick-project:archive']) {
+  const projects = [
+    ...(includeLegacy ? [f.input.rows.media.id] : []),
+    'project-asset:quick-project:archive',
+  ];
+  for (const id of projects) {
     await applyPreparedVideoReviewReplica({
       ...f.input,
       operationId: `review-${id}`,
@@ -527,6 +694,50 @@ async function setupWithIndependentReview() {
   }
   return f;
 }
+
+it.each([false, true])(
+  'keeps the source and its remote head on project-only purge when capture is paused: %s',
+  async (paused) => {
+    const f = await setupWithIndependentReview(false);
+    const projectId = 'project-asset:quick-project:archive';
+    const media = { ...f.input.rows.media, savedIndependently: false };
+    f.table('media_library').set(media.id, media);
+    const project = await readVideoWorkspace(projectId);
+    expect(project).not.toBeNull();
+    const profile = parseSyncCaptureRecord(f.table('sync_capture').get('profile'));
+    if (profile?.kind !== 'profile') throw new Error('Missing capture profile');
+    const operations = () =>
+      [...f.table('sync_capture').values()]
+        .map(parseSyncCaptureRecord)
+        .filter((record) => record?.kind === 'sync-operation');
+
+    const sourceId = await deleteVideoWorkspaceProject(projectId, project!.workspace.revision);
+    expect(sourceId).toBe(media.id);
+    expect(await readVideoWorkspace(projectId)).toBeNull();
+    expect(operations()).toEqual([
+      expect.objectContaining({
+        rootKind: 'video-review',
+        rootId: projectId,
+        change: { kind: 'tombstone' },
+      }),
+    ]);
+    if (paused) f.table('sync_capture').set('profile', { ...profile, enabled: false });
+    const before = structuredClone(f.rows);
+    await deleteMediaAssetWithProjectCascade(sourceId, [], undefined, true);
+    expect(f.rows).toEqual(before);
+
+    f.table('sync_capture').set('profile', profile);
+    await deleteMediaAssetWithProjectCascade(sourceId, []);
+    expect(f.table('media_library').has(media.id)).toBe(false);
+    expect(operations()).toContainEqual(
+      expect.objectContaining({
+        rootKind: 'media',
+        rootId: media.id,
+        change: { kind: 'tombstone' },
+      })
+    );
+  }
+);
 
 it('reuses and updates an original metadata head without changing independent reviews', async () => {
   const f = await setupWithIndependentReview();

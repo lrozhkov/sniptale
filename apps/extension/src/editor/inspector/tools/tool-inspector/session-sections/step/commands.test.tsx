@@ -1,3 +1,4 @@
+import { readStepValueControlProps } from '../../../step-value-input.test-support';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it } from 'vitest';
 
@@ -7,7 +8,7 @@ import { buildStepValueCommand } from './value';
 
 function getStepValueInputProps(command: ReturnType<typeof buildStepValueCommand>) {
   const input = (command.content as any).props.children;
-  return input.type(input.props).props;
+  return readStepValueControlProps(input);
 }
 
 it('builds step compact commands with preview and commit routing', () => {
@@ -21,9 +22,9 @@ it('builds step compact commands with preview and commit routing', () => {
   expect(renderToStaticMarkup(<>{sizeCommand.trigger}</>)).toContain(String(settings.sizeLevel));
   expect(renderToStaticMarkup(<>{sizeCommand.trigger}</>)).not.toContain('SZ');
   expect(sizeCommand.preservePopoverLabel).toBe(true);
-  valueControl.onChange({ currentTarget: { value: '3' } });
+  valueControl.onChange!({ currentTarget: { value: '3' } } as never);
   expect(params.previewStepPatch).toHaveBeenNthCalledWith(1, { value: '3' });
-  valueControl.onValueCommit();
+  valueControl.onValueCommit?.('3');
   sizeControl.onCommitValue(20);
 
   expect(sizeControl.max).toBe(20);
@@ -46,8 +47,8 @@ it('uses text-mode input constraints for non-numeric step values', () => {
   expect(valueControl.maxLength).toBe(1);
   expect(valueControl.pattern).toBeUndefined();
 
-  valueControl.onChange({ currentTarget: { value: 'B' } });
-  valueControl.onValueCommit();
+  valueControl.onChange!({ currentTarget: { value: 'B' } } as never);
+  valueControl.onValueCommit?.('B');
 
   expect(params.previewStepPatch).toHaveBeenCalledWith({ value: 'B' });
   expect(params.commitPendingSelectionSettings).toHaveBeenCalledOnce();

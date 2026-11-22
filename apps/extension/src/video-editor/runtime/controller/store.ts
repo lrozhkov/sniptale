@@ -322,6 +322,18 @@ export function getCurrentVideoEditorProjectSnapshot() {
   return useVideoEditorStore.getState().project;
 }
 
+/** Read authored content, history and opening authority from the same store revision. */
+export function getCurrentVideoEditorWorkspaceSnapshot() {
+  const state = useVideoEditorStore.getState();
+  return {
+    project: state.project,
+    projectHistory: state.projectHistory,
+    nativeWorkspace: state.nativeWorkspace,
+    syncNativeWorkspace: state.syncNativeWorkspace,
+    projectSessionId: state.projectSessionId,
+  };
+}
+
 export function getCurrentVideoEditorProjectId(): string | null {
   return useVideoEditorStore.getState().project?.id ?? null;
 }

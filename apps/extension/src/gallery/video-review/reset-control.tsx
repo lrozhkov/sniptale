@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { RotateCcw } from 'lucide-react';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import { translate } from '../../platform/i18n';
-import { ReviewButton, reviewIconButtonClassName } from './controls';
+import { ReviewButton } from './controls';
 import { ReviewHistoryResetChoices } from './history-reset-choices';
 
 /** Choice, confirmation and submission share one disposable UI owner. */
@@ -43,12 +43,14 @@ export function ReviewResetControl(props: {
     <>
       <ReviewButton
         label={translate('gallery.videoReview.historyReset')}
-        chrome
-        className={reviewIconButtonClassName}
+        className="w-full justify-start [&>span]:gap-2"
         disabled={props.busy}
+        aria-haspopup="dialog"
+        aria-expanded={anchor !== null}
         onClick={(event) => (anchor ? close() : setAnchor(event.currentTarget))}
       >
         <RotateCcw size={16} aria-hidden="true" />
+        {translate('gallery.videoReview.historyReset')}
       </ReviewButton>
       {anchor && target && !confirming ? (
         <ReviewHistoryResetChoices

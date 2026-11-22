@@ -1,6 +1,19 @@
 // @vitest-environment jsdom
+
+import { editorFixtureMessages } from '../../testing/translations.test-support';
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: Parameters<typeof editorFixtureMessages>[0]) =>
+    editorFixtureMessages(locale)
+  ),
+}));
+
+beforeEach(async () => {
+  const translations = await import('../../testing/translations.test-support');
+  await translations.prepareEditorTranslations('en');
+});
 import { EDITOR_AUTOSAVE_POLICY } from '../../../features/autosave/policy';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   activate,
   createDocument,
@@ -12,6 +25,78 @@ import {
   loggerWarnMock,
   publishLibraryChangedMock,
 } from './autosave.test-support';
+
+it('passes the original binding only on the first save of an image project', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  const autosave = createEditorSessionAutosaveService();
+  activate(autosave);
+  const original = { mediaId: 'original', generation: 'original-generation' };
+  autosave.updateContext({ original });
+  commitWorkspaceMock.mockResolvedValueOnce({
+    ...createWorkspaceCommitResult(1),
+    sourceGeneration: 'project-generation',
+  });
+
+  await autosave.persistSnapshot(() => createDocument('initial edit'));
+  await autosave.persistSnapshot(() => createDocument('following edit'));
+
+  expect(commitWorkspaceMock).toHaveBeenNthCalledWith(
+    1,
+    expect.objectContaining({ original, expectedRevision: 0, expectedGeneration: null })
+  );
+  expect(commitWorkspaceMock).toHaveBeenNthCalledWith(
+    2,
+    expect.objectContaining({
+      expectedRevision: 1,
+      expectedGeneration: 'project-generation',
+      requireExistingRoot: true,
+    })
+  );
+  expect(commitWorkspaceMock.mock.calls[1]?.[0]).not.toHaveProperty('original');
+  expect(publishLibraryChangedMock).toHaveBeenCalledExactlyOnceWith('update', [
+    'original',
+    'image-1',
+  ]);
+  autosave.dispose();
+});
+
+it('acknowledges the local-file binding only after its first durable write', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  const autosave = createEditorSessionAutosaveService();
+  activate(autosave);
+  const newOriginal = {
+    mediaId: 'original',
+    filename: 'input.png',
+    width: 20,
+    height: 20,
+    dataUrl: 'data:image/png;base64,YQ==',
+  };
+  const onFirstPublication = vi.fn();
+  autosave.updateContext({ newOriginal, onFirstPublication });
+  const first = Promise.withResolvers<ReturnType<typeof createWorkspaceCommitResult>>();
+  commitWorkspaceMock.mockReturnValueOnce(first.promise);
+  const saving = autosave.persistSnapshot(() => createDocument('initial edit'));
+  expect(onFirstPublication).not.toHaveBeenCalled();
+  first.resolve(createWorkspaceCommitResult(1));
+  await saving;
+  await autosave.persistSnapshot(() => createDocument('following edit'));
+
+  expect(commitWorkspaceMock).toHaveBeenNthCalledWith(
+    1,
+    expect.objectContaining({ newOriginal, expectedRevision: 0, requireMissingRoot: true })
+  );
+  expect(commitWorkspaceMock).toHaveBeenNthCalledWith(
+    2,
+    expect.objectContaining({ expectedRevision: 1, requireExistingRoot: true })
+  );
+  expect(commitWorkspaceMock.mock.calls[1]?.[0]).not.toHaveProperty('newOriginal');
+  expect(onFirstPublication).toHaveBeenCalledOnce();
+  expect(publishLibraryChangedMock).toHaveBeenCalledExactlyOnceWith('update', [
+    'original',
+    'image-1',
+  ]);
+  autosave.dispose();
+});
 
 it('coalesces expired uncaptured autosaves behind an acquired workspace write', async () => {
   const { createEditorSessionAutosaveService } = await import('./');
@@ -93,6 +178,26 @@ describe('presentation scheduling admission', () => {
 });
 
 describe('automatic presentation recovery', () => {
+  it('does not publish an old render after the same root starts another lifetime', async () => {
+    const { createEditorSessionAutosaveService } = await import('./');
+    const autosave = createEditorSessionAutosaveService();
+    const rendered = Promise.withResolvers<string>();
+    autosave.activate({
+      aggregateId: 'image-1',
+      durableRevision: 4,
+      sourceGeneration: 'opened',
+      sourceTitle: null,
+      sourceUrl: null,
+      renderPresentation: () => rendered.promise,
+    });
+    autosave.schedulePresentation();
+    await vi.advanceTimersByTimeAsync(3_000);
+    autosave.updateContext({ sourceGeneration: 'replacement' });
+    rendered.resolve('data:image/png;base64,QUJD');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(commitPresentationMock).not.toHaveBeenCalled();
+    autosave.dispose();
+  });
   it.each(['render', 'thumbnail', 'commit'] as const)(
     'retries transient %s failures without rewriting the workspace',
     async (stage) => {
@@ -475,21 +580,26 @@ describe('image aggregate autosave', () => {
     expect(commitWorkspaceMock).toHaveBeenCalledOnce();
     queuePendingAutosave(recoveredChainState, createDocument('after-failure'));
     await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
-    expect(commitWorkspaceMock).toHaveBeenCalledTimes(2);
+    expect(commitWorkspaceMock).toHaveBeenCalledTimes(3);
+    expect(commitWorkspaceMock.mock.calls[1]![0]).toBe(commitWorkspaceMock.mock.calls[0]![0]);
+    expect(commitWorkspaceMock.mock.calls[2]![0]).toMatchObject({
+      document: createDocument('after-failure'),
+      expectedRevision: 1,
+    });
 
     const detachedState = createAutosaveState();
     activateAutosaveContext(detachedState, context);
     queuePendingAutosave(detachedState, createDocument('detached'));
     detachedState.activeContext = null;
     await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
-    expect(commitWorkspaceMock).toHaveBeenCalledTimes(2);
+    expect(commitWorkspaceMock).toHaveBeenCalledTimes(3);
 
     const emptyState = createAutosaveState();
     activateAutosaveContext(emptyState, context);
     queuePendingAutosave(emptyState, createDocument('cleared'));
     emptyState.pendingDocument = null;
     await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
-    expect(commitWorkspaceMock).toHaveBeenCalledTimes(2);
+    expect(commitWorkspaceMock).toHaveBeenCalledTimes(3);
   });
 });
 

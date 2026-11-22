@@ -1,8 +1,39 @@
 // @vitest-environment jsdom
+import en from '../../platform/i18n/catalogs/en.json';
+import ru from '../../platform/i18n/catalogs/ru.json';
+import { prepareTranslations, setLocalePreference } from '../../platform/i18n/locale/state';
+import type { AppLocale } from '@sniptale/platform/i18n/config';
 import * as recognitionHooks from './use-recognition';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, beforeEach, expect, it, vi } from 'vitest';
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (language: AppLocale) => Promise.resolve(catalogFixtureMessages(language)),
+}));
+
+beforeAll(async () => {
+  await prepareTranslations('gallery', 'ru');
+  await setLocalePreference('ru');
+});
+
+function catalogFixtureMessages(language: AppLocale): Record<string, string> {
+  const messages: Record<string, string> = {};
+  function visit(value: unknown, prefix: string) {
+    if (typeof value === 'string') {
+      messages[prefix] = value;
+      return;
+    }
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+      throw new Error('Invalid authored catalog fixture');
+    }
+    for (const [key, child] of Object.entries(value)) {
+      visit(child, prefix ? `${prefix}.${key}` : key);
+    }
+  }
+  visit({ en, ru }[language], '');
+  return messages;
+}
+
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import {
   addReviewTextFragment,
@@ -247,6 +278,9 @@ async function mount(
       )
     );
   await render(originalSelection);
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-recognition"]')!.click()
+  );
   return { session, proposal, onSelectText, render };
 }
 function button(label: string) {
@@ -296,8 +330,16 @@ it('offers advanced editing after accepted source recognition as an explicit act
 it('disables selected clip sound controls only while Apply is in flight', async () => {
   await mount();
   await recognize();
-  const sound = () =>
-    host.querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.audioInspector"]')!;
+  const sound = () => {
+    act(() =>
+      host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-audio"]')!.click()
+    );
+    return host.querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.audioInspector"]')!;
+  };
+  const recognition = () =>
+    act(() =>
+      host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-recognition"]')!.click()
+    );
   expect(sound().disabled).toBe(false);
   let release!: () => void;
   mocks.apply.mockImplementationOnce(
@@ -306,6 +348,7 @@ it('disables selected clip sound controls only while Apply is in flight', async 
         release = resolve;
       })
   );
+  recognition();
   await click(translate('gallery.videoReview.recognitionApply'));
   expect(sound().disabled).toBe(true);
   await act(async () => release());
@@ -313,7 +356,7 @@ it('disables selected clip sound controls only while Apply is in flight', async 
 });
 it('keeps ordinary audio controls and one compact model form without requesting speech on mount', async () => {
   await mount();
-  expect(host.querySelector('[data-ui="gallery.videoReview.audioInspector"]')).not.toBeNull();
+  expect(host.querySelector('[role="tab"][aria-controls$="-audio"]')).not.toBeNull();
   expect(button(translate('gallery.videoReview.recognitionStart'))).toBeDefined();
   expect(host.querySelector('input[type="range"]')).toBeNull();
   expect(host.querySelectorAll('[role="dialog"]')).toHaveLength(0);
@@ -603,6 +646,10 @@ it('shows gain and processing in Basic without starting recognition or model req
   expect(host.textContent).toContain(translate('gallery.videoReview.volume'));
   expect(host.textContent).not.toContain(translate('gallery.videoReview.recognitionTitle'));
   expect(host.querySelector('[data-ui="gallery.videoReview.speechRecognition"]')).toBeNull();
+  expect(host.querySelector('[data-ui="audio.processing-fields"]')).toBeNull();
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-audio-effects"]')!.click()
+  );
   expect(host.querySelector('[data-ui="audio.processing-fields"]')).not.toBeNull();
   await act(async () =>
     host

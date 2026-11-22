@@ -52,47 +52,54 @@ function initial(): VideoWorkspaceSnapshot {
   };
 }
 
-it('serializes draft then Save using the committed draft revision, without an extra history step', async () => {
+it('consumes a local draft in the same history buffer and publishes one coherent snapshot', async () => {
   const snapshot = initial();
-  const draft = { aggregateId: 'recording:r', annotation, before: null, revision: 4, updatedAt: 2 };
-  const operation = {
+  const operation: ReviewOperation = {
     id: 'op',
     at: 2,
-    target: 'annotation' as const,
+    target: 'annotation',
     before: null,
     after: annotation,
   };
-  const saved = {
-    ...snapshot,
-    workspace: { ...snapshot.workspace, revision: 2, cursor: 1, history: [operation] },
-  };
-  const deps = {
-    saveVideoWorkspaceDraft: vi.fn(async () => ({ ...snapshot, draft })),
-    saveVideoWorkspaceSnapshot: vi.fn(async () => structuredClone(snapshot)),
-    saveVideoWorkspaceAdvanced: vi.fn(async () => snapshot),
-    commitVideoWorkspace: vi.fn(async () => saved),
-    readVideoWorkspace: vi.fn(async () => snapshot),
-    moveVideoWorkspaceHistory: vi.fn(async () => snapshot),
-  };
-  const session = createVideoReviewSession(snapshot, deps);
-  const listener = vi.fn();
-  const unsubscribe = session.subscribe(listener);
-  const pendingDraft = session.saveDraft(annotation, null);
-  const pendingSave = session.commit(operation, true);
-  expect(session.getSnapshot().pending).toBe(2);
-  await Promise.all([pendingDraft, pendingSave]);
-  expect(deps.commitVideoWorkspace).toHaveBeenCalledWith(
-    expect.objectContaining({
-      expectedRevision: 1,
-      expectedSourceAssetId: 'source',
-      consumeDraftRevision: 4,
-    })
+  const native = vi.fn(
+    async (args: { workspace: unknown; draft: unknown; expectedRevision: number }) => {
+      const workspace = parseVideoWorkspace(args.workspace);
+      if (!workspace || args.draft !== null) throw new Error('Invalid publication');
+      return { workspace: { ...workspace, revision: args.expectedRevision + 1 }, draft: null };
+    }
   );
-  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
-  expect(session.getSnapshot().document.annotations).toEqual([annotation]);
-  expect(session.getSnapshot().pending).toBe(0);
-  expect(listener).toHaveBeenCalled();
-  unsubscribe();
+  const unused = vi.fn(async () => snapshot);
+  const session = createVideoReviewSession(snapshot, {
+    readVideoWorkspace: unused,
+    saveVideoWorkspaceSnapshot: native,
+    saveVideoWorkspaceDraft: unused,
+    saveVideoWorkspaceAdvanced: unused,
+    commitVideoWorkspace: unused,
+    moveVideoWorkspaceHistory: unused,
+  });
+  try {
+    const draft = session.saveDraft(annotation, null);
+    const save = session.commit(operation, true);
+    expect(session.getSnapshot().pending).toBe(2);
+    await Promise.all([draft, save]);
+    expect(native).not.toHaveBeenCalled();
+    expect(session.getSnapshot().snapshot.draft).toBeNull();
+    expect(session.getSnapshot().document.annotations).toEqual([annotation]);
+    await session.flush();
+    expect(native).toHaveBeenCalledOnce();
+    expect(native).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expectedRevision: 1,
+        expectedSourceAssetId: 'source',
+        expectedDraftRevision: null,
+        draft: null,
+      })
+    );
+    expect(session.getSnapshot().snapshot.workspace.history).toEqual([operation]);
+    expect(session.getSnapshot()).toMatchObject({ dirty: false, pending: 0 });
+  } finally {
+    await session.dispose();
+  }
 });
 
 it('durably commits an explicit recording save while autosave stays disabled', async () => {
@@ -140,7 +147,9 @@ it('keeps recovery and committed state after failed Save and exposes reload expl
   };
   const deps = {
     saveVideoWorkspaceDraft: vi.fn(async () => snapshot),
-    saveVideoWorkspaceSnapshot: vi.fn(async () => structuredClone(snapshot)),
+    saveVideoWorkspaceSnapshot: vi.fn(async () => {
+      throw { code: 'conflict' };
+    }),
     saveVideoWorkspaceAdvanced: vi.fn(async () => snapshot),
     commitVideoWorkspace: vi.fn(async () => {
       throw { code: 'conflict' };
@@ -149,10 +158,13 @@ it('keeps recovery and committed state after failed Save and exposes reload expl
     moveVideoWorkspaceHistory: vi.fn(async () => snapshot),
   };
   const session = createVideoReviewSession(snapshot, deps);
-  await expect(
-    session.commit({ id: 'op', at: 2, target: 'annotation', before: null, after: annotation }, true)
-  ).rejects.toEqual({ code: 'conflict' });
-  expect(session.getSnapshot()).toMatchObject({ error: 'conflict', pending: 0, snapshot });
+  await session.commit(
+    { id: 'op', at: 2, target: 'annotation', before: null, after: annotation },
+    true
+  );
+  await expect(session.flush()).rejects.toEqual({ code: 'conflict' });
+  expect(session.getSnapshot()).toMatchObject({ error: 'conflict', pending: 0, dirty: true });
+  expect(session.getSnapshot().document.annotations).toEqual([annotation]);
   await expect(session.flush()).rejects.toThrow();
   await session.reload();
   await session.history('undo');
@@ -176,7 +188,7 @@ it('saves advanced state through the revisioned queue and reports failures as co
   };
   const deps = {
     saveVideoWorkspaceDraft: vi.fn(async () => snapshot),
-    saveVideoWorkspaceSnapshot: vi.fn(async () => structuredClone(snapshot)),
+    saveVideoWorkspaceSnapshot: vi.fn(async () => saved),
     saveVideoWorkspaceAdvanced: vi.fn(async () => saved),
     commitVideoWorkspace: vi.fn(async () => snapshot),
     readVideoWorkspace: vi.fn(async () => snapshot),
@@ -184,12 +196,14 @@ it('saves advanced state through the revisioned queue and reports failures as co
   };
   const session = createVideoReviewSession(snapshot, deps);
   await session.saveAdvanced(advanced);
-  expect(deps.saveVideoWorkspaceAdvanced).toHaveBeenCalledWith(
+  expect(deps.saveVideoWorkspaceSnapshot).not.toHaveBeenCalled();
+  await session.flush();
+  expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledWith(
     expect.objectContaining({
       aggregateId: 'recording:r',
       expectedRevision: 1,
       expectedSourceAssetId: 'source',
-      advanced,
+      workspace: expect.objectContaining({ advanced }),
     })
   );
   expect(session.getSnapshot().snapshot.workspace.advanced).toEqual(advanced);
@@ -307,7 +321,7 @@ it('cancels queued resume when paused again before its write starts', async () =
   expect(session.getSnapshot().dirty).toBe(true);
 });
 
-it('keeps an existing conflict visible when autosave is toggled without a local buffer', async () => {
+it('keeps an existing conflict visible when autosave is toggled with a retained local buffer', async () => {
   const snapshot = initial();
   const deps = {
     saveVideoWorkspaceDraft: vi.fn(async () => {
@@ -317,14 +331,17 @@ it('keeps an existing conflict visible when autosave is toggled without a local 
     commitVideoWorkspace: vi.fn(),
     moveVideoWorkspaceHistory: vi.fn(),
     readVideoWorkspace: vi.fn(),
-    saveVideoWorkspaceSnapshot: vi.fn(),
+    saveVideoWorkspaceSnapshot: vi.fn(async () => {
+      throw { code: 'conflict' };
+    }),
   };
   const session = createVideoReviewSession(snapshot, deps);
-  await expect(session.saveDraft(annotation, null)).rejects.toEqual({ code: 'conflict' });
+  await session.saveDraft(annotation, null);
+  await expect(session.flush()).rejects.toEqual({ code: 'conflict' });
   session.setAutosaveEnabled(false);
   session.setAutosaveEnabled(true);
   expect(session.getSnapshot().error).toBe('conflict');
-  expect(deps.saveVideoWorkspaceSnapshot).not.toHaveBeenCalled();
+  expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledOnce();
 });
 
 it('retries the same failed speech save using fresh queued history and durable revision', async () => {
@@ -404,8 +421,9 @@ it('retries the same failed speech save using fresh queued history and durable r
   );
   expect(commitVideoWorkspace).toHaveBeenCalledTimes(2);
   expect(stored.workspace.history).toHaveLength(1);
-  deps.moveVideoWorkspaceHistory.mockRejectedValueOnce(new Error('history failed'));
-  await expect(session.history('undo')).rejects.toThrow('history failed');
+  deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(new Error('history failed'));
+  await session.history('undo');
+  await expect(session.flush()).rejects.toThrow('history failed');
   await expect(
     saveReviewSpeechTranscript(session, { kind: 'voiceover', clipId: 'voice' }, transcript)
   ).rejects.toThrow('storage');
@@ -556,13 +574,22 @@ it('keeps source mute autosave payload independent of unchanged text and preserv
     stored = { workspace, draft: stored.draft };
     return structuredClone(stored);
   });
-  const deps = {
+  const deps: Parameters<typeof createVideoReviewSession>[1] = {
     readVideoWorkspace: read,
     commitVideoWorkspace: commit,
     moveVideoWorkspaceHistory: read,
     saveVideoWorkspaceAdvanced: read,
     saveVideoWorkspaceDraft: read,
-    saveVideoWorkspaceSnapshot: read,
+    saveVideoWorkspaceSnapshot: async (request) => {
+      const workspace = parseVideoWorkspace(request.workspace);
+      if (!workspace || request.draft !== null) throw new Error('Invalid test snapshot');
+      expect(request.expectedRevision).toBe(stored.workspace.revision);
+      stored = {
+        workspace: { ...workspace, revision: stored.workspace.revision + 1 },
+        draft: null,
+      };
+      return structuredClone(stored);
+    },
   };
   const session = createVideoReviewSession(stored, deps);
   const before = session.getSnapshot().document.advancedContent;
@@ -774,9 +801,9 @@ it('saves buffered content before New and retries the same stable archive identi
     return structuredClone(stored);
   });
   const create = vi
-    .fn(async (args: { expectedRevision: number; archiveId: string }) => {
+    .fn(async (args: { expectedRevision: number; newProjectId: string }) => {
       expect(args.expectedRevision).toBe(2);
-      expect(args.archiveId).toBe('recording:quick-project:stable-command');
+      expect(args.newProjectId).toBe('recording:quick-project:stable-command');
       expect(stored.workspace.history[0]).toMatchObject({
         target: 'annotation',
         after: annotation,

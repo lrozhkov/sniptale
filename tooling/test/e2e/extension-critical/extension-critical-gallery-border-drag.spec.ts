@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { startHostServer } from '../support/host-server';
 import {
   addReviewFocus,

@@ -49,8 +49,8 @@ export function ReviewWebcamCropPreview(props: {
     return () => window.removeEventListener('blur', cancel);
   }, []);
   return (
-    <div data-ui="gallery.videoReview.webcamCrop" className="space-y-2">
-      <video ref={video} muted playsInline preload="auto" className="hidden" aria-hidden />
+    <div data-ui="gallery.videoReview.webcamCrop" className="review-webcam-crop-preview">
+      <video ref={video} muted playsInline preload="auto" hidden />
       <button
         type="button"
         aria-label={translate('videoEditor.sidebar.cameraCropPreview')}

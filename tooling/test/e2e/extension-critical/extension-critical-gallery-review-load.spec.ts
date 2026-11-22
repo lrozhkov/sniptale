@@ -4,7 +4,7 @@ import {
 } from '../support/native-review-workspace';
 import { reviewAdvancedContentBaseline } from '../../../../apps/extension/src/features/video/review/document';
 import { expect, test, type Page } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';

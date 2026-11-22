@@ -1,4 +1,4 @@
-import { MousePointer2, Palette, Clock3, Move, RotateCcw } from 'lucide-react';
+import { Waves, Palette, Clock3, Move, RotateCcw } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { translate } from '../../platform/i18n';
 import { PointerFeedbackFields } from '../../ui/pointer-feedback/fields';
@@ -21,6 +21,7 @@ export function ReviewClickFields(props: Parameters<typeof reviewClickSections>[
 
 export function reviewClickSections(props: {
   information?: ReactNode;
+  content?: ReactNode;
   gesture?: boolean;
   extraSections?: Parameters<typeof ReviewInspectorSections>[0]['sections'];
   values: readonly ReviewClickStyle[];
@@ -35,17 +36,22 @@ export function reviewClickSections(props: {
       onChange={props.onChange}
     />
   );
-  const sections = reviewInformationSections(props.information);
+  const sections: Parameters<typeof ReviewInspectorSections>[0]['sections'][number][] = [];
   sections.push({
     id: 'animation',
     label: translate('gallery.videoReview.clickEffect'),
-    icon: MousePointer2,
-    content: fields('animation'),
+    icon: Waves,
+    content: (
+      <>
+        {props.content}
+        {fields('animation')}
+      </>
+    ),
   });
   if (!props.values.every((value) => value.effect === 'off')) {
     sections.push({
       id: 'appearance',
-      label: translate('gallery.videoReview.clickAppearance'),
+      label: translate('videoEditor.effectsLibrary.objectAppearance'),
       icon: Palette,
       content: fields('appearance'),
     });
@@ -59,16 +65,18 @@ export function reviewClickSections(props: {
         },
         {
           id: 'position',
-          label: translate('gallery.videoReview.clickPosition'),
+          label: translate('gallery.videoReview.spatialToolPosition'),
           icon: Move,
           content: fields('position'),
         }
       );
   }
   if (props.extraSections) sections.push(...props.extraSections);
+  sections.push(...reviewInformationSections(props.information));
   sections.push(
     reviewInspectorActions(
       <ReviewButton
+        selectionAction="reset"
         className={`${reviewTextButtonClassName} !w-full justify-start`}
         label={translate('gallery.videoReview.clickReset')}
         onClick={() => props.onChange(null)}

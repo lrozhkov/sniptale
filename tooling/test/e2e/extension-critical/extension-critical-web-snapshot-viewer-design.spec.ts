@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import type { BrowserContext, Locator, Page, TestInfo, ViewportSize } from '@playwright/test';
-import { translate, type TranslationKey } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
+import type { TranslationKey } from '../../../../apps/extension/src/platform/i18n';
 import { expect, test } from '../support/extension-fixture';
 import {
   authoredStyle,
@@ -284,16 +285,27 @@ async function catalogComposition(state: SavedViewer, composition: Composition, 
       const zoom = preview.getByRole('group', {
         name: tr(composition, 'webSnapshotViewer.app.previewZoom'),
       });
-      await zoom
-        .getByRole('button', { name: tr(composition, 'webSnapshotViewer.app.zoomIn'), exact: true })
-        .click();
-      await expect(zoom.getByText('125%', { exact: true })).toBeVisible();
-      await zoom
-        .getByRole('button', {
-          name: tr(composition, 'webSnapshotViewer.app.zoomOut'),
-          exact: true,
-        })
-        .click();
+      const zoomIn = zoom.getByRole('button', {
+        name: tr(composition, 'webSnapshotViewer.app.zoomIn'),
+        exact: true,
+      });
+      const zoomOut = zoom.getByRole('button', {
+        name: tr(composition, 'webSnapshotViewer.app.zoomOut'),
+        exact: true,
+      });
+      await capture(page, info, 'asset-zoom-before-step');
+      const readout = (percent: string) => zoom.getByText(percent, { exact: true });
+      await expect(readout('100%')).toHaveCSS('width', '44px');
+      await expect(zoomOut).toBeDisabled();
+      await expect(zoomIn.locator('svg.lucide-plus')).toHaveCount(1);
+      await expect(zoomOut.locator('svg.lucide-minus')).toHaveCount(1);
+      await zoomIn.press('Enter');
+      await expect(readout('125%')).toHaveCSS('width', '44px');
+      await zoomIn.click();
+      await expect(readout('150%')).toBeVisible();
+      await expect(zoomIn).toBeDisabled();
+      await zoomOut.click();
+      await zoomOut.click();
       await expect(zoom.getByText('100%', { exact: true })).toBeVisible();
     }
     await capture(page, info, `inline-preview-${kind}`);
@@ -477,6 +489,16 @@ test('native viewer commands, navigation and original download', async ({
       .getByRole('button', { name: tr(composition, 'webSnapshotViewer.app.zoomIn'), exact: true })
       .click();
     await expect(actual).toHaveText('110%');
+    await actual.click();
+    await expect(actual).toHaveText('100%');
+    const zoomOut = toolbar.getByRole('button', {
+      name: tr(composition, 'webSnapshotViewer.app.zoomOut'),
+      exact: true,
+    });
+    for (let step = 0; step < 9; step++) await zoomOut.click();
+    await expect(actual).toHaveText('10%');
+    await expect(zoomOut).toBeDisabled();
+    await expect(actual).toHaveCSS('width', '44px');
     await actual.click();
     await expect(actual).toHaveText('100%');
     const fit = toolbar.getByRole('button', {

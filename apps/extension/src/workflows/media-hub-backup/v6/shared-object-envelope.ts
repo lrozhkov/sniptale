@@ -11,6 +11,7 @@ import {
   isSharedBackupLayout,
   assertReviewProjectLayout,
   assertCursorAttachmentLayout,
+  assertImageHistoryLayout,
 } from './layout';
 
 /** Each read receives its own strictly parsed manifest; legacy layouts cannot admit aliases. */
@@ -19,11 +20,13 @@ export function parseBackupRootEnvelope(value: unknown, manifest: MediaHubBackup
     if (!manifest.sharedObjects) throw new Error('Media backup shared object table is missing.');
     const admitted = parseSharedRootEnvelope(value, manifest.sharedObjects);
     assertCursorAttachmentLayout(admitted.envelope.metadata, manifest.layout);
+    assertImageHistoryLayout(admitted.envelope.metadata, manifest.layout);
     return admitted;
   }
   const envelope = parseRootEnvelope(value);
   assertReviewProjectLayout(envelope.metadata, manifest.layout);
   assertCursorAttachmentLayout(envelope.metadata, manifest.layout);
+  assertImageHistoryLayout(envelope.metadata, manifest.layout);
   return { envelope, directObjects: envelope.objects, sharedIds: [] };
 }
 

@@ -7,6 +7,8 @@ import {
 import { parseScenarioExportEntry } from '../../composition/persistence/scenario/read-guards';
 import type { SyncNativeEditingRoot } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import { listVideoWorkspaceSummaries } from '../../composition/persistence/review-workspaces/summaries';
+import { listImageWorkspaceProjectSummaries } from '../../composition/persistence/image-workspaces/read';
+import { deleteImageWorkspaceProject } from '../../composition/persistence/image-aggregates';
 import {
   deleteVideoWorkspaceProject,
   renameVideoWorkspaceProject,
@@ -29,14 +31,18 @@ import {
   listScenarioExports,
   deleteScenarioExport,
 } from '../../composition/persistence/scenario/projects';
-import { deleteMediaThumbnail } from '../../composition/persistence/media-library/index.library.ts';
+import {
+  deleteMediaThumbnail,
+  listCollectableProjectOriginalIds,
+} from '../../composition/persistence/media-library/index.library.ts';
 import { deleteScenarioProjectRecord } from '../../composition/persistence/scenario/store/public';
 import {
   listMediaAssetProjectUsage,
   type MediaAssetProjectUsage,
 } from '../../composition/persistence/media-library/usage';
 import { deleteMediaLibraryAssetsBatchSafely } from './store';
-import { deletePersistedVideoProject } from './video-projects';
+import { purgePersistedVideoProject } from './video-projects';
+import { tryCollectProjectOriginal } from './project-original-cleanup';
 import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
 
 const maintenanceLog = createMaintenanceLog();
@@ -54,6 +60,10 @@ async function withTrashPublicationResources(
   await runWithAssetResourceRead(async () => {
     const roots: SyncNativeEditingRoot[] = [];
     for (const target of targets) {
+      if (target.kind === 'image-project') {
+        roots.push({ rootKind: 'image-project', rootId: target.id });
+        continue;
+      }
       if (target.kind === 'scenario-export') {
         const db = await initDB();
         const entry = parseScenarioExportEntry(await db.get(SCENARIO_EXPORTS_STORE, target.id));
@@ -100,7 +110,8 @@ export async function permanentlyDeleteTrashItem(
 /** Release only the confirmed root through its existing aggregate/resource owner. */
 async function deleteLibraryTarget(
   target: LibraryTrashTarget,
-  expectedUsage?: readonly MediaAssetProjectUsage[]
+  expectedUsage?: readonly MediaAssetProjectUsage[],
+  releaseUnclaimedOriginal = true
 ): Promise<void> {
   if (target.kind === 'media') {
     await deleteMediaLibraryAssetsBatchSafely(
@@ -108,14 +119,36 @@ async function deleteLibraryTarget(
       new Map([[target.id, expectedUsage ?? []]])
     );
   } else if (target.kind === 'quick-edit-project') {
-    await deleteVideoWorkspaceProject(target.id, target.expectedRevision);
+    const sourceId = await deleteVideoWorkspaceProject(target.id, target.expectedRevision);
+    if (releaseUnclaimedOriginal) await tryCollectProjectOriginal(sourceId);
+  } else if (target.kind === 'image-project') {
+    const sourceId = await deleteImageWorkspaceProject(
+      target.id,
+      target.expectedRevision,
+      target.expectedLifecycleUpdatedAt
+    );
+    if (releaseUnclaimedOriginal) await tryCollectProjectOriginal(sourceId);
   } else if (target.kind === 'scenario-project') {
-    await deleteScenarioProjectRecord(target.id);
+    const sourceIds = await deleteScenarioProjectRecord(target.id);
+    if (releaseUnclaimedOriginal)
+      for (const sourceId of sourceIds) await tryCollectProjectOriginal(sourceId);
   } else if (target.kind === 'video-project') {
-    await deletePersistedVideoProject(target.id, { preserveExports: true });
+    await purgePersistedVideoProject(target.id, {
+      preserveExports: true,
+      releaseUnclaimedOriginal,
+    });
   } else {
     await deleteScenarioExport(target.id);
     await deleteMediaThumbnail(`scenario-export:${target.id}`);
+  }
+}
+
+/** Recover interrupted last-project deletion independently of Trash expiration policy. */
+export async function cleanupProjectOriginals(signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return;
+  for (const id of await listCollectableProjectOriginalIds(signal)) {
+    if (signal.aborted) return;
+    await tryCollectProjectOriginal(id);
   }
 }
 
@@ -124,11 +157,12 @@ export async function permanentlyDeleteLibraryItem(
   entry: {
     target: LibraryTrashTarget;
     lifecycle: Pick<LibraryLifecycle, 'updatedAt' | 'trashedAt'>;
+    releaseUnclaimedOriginal?: boolean;
   },
   expectedUsage?: readonly MediaAssetProjectUsage[]
 ): Promise<void> {
   await runWithStoredItemLifecycle(entry.target, entry.lifecycle, () =>
-    deleteLibraryTarget(entry.target, expectedUsage)
+    deleteLibraryTarget(entry.target, expectedUsage, entry.releaseUnclaimedOriginal)
   );
   publishMediaHubLibraryChanged('delete', [entry.target.id]);
 }
@@ -141,11 +175,12 @@ export async function cleanupLibraryTrash(
 ): Promise<{ failedCount: number }> {
   if (signal?.aborted || !policy.trashCleanupEnabled) return { failedCount: 0 };
   const cutoff = now - (policy.trashRetentionDays ?? 30) * 86_400_000;
-  const [media, videos, scenarios, quickEdits] = await Promise.all([
-    listMediaLibrary(),
+  const [media, videos, scenarios, quickEdits, images] = await Promise.all([
+    listMediaLibrary({ includeProjectRetained: true }),
     listVideoProjectEntries(),
     listScenarioProjectEntries(),
     listVideoWorkspaceSummaries(),
+    listImageWorkspaceProjectSummaries(),
   ]);
   const candidates: TrashDeletionTarget[] = [];
   const append = (target: LibraryTrashTarget, trashedAt: number | undefined) => {
@@ -164,6 +199,17 @@ export async function cleanupLibraryTrash(
   quickEdits.forEach((item) =>
     append(
       { kind: 'quick-edit-project', id: item.aggregateId, expectedRevision: item.revision },
+      item.lifecycle.trashedAt
+    )
+  );
+  images.forEach((item) =>
+    append(
+      {
+        kind: 'image-project',
+        id: item.aggregateId,
+        expectedRevision: item.revision,
+        expectedLifecycleUpdatedAt: item.lifecycle.updatedAt,
+      },
       item.lifecycle.trashedAt
     )
   );

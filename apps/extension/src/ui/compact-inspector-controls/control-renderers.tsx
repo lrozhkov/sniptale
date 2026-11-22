@@ -4,12 +4,13 @@ import { Check } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { resolveCompactGridClassName } from '@sniptale/ui/compact-inspector-controls/grid';
 import { cx } from './shared';
-import { useInspectorLayout } from './layout';
+import { measureSegmentWidth, useInspectorFitting, useInspectorLayout } from './layout';
 import { CompactSelect } from './select';
 
 export function CompactSegmentedSelector<T extends string>(props: {
   ariaLabel: string;
   columns: 1 | 2 | 3 | 4 | 5;
+  showOptionLabels?: boolean | undefined;
   options: Array<{
     disabled?: boolean;
     description?: string;
@@ -26,6 +27,7 @@ export function CompactSegmentedSelector<T extends string>(props: {
     <div
       role="group"
       data-ui="shared.ui.compact-inspector.segmented-row"
+      data-property-segments=""
       aria-label={props.ariaLabel}
       className={cx('grid min-w-0 flex-1 gap-1.5', resolveCompactGridClassName(props.columns))}
     >
@@ -35,6 +37,7 @@ export function CompactSegmentedSelector<T extends string>(props: {
           active={option.value === props.value}
           onChange={props.onChange}
           option={option}
+          showLabel={props.showOptionLabels}
         />
       ))}
     </div>
@@ -47,49 +50,69 @@ function InspectorSegments<T extends string>(
 ) {
   const host = useRef<HTMLDivElement>(null);
   const [dropdown, setDropdown] = useState(false);
-  const iconOnly = props.options.every((option) => option.icon !== undefined);
-  const labelKey = JSON.stringify(props.options.map((option) => option.label));
+  const fitting = useInspectorFitting();
+  const lifetime = useRef(0);
+  const iconOnly =
+    !props.showOptionLabels && props.options.every((option) => option.icon !== undefined);
+  const labelKey = JSON.stringify(
+    props.options.map((option) => (!props.showOptionLabels && option.icon ? '' : option.label))
+  );
   useLayoutEffect(() => {
     const element = host.current;
     if (!element) return;
-    const fit = () => {
+    const token = ++lifetime.current;
+    let disposed = false;
+    const current = () => token === lifetime.current && !disposed && element.isConnected;
+    const measure = () => {
       if (
-        !element.clientWidth ||
+        !current() ||
         element.matches(':focus-within') ||
         element.querySelector('[aria-expanded="true"]')
       )
-        return;
-      const context = document.createElement('canvas').getContext('2d');
-      if (!context) return;
-      const style = getComputedStyle(element);
-      context.font = `500 ${style.fontSize} ${style.fontFamily}`;
-      const labels: unknown = JSON.parse(labelKey);
-      if (
-        !Array.isArray(labels) ||
-        !labels.every((value): value is string => typeof value === 'string')
-      )
-        return;
-      const width = labels.reduce((sum, label) => sum + context.measureText(label).width + 12, 0);
-      setDropdown(!iconOnly && width + 4 + 2 * (labels.length - 1) > element.clientWidth);
+        return null;
+      let next = false;
+      if (!iconOnly) {
+        const available = element.clientWidth;
+        if (!available) return null;
+        const context = element.ownerDocument.createElement('canvas').getContext('2d');
+        if (!context) return null;
+        const style = getComputedStyle(element);
+        context.font = style.font;
+        const labels: unknown = JSON.parse(labelKey);
+        if (
+          !Array.isArray(labels) ||
+          !labels.every((value): value is string => typeof value === 'string')
+        )
+          return null;
+        next = measureSegmentWidth(context, labels) > available;
+      }
+      return () => {
+        if (current()) setDropdown(next);
+      };
     };
-    fit();
+    const fit = () => {
+      if (!current()) return;
+      if (fitting) fitting.schedule(measure);
+      else measure()?.();
+    };
+    if (fitting) fitting.beforePaint(measure);
+    else measure()?.();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fit);
     observer?.observe(element);
     element
       .querySelectorAll('.sniptale-property-segments > button')
       .forEach((button) => observer?.observe(button));
-    let disposed = false;
-    void document.fonts?.ready.then(() => {
-      if (!disposed) fit();
-    });
+    void document.fonts?.ready.then(fit);
     const afterBlur = () => queueMicrotask(fit);
     element.addEventListener('focusout', afterBlur);
     return () => {
       disposed = true;
+      lifetime.current = token + 1;
+      fitting?.cancel(measure);
       observer?.disconnect();
       element.removeEventListener('focusout', afterBlur);
     };
-  }, [iconOnly, labelKey]);
+  }, [fitting, iconOnly, labelKey]);
   return (
     <div ref={host} className="sniptale-property-choice">
       {dropdown ? (
@@ -105,8 +128,10 @@ function InspectorSegments<T extends string>(
           role="group"
           aria-label={props.ariaLabel}
           data-ui="shared.ui.compact-inspector.segmented-row"
+          data-property-segments=""
           data-icon-only={iconOnly ? 'true' : undefined}
-          className="sniptale-property-segments"
+          data-visible-icons={props.showOptionLabels ? '' : undefined}
+          className={'sniptale-property-segments sniptale-framed-segments'}
           style={{
             gridTemplateColumns: `repeat(${props.options.length}, minmax(${iconOnly ? '0' : 'max-content'}, 1fr))`,
           }}
@@ -115,13 +140,17 @@ function InspectorSegments<T extends string>(
             <button
               key={option.value}
               type="button"
+              data-segment-face=""
               aria-label={option.label}
               title={option.description ?? option.label}
               aria-pressed={option.value === props.value}
               disabled={option.disabled}
               onClick={() => props.onChange(option.value)}
             >
-              {option.icon ?? <span className="sniptale-interface-label">{option.label}</span>}
+              {option.icon}
+              {(!option.icon || props.showOptionLabels) && (
+                <span className="sniptale-interface-label">{option.label}</span>
+              )}
             </button>
           ))}
         </div>
@@ -132,6 +161,7 @@ function InspectorSegments<T extends string>(
 
 function SegmentedOption<T extends string>(props: {
   active: boolean;
+  showLabel?: boolean | undefined;
   option: {
     disabled?: boolean;
     description?: string;
@@ -146,6 +176,7 @@ function SegmentedOption<T extends string>(props: {
       compact
       tone="toggle"
       active={props.active}
+      data-segment-face=""
       className={[
         'min-w-0 !h-auto !min-h-10 !whitespace-normal !px-2 py-2 text-center',
         '!text-[length:var(--sniptale-compact-font-size,11px)] !leading-tight',
@@ -155,7 +186,8 @@ function SegmentedOption<T extends string>(props: {
       title={props.option.description ?? props.option.label}
       onClick={() => props.onChange(props.option.value)}
     >
-      {props.option.icon ?? (
+      {props.option.icon}
+      {(!props.option.icon || props.showLabel) && (
         <span className="sniptale-interface-label min-w-0 break-normal">{props.option.label}</span>
       )}
     </ProductActionButton>

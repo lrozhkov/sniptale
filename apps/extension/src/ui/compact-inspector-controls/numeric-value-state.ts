@@ -24,6 +24,7 @@ interface NumericValueStateParams {
   getStepValue?: ((value: number, direction: 1 | -1) => number) | undefined;
   onCommitValue: (value: number) => void;
   onPreviewValue: (value: number) => void;
+  onCancelValue?: ((origin: number | null) => void) | undefined;
   precision?: number | undefined;
   step: number;
   unit: CompactInspectorUnit;
@@ -33,10 +34,45 @@ interface NumericValueStateParams {
 export function useNumericValueFieldState(params: NumericValueStateParams) {
   const draftState = useNumericDraftState(params);
   const actions = useNumericFieldActions({ ...params, draftState });
+  const stepOrigin = useRef<{ value: number | null } | null>(null);
+  const previewStep = (direction: 1 | -1) => {
+    stepOrigin.current ??= { value: params.value };
+    applyNumericStep({
+      ...params,
+      direction,
+      draftState,
+      onPreviewValue: (value) => {
+        if (stepOrigin.current?.value !== null) params.onPreviewValue(value);
+      },
+      onCommitValue: () => undefined,
+    });
+  };
+  const finishStep = () => {
+    const origin = stepOrigin.current;
+    if (origin === null) return;
+    if (draftState.stepValueRef.current === origin.value) {
+      cancelStep();
+      return;
+    }
+    stepOrigin.current = null;
+    params.onCommitValue(draftState.stepValueRef.current);
+  };
+  const cancelStep = () => {
+    const origin = stepOrigin.current;
+    stepOrigin.current = null;
+    if (origin === null) return;
+    draftState.stepValueRef.current = origin.value ?? 0;
+    draftState.setDraft(formatCompactEditNumber(origin.value, { precision: params.precision }));
+    if (params.onCancelValue) params.onCancelValue(origin.value);
+    else if (origin.value !== null) params.onPreviewValue(origin.value);
+  };
 
   return {
     ...draftState,
     ...actions,
+    previewStep,
+    finishStep,
+    cancelStep,
   };
 }
 
@@ -278,7 +314,7 @@ function handleNumericKeyDown({
     commitDraft();
     if (enterBehavior === 'blur') event.currentTarget.blur();
     else focusNextCompactInput(event.currentTarget);
-  } else if (event.key === 'Escape') {
+  } else if (event.key === 'Escape' && draftState.editingRef.current) {
     event.preventDefault();
     cancelNumericEditing(draftState);
   }

@@ -6,7 +6,7 @@ import {
   type RecordingMediaPermissionResult,
 } from '@sniptale/runtime-contracts/video/types/messages.surface';
 import { createRuntimeMessagingTransport } from '../platform/runtime-messaging';
-import { createTranslator } from '../platform/i18n';
+import { createTranslator, prepareTranslations } from '../platform/i18n';
 import { openMediaPermissionSettingsPage } from '../platform/navigation/extension-pages';
 import { createRecordingMediaPermissionSession } from './session';
 import '@sniptale/ui/styles';
@@ -136,7 +136,54 @@ function receiveBootstrap(event: MessageEvent<unknown>) {
   )
     return;
   window.removeEventListener('message', receiveBootstrap);
-  mountPermissionSession(event.data, port);
+  if (
+    !document.querySelector('main') ||
+    !document.getElementById('heading') ||
+    !document.querySelector('[data-ui="recording.media-permission.status"]') ||
+    !document.querySelector('[data-ui="recording.media-permission.cancel"]') ||
+    !document.querySelector('[data-ui="recording.media-permission.settings"]')
+  ) {
+    port.close();
+    return;
+  }
+  const bootstrap = event.data;
+  let pending = true;
+  const cleanup = () => {
+    window.removeEventListener('pagehide', cancel);
+    window.removeEventListener('unload', cancel);
+    port.onmessage = null;
+  };
+  const cancel = () => {
+    if (!pending) return;
+    pending = false;
+    cleanup();
+    port.postMessage({ status: 'cancelled' } satisfies RecordingMediaPermissionResult);
+    port.close();
+  };
+  port.onmessage = (message: MessageEvent<unknown>) => {
+    if (isRecordingMediaPermissionCancellation(message.data)) cancel();
+  };
+  port.start();
+  window.addEventListener('pagehide', cancel, { once: true });
+  window.addEventListener('unload', cancel, { once: true });
+  void prepareTranslations('media-permission', bootstrap.locale).then(
+    () => {
+      if (!pending) return;
+      pending = false;
+      cleanup();
+      mountPermissionSession(bootstrap, port);
+    },
+    () => {
+      if (!pending) return;
+      pending = false;
+      cleanup();
+      port.postMessage({
+        status: 'failed',
+        reason: 'unavailable',
+      } satisfies RecordingMediaPermissionResult);
+      port.close();
+    }
+  );
 }
 
 window.addEventListener('message', receiveBootstrap);

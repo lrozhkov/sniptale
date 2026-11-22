@@ -170,6 +170,41 @@ it('aborts the complete repair when the second project store cannot be written',
   expect(persisted.get('scenario_projects')?.get(scenario.id)).toEqual(scenario);
 });
 
+it('promotes private origins referenced only by retained Montage history', async () => {
+  const { persisted } = createProjectStores();
+  const video = createVideoProjectEntry(
+    {},
+    {
+      lifecycle: createLibraryLifecycle('library', 1),
+      history: {
+        version: 1,
+        epoch: 'epoch',
+        past: [],
+        future: [{ assetId: 'inverse' }],
+        sources: [{ kind: 'project-asset', id: 'private' }],
+      },
+    }
+  );
+  persisted.get('video_projects')!.set(video.id, video);
+  const origin = createMediaLibraryEntry({
+    id: 'origin',
+    lifecycle: createLibraryLifecycle('temporary', 1),
+  });
+  persisted.get('media_library')!.set(origin.id, origin);
+  persisted.get('project_assets')!.set(
+    'private',
+    createProjectAssetEntry({
+      id: 'private',
+      originMediaId: origin.id,
+    })
+  );
+  await repairTemporaryProjectLifecycles(100);
+  expect(persisted.get('media_library')!.get(origin.id)).toMatchObject({
+    lifecycle: { storageClass: 'library', savedAt: 100 },
+  });
+  expect(persisted.get('video_projects')!.get(video.id)).toEqual(video);
+});
+
 it('repairs used logical sources even when their parent is already permanent', async () => {
   const { persisted } = createProjectStores();
   const video = createVideoProjectEntryWithMediaClip({ id: 'accepted-video' });
@@ -251,6 +286,7 @@ it.each(['current', 'history'] as const)('retains scenario source used in %s', a
   );
   await repairTemporaryProjectLifecycles(100);
   expect(persisted.get('media_library')!.get('origin')).toMatchObject({
+    savedIndependently: false,
     lifecycle: { storageClass: 'library', savedAt: 100 },
   });
 });

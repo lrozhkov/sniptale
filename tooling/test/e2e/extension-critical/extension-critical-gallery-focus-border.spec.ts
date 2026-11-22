@@ -1,7 +1,8 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { build } from 'esbuild';
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 import {
@@ -184,27 +185,21 @@ for (const variant of [
         await hold
           .getByRole('button', { name: label('gallery.videoReview.borderPulse'), exact: true })
           .click();
-        const speed = inspector.getByRole('textbox', {
-          name: label('gallery.videoReview.borderSpeed'),
-          exact: true,
-        });
+        const speedLabel = label('gallery.videoReview.borderSpeed');
+        const speed = numericControl(hold, speedLabel);
         await expect(speed).toHaveValue('1');
         await expect(
-          inspector.getByRole('textbox', {
-            name: label('gallery.videoReview.borderSegmentPercent'),
-            exact: true,
-          })
+          numericControl(hold, label('gallery.videoReview.borderSegmentPercent'))
         ).toHaveCount(0);
-        await speed.fill('0.5');
+        await (await openNumericControl(hold, speedLabel)).fill('0.5');
         await speed.press('Enter');
         await expect.poll(async () => (await persistedFocus(page))?.border?.period).toBe(4);
-        const style = inspector.getByRole('button', {
+        const style = inspector.getByRole('group', {
           name: label('gallery.videoReview.borderStyle'),
           exact: true,
         });
-        await style.click();
-        await page
-          .getByRole('option', {
+        await style
+          .getByRole('button', {
             name: label('gallery.videoReview.borderStyle_dashed'),
             exact: true,
           })
@@ -218,9 +213,8 @@ for (const variant of [
             exact: true,
           })
           .click();
-        await style.click();
-        await page
-          .getByRole('option', {
+        await style
+          .getByRole('button', {
             name: label('gallery.videoReview.borderStyle_solid'),
             exact: true,
           })
@@ -229,9 +223,8 @@ for (const variant of [
           hold.getByRole('button', { name: label('gallery.videoReview.borderStill'), exact: true })
         ).toHaveAttribute('aria-pressed', 'true');
         await expect(speed).toHaveCount(0);
-        await style.click();
-        await page
-          .getByRole('option', {
+        await style
+          .getByRole('button', {
             name: label('gallery.videoReview.borderStyle_dashed'),
             exact: true,
           })
@@ -246,12 +239,10 @@ for (const variant of [
           })
           .click();
         await expect(speed).toHaveValue('0.5');
-        const segmentSize = inspector.getByRole('textbox', {
-          name: label('gallery.videoReview.borderSegmentPercent'),
-          exact: true,
-        });
+        const segmentLabel = label('gallery.videoReview.borderSegmentPercent');
+        const segmentSize = numericControl(hold, segmentLabel);
         await expect(segmentSize).toHaveValue('100');
-        await segmentSize.fill('65');
+        await (await openNumericControl(hold, segmentLabel)).fill('65');
         await segmentSize.press('Enter');
         await expect
           .poll(async () => (await persistedFocus(page))?.border?.segmentPercent)
@@ -317,11 +308,10 @@ for (const variant of [
             exact: true,
           })
           .click();
-        const zoomScale = inspector.getByRole('textbox', {
-          name: label('gallery.videoReview.zoomScale'),
-          exact: true,
-        });
-        await zoomScale.fill('1');
+        const zoomScale = numericControl(inspector, label('gallery.videoReview.zoomScale'));
+        await (
+          await openNumericControl(inspector, label('gallery.videoReview.zoomScale'))
+        ).fill('1');
         await zoomScale.press('Enter');
         // Both overlay types must reach the decoration, not stop at the first video row.
         for (const type of [
@@ -580,3 +570,145 @@ test('Ripple keeps the original border fixed while an outline expands and fades'
   expect(samples[2].echo).toBeGreaterThan(samples[3].echo);
   await page.screenshot({ path: info.outputPath('border-ripple.png'), fullPage: false });
 });
+
+for (const [locale, theme] of [
+  ['en', 'light'],
+  ['ru', 'dark'],
+] as const) {
+  test(`Focus Border field layout (${theme})`, async ({ page }, info) => {
+    const host = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': locale,
+          'sniptale-theme-preference': theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', {
+        width: 160,
+        height: 90,
+        duration: 4,
+      });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const button = (key: Parameters<typeof translate>[0]) =>
+        dialog.getByRole('button', { name: label(key), exact: true });
+      await button('gallery.videoReview.advancedEditing').click();
+      await seek(page, 0.5);
+      await addReviewFocus(page, locale, 'border');
+      const inspector = dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]');
+      const width = inspector.getByRole('textbox', {
+        name: label('gallery.videoReview.borderWidth'),
+        exact: true,
+      });
+      const stroke = inspector.getByRole('group', {
+        name: label('gallery.videoReview.borderStyle'),
+        exact: true,
+      });
+      const roundness = inspector.getByRole('textbox', {
+        name: label('gallery.videoReview.focusRoundness'),
+        exact: true,
+      });
+      for (const [field, key] of [
+        [width, 'gallery.videoReview.borderWidth'],
+        [roundness, 'gallery.videoReview.focusRoundness'],
+      ] as const) {
+        const value = field.locator(
+          'xpath=ancestor::*[@data-ui="shared.ui.compact-inspector.numeric-value-field"]'
+        );
+        await expect(value.getByRole('button')).toHaveCount(2);
+        await expect(value.getByRole('slider')).toHaveCount(0);
+        await expect(field).toHaveAccessibleName(label(key));
+      }
+      await expect(stroke.getByRole('button')).toHaveCount(3);
+      const disclosure = inspector.locator('summary', {
+        hasText: label('gallery.videoReview.preciseArea'),
+      });
+      await disclosure.scrollIntoViewIfNeeded();
+      const strokeRow = stroke.locator('xpath=ancestor::*[@data-layout="inline"][1]');
+      const strokeLabel = strokeRow.locator('.sniptale-parameter-name');
+      const disclosureIsAligned = async () => {
+        const [summary, field, name] = await Promise.all([
+          disclosure.boundingBox(),
+          stroke.boundingBox(),
+          strokeLabel.boundingBox(),
+        ]);
+        if (!summary || !field || !name) return false;
+        return (
+          Math.abs(summary.x - name.x) <= 1 &&
+          Math.abs(summary.x + summary.width - field.x - field.width) <= 1
+        );
+      };
+      await expect.poll(disclosureIsAligned).toBe(true);
+      await page.screenshot({ path: info.outputPath('framing-fields.png'), fullPage: false });
+      await disclosure.click();
+      await expect.poll(disclosureIsAligned).toBe(true);
+      await disclosure.locator('xpath=..').getByRole('textbox').first().scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('framing-position-and-size.png'),
+        fullPage: false,
+      });
+      await disclosure.click();
+      await expect(width).toHaveValue('3');
+      await width.fill('6');
+      await width.press('Enter');
+      await expect(width).toHaveValue('6');
+      await expect(width).not.toBeFocused();
+      await button('gallery.videoReview.undo').click();
+      await expect(width).toHaveValue('3');
+      await button('gallery.videoReview.redo').click();
+      await expect(width).toHaveValue('6');
+      if (page.viewportSize()!.width === 1920) {
+        const scroll = dialog.locator('.review-inspector-scroll');
+        const handle = dialog.locator('[data-ui="gallery.videoReview.resizeInspector"]');
+        const contentWidth = () =>
+          scroll.evaluate((node) => {
+            const style = getComputedStyle(node);
+            return (
+              node.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+            );
+          });
+        for (const target of [523, 524, 525, 643, 644, 645]) {
+          const current = await contentWidth();
+          const box = (await handle.boundingBox())!;
+          await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+          await page.mouse.down();
+          await page.mouse.move(box.x + box.width / 2 - (target - current), box.y + box.height / 2);
+          await page.mouse.up();
+          await expect.poll(contentWidth).toBe(target);
+          await expect.poll(disclosureIsAligned).toBe(true);
+          const hexFits = await inspector
+            .locator('.inspector-hex-editor input')
+            .evaluate((input) => {
+              const node = input as HTMLInputElement;
+              const ruler = node.ownerDocument.createElement('span');
+              const style = getComputedStyle(node);
+              ruler.style.cssText = 'position:absolute;visibility:hidden;white-space:pre';
+              ruler.style.font = style.font;
+              ruler.style.fontVariantNumeric = style.fontVariantNumeric;
+              ruler.textContent = node.value;
+              node.parentElement!.append(ruler);
+              const width = ruler.getBoundingClientRect().width;
+              ruler.remove();
+              return width <= node.clientWidth;
+            });
+          expect(hexFits).toBe(true);
+          await page.screenshot({
+            path: info.outputPath(`framing-inspector-${target}.png`),
+            fullPage: false,
+          });
+        }
+      }
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+}

@@ -6,7 +6,7 @@ import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { applyHarnessBootstrap, VIDEO_EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
 import { createEmptyVideoProject } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { createTextClip } from '../../../../apps/extension/src/features/video/project/factories/overlay-clip';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 const ui = (page: Page, name: string) => page.locator(`[data-ui="${name}"]`);
 test.use({ actionTimeout: 10_000 });
@@ -253,17 +253,18 @@ async function inspectVideoCommands(page: Page, locale: Locale, info: TestInfo) 
   await page
     .getByRole('button', { name: label('videoEditor.app.exportButton'), exact: true })
     .click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-  const cancel = dialog.getByRole('button', {
-    name: label('videoEditor.exportDialog.cancel'),
+  const exportInspector = ui(page, 'video-editor.export.inspector');
+  await expect(exportInspector).toBeVisible();
+  const submit = exportInspector.getByRole('button', {
+    name: label('videoEditor.exportDialog.submit'),
     exact: true,
   });
-  await cancel.scrollIntoViewIfNeeded();
-  await expect(cancel).toBeInViewport({ ratio: 1 });
-  await screenshot(page, info, 'export-draft-dialog');
-  await cancel.click();
-  await expect(dialog).toHaveCount(0);
+  await expect(submit).toBeInViewport({ ratio: 1 });
+  await screenshot(page, info, 'export-inspector');
+  await submit.focus();
+  await page.keyboard.press('Escape');
+  await expect(exportInspector).toHaveCount(0);
+  await expect(ui(page, 'video-editor.inspector.content')).toBeVisible();
   await expect(clip).toHaveCount(1);
 }
 

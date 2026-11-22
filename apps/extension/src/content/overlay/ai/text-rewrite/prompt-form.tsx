@@ -1,3 +1,4 @@
+import { ProductTextarea } from '@sniptale/ui/product-form-controls';
 import { getAIProviderFailureKey } from '../../../../features/ai/provider-failure-copy';
 import { useEffect, useId, useLayoutEffect, useRef, type SyntheticEvent } from 'react';
 import { Send, Square } from 'lucide-react';
@@ -190,7 +191,7 @@ function TextRewritePromptFields({
         ) : null}
       </div>
       <div className="relative" data-ui="content.ai-text.prompt-field">
-        <textarea
+        <ProductTextarea
           ref={textareaRef}
           id={inputId}
           data-ui="content.ai-text.prompt"
@@ -200,14 +201,7 @@ function TextRewritePromptFields({
           disabled={session.request.busy}
           maxLength={CONTENT_AI_PAYLOAD_LIMITS.maxPromptChars}
           placeholder={translate('content.toolbar.aiTextPlaceholder')}
-          className={[
-            'sniptale-design-review-authored-text block min-h-20 max-h-40 w-full resize-none overflow-y-auto',
-            'rounded-[4px] border border-[color:var(--sniptale-color-border-strong)]',
-            'bg-[var(--sniptale-color-surface-input)] py-2 pl-3 pr-12 text-xs leading-5',
-            'text-[var(--sniptale-color-text-primary)] outline-none',
-            'placeholder:text-[var(--sniptale-color-text-secondary)]',
-            'focus:ring-1 focus:ring-[color:var(--sniptale-color-border-strong)] disabled:opacity-50',
-          ].join(' ')}
+          className="min-h-20! max-h-40 resize-none! pe-12!"
           onChange={(event) => {
             if (voiceBusy) voice.actions.cancel();
             session.setPrompt(event.currentTarget.value);

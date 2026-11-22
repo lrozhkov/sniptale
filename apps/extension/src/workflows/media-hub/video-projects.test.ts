@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   deleteMediaThumbnail: vi.fn(),
+  collectOriginal: vi.fn(),
   deleteProjectExport: vi.fn(),
   deleteRecording: vi.fn(),
   deleteVideoPreviewCacheProjectRecords: vi.fn(),
@@ -9,6 +10,9 @@ const mocks = vi.hoisted(() => ({
   listProjectExports: vi.fn(),
   listVideoProjects: vi.fn(),
   publishMediaHubLibraryChanged: vi.fn(),
+}));
+vi.mock('./project-original-cleanup', () => ({
+  tryCollectProjectOriginal: mocks.collectOriginal,
 }));
 
 vi.mock('../../composition/persistence/video-preview-cache', async (importOriginal) => ({
@@ -43,12 +47,12 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
-import { deletePersistedVideoProject } from './video-projects';
+import { deletePersistedVideoProject, purgePersistedVideoProject } from './video-projects';
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.deleteVideoPreviewCacheProjectRecords.mockResolvedValue({ removedCount: 1 });
-  mocks.deleteVideoProject.mockResolvedValue([]);
+  mocks.deleteVideoProject.mockResolvedValue({ deletedProjectAssetIds: [], originalMediaIds: [] });
   mocks.listProjectExports.mockResolvedValue([]);
   mocks.listVideoProjects.mockResolvedValue([]);
 });
@@ -80,4 +84,17 @@ it('preserves independently published exports when purging only their trashed pa
   expect(mocks.deleteProjectExport).not.toHaveBeenCalled();
   expect(mocks.deleteMediaThumbnail).not.toHaveBeenCalledWith('export:restored-export');
   expect(mocks.deleteMediaThumbnail).not.toHaveBeenCalledWith('export:recent-trash-export');
+});
+
+it('rechecks only originals released by the committed Montage work', async () => {
+  mocks.deleteVideoProject.mockResolvedValue({
+    deletedProjectAssetIds: [],
+    originalMediaIds: ['released-original'],
+  });
+
+  await purgePersistedVideoProject('project-1', { preserveExports: true });
+
+  expect(mocks.collectOriginal).toHaveBeenCalledExactlyOnceWith('released-original');
+  expect(mocks.deleteVideoProject).toHaveBeenCalledBefore(mocks.collectOriginal);
+  expect(mocks.listVideoProjects).not.toHaveBeenCalled();
 });

@@ -30,6 +30,24 @@ Physical database version 54 advances mediaLibrary from 34 to 35 and scenarioPro
 
 The document asset owner retains the original image, accepted color image, visibility mask and key image through its existing resource closure. Managed backgrounds keep these fields on the serialized background object. The change adds no Frame binary property, store, journal or archive layout. Portable readers refuse unsupported document versions before restore staging or publication.
 
+## Montage history publication
+
+Physical database version 65 advances the videoProjects contract to version 14. The additive migration preserves every existing record, store and immutable file. Earlier writers refuse the newer database before mutation.
+
+The native workspace factory uses the existing asset journal and project writer. Preparation captures the canonical predecessor and retained revision before file IO. Preparation stores each distinct inverse value in one immutable JSON object. Retained changes reuse their admitted native references. One transaction publishes the current document, history references, ownership, source retention and revision. The history budget permits 1000 transitions and 32 MiB, including unfinished gesture recovery.
+
+A retry retains its prepared attempt and journal identity. An exact acknowledgement does not create another revision. The live attempt retains its own sync receipt across acknowledgement failure. Deleted or recreated identities refuse delayed publication through the retained revision counter. Cold recovery validates unknown metadata, actual file hashes, both history directions and source closure before publication. Superseded journals settle before obsolete file reads and preserve published resources.
+
+This protocol does not activate an editor producer or startup recovery. Archive and sync history codecs must preserve the complete graph before producer activation. Raw native history fields remain invalid at portable receiving boundaries.
+
+## Inline Montage history
+
+Database version 66 advances videoProjects to version 15. The migration preserves existing rows, stores and immutable files. Earlier writers refuse the newer database.
+
+The version 2 history envelope stores inverse JSON values in project metadata. The version 1 file envelope remains readable. Reading does not rewrite either format. The logical byte budget counts each transition, including repeated values and unfinished gesture recovery.
+
+Native publication retains revision, source and identity admission. Inline values grant no publication authority. Cold readers validate both history directions and retained sources. Archive and sync preserve the typed history outside raw native project fields. Accepted replacement releases obsolete inverse files through the existing resource owner.
+
 ## Recording recovery
 
 The recordings domain owns `recording_recovery_sessions` and `recording_recovery_blocks` in the canonical database. Both stores contain authoritative user data. Database version 33 adds these stores and changes the recordings contract from 2 to 3. The migration preserves all earlier rows and immutable media.
@@ -54,9 +72,13 @@ Explicit media backup v6 excludes pending recordings and retained safety copies.
 
 ## Admission and migration
 
-Quick-edit projects can share one source video. The source media ID identifies its default workspace. An archived workspace retains its own aggregate ID and an explicit `sourceMediaId`. Source lookup, usage, retention, authorization, and transfer resolve that reference. History and draft writes retain the workspace aggregate ID.
+Quick-edit projects can share one source video. The original workspace can use the source media ID. Other projects have their own workspace ID and an explicit `sourceMediaId`. Source lookup, usage, retention, authorization, and transfer resolve that reference. History and draft writes use the workspace ID.
 
-Creating a project copies the complete previous default into an independent archive. One transaction creates the archive and replaces the default. The default revision increases, so delayed writes cannot replace the new project. A stable archive ID identifies a repeated command. Failure preserves the previous default.
+One transaction creates the new project and increases the revision of the previous project. The previous project keeps its ID, content, history, and recovery draft. A retry with the same command ID returns the project that the command created. After permanent deletion of that project, the previous revision cannot authorize its creation again. If the transaction fails, the previous project and its revision remain available for retry.
+
+New and restored quick-edit projects receive a local generation. Project creation checks the generation of the previous project. If the previous project has the same ID and revision after recreation, its new generation prevents the delayed command. Backup and sync exclude the local generation from portable project content.
+
+Database version 70 advances the mediaLibrary contract to version 44. The transition keeps the existing rows and files. Older writers refuse the new contract before they write a workspace.
 
 Database version 36 changes the mediaLibrary contract to 28. The migration preserves existing rows, history, recovery, stores, and indexes. Earlier writers cannot admit this database. Portable backup gives each archived project an independent media root. Restore binds that project to its restored source.
 
@@ -142,7 +164,7 @@ Gallery bundled action sounds require physical database version 23, mediaLibrary
 
 Earlier writers refuse the newer database before dropping the authored settings.
 
-Bounded editor history requires physical database version24, mediaLibrary contract21 and scenarioProjects contract7. The additive23→24 admission publishes contracts only, preserving every released head, row, draft and immutable object. Ordinary admitted mutations retain at most50 combined Undo/Redo transitions and8MiB canonical UTF8 operation metadata. Current content remains outside that budget. Gallery logical format2 retains a complete document baseline, including Cuts, Speed, notes, canvas comments and authored advanced content.
+Bounded editor history requires physical database version24, mediaLibrary contract21 and scenarioProjects contract7. The additive23→24 admission publishes contracts only, preserving every released head, row, draft and immutable object. Ordinary admitted mutations retain at most1000 combined Undo/Redo transitions and32MiB canonical UTF8 operation metadata. Current content remains outside that budget. Gallery logical format2 retains a complete document baseline, including Cuts, Speed, notes, canvas comments and authored advanced content.
 
 Physical format3 keeps that baseline at ordinal zero and a stable positive ordinal range in the head. Reads check the full retained graph and redo without mutation. The first admitted legacy mutation may replace its representation. Warm rollover removes only expired rows and updates baseline/head and the new tail, including ordinary paused-buffer Save.
 
@@ -150,7 +172,7 @@ Gallery field typing uses an explicit owner API with a page-issued action identi
 
 Missing or superseded write evidence is unknown and cannot authorize another append. UI-only acknowledgement, idle and maxWait do not close the field group. Portable review carries authored history and the complete baseline, omits this private write marker and rejects marker-bearing input before restore publication.
 
-Scenario saved versions retain at most20 previous roots and16MiB canonical UTF8 metadata, separately from current content and the50/8MiB page Undo policy. Existing valid50/64MiB roots remain read-admitted until an explicit mutation. The existing editor/autosave queue publishes final closed action captures in order before a later action. Repeated publication of one action retains its earliest previous saved root. Generate action IDs outside the pure reducer.
+Scenario saved versions retain at most20 previous roots and16MiB canonical UTF8 metadata, separately from current content and the1000/32MiB page Undo policy. Existing valid50/64MiB roots remain read-admitted until an explicit mutation. The existing editor/autosave queue publishes final closed action captures in order before a later action. Repeated publication of one action retains its earliest previous saved root. Generate action IDs outside the pure reducer.
 
 These IDs require an exact owner revision for metadata-only publication.
 
@@ -670,7 +692,7 @@ Both editors share controlled fields and transition settings. Each editor retain
 
 Montage schema 32 admits optional `cameraTiming` on VIDEO clips. A camera placement retains this field after a move to another compatible video track. Earlier schemas refuse this field. Readers retain legacy camera behavior when the field is absent.
 
-`offsetSeconds` ranges from -86400 through 86400. The clip source clock owns positions, hidden intervals, and edits. Media decoders subtract `offsetSeconds` from that clock. They skip timestamps outside `[0, mediaDuration)`. Missing coverage does not repeat an endpoint frame.
+`offsetSeconds` ranges from -86400 through 86400. Camera pixels use the clip media clock. Media decoders subtract `offsetSeconds` from that clock. They skip timestamps outside `[0, mediaDuration)`. Missing coverage does not repeat an endpoint frame. An absent `timeDomain` retains source-clock positions, hidden intervals, and edits.
 
 The `bounded` transition policy caps effective position transitions at the next position. Interpolation starts at the previous authored destination and crop. Stored transition durations remain unchanged. Legacy cameras retain continuous interruption.
 
@@ -680,6 +702,19 @@ Preview, export, thumbnails, and crop previews use the media clock. Source text 
 
 The existing project mutation owner promotes edits that contain `cameraTiming` to schema 32. Existing history, resource admission, retention, and guarded publication owners retain authority. This field adds no writer, store, or physical database migration.
 
+Montage schema 56 admits `cameraTiming.timeDomain: 'result'` with a required `layoutClock`. Earlier schemas refuse this result clock. Readers refuse future schemas. Legacy cameras retain their source clocks.
+
+Layout time ranges from -86400 through 86400 seconds. Source time ranges from zero through 86400 seconds. Playback rate ranges from 0.0625 through 16. Only result cameras admit `layoutClock`.
+
+The `layoutClock` retains the original layout time, media source time, and playback rate. Conversion records this origin for each camera placement. Timeline placement, source trims, playback offsets, and rate changes map to the retained origin. Camera positions, transition durations, and hidden intervals retain their stored values. This mapping preserves animation through moves, duplication, intro insertion, trimming, splitting, and rate changes. Camera pixels retain their separate media clock.
+
+The existing project mutation owner retains schema 56 after edits. The clock adds no writer, store, resource claim, or physical database migration.
+
+Montage schema 56 also admits `sourceInteractionTiming` on video placements. Its time, source time, and rate use the same bounds as `layoutClock`. Unknown origin fields refuse admission. Earlier schemas refuse retained result-domain interaction documents, including documents with no current placement.
+
+Gallery conversion records this origin when cursor motions, presses, or overrides use result time. Each live bound placement requires the origin. Movement, duplication, intro insertion, trim, split, and rate changes preserve authored phase. Result-time cursor motion and input feedback continue through held video frames. Captured source facts retain their source clocks.
+
+The retained document determines the clock of its derived cursor segments and action occurrences. Native editing maps timeline coordinates through that declared clock. Clip duplication copies the bound document and gives cursor segments and keys independent identities. Aggregate admission failure refuses the complete copy. No new writer, store, or resource authority exists.
 
 ## Montage cursor source observations
 
@@ -1204,3 +1239,74 @@ Physical database version 57 admits Gallery advanced schema 31 and Native projec
 The additive 56→57 migration changes contracts only. It preserves project heads, history, recovery drafts, source references and immutable media bytes. Older writers refuse the newer database before they can discard audio settings.
 
 DSP settings contain fixed processor identities and parameters. They contain no executable code. Reads of older supported projects do not add processing settings or write project migrations. User audio presets retain their separate browser storage authority.
+
+## Durable Image history
+
+Physical database version 67 advances the mediaLibrary contract to version 41. The additive 66→67 migration preserves existing rows and files. Earlier writers refuse the newer database.
+
+New native history envelopes use version 2. One immutable JSON file contains all snapshots and pooled drawing values. Logical slots reference this shared file. Raster payloads retain their existing immutable asset references. Version 1 envelopes remain readable. A later save replaces individual JSON files through the existing atomic publisher. Existing cleanup removes obsolete files after publication.
+
+Portable history version 2 uses the same shared JSON file. Privacy projection still checks every snapshot and removes unused resources before archive creation. Archive and sync receivers check the complete bundle against its declared slots. Cursor changes reuse the bundle. A content change creates one replacement bundle through coalesced autosave.
+
+Physical database version 62 adds `image_workspace_identities` and advances the mediaLibrary contract to version 40. The additive 61→62 migration preserves existing documents, history, assets and presentations. Earlier writers refuse the newer database before mutation.
+
+Image history retains a cursor, actions and references to immutable snapshot and object versions. Unchanged raster bytes and drawing payloads share retained resources. History keeps up to 1000 transitions and 32 MiB of additional snapshot metadata and pooled drawing data. Current content remains available when history retention removes transitions.
+
+Image retention has a separate 64 MiB limit for encoded raster values that the newest retained state does not use. The editor counts each shared raster value once. The limit also includes a newest-state favicon if removing source metadata would leave the bytes in an earlier state only. Undo and Redo move the cursor without changing which state sets the raster allowance. Native storage keeps raster bytes in immutable assets.
+
+Database version 69 advances the mediaLibrary contract to version 43. The additive migration preserves existing rows and files. Earlier writers refuse the newer database before they apply their combined history budget.
+
+Native admission limits history JSON to 512 MiB and 100,000 values before file reads. These admission limits do not replace the smaller runtime retention budget. Canvas SVG sources remain in bounded object JSON. Raster resources retain their existing validators.
+
+History capture and autosave have separate responsibilities. An accepted edit prepares a revision guard without serializing the retained graph. The existing autosave coordinator captures the graph for a coalesced save. Full checkpoint capture still depends on retained metadata. This contract does not promise constant execution time for the complete save.
+
+The existing Image writer prepares immutable resources and publishes the document, history cursor, ownership and sync capture through its existing journal and CAS. Warm saves reuse known resources without encoding or writing their bytes again. The writer retains one prepared publication after a retryable failure. A retry resumes that publication before a newer buffered save. Disabling autosave pauses new background saves and retains completed work.
+
+The identity ledger distinguishes replacement lifetimes that reuse an aggregate ID and revision. Deletion retires the lifetime. Restore creates a new generation. Delayed saves, presentations, promotions and resets must match their observed generation before publication. An acknowledgement cannot replace a newer durable revision or rebind another editor context.
+
+Working copies retain their captured history. The native publication result supplies their revision, generation and owned resource maps. A newer live edit prevents automatic rebinding to a completed copy. Library copies retain the existing current-image baseline behavior.
+
+Archive layout `library-folders-v6` and Image sync operation version 3 admit portable history references. Portable records contain object IDs and omit native publication receipts. Privacy projection applies to every retained snapshot. Existing archive inventory, asset ownership, deletion and recovery remain authoritative for historical resources. Missing remote history JSON requires bounded, verified recovery before publication locks. Large bitmap resources can remain deferred.
+
+
+## Scenario identity reuse
+
+Physical database version 63 adds `scenario_project_revisions` and advances the scenarioProjects contract to version 13. The additive migration preserves existing records and files. Earlier writers refuse the newer database before mutation.
+
+Native deletion retains the highest local revision in the same transaction that removes the root. The record contains only a project identifier and counter. It survives ordinary deletion and requires no sync profile. Global erasure includes this store through the database registry.
+
+Recreation and archive replacement use a revision above the retained counter. Ready publication prepares that target revision and checks it again before commit. An intervening creation and deletion invalidates the old publication. Exact committed replay retains the accepted revision.
+
+Native reads do not change the counter. Invalid or exhausted counters refuse the affected write and preserve the last committed content. This identity fence does not store editing history or replace the autosave coordinator.
+
+
+## Scenario editing checkpoint storage
+
+Physical database version 64 advances the scenarioProjects contract to version 14. The migration preserves existing records, stores and files. Earlier writers refuse the newer database before mutation.
+
+Optional `editingHistory` retains separate `past` and `future` branches. Their order determines the navigation cursor. Saved revisions retain their separate chronology and budget. An explicit empty checkpoint differs from an absent legacy checkpoint.
+
+Native unit format 3 shares unchanged Guide items and Tour slides across current content, saved revisions and both editing branches. The checkpoint permits 1000 transitions and 32 MiB of pooled payload. Empty history retains current content independently of this budget. Admission checks project identities, complete unit references and UTF-8 byte sizes. Reads do not repair or prune physical evidence.
+
+Resource admission, reachability and source promotion share one collector over current content, saved revisions and both editing branches. It reads references without serializing snapshot payloads.
+
+V6 Scenario archives with an editing checkpoint use a version 1 `scenario-unit-history` body in the existing history object. The body reuses native units for current content, saved revisions and both editing branches. Logical child references use `scenarioAssetId`. Readers bind the body to current metadata and validate its complete graph before staging. Restore remaps project, child and editor-document identities in all retained states. The existing source privacy policy applies to all states. Legacy history arrays remain readable. Older readers refuse the new body before staging. Existing archive byte and depth bounds remain unchanged.
+
+Native sync uses a version 1 `native-scenario-unit-history` body in the existing history Blob and claimed metadata reference. The body retains native identities and shares units across saved revisions and both editing branches. Preparation verifies its hash, complete graph, exact current binding and resource closure before native publication. Legacy arrays remain readable. The existing transaction, revision fences and resource claims remain authoritative.
+
+The CAS save API accepts an explicit editing checkpoint with current content and returns both in its committed snapshot. It validates and detaches the supplied branches before asynchronous preparation. Cursor changes require an exact owner revision even when current content matches storage. These changes preserve saved-revision chronology. The existing transaction validates resource references and publishes current content with both branches atomically. Checkpoint saves cannot carry child publication mutations.
+
+Generic content commands append the previous current project to an existing editing checkpoint and clear its future branch. The existing constructor applies this rule without tool registration. An exact CAS continuation with the same action identity updates its existing action. A timestamp-only change preserves navigation. It retains the nearest past under the same pooled byte and transition limits as strict admission. It measures shared immutable units once. Metadata-only maintenance preserves editing branches and keeps its saved-version policy.
+
+The editing snapshot reader obtains current content, revision and navigation from one admitted native entry. An explicit empty checkpoint overrides the saved archive. Only legacy entries without a checkpoint derive bounded past from saved revisions. The saved-version query retains its separate archive meaning.
+
+The Scenario page loads the editing snapshot and restores both navigation branches without creating an action. Runtime retention shares the native pooled budget across both branches. Each reducer caches encodings of its immutable projects and units through weak references.
+
+Autosave captures current content and the complete editing checkpoint together through the existing ordered coordinator and CAS writer. One latest checkpoint preserves finished actions without draining them into saved revisions. Content equality alone cannot acknowledge a different checkpoint. A late acknowledgement preserves newer pending navigation.
+
+Automatic saves preserve the active edit group. A transient group origin retains its original navigation by reference until the field group ends. Returning to the original content restores that navigation without an empty action. Branches with the same captured nodes and order reuse their native acknowledgement without another write. Generic command acknowledgements supply their canonical navigation checkpoint.
+
+
+Explicit Library removal clears selected resource references from current content, saved revisions and both editing branches. It preserves branch order and historical timestamps. The operation retains existing image slots, captions and layout. It does not append an editing action. The native transaction publishes the sanitized graph and removes child ownership together. Revision exhaustion refuses the transaction and preserves its predecessor.
+
+Database version 68 publishes mediaLibrary contract 42, videoProjects contract 16 and scenarioProjects contract 15. This admission prevents older writers from truncating the larger history. The additive migration preserves existing rows and files.

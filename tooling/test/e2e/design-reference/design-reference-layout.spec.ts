@@ -84,6 +84,51 @@ test.afterAll(async () => {
 });
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`reference prompt keeps dictation outside text scroll ${viewport.name}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize(viewport.size);
+    await page.goto(`${origin}examples/fields/?view=both&mode=examples&lang=ru`);
+    const themes = page.locator('.theme');
+    await expect(themes).toHaveCount(2);
+    for (const theme of await themes.all()) {
+      const input = theme.getByRole('textbox', { name: 'Запрос', exact: true });
+      const dictation = theme.getByRole('button', {
+        name: 'Вставить пример диктовки',
+        exact: true,
+      });
+      await input.fill(Array.from({ length: 24 }, (_, line) => `Строка ${line + 1}`).join('\n'));
+      await input.blur();
+      await theme.getByText('Запрос', { exact: true }).hover();
+      await expect(dictation).toBeHidden();
+      await input.hover();
+      await expect(dictation).toBeVisible();
+      const position = (await input.boundingBox())!;
+      const action = (await dictation.boundingBox())!;
+      expect(position.y + position.height).toBeLessThanOrEqual(action.y);
+      await page.mouse.move(
+        action.x + action.width / 2,
+        (position.y + position.height + action.y) / 2
+      );
+      await expect(dictation).toBeVisible();
+      await dictation.hover();
+      await expect(input).not.toBeFocused();
+      await input.hover();
+      await input.evaluate((node) => {
+        node.scrollTop = 0;
+      });
+      await page.mouse.wheel(0, 100);
+      await expect.poll(() => input.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+      await dictation.click();
+      await expect(input).toHaveValue(/Пример диктовки/u);
+      await expect(input).toBeFocused();
+      await page.screenshot({
+        path: info.outputPath(`reference-prompt-${await theme.getAttribute('data-theme')}.png`),
+        fullPage: false,
+      });
+    }
+  });
+
   test(`reference control composition ${viewport.name}`, async ({ page }, info) => {
     await page.setViewportSize(viewport.size);
     await page.goto(origin);
@@ -180,6 +225,212 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
   for (const theme of ['light', 'dark'] as const) {
+    test(`reference switch with status ${viewport.name} ${theme}`, async ({ page }, info) => {
+      const ru = viewport.size.width === 1920;
+      const copy = ru
+        ? {
+            shadow: 'Тень',
+            enabled: 'Включено',
+            off: 'Выключено',
+            direction: 'Направление',
+            center: 'Центр',
+            down: 'Вниз',
+            offset: 'Смещение Y',
+            opacity: 'Непрозрачность',
+            radius: 'Скругление',
+            grid: 'Показать сетку',
+          }
+        : {
+            shadow: 'Shadow',
+            enabled: 'Enabled',
+            off: 'Disabled',
+            direction: 'Direction',
+            center: 'Center',
+            down: 'Down',
+            offset: 'Offset Y',
+            opacity: 'Opacity',
+            radius: 'Corner radius',
+            grid: 'Show grid',
+          };
+      await page.setViewportSize(viewport.size);
+      await page.goto(
+        `${origin}examples/choices/?view=${theme}&mode=examples&lang=${ru ? 'ru' : 'en'}`
+      );
+      const sample = page.locator('[data-case="choices.switch-status"]');
+      const toggle = sample.getByRole('switch', { name: copy.shadow, exact: true });
+      const status = sample.locator('.sniptale-switch-status');
+      const subject = sample.locator('.reference-switch-subject');
+      const opacity = sample.getByRole('slider', { name: copy.opacity, exact: true });
+      const corner = sample.getByRole('textbox', { name: copy.radius, exact: true });
+      const label = (text: string) => status.getByText(text, { exact: true });
+      const right = (box: { x: number; width: number }) => box.x + box.width;
+      await expect(toggle).toHaveAttribute('aria-checked', 'true');
+      await label(copy.enabled).hover();
+      await expect(status).toHaveCSS('cursor', 'pointer');
+      await expect(toggle.locator('.sniptale-glass-switch-thumb')).toBeVisible();
+      const initial = await status.boundingBox();
+      const cornerEdge = await corner.evaluate(
+        (element) => element.closest('.sniptale-parameter-value')!.getBoundingClientRect().right
+      );
+      expect(Math.abs(right((await toggle.boundingBox())!) - cornerEdge)).toBeLessThanOrEqual(1);
+      await toggle.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('switch-status-enabled.png'),
+        fullPage: false,
+      });
+      await label(copy.enabled).click();
+      await expect(toggle).toHaveAttribute('aria-checked', 'false');
+      await expect(label(copy.off)).toBeVisible();
+      const disabled = await status.boundingBox();
+      expect(disabled?.x).toBeCloseTo(initial!.x, 0);
+      expect(disabled?.width).toBeCloseTo(initial!.width, 0);
+      await expect(subject).toHaveCSS('box-shadow', 'none');
+      await expect(opacity).toBeDisabled();
+      await expect(sample.locator('.opacity-field')).toHaveCSS('opacity', '0.55');
+      await expect(corner).toBeEnabled();
+      await expect(sample.getByRole('switch', { name: copy.grid, exact: true })).toBeEnabled();
+      await page.screenshot({
+        path: info.outputPath('switch-status-disabled.png'),
+        fullPage: false,
+      });
+
+      await toggle.focus();
+      await page.keyboard.press('Space');
+      await expect(toggle).toHaveAttribute('aria-checked', 'true');
+      await expect(toggle).toBeFocused();
+      await expect(opacity).toHaveValue('25');
+      await expect(subject).not.toHaveCSS('box-shadow', 'none');
+      const direction = sample.getByRole('group', { name: copy.direction, exact: true });
+      const offset = sample.getByRole('textbox', { name: copy.offset, exact: true });
+      await direction.getByRole('button', { name: copy.center }).click();
+      await expect(offset).toBeDisabled();
+      await expect(offset).toHaveValue('0');
+      await direction.getByRole('button', { name: copy.down }).click();
+      await expect(offset).toBeEnabled();
+      await expect(offset).toHaveValue('12');
+      await toggle.focus();
+      const inspector = sample.locator('.reference-switch-inspector');
+      await inspector.evaluate((node) => node.style.setProperty('width', '218px'));
+      await expect
+        .poll(() => inspector.evaluate((node) => node.scrollWidth - node.clientWidth))
+        .toBeLessThanOrEqual(1);
+      await label(copy.enabled).click();
+      await expect(toggle).toHaveAttribute('aria-checked', 'false');
+      await expect(label(copy.off)).toBeVisible();
+    });
+
+    test(`reference lens and responsive choices ${viewport.name} ${theme}`, async ({
+      page,
+    }, info) => {
+      await page.setViewportSize(viewport.size);
+      await page.goto(`${origin}examples/choices/?view=${theme}&mode=examples&lang=ru`);
+      const lens = page.locator('[data-case="choices.lens"]');
+      const shape = lens.getByRole('group', { name: 'Форма линзы', exact: true });
+      const rectangle = shape.getByRole('button', { name: 'Прямоугольник', exact: true });
+      const diameter = lens
+        .locator('.sniptale-parameter-name')
+        .getByText('Диаметр', { exact: true });
+      await expect(rectangle).toHaveText('Прямоугольник');
+      await expect(rectangle.locator('svg')).toBeVisible();
+      await expect(diameter).toBeVisible();
+      await rectangle.press('Space');
+      await expect(rectangle).toHaveAttribute('aria-pressed', 'true');
+      await expect(rectangle).toHaveCSS('outline-style', 'solid');
+      await expect(lens.locator('.reference-lens')).toHaveAttribute('data-shape', 'rectangle');
+      await expect(diameter).toHaveCount(0);
+      await expect(lens.getByText('Ширина', { exact: true })).toBeVisible();
+      await expect(lens.getByText('Высота', { exact: true })).toBeVisible();
+      await lens.getByRole('button', { name: 'Оптическая', exact: true }).click();
+      await expect(lens.locator('.reference-lens')).toHaveAttribute('data-optics', 'optical');
+      await expect(lens.getByText('Ширина края', { exact: true })).toBeVisible();
+      await expect(lens.locator('.reference-lens-inspector')).toHaveCSS('width', '327px');
+      await lens.locator('.reference-lens-inspector').scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('lens-choices.png'), fullPage: false });
+
+      const fit = page.locator('[data-case="choices.segment-fit"]');
+      const row = fit.locator('.sniptale-parameter-row');
+      const width = fit.getByRole('slider');
+      const segments = fit.getByRole('group', { name: 'Область', exact: true });
+      const inside = segments.getByRole('button', { name: 'Внутри рамки', exact: true });
+      const trigger = fit.getByRole('button', { name: 'Область', exact: true });
+      await width.fill('520');
+      await expect(segments).toBeVisible();
+      await inside.click();
+      await expect(inside).toHaveAttribute('aria-pressed', 'true');
+      await expect(segments.getByRole('button', { name: 'Вне рамки', exact: true })).toBeDisabled();
+      const wideHeight = (await row.boundingBox())!.height;
+      let narrow = 120;
+      let wide = 520;
+      const resize = async (size: number) => {
+        await width.fill(String(size));
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+            )
+        );
+      };
+      while (wide - narrow > 1) {
+        const size = Math.floor((narrow + wide) / 2);
+        await resize(size);
+        if (await segments.isVisible()) wide = size;
+        else narrow = size;
+      }
+      for (const size of [wide + 1, wide, narrow]) {
+        await resize(size);
+        await expect(row).toHaveAttribute('data-layout', 'inline');
+        expect((await row.boundingBox())!.height).toBe(wideHeight);
+        expect(await segments.isVisible()).toBe(size >= wide);
+      }
+      await expect(trigger).toHaveText('Внутри рамки');
+      await trigger.click();
+      const list = fit.getByRole('listbox');
+      await expect(list.getByRole('option', { name: 'Вне рамки' })).toBeDisabled();
+      await trigger.press('Escape');
+      await expect(trigger).toBeFocused();
+      await width.fill('520');
+      await expect(inside).toHaveAttribute('aria-pressed', 'true');
+      await expect(row).toHaveAttribute('data-layout', 'inline');
+    });
+
+    test(`reference inspector segments use one selected surface ${viewport.name} ${theme}`, async ({
+      page,
+    }, info) => {
+      await page.setViewportSize(viewport.size);
+      await page.goto(`${origin}examples/layers/?view=${theme}&mode=examples&lang=ru`);
+      const scale = page.getByRole('group', { name: 'Масштаб', exact: true });
+      const half = scale.getByRole('button', { name: '50%', exact: true });
+      const full = scale.getByRole('button', { name: '100%', exact: true });
+      const transparent = 'rgba(0, 0, 0, 0)';
+      const field = await pickerToken(full, '--sniptale-color-field');
+      await expect(scale).toHaveCSS('background-color', transparent);
+      const paint = (button: Locator) =>
+        button.evaluate((element) => {
+          const { width, height, backgroundColor } = getComputedStyle(element, '::before');
+          return { width: parseFloat(width), height: parseFloat(height), backgroundColor };
+        });
+      const target = (await full.boundingBox())!;
+      const before = await paint(full);
+      expect(before.backgroundColor).toBe(field);
+      expect(target.width - before.width).toBeCloseTo(4);
+      expect(target.height - before.height).toBeCloseTo(6);
+      expect((await paint(half)).backgroundColor).toBe(transparent);
+      await half.hover();
+      await expect(half).toHaveCSS('cursor', 'pointer');
+      const hover = await pickerToken(half, '--sniptale-color-field-hover');
+      await expect.poll(async () => (await paint(half)).backgroundColor).toBe(hover);
+      const groupBounds = await scale.boundingBox();
+      await half.click();
+      await page.mouse.move(0, 0);
+      await expect(half).toHaveAttribute('aria-pressed', 'true');
+      expect((await paint(half)).backgroundColor).toBe(field);
+      expect((await paint(full)).backgroundColor).toBe(transparent);
+      expect(await scale.boundingBox()).toEqual(groupBounds);
+      expect(await full.boundingBox()).toEqual(target);
+      await scale.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('inspector-segments.png'), fullPage: false });
+    });
+
     test(`reference choice identity and lifecycle ${viewport.name} ${theme}`, async ({
       page,
     }, info) => {
@@ -489,6 +740,66 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
   for (const theme of ['light', 'dark'] as const) {
+    test(`reference inspector fields keep their idle geometry during editing ${viewport.name} ${theme}`, async ({
+      page,
+    }, info) => {
+      await page.setViewportSize(viewport.size);
+      await page.goto(`${origin}examples/layers/?view=${theme}&mode=examples&lang=ru`);
+      const fields = page.locator('.inspector-fields');
+      const gradient = fields.locator(
+        '.gradient-field [data-ui="shared.ui.paint-selector.trigger"]'
+      );
+      await expect(gradient).toHaveCSS('height', '32px');
+      await expect(gradient.locator('svg')).toHaveCount(0);
+      const swatch = gradient.locator('[data-ui="shared.ui.paint-selector.preview"]');
+      await expect(swatch).toHaveCSS('width', '26px');
+      await expect(swatch).toHaveCSS('height', '16px');
+      await expect(gradient.locator('.paint-inspector-value')).toHaveCSS('white-space', 'nowrap');
+      const gradientBorder = await gradient.evaluate((node) => getComputedStyle(node).borderColor);
+      await gradient.click();
+      await expect(gradient).toHaveAttribute('aria-expanded', 'true');
+      await expect(gradient).toHaveCSS('border-color', gradientBorder);
+      await page.keyboard.press('Escape');
+      await expect(gradient).toHaveAttribute('aria-expanded', 'false');
+
+      const color = fields.locator('.color-alpha-field .color-frame');
+      const colorSwatch = color.locator('.inspector-swatch-trigger');
+      const hex = color.locator('.inspector-hex-editor input');
+      const alpha = color.locator('.alpha-value input');
+      await expect(hex).toHaveCSS('opacity', '1');
+      await expect(alpha).toHaveCSS('opacity', '1');
+      const colorBorder = await color.evaluate((node) => getComputedStyle(node).borderColor);
+      await colorSwatch.click();
+      await expect(hex).toHaveCSS('opacity', '0.4');
+      await expect(alpha).toHaveCSS('opacity', '0.4');
+      await expect(color).toHaveCSS('border-color', colorBorder);
+      await page.keyboard.press('Escape');
+      await expect(hex).toHaveCSS('opacity', '1');
+      await expect(alpha).toHaveCSS('opacity', '1');
+
+      const title = fields.getByRole('textbox', { name: 'Название', exact: true });
+      const clear = fields.locator('.reference-inspector-text .sniptale-field-clear');
+      const textarea = fields.getByRole('textbox', { name: 'Текст', exact: true });
+      await expect(title).toHaveCSS('height', '32px');
+      await expect(textarea).toHaveCSS('min-height', '80px');
+      await expect(textarea).toHaveCSS('padding-inline-start', '8px');
+      const radius = fields.locator('.sniptale-framed-stepper');
+      const radiusWidth = (await radius.boundingBox())!.width;
+      const columnWidth = (await gradient.boundingBox())!.width;
+      expect(Math.abs(radiusWidth - columnWidth)).toBeLessThanOrEqual(1);
+      await title.hover();
+      await expect(clear).toHaveCSS('opacity', '1');
+      await title.click();
+      await expect(title).toBeFocused();
+      await expect(clear).toHaveCSS('opacity', '0');
+      await title.fill('Новая подпись');
+      await title.press('Escape');
+      await expect(title).toHaveValue('Новый объект');
+      await expect(title).not.toBeFocused();
+      await page.evaluate(() => document.fonts.ready);
+      await page.screenshot({ path: info.outputPath('inspector-fields.png'), fullPage: false });
+    });
+
     test(`reference picker geometry and editing ${viewport.name} ${theme}`, async ({
       page,
     }, info) => {
@@ -537,7 +848,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await color.getByRole('button', { name: 'Исходный', exact: true }).click();
       await expect(hex).toHaveValue('#FA7116');
       await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
-      const copy = color.getByRole('button', { name: 'Копировать цвет', exact: true });
+      const copy = color.getByRole('button', { name: 'Скопировать HEX цвета', exact: true });
       await copy.click();
       await expect
         .poll(() => page.evaluate(() => navigator.clipboard.readText()))

@@ -7,6 +7,7 @@ import {
 } from '../../contracts/effect-runtime/types';
 import { createEffectRuntimeWorkerExecutionState } from '../worker/execute';
 import { createEffectRuntimeBrokerSession } from './session';
+import { finishWorkerStartupOnFirstListener } from './worker.test-support';
 
 class Bitmap {
   close = vi.fn();
@@ -85,7 +86,7 @@ function runtime() {
   };
   const session = createEffectRuntimeBrokerSession({
     compositionBackend: 'gpu-scene-plan',
-    workerFactory: () => worker,
+    workerFactory: () => finishWorkerStartupOnFirstListener(worker),
   });
   return { session, posted, createRenderer, render, dispose, execution };
 }

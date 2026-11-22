@@ -9,7 +9,7 @@ import { replaceNativeReviewWorkspace } from './support/native-review-workspace'
 import { chromium, expect, test as base, type Page, type ConsoleMessage } from '@playwright/test';
 import { previewPerformanceSummary } from './support/preview-performance-report';
 import { writeFile } from 'node:fs/promises';
-import { translate } from '../../../apps/extension/src/platform/i18n';
+import { translate } from './support/catalog-fixture';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 
 import { createQuickEditWatermark } from '../../../apps/extension/src/features/video/project/scene/watermark';

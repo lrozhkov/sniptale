@@ -15,6 +15,36 @@ import {
   parseCapturedMediaRows,
 } from './guards';
 import { collectSyncCaptureClaims } from './claims';
+import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
+import { captureProfileBounds, MAX_CAPTURE_ROWS } from './contracts';
+
+it('admits full Montage history claims without changing other capture profiles', () => {
+  const row = change();
+  if (row.change.kind !== 'video-project') throw new Error('Missing project fixture');
+  const rows = row.change.rows;
+  const changes = Array.from({ length: EDITOR_HISTORY_LIMITS.maxActions }, (_, index) => ({
+    assetId: `history-${index}`,
+  }));
+  rows.project.history = { version: 1, epoch: 'epoch', past: changes, future: [], sources: [] };
+  for (const { assetId } of changes)
+    rows.refs.push({
+      assetId,
+      createdAt: 1,
+      location: { kind: 'opfs', objectKey: `objects/${assetId}` },
+      mimeType: 'application/json',
+      size: 10,
+      sha256: 'a'.repeat(64),
+    });
+  const captured = createNativeCapture({ ...row, change: { kind: 'video-project', rows } });
+  expect(parseSyncCaptureRecord(captured)).not.toBeNull();
+  expect(collectSyncCaptureClaims([captured]).assetIds).toEqual(
+    new Set(rows.refs.map((ref) => ref.assetId))
+  );
+  expect(captureProfileBounds('video-project').objects).toBe(
+    MAX_CAPTURE_ROWS * 2 + EDITOR_HISTORY_LIMITS.maxActions
+  );
+  expect(captureProfileBounds('image').objects).toBe(MAX_CAPTURE_ROWS * 2);
+});
 
 function fixture(): CapturedVideoProjectRows {
   const project = createVideoProjectEntryWithMediaClip();

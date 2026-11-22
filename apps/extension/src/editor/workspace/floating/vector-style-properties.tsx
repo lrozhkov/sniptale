@@ -60,6 +60,7 @@ function VectorParameter(props: {
         unit={props.unit}
         enterBehavior="blur"
         onPreviewValue={props.onPreview}
+        onCancelValue={props.onCancel}
         onCommitValue={props.onCommit}
       />
     </InspectorSurface>

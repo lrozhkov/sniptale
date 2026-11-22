@@ -14,7 +14,7 @@ import type {
 import { VideoTrackKind } from '../../../../apps/extension/src/features/video/project/types';
 import { assertExportReadyVideoProject } from '../../../../apps/extension/src/features/video/project/validation/root';
 import { REVIEW_CLICK_DEFAULT } from '../../../../apps/extension/src/features/video/project/action-feedback/validation';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { readNativeVideoProject } from '../support/native-video-project';

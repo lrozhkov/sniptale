@@ -2,10 +2,7 @@
 import { projectReviewWorkspace } from '../../workflows/video-review/session-durable-access';
 import type { ReviewSessionState } from '../../workflows/video-review/session-types';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
-import type {
-  VideoWorkspaceProjectCreationAcknowledgement,
-  VideoWorkspaceSnapshot,
-} from '../../composition/persistence/review-workspaces/contracts';
+import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
@@ -68,7 +65,7 @@ it('renames on a single title click, retains a failed draft for retry, and cance
   }
 });
 
-it('flushes project commands, releases Busy after failure, and retains New receipt through retry', async () => {
+it('releases Busy after a failed flush and opens a new session after retrying the save', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const snapshot: VideoWorkspaceSnapshot = {
     workspace: {
@@ -88,16 +85,15 @@ it('flushes project commands, releases Busy after failure, and retains New recei
   const created = vi.fn();
   const flush = vi.fn(async () => {});
   const rename = vi.fn(async (_name: string) => snapshot);
-  const createProject = vi
-    .fn(async (_receipt: string) => snapshot)
-    .mockRejectedValueOnce(new Error('quota'));
+  const saveBuffered = vi.fn(async () => snapshot).mockRejectedValueOnce(new Error('quota'));
   const canStart = vi.fn(() => true);
   const setBusy = vi.fn();
   const failures: unknown[] = [];
   const state = {
     session: {
       rename,
-      createProject,
+      saveBuffered,
+      getCheckpointExitReceipt: () => null,
       getSnapshot: () => ({
         snapshot,
         document: projectReviewWorkspace(snapshot),
@@ -141,8 +137,11 @@ it('flushes project commands, releases Busy after failure, and retains New recei
     expect(failures).toHaveLength(1);
     expect(created).not.toHaveBeenCalled();
     await act(async () => commands!.newProject!());
-    expect(createProject.mock.calls[0]).toEqual(createProject.mock.calls[1]);
-    expect(created).toHaveBeenCalledExactlyOnceWith('recording:source');
+    expect(saveBuffered).toHaveBeenCalledTimes(2);
+    expect(created).toHaveBeenCalledExactlyOnceWith(
+      expect.stringMatching(/^recording:quick-project:/),
+      'recording:source'
+    );
     act(() => root.render(<Harness enabled={false} />));
     expect(commands!.newProject).toBeUndefined();
   } finally {
@@ -189,22 +188,17 @@ function projectCommandFixture(retained = false) {
     rootId,
     revision: '00000000-0000-4000-8000-000000000005',
   });
-  const create = vi.fn<(command: string) => Promise<VideoWorkspaceProjectCreationAcknowledgement>>(
-    async (command) => ({
-      workspace: { ...snapshot.workspace, aggregateId: 'recording:source' },
-      draft: null,
-      archiveCheckpointReceipt: rootReceipt(`recording:quick-project:${command}`),
-      ...(retained
-        ? { retainedEditorCheckpointReceipt: rootReceipt(snapshot.workspace.aggregateId) }
-        : {}),
-    })
+  const save = vi.fn(async () => snapshot);
+  const getCheckpointExitReceipt = vi.fn<() => ReturnType<typeof rootReceipt> | null>(() =>
+    rootReceipt(snapshot.workspace.aggregateId)
   );
   const created = vi.fn();
   const flush = vi.fn(async () => undefined);
   const failures: unknown[] = [];
   const state = {
     session: {
-      createProject: create,
+      saveBuffered: save,
+      getCheckpointExitReceipt,
       rename: vi.fn(async () => snapshot),
       getSnapshot: () => current,
     },
@@ -229,7 +223,8 @@ function projectCommandFixture(retained = false) {
   return {
     snapshot,
     state,
-    create,
+    save,
+    getCheckpointExitReceipt,
     created,
     flush,
     failures,
@@ -245,20 +240,19 @@ function projectCommandFixture(retained = false) {
 }
 
 it.each([false, true])(
-  'requests only fixed New roles before opening the returned default; retained=%s',
+  'requests only the retained project receipt before opening a new session; independent=%s',
   async (retained) => {
     const f = projectCommandFixture(retained);
     try {
       await act(async () => f.commands().newProject!());
-      const command = f.create.mock.calls[0]![0];
+      expect(f.save).toHaveBeenCalledOnce();
       expect(requestExit.mock.calls.map((call) => call[0].rootId)).toEqual([
-        `recording:quick-project:${command}`,
-        ...(retained ? ['recording:editor-a'] : []),
+        retained ? 'recording:editor-a' : 'recording:source',
       ]);
-      expect(requestExit.mock.calls.some((call) => call[0].rootId === 'recording:source')).toBe(
-        false
+      expect(f.created).toHaveBeenCalledExactlyOnceWith(
+        expect.stringMatching(/^recording:quick-project:/),
+        'recording:source'
       );
-      expect(f.created).toHaveBeenCalledExactlyOnceWith('recording:source');
     } finally {
       f.cleanup();
     }
@@ -266,7 +260,7 @@ it.each([false, true])(
 );
 
 it.each(['edit', 'rebind', 'unmount'] as const)(
-  'does not continue a New transition or request the second role after %s during first IPC',
+  'does not open a new session after %s during the retained checkpoint request',
   async (change) => {
     const f = projectCommandFixture(true);
     const rpc = projectDeferred<void>();
@@ -287,22 +281,22 @@ it.each(['edit', 'rebind', 'unmount'] as const)(
 );
 
 it(
-  'preserves the native command identity through native and flush refusal and treats ' +
+  'retains the old project through save or flush refusal and treats ' +
     'exit IPC failure as advisory',
   async () => {
     const f = projectCommandFixture(true);
     try {
-      f.create.mockRejectedValueOnce(new Error('Native refused'));
+      f.save.mockRejectedValueOnce(new Error('Native refused'));
       await act(async () => f.commands().newProject!());
       expect(requestExit).not.toHaveBeenCalled();
       expect(f.created).not.toHaveBeenCalled();
       f.flush.mockRejectedValueOnce(new Error('Recovery refused'));
       await act(async () => f.commands().newProject!());
-      expect(f.create).toHaveBeenCalledOnce();
+      expect(f.save).toHaveBeenCalledOnce();
       requestExit.mockRejectedValueOnce(new Error('Worker unavailable'));
       await act(async () => f.commands().newProject!());
-      expect(f.create.mock.calls[0]).toEqual(f.create.mock.calls[1]);
-      expect(requestExit).toHaveBeenCalledTimes(2);
+      expect(f.save).toHaveBeenCalledTimes(2);
+      expect(requestExit).toHaveBeenCalledOnce();
       expect(f.created).toHaveBeenCalledOnce();
       expect(f.failures).toHaveLength(2);
     } finally {
@@ -311,10 +305,10 @@ it(
   }
 );
 
-it('does not invent a role RPC for an older or replayed creation ACK without receipts', async () => {
+it('opens a new session without a checkpoint request when the current project has no receipt', async () => {
   const f = projectCommandFixture();
   try {
-    f.create.mockResolvedValueOnce({ workspace: f.snapshot.workspace, draft: null });
+    f.getCheckpointExitReceipt.mockReturnValueOnce(null);
     await act(async () => f.commands().newProject!());
     expect(requestExit).not.toHaveBeenCalled();
     expect(f.created).toHaveBeenCalledOnce();
@@ -323,32 +317,26 @@ it('does not invent a role RPC for an older or replayed creation ACK without rec
   }
 });
 
-it(
-  'rejects a canonical replacement during the second role IPC and retries the same ' +
-    'completed command without selecting newer pending work',
-  async () => {
-    const f = projectCommandFixture(true);
-    const rpc = projectDeferred<void>();
-    requestExit
-      .mockResolvedValueOnce({ kind: 'checkpoint-exit', outcome: 'requested' })
-      .mockReturnValueOnce(rpc.promise);
-    try {
-      await act(async () => f.commands().newProject!());
-      expect(requestExit).toHaveBeenCalledTimes(2);
-      const replacement = { ...f.snapshot, workspace: { ...f.snapshot.workspace, revision: 2 } };
-      f.setCurrent({ snapshot: replacement, document: projectReviewWorkspace(replacement) });
-      await act(async () => rpc.resolve());
-      expect(f.created).not.toHaveBeenCalled();
-      f.create.mockResolvedValueOnce({
-        workspace: { ...replacement.workspace, aggregateId: 'recording:source' },
-        draft: null,
-      });
-      await act(async () => f.commands().newProject!());
-      expect(f.create.mock.calls[1]).toEqual(f.create.mock.calls[0]);
-      expect(requestExit).toHaveBeenCalledTimes(2);
-      expect(f.created).toHaveBeenCalledExactlyOnceWith('recording:source');
-    } finally {
-      f.cleanup();
-    }
+it('does not switch away from a project replaced while requesting its checkpoint', async () => {
+  const f = projectCommandFixture(true);
+  const rpc = projectDeferred<void>();
+  requestExit.mockReturnValueOnce(rpc.promise);
+  try {
+    await act(async () => f.commands().newProject!());
+    expect(requestExit).toHaveBeenCalledOnce();
+    const replacement = { ...f.snapshot, workspace: { ...f.snapshot.workspace, revision: 2 } };
+    f.setCurrent({ snapshot: replacement, document: projectReviewWorkspace(replacement) });
+    await act(async () => rpc.resolve());
+    expect(f.created).not.toHaveBeenCalled();
+    f.getCheckpointExitReceipt.mockReturnValueOnce(null);
+    await act(async () => f.commands().newProject!());
+    expect(f.save).toHaveBeenCalledTimes(2);
+    expect(requestExit).toHaveBeenCalledOnce();
+    expect(f.created).toHaveBeenCalledExactlyOnceWith(
+      expect.stringMatching(/^recording:quick-project:/),
+      'recording:source'
+    );
+  } finally {
+    f.cleanup();
   }
-);
+});

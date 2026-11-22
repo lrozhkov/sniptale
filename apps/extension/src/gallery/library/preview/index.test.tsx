@@ -238,7 +238,7 @@ it('renders source link when available and fallback copy when missing', () => {
 
   render(createProps());
 
-  expect(container?.textContent).toContain('gallery.preview.sourceMissing');
+  expect(container?.textContent).toContain('gallery.preview.sourceUrlMissing');
 });
 
 it('shows Trash source and filename as inert metadata', () => {

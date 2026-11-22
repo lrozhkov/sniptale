@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import { buildRecordingMediaEntry } from '../media-library/entry-mapping';
 import { parseRecordingEntry } from '../recordings/index.guards';
@@ -19,8 +19,11 @@ vi.mock('../assets', async (original) => ({
 }));
 beforeEach(() => {
   vi.clearAllMocks();
+  // Isolate synthetic databases from process-wide Node Web Locks.
+  vi.stubGlobal('navigator', {});
   io.journals.mockResolvedValue([]);
 });
+afterEach(() => vi.unstubAllGlobals());
 
 type RecordingInput = ApplyPreparedMediaReplicaInput & {
   rows: Extract<ApplyPreparedMediaReplicaInput['rows'], { recording: unknown }>;

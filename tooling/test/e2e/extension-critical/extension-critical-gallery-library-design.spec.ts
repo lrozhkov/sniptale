@@ -1,5 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import type { Locator, Page, TestInfo } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { test, expect } from '../support/extension-fixture';
 import { seedReviewVideo, seedReviewWebcamBundle } from '../support/quick-editor-media-fixture';
@@ -42,7 +43,7 @@ async function openLibrary(page: Page, extensionId: string, locale: Locale, them
   await page.evaluate(() => document.fonts.ready);
 }
 
-async function seedImages(page: Page, prefix: string) {
+async function galleryImageFixture(page: Page) {
   const bytes = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 640;
@@ -54,12 +55,17 @@ async function seedImages(page: Page, prefix: string) {
     context.fillRect(100, 80, 440, 200);
     return canvas.toDataURL('image/png').split(',')[1]!;
   });
+  return Buffer.from(bytes, 'base64');
+}
+
+async function seedImages(page: Page, prefix: string) {
+  const buffer = await galleryImageFixture(page);
   const names = [`${prefix}-first.png`, `${prefix}-second.png`] as const;
   await page.locator('input[type="file"][multiple]').setInputFiles(
     names.map((name) => ({
       name,
       mimeType: 'image/png',
-      buffer: Buffer.from(bytes, 'base64'),
+      buffer,
     }))
   );
   await searchLibrary(page, prefix);
@@ -202,19 +208,26 @@ for (const locale of ['ru', 'en'] as const) {
             exact: true,
           });
           await expect.soft(modeGroup).toHaveCSS('border-top-style', 'solid');
-          await expect
-            .soft(modeGroup.locator('button[aria-pressed="true"]'))
-            .toHaveCSS('background-color', 'rgba(0, 0, 0, 0)', { timeout: 500 });
           const selectedMode = modeGroup.locator('button[aria-pressed="true"]');
-          const selectedColor = await selectedMode.evaluate((node) => {
+          const selectedStyle = await selectedMode.evaluate((node) => {
             const sample = document.createElement('span');
-            sample.style.color = 'var(--sniptale-color-accent)';
+            sample.style.color = 'var(--sniptale-color-text-primary)';
+            sample.style.backgroundColor =
+              'color-mix(in srgb, var(--sniptale-color-text-secondary) 22%, var(--sniptale-color-surface-panel))';
             node.append(sample);
-            const color = getComputedStyle(sample).color;
+            const { color, backgroundColor } = getComputedStyle(sample);
             sample.remove();
-            return color;
+            return { color, backgroundColor };
           });
-          await expect(selectedMode).toHaveCSS('color', selectedColor);
+          await expect(selectedMode).toHaveCSS('color', selectedStyle.color);
+          await expect(selectedMode).toHaveCSS('background-color', selectedStyle.backgroundColor);
+          const groupBox = (await modeGroup.boundingBox())!;
+          const selectedBox = (await selectedMode.boundingBox())!;
+          expect(selectedBox.y - groupBox.y).toBeGreaterThanOrEqual(2);
+          expect(groupBox.y + groupBox.height - selectedBox.y - selectedBox.height).toBeCloseTo(
+            selectedBox.y - groupBox.y,
+            0
+          );
           if (mode !== 'viewModeList') {
             const item = card(names[0]!);
             const previewBounds = (await item
@@ -481,6 +494,224 @@ for (const locale of ['ru', 'en'] as const) {
       });
     }
   }
+}
+
+for (const [theme, viewport] of [
+  ['light', PRIMARY_BROWSER_VIEWPORTS[0]],
+  ['dark', PRIMARY_BROWSER_VIEWPORTS[1]],
+] as const) {
+  test(`library header search stays stable ${theme} ${viewport.name}`, async ({
+    page,
+    extensionId,
+  }, info) => {
+    await page.setViewportSize(viewport.size);
+    await openLibrary(page, extensionId, 'en', theme);
+    const prefix = `stable-search-${randomUUID().slice(0, 8)}`;
+    const [first, second] = await seedImages(page, prefix);
+    const search = page.locator('[data-ui="gallery.header.search"]');
+    const input = search.getByLabel(translate('gallery.app.searchLabel', 'en'));
+    const clear = search.getByRole('button', { name: translate('gallery.app.clearSearch', 'en') });
+    const viewMode = page.locator('[data-ui="gallery.header.view-mode"]');
+    await input.blur();
+    await page.mouse.move(0, 0);
+    const geometry = async () => {
+      await search.evaluate((node) => Promise.all(node.getAnimations().map((a) => a.finished)));
+      return {
+        field: (await search.boundingBox())!,
+        input: (await input.boundingBox())!,
+        view: (await viewMode.boundingBox())!,
+      };
+    };
+    const idle = await geometry();
+    await expect(clear).toBeHidden();
+    await input.hover();
+    await expect(clear).toBeVisible();
+    await expect(clear).toHaveCSS('width', '24px');
+    await expect(clear).toHaveCSS('height', '24px');
+    await input.fill(first);
+    await input.press('Enter');
+    await expect(page.locator('[data-gallery-keyboard-id]')).toHaveCount(1);
+    const editing = await geometry();
+    expect(editing.field).toEqual(idle.field);
+    expect(editing.input).toEqual(idle.input);
+    expect(editing.view).toEqual(idle.view);
+    await screenshot(page, info, 'library-search-filled');
+    await clear.focus();
+    await page.keyboard.down('Space');
+    await expect(clear).toHaveAttribute('data-pressing', 'true');
+    await expect(input).toHaveValue(first);
+    await page.keyboard.press('Escape');
+    await page.keyboard.up('Space');
+    await expect(clear).not.toHaveAttribute('data-pressing', 'true');
+    await expect(input).toHaveValue(first);
+    await clear.hover();
+    await page.mouse.down();
+    await expect(clear).toHaveAttribute('data-pressing', 'true');
+    await page.mouse.move(0, 0);
+    await expect(clear).not.toHaveAttribute('data-pressing', 'true');
+    await page.mouse.up();
+    await expect(input).toHaveValue(first);
+    await clear.click();
+    await expect(input).toBeFocused();
+    await expect(input).toHaveValue('');
+    await expect(clear).toHaveCount(0);
+    for (const name of [first, second]) {
+      await expect(
+        page
+          .locator('[data-gallery-keyboard-id]')
+          .filter({ has: page.getByRole('button', { name, exact: true }) })
+      ).toHaveCount(1);
+    }
+    expect(await geometry()).toEqual(idle);
+  });
+
+  test(`library facet search and saved view draft ${theme} ${viewport.name}`, async ({
+    page,
+    extensionId,
+  }, info) => {
+    const t = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+    await page.setViewportSize(viewport.size);
+    await openLibrary(page, extensionId, 'en', theme);
+    const id = randomUUID().slice(0, 8);
+    const [name] = await seedImages(page, `facet-search-${id}`);
+    await page.getByRole('button', { name, exact: true }).first().click();
+    const preview = page.locator('[data-ui="gallery.preview.inspector"]');
+    const tag = `design-tag-${id}`;
+    const tagInput = preview.getByRole('combobox');
+    for (const value of [
+      ...Array.from({ length: 10 }, (_, index) => `fixture-tag-${index}`),
+      tag,
+    ]) {
+      await preview.getByRole('button', { name: t('gallery.app.addTags'), exact: true }).click();
+      await tagInput.fill(value);
+      await tagInput.press('Enter');
+      await expect(tagInput).toHaveCount(0);
+    }
+    await expect(preview.getByText(tag, { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: t('common.actions.close'), exact: true }).click();
+    const facet = page.locator('details').filter({
+      has: page.locator('summary').filter({ hasText: t('gallery.app.facetTitle.tags') }),
+    });
+    if ((await facet.getAttribute('open')) === null) await facet.locator('summary').click();
+    const facetText = `${t('gallery.app.facetSearch')} ${t('gallery.app.facetTitle.tags')}`;
+    const query = facet.getByLabel(facetText, { exact: true });
+    const option = facet.getByRole('checkbox', { name: tag });
+    await expect(option).toBeAttached();
+    await query.fill('not-a-tag-anywhere');
+    await expect(facet.getByText(t('gallery.app.facetNoMatches'))).toBeVisible();
+    const clearQuery = query.locator('..').getByRole('button');
+    await clearQuery.click();
+    await expect(query).toBeFocused();
+    await expect(query).toHaveValue('');
+    await query.fill(id);
+    await expect(facet.getByRole('checkbox')).toHaveCount(1);
+    await screenshot(page, info, 'facet-search-filled');
+    await option.locator('..').click();
+    await expect(option).toBeChecked();
+
+    const startDraft = page.getByRole('button', {
+      name: t('gallery.app.savedViewSave'),
+      exact: true,
+    });
+    await startDraft.click();
+    const draft = page.getByRole('textbox', { name: t('gallery.app.savedViewName') });
+    await expect(draft).toBeFocused();
+    const save = draft
+      .locator('../..')
+      .getByRole('button', { name: t('gallery.app.savedViewConfirm'), exact: true });
+    await draft.fill('Discard draft');
+    const clearDraft = draft.locator('..').getByRole('button');
+    await draft.press('Tab');
+    await expect(clearDraft).toBeFocused();
+    await clearDraft.press('Space');
+    await expect(draft).toBeFocused();
+    await expect(draft).toHaveValue('');
+    await expect(save).toBeDisabled();
+    await draft.press('Escape');
+    await expect(draft).toHaveCount(0);
+    await startDraft.click();
+    const savedName = `Gallery design ${id}`;
+    await draft.fill(savedName);
+    await screenshot(page, info, 'saved-view-draft');
+    await draft.press('Enter');
+    await expect(draft).toHaveCount(0);
+    await expect(page.getByRole('button', { name: savedName, exact: true })).toBeVisible();
+  });
+
+  test(`library dropdowns preserve selection and import cancellation ${theme} ${viewport.name}`, async ({
+    page,
+    extensionId,
+  }, info) => {
+    const t = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+    await page.setViewportSize(viewport.size);
+    await openLibrary(page, extensionId, 'en', theme);
+    const file = {
+      name: `dropdown-proof-${randomUUID().slice(0, 8)}.png`,
+      mimeType: 'image/png',
+      buffer: await galleryImageFixture(page),
+    };
+    const files = page.locator('input[type="file"][multiple]');
+    await files.setInputFiles(file);
+    await searchLibrary(page, file.name);
+    const item = page.locator('[data-gallery-keyboard-id]');
+    await expect(item).toHaveCount(1);
+
+    const openChoice = async (trigger: Locator) => {
+      await page.mouse.move(0, 0);
+      const tokens = await trigger.evaluate((node) => {
+        const sample = document.createElement('span');
+        node.append(sample);
+        const resolve = (token: string) => {
+          sample.style.backgroundColor = `var(${token})`;
+          return getComputedStyle(sample).backgroundColor;
+        };
+        const resting = resolve('--sniptale-color-surface-input');
+        const hover = resolve('--sniptale-color-surface-hover');
+        sample.remove();
+        return { resting, hover };
+      });
+      await expect.soft(trigger).toHaveCSS('background-color', tokens.resting, { timeout: 1000 });
+      await expect
+        .soft(trigger.locator('svg.lucide-chevron-down'))
+        .toHaveCSS('width', '12px', { timeout: 1000 });
+      await trigger.hover();
+      await expect.soft(trigger).toHaveCSS('background-color', tokens.hover, { timeout: 1000 });
+      await trigger.click();
+      await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+      await expect.soft(trigger).toHaveCSS('background-color', tokens.hover, { timeout: 1000 });
+      const menu = page.getByRole('listbox');
+      await expect(menu).toBeInViewport({ ratio: 1 });
+      return menu;
+    };
+
+    const sort = page.getByRole('button', { name: t('gallery.app.sortLabel'), exact: true });
+    const sortMenu = await openChoice(sort);
+    await screenshot(page, info, 'library-sort-open');
+    await sortMenu.getByRole('option', { name: t('gallery.app.sortRecentlyModified') }).click();
+    await expect(sort).toContainText(t('gallery.app.sortRecentlyModified'));
+    await sort.press('Enter');
+    await expect(sortMenu.getByRole('option', { selected: true })).toHaveText(
+      t('gallery.app.sortRecentlyModified')
+    );
+    await page.keyboard.press('Escape');
+    await expect(sort).toBeFocused();
+
+    await files.setInputFiles(file);
+    const dialog = page.getByRole('dialog');
+    const conflict = dialog.getByRole('button', {
+      name: t('gallery.importModal.conflictActionLabel'),
+      exact: true,
+    });
+    const conflictMenu = await openChoice(conflict);
+    await screenshot(page, info, 'library-import-choice-open');
+    await conflictMenu
+      .getByRole('option', { name: t('gallery.importModal.mediaConflictKeepBoth'), exact: true })
+      .click();
+    await expect(conflict).toContainText(t('gallery.importModal.mediaConflictKeepBoth'));
+    await dialog.getByRole('button', { name: t('common.actions.cancel'), exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await expect(item).toHaveCount(1);
+  });
 }
 
 for (const width of [1535, 1536, 1537, 1100]) {

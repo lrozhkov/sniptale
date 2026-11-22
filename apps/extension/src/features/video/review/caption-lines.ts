@@ -1,5 +1,26 @@
 const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 
+function fittingGraphemes(
+  units: readonly string[],
+  offset: number,
+  width: number,
+  measure: (text: string) => number
+) {
+  // Bound the search by the next line rather than measuring prefixes of the full suffix.
+  let low = 1;
+  let high = Math.min(2, units.length - offset);
+  while (low < high && measure(units.slice(offset, offset + high).join('')) <= width) {
+    low = high;
+    high = Math.min(high * 2, units.length - offset);
+  }
+  while (low + 1 < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (measure(units.slice(offset, offset + middle).join('')) <= width) low = middle;
+    else high = middle;
+  }
+  return low;
+}
+
 /** Full text wrapping; long tokens break only between graphemes, never with ellipsis. */
 export function wrapReviewCaptionText(
   text: string,
@@ -22,15 +43,9 @@ export function wrapReviewCaptionText(
       const units = Array.from(graphemes.segment(piece), (entry) => entry.segment);
       let offset = 0;
       while (offset < units.length) {
-        let low = 1;
-        let high = units.length - offset;
-        while (low < high) {
-          const middle = Math.ceil((low + high) / 2);
-          if (measure(units.slice(offset, offset + middle).join('')) <= width) low = middle;
-          else high = middle - 1;
-        }
-        const part = units.slice(offset, offset + low).join('');
-        offset += low;
+        const count = fittingGraphemes(units, offset, width, measure);
+        const part = units.slice(offset, offset + count).join('');
+        offset += count;
         if (offset < units.length) lines.push(part);
         else line = part;
       }

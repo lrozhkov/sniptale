@@ -86,16 +86,22 @@ function useTextRecordingTake(
   } catch {
     /* Pending editor fields have a display cap; Start joins them before basis validation and acquisition. */
   }
-  const playback = useVoiceoverPlayback(context.video, () => {
-    const current = owner.current;
-    const state = current.props.access.session.getSnapshot();
-    return (
-      createReviewTimeMap(
-        state.snapshot.workspace.source.duration,
-        state.document.edits
-      ).timelineToSource((current.pending ?? current.basis)?.resultStart ?? 0) ?? 0
-    );
-  });
+  const playback = useVoiceoverPlayback(
+    context.video,
+    () => {
+      const current = owner.current;
+      const resultStart = (current.pending ?? current.basis)?.resultStart ?? 0;
+      if (current.context.transport) return resultStart;
+      const state = current.props.access.session.getSnapshot();
+      return (
+        createReviewTimeMap(
+          state.snapshot.workspace.source.duration,
+          state.document.edits
+        ).timelineToSource(resultStart) ?? 0
+      );
+    },
+    context.transport
+  );
   const stop = () => {
     playback.syncStop();
     if (owner.current.ownsSilence) {

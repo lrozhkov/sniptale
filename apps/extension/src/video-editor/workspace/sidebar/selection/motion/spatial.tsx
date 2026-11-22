@@ -127,7 +127,6 @@ export function MotionDepthFields(props: SpatialFieldProps) {
         label={translate('gallery.videoReview.depthMode')}
         value={accepted.mode}
         disabled={!accepted.enabled}
-        layout="stacked"
         options={[
           { value: 'depth', label: translate('gallery.videoReview.depthModeDepth') },
           { value: 'area', label: translate('gallery.videoReview.depthModeArea') },

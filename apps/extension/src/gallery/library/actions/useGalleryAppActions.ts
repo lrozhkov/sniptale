@@ -10,7 +10,9 @@ import type {
   GallerySelectionController,
   GallerySurfaceController,
 } from './controller-types';
-import type { GalleryItem } from '../items';
+import { isGalleryMediaItem, type GalleryItem } from '../items';
+import { isImageKind } from '../ui';
+import { createSecureRandomUuid } from '@sniptale/platform/security/secure-random-id';
 import { useRef } from 'react';
 import {
   createClosePendingImportAction,
@@ -151,7 +153,23 @@ function buildGalleryAppActionsResult(args: {
           args.navigationCoordinator,
           args.readPreviewState
         )(target, withBusy),
-      openInEditor,
+      openInEditor: (item) => {
+        if (!isGalleryMediaItem(item) || !isImageKind(item.kind)) {
+          openInEditor(item);
+          return;
+        }
+        if (
+          item.lifecycle?.trashedAt !== undefined ||
+          args.readPreviewState().preview.session.item?.id !== item.id
+        )
+          return;
+        const request = createSecureRandomUuid();
+        controller.actions.preview.setPreview((current) =>
+          current.item?.id === item.id && current.item.lifecycle?.trashedAt === undefined
+            ? { ...current, inspectorCollapsed: false, imageProjectPickerRequest: request }
+            : current
+        );
+      },
       openSnapshotScreenshotInEditor: () =>
         void openSnapshotScreenshotInEditor(controller, withBusy),
       resetChanges: () => resetPreviewChanges(controller),

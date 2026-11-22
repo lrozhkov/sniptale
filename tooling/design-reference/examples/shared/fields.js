@@ -145,3 +145,31 @@ export function TextField({
     },
   };
 }
+
+const microphone =
+  'M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z M19 10v2a7 7 0 0 1-14 0v-2 M12 19v3';
+
+export function DictationSampleButton(input, locale) {
+  const sample = locale === 'ru' ? 'Пример диктовки.' : 'Dictation sample.';
+  const button = ActionButton({
+    label: locale === 'ru' ? 'Вставить пример диктовки' : 'Insert dictation sample',
+    kind: 'utility',
+    appearance: 'chrome',
+    iconOnly: true,
+    iconPath: microphone,
+    onClick: () => {
+      const start = input.selectionStart ?? input.value.length;
+      const end = input.selectionEnd ?? start;
+      const leading = /\S/u.test(input.value.charAt(start - 1)) ? ' ' : '';
+      const trailing = /\S/u.test(input.value.charAt(end)) ? ' ' : '';
+      input.setRangeText(leading + sample + trailing, start, end, 'end');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.focus({ preventScroll: true });
+    },
+  });
+  button.classList.add('inspector-dictation');
+  button.addEventListener('pointerdown', (event) => {
+    if (event.button === 0) event.preventDefault();
+  });
+  return button;
+}

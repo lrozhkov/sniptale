@@ -33,7 +33,8 @@ export function CameraWindowButton({
       {...press.props}
       ref={ref}
       className={[
-        'inline-flex min-w-0 items-center justify-center gap-1.5 disabled:opacity-40',
+        'inline-flex min-w-0 cursor-pointer items-center justify-center gap-1.5',
+        'disabled:cursor-not-allowed disabled:opacity-40',
         iconOnly ? 'size-8 shrink-0' : 'w-full',
         responsiveLabel ? 'camera-recording-command' : '',
       ].join(' ')}

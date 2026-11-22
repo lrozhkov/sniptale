@@ -191,9 +191,7 @@ it('shares caption visibility between the text eye and scene without disabling t
     ).toBe(false);
     await act(async () => eye().click());
     expect(eye().getAttribute('aria-pressed')).toBe('true');
-    await act(async () =>
-      fixture.host.querySelector<HTMLButtonElement>('[data-lane-tab="settings"]')!.click()
-    );
+    await fixture.section('captions');
     const toggle = fixture.host.querySelector<HTMLButtonElement>(
       '[data-ui="gallery.videoReview.captionScene"] [role="switch"]'
     )!;

@@ -179,6 +179,9 @@ it('edits the background paint and the selected zoom region through the panel ca
   act(() => root.render(<Harness />));
   expect(host.querySelector('[data-ui="gallery.videoReview.backgroundInspector"]')).toBeNull();
   await act(async () => button('toggleMode').click());
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-background"]')!.click()
+  );
   expect(host.querySelector('[data-ui="gallery.videoReview.backgroundInspector"]')).not.toBeNull();
   expect(host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')).toBeNull();
 
@@ -191,6 +194,9 @@ it('edits the background paint and the selected zoom region through the panel ca
   await act(async () => button('addZoom').click());
   expect(host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')).not.toBeNull();
   expect(host.querySelector('[data-ui="gallery.videoReview.backgroundInspector"]')).not.toBeNull();
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-framing"]')!.click()
+  );
   const focusX = host.querySelector<HTMLInputElement>(
     '[aria-label="gallery.videoReview.zoomFocusX"]'
   )!;
@@ -302,20 +308,17 @@ it('routes Border numeric drafts through the panel and cancels without a durable
     );
   }
   act(() => root.render(<DraftHarness />));
-  const range = host.querySelector<HTMLInputElement>(
-    '[aria-label="gallery.videoReview.borderWidth range"]'
+  const increase = host.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.videoReview.borderWidth increase"]'
   )!;
-  await act(async () => {
-    range.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
-    setInputValue(range, '9');
-  });
-  expect(host.querySelector('[data-testid="draft-width"]')!.textContent).toBe('9');
+  act(() => increase.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  expect(host.querySelector('[data-testid="draft-width"]')!.textContent).toBe('4');
   expect(region.border.width).toBe(3);
   expect(setZoom).not.toHaveBeenCalled();
-  await act(async () =>
-    range.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  act(() =>
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))
   );
-  await act(async () => range.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+  act(() => window.dispatchEvent(new MouseEvent('pointerup')));
   expect(host.querySelector('[data-testid="draft-width"]')!.textContent).toBe('3');
   expect(setZoom).not.toHaveBeenCalled();
 });
@@ -444,9 +447,9 @@ function mountSpatialDraftPanel(name = 'perspectiveX') {
       details.dispatchEvent(new Event('toggle'));
     });
   }
-  const input = (name: string, range = false) => {
+  const input = (name: string) => {
     const node = host.querySelector<HTMLInputElement>(
-      `input[aria-label="gallery.videoReview.${name}${range ? ' range' : ''}"]`
+      `input[aria-label="gallery.videoReview.${name}"]`
     );
     if (!node) throw new Error(`Missing spatial numeric input: ${name}`);
     return node;
@@ -455,6 +458,10 @@ function mountSpatialDraftPanel(name = 'perspectiveX') {
     region,
     input,
     mutations,
+    stepper: (name: string) =>
+      host.querySelector<HTMLButtonElement>(
+        `button[aria-label="gallery.videoReview.${name} increase"]`
+      )!,
     authored: () => authored.zoom.regions[0]!,
     owner: () => owner,
   };
@@ -480,42 +487,38 @@ it.each(['perspectiveX', 'depthWidth'])(
 );
 
 it.each(['perspectiveX', 'depthWidth'])(
-  'commits one %s range edit after its transient value has rerendered through the real panel',
+  'commits one %s stepper edit after its transient value has rerendered through the real panel',
   async (name) => {
     const panel = mountSpatialDraftPanel(name);
-    const range = panel.input(name, true);
-    await act(async () => {
-      range.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
-      setInputValue(range, '45');
-    });
-    expect(panel.input(name).value).toBe('45');
+    const stepper = panel.stepper(name);
+    const expected = name === 'perspectiveX' ? 10.1 : 20.1;
+    await act(async () => stepper.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+    expect(panel.input(name).value).toBe(String(expected));
     expect(panel.authored()).toEqual(panel.region);
     expect(panel.mutations).not.toHaveBeenCalled();
-    await act(async () => range.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+    await act(async () => window.dispatchEvent(new MouseEvent('pointerup')));
     expect(panel.mutations).toHaveBeenCalledTimes(1);
     expect(
       name === 'perspectiveX'
         ? panel.authored().perspective?.rotateX
         : panel.authored().depthOfField?.width
-    ).toBe(name === 'perspectiveX' ? 45 : 0.45);
-    expect(panel.input(name).value).toBe('45');
+    ).toBeCloseTo(name === 'perspectiveX' ? expected : expected / 100);
+    expect(panel.input(name).value).toBe(String(expected));
   }
 );
 
 it.each(['perspectiveX', 'depthWidth'])(
-  'cancels %s range preview and ignores its later pointerup after exact fields have synchronized',
+  'cancels %s stepper preview and ignores its later pointerup after exact fields have synchronized',
   async (name) => {
     const panel = mountSpatialDraftPanel(name);
-    const range = panel.input(name, true);
-    await act(async () => {
-      range.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
-      setInputValue(range, '45');
-    });
-    expect(panel.input(name).value).toBe('45');
+    const stepper = panel.stepper(name);
+    const expected = name === 'perspectiveX' ? 10.1 : 20.1;
+    await act(async () => stepper.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+    expect(panel.input(name).value).toBe(String(expected));
     await act(async () =>
-      range.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))
     );
-    await act(async () => range.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+    await act(async () => window.dispatchEvent(new MouseEvent('pointerup')));
     expect(panel.input(name).value).toBe(name === 'perspectiveX' ? '10' : '20');
     expect(panel.authored()).toEqual(panel.region);
     expect(panel.mutations).not.toHaveBeenCalled();
@@ -603,7 +606,7 @@ it('keeps computer admission cancellation reachable while Scene controls are dis
   expect(cancel).toHaveBeenCalledOnce();
 });
 
-it('dispatches shared source filter controls through the Gallery content adapter', () => {
+it('dispatches shared source filter controls through the Gallery content adapter', async () => {
   const advanced = createQuickEditAdvancedState(),
     onSourceFilters = vi.fn();
   act(() =>
@@ -627,11 +630,22 @@ it('dispatches shared source filter controls through the Gallery content adapter
       />
     )
   );
+  expect(host.querySelector('[data-section="canvas"]')).not.toBeNull();
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-source-filters"]')!.click()
+  );
   const add = [...host.querySelectorAll('button')].find(
-    (item) => item.textContent === translate('videoEditor.sidebar.sourceFiltersAddBloom')
+    (item) => item.getAttribute('aria-label') === translate('videoEditor.sidebar.sourceFiltersAdd')
   );
   if (!add) throw new Error('Missing shared source filter controls');
   act(() => add.click());
+  const bloom = [...document.querySelectorAll<HTMLButtonElement>('button[role="option"]')].find(
+    (item) => item.textContent === translate('videoEditor.sidebar.sourceFiltersAddBloom')
+  );
+  if (!bloom) throw new Error('Missing Bloom option');
+  await act(async () => {
+    bloom.click();
+  });
   expect(onSourceFilters).toHaveBeenCalledWith({
     version: 1,
     filters: [expect.objectContaining({ kind: 'bloom', enabled: true, intensity: 1 })],

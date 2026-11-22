@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import {
   MAX_POPUP_EXPORT_JOB_TABS,
   MAX_POPUP_EXPORT_STATUS_TEXT_BYTES,
+  MAX_POPUP_EXPORT_TAB_TITLE_BYTES,
 } from '@sniptale/runtime-contracts/export';
 
 import {
@@ -158,6 +159,26 @@ it('rejects export progress payloads with invalid active step keys', () => {
   expect(isExportProgress({ phase: 'idle', message: '', current: -1, total: 0, errors: [] })).toBe(
     false
   );
+});
+
+it('accepts bounded collection context without requiring other-language message text', () => {
+  const progress = {
+    phase: 'downloading',
+    message: 'Text in any producer locale',
+    current: 0,
+    total: 1,
+    errors: [],
+  };
+  expect(isExportProgress({ ...progress, collectingPageTitle: 'Example page' })).toBe(true);
+  expect(isExportProgress({ ...progress, collectingPageTitle: '' })).toBe(true);
+  for (const collectingPageTitle of [
+    null,
+    3,
+    {},
+    'x'.repeat(MAX_POPUP_EXPORT_TAB_TITLE_BYTES + 1),
+  ]) {
+    expect(isExportProgress({ ...progress, collectingPageTitle })).toBe(false);
+  }
 });
 
 it('narrows popup export job phases and positive integer revisions', () => {

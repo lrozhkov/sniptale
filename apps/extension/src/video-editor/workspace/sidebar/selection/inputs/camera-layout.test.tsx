@@ -70,6 +70,65 @@ function button(suffix: string) {
   return element;
 }
 
+it('shows and edits result-clock destination times and transition seconds after a freeze', async () => {
+  const props = createProps();
+  Object.assign(props.clip, {
+    startTime: 10,
+    sourceStart: 2,
+    sourceDuration: 6,
+    duration: 3,
+    playbackRate: 2,
+  });
+  props.clip.cameraTiming = { offsetSeconds: 0, transitions: 'bounded', timeDomain: 'result' };
+  props.clip.cameraPositions = [
+    {
+      id: 'position',
+      sourceTime: 11,
+      transform: props.clip.transform,
+      fitMode: props.clip.fitMode,
+      transition: { kind: 'smooth', duration: 0.5 },
+    },
+  ];
+  act(() => root.render(<CameraLayoutControls {...props} currentTime={11.25} />));
+  const input = (key: string) =>
+    container.querySelector<HTMLInputElement>(`input[aria-label="videoEditor.sidebar.${key}"]`)!;
+  expect(input('cameraPositionTime').value).toBe('1');
+  expect(input('cameraTransitionDuration').value).toBe('0.5');
+  const enter = (key: string, value: string) => {
+    const field = input(key);
+    act(() => field.dispatchEvent(new FocusEvent('focusin', { bubbles: true })));
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, value);
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    act(() => field.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' })));
+  };
+  enter('cameraPositionTime', '1.25');
+  expect(props.onEditCameraPosition).toHaveBeenLastCalledWith(props.clip.id, {
+    kind: 'update',
+    id: 'position',
+    sourceTime: 11.25,
+  });
+  enter('cameraTransitionDuration', '0.75');
+  expect(props.onEditCameraPosition).toHaveBeenLastCalledWith(props.clip.id, {
+    kind: 'update',
+    id: 'position',
+    transition: { kind: 'smooth', duration: 0.75 },
+  });
+  act(() => root.render(<CameraLayoutControls {...props} currentTime={10} />));
+  const positions = container.querySelector<HTMLButtonElement>(
+    'button[aria-label="videoEditor.sidebar.cameraPosition"]'
+  )!;
+  act(() => positions.click());
+  const choices = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')];
+  expect(choices).toHaveLength(2);
+  await act(async () => choices[1]!.click());
+  expect(props.onEditCameraPosition).toHaveBeenLastCalledWith(props.clip.id, {
+    kind: 'select',
+    id: 'position',
+  });
+});
+
 describe('camera interval controls', () => {
   it('offers all split directions and a docked return for an active split', () => {
     const props = createProps();

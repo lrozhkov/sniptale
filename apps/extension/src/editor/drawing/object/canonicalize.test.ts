@@ -232,3 +232,57 @@ it('keeps nested text content, auto width and scaled font geometry during canoni
   });
   void canvas.dispose();
 });
+
+it.each([false, true])(
+  'refreshes sibling geometry once after batch restoration, including failure=%s',
+  (failPreparation) => {
+    const canvas = new Canvas(document.createElement('canvas'), { renderOnAddRemove: false });
+    try {
+      const peer = new Rect({ left: 250, top: 140, width: 20, height: 30 });
+      const drawings = Array.from({ length: 8 }, (_, index) => {
+        const object = createEditorDrawingFabricObject(
+          {
+            kind: 'rectangle',
+            id: `batch-${index}`,
+            bounds: { x: index * 12, y: index * 9, width: 30, height: 20 },
+            color: '#123456',
+            fillColor: null,
+            width: 2,
+          },
+          index + 1
+        );
+        object.sniptaleLabel = `Rectangle ${index + 1}`;
+        object.sniptaleLocked = index % 2 === 0;
+        return object;
+      });
+      canvas.add(peer, ...drawings);
+      const positions = drawings.map((object) => object.getCoords());
+      const refreshPeer = vi.spyOn(peer, 'setCoords');
+      const prepareObject = vi.fn(() => {
+        if (failPreparation && prepareObject.mock.calls.length === 3)
+          throw new Error('Preparation refused');
+      });
+      const restore = () =>
+        restoreCanonicalEditorDrawingObjects({ canvas, source: null, prepareObject });
+      if (failPreparation) expect(restore).toThrow('Preparation refused');
+      else restore();
+      expect(refreshPeer).toHaveBeenCalledTimes(1);
+      expect(canvas.getObjects()[0]).toBe(peer);
+      const restored = canvas.getObjects().slice(1);
+      expect(restored).toHaveLength(drawings.length);
+      restored.forEach((object, index) => {
+        expect(object.sniptaleId).toBe(`batch-${index}`);
+        expect(object.sniptaleLabel).toBe(`Rectangle ${index + 1}`);
+        expect(object.sniptaleLocked).toBe(index % 2 === 0);
+        object.getCoords().forEach((point, corner) => {
+          expect(point.distanceFrom(positions[index]![corner]!)).toBeLessThan(0.001);
+        });
+        if (!failPreparation || index < 3) expect(object).not.toBe(drawings[index]);
+        else expect(object).toBe(drawings[index]);
+      });
+      expect(prepareObject).toHaveBeenCalledTimes(failPreparation ? 3 : 8);
+    } finally {
+      canvas.destroy();
+    }
+  }
+);

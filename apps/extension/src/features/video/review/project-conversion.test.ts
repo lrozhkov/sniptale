@@ -19,6 +19,9 @@ import { buildReviewTimeMap } from './timeline';
 import { REVIEW_SPEED_RATES } from './speed';
 import { parseHydratableVideoProject } from '../project/validation/root';
 import { planReviewProjectConversion } from './project-conversion';
+import { loadQuickEditAdvancedContentState } from './advanced/validation';
+import { exportReviewSubtitles } from './subtitle-export';
+import { createReviewAnnotationTextClip } from './annotation-effects/text-animation';
 
 import { fixture, externalAudioFixture, actionFixture } from './project-conversion.test-support';
 
@@ -777,4 +780,62 @@ it('transfers independent original and external audio processing without applyin
       );
   }
   expect(input).toEqual(before);
+});
+
+it('refuses Montage conversion before materializing a project that would lose native text', () => {
+  const input = fixture();
+  input.document.advancedContent.annotationEffects = {
+    enabled: false,
+    instances: [],
+    textClips: [createReviewAnnotationTextClip('title', 'Keep me', 2, 4, 0)],
+  };
+  const before = structuredClone(input);
+  expect(planReviewProjectConversion(input)).toEqual({
+    status: 'blocked',
+    issues: [{ kind: 'unmapped-content', field: 'annotationEffects' }],
+  });
+  expect(input).toEqual(before);
+});
+
+it('preserves old subtitle settings and voiceover and keeps native titles out of SRT and VTT', () => {
+  const input = fixture();
+  const original = input.document.advancedContent;
+  original.audio.voiceover = [
+    {
+      id: 'voice',
+      assetId: 'voice-track',
+      timelineStart: 1,
+      sourceOffset: 0,
+      duration: 1,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+  ];
+  const restored = loadQuickEditAdvancedContentState({ ...original, schemaVersion: 34 });
+  expect(restored).toEqual(original);
+  const title = createReviewAnnotationTextClip('title', 'Independent title', 1, 2, 0);
+  const both = loadQuickEditAdvancedContentState({
+    ...restored,
+    annotationEffects: { enabled: true, instances: [], textClips: [title] },
+  });
+  expect(both?.audio.voiceover).toEqual(original.audio.voiceover);
+  expect(both?.captions).toEqual(original.captions);
+  const fragments = both?.text?.fragments;
+  if (!fragments) throw new Error('Subtitles were not restored');
+  for (const format of ['srt', 'vtt'] as const) {
+    const exported = exportReviewSubtitles({
+      fragments,
+      format,
+      ids: fragments.map((fragment) => fragment.id),
+      segments: buildReviewTimeMap(input.source.duration, input.document.edits),
+      language: null,
+      onlyShown: false,
+      normalizeOverlaps: false,
+      mainOffset: 0,
+    });
+    expect(exported).toMatchObject({ ok: true, count: 1, text: expect.stringContaining('Text') });
+    if (exported.ok) expect(exported.text).not.toContain(title.text);
+  }
 });

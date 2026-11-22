@@ -1,4 +1,5 @@
-import type { ComponentType } from 'react';
+import type { ComponentType, ReactNode } from 'react';
+import { Circle, Contrast, Droplet, RectangleHorizontal } from 'lucide-react';
 import type { QuickEditSpotlight } from '../../features/video/project/scene/focus-appearance';
 import { authorQuickEditLensArea } from '../../features/video/project/scene/focus-appearance';
 import { FocusRoundnessField, FocusAreaFields } from './geometry';
@@ -18,15 +19,41 @@ export function SpotlightAppearanceFields(props: {
   onPreview?: ((patch: SpotlightAppearancePatch | null) => void) | undefined;
   Details: ComponentType<InspectorDisclosureProps>;
   preferenceId: string;
+  framing?: {
+    renderChoice(choice: ReactNode): ReactNode;
+    lensPlacement?: ReactNode;
+  };
 }) {
   const { value, onChange, Details } = props;
+  const lensFraming = value.effect === 'magnify' ? props.framing : undefined;
+  const areaProps = {
+    area: value.area,
+    onPreview: (area: QuickEditSpotlight['area'] | null) =>
+      props.onPreview?.(area === null ? null : { area }),
+    onChange: (area: QuickEditSpotlight['area']) => onChange({ area }),
+  };
   return (
     <div className="sniptale-parameter-stack">
       {value.effect === 'magnify' ? (
         <>
-          <LensShapeFields value={value} onChange={onChange} onPreview={props.onPreview} />
+          {lensFraming ? (
+            <>
+              {lensFraming.renderChoice(
+                <LensShapeChoice value={value} onChange={onChange} visual />
+              )}
+              {lensFraming.lensPlacement}
+            </>
+          ) : (
+            <LensShapeChoice value={value} onChange={onChange} />
+          )}
+          {value.lensShape === 'circle' ? (
+            <LensDiameterField value={value} onChange={onChange} onPreview={props.onPreview} />
+          ) : lensFraming ? (
+            <FocusAreaFields {...areaProps} fields="size" />
+          ) : null}
           <PreviewNumericRow
-            label={translate('gallery.videoReview.clickMagnification')}
+            label={translate('gallery.videoReview.focusLensMagnification')}
+            rangePresentation="field"
             min={1}
             max={4}
             step={0.1}
@@ -40,7 +67,6 @@ export function SpotlightAppearanceFields(props: {
           />
           <SegmentedRow<'flat' | 'optical'>
             columns={2}
-            layout="stacked"
             label={translate('gallery.videoReview.clickLensOptics')}
             ariaLabel={translate('gallery.videoReview.clickLensOptics')}
             value={value.lensOptics ?? 'flat'}
@@ -53,6 +79,7 @@ export function SpotlightAppearanceFields(props: {
           {value.lensOptics === 'optical' ? (
             <PreviewNumericRow
               label={translate('gallery.videoReview.clickLensEdgeWidth')}
+              rangePresentation={lensFraming ? 'field' : undefined}
               min={1}
               max={30}
               step={1}
@@ -66,23 +93,17 @@ export function SpotlightAppearanceFields(props: {
             />
           ) : null}
         </>
+      ) : props.framing ? (
+        props.framing.renderChoice(
+          <SpotlightModeChoice value={value.effect} onChange={onChange} visual />
+        )
       ) : (
-        <SegmentedRow<'dim' | 'blur'>
-          columns={2}
-          layout="stacked"
-          label={translate('gallery.videoReview.focusOutside')}
-          ariaLabel={translate('gallery.videoReview.focusOutside')}
-          value={value.effect}
-          options={[
-            { value: 'dim', label: translate('gallery.videoReview.focusDim') },
-            { value: 'blur', label: translate('gallery.videoReview.focusBlur') },
-          ]}
-          onChange={(effect) => onChange({ effect })}
-        />
+        <SpotlightModeChoice value={value.effect} onChange={onChange} />
       )}
       {value.effect === 'dim' ? (
         <PreviewNumericRow
           label={translate('gallery.videoReview.focusStrength')}
+          rangePresentation="field"
           min={0}
           max={100}
           step={1}
@@ -97,6 +118,7 @@ export function SpotlightAppearanceFields(props: {
       ) : value.effect === 'blur' ? (
         <PreviewNumericRow
           label={translate('gallery.videoReview.focusBlurRadius')}
+          rangePresentation="field"
           min={0}
           max={40}
           step={1}
@@ -116,13 +138,13 @@ export function SpotlightAppearanceFields(props: {
           />
           <Details
             preferenceId={props.preferenceId}
-            label={translate('gallery.videoReview.preciseArea')}
+            label={translate(
+              lensFraming
+                ? 'gallery.videoReview.precisePosition'
+                : 'gallery.videoReview.preciseArea'
+            )}
           >
-            <FocusAreaFields
-              area={value.area}
-              onPreview={(area) => props.onPreview?.(area === null ? null : { area })}
-              onChange={(area) => onChange({ area })}
-            />
+            <FocusAreaFields {...areaProps} fields={lensFraming ? 'position' : undefined} />
           </Details>
         </>
       ) : null}
@@ -130,7 +152,78 @@ export function SpotlightAppearanceFields(props: {
   );
 }
 
-function LensShapeFields(props: {
+function SpotlightModeChoice(props: {
+  value: 'dim' | 'blur';
+  onChange(patch: SpotlightAppearancePatch): void;
+  visual?: boolean;
+}) {
+  const label = translate('gallery.videoReview.focusOutside');
+  return (
+    <SegmentedRow<'dim' | 'blur'>
+      columns={2}
+      layout={props.visual ? 'stacked' : 'inline'}
+      label={label}
+      ariaLabel={label}
+      showOptionLabels={props.visual}
+      value={props.value}
+      options={[
+        {
+          value: 'dim',
+          label: translate('gallery.videoReview.focusDim'),
+          icon: props.visual ? <Contrast size={19} strokeWidth={1.5} aria-hidden /> : undefined,
+        },
+        {
+          value: 'blur',
+          label: translate('gallery.videoReview.focusBlur'),
+          icon: props.visual ? <Droplet size={19} strokeWidth={1.5} aria-hidden /> : undefined,
+        },
+      ]}
+      onChange={(effect) => props.onChange({ effect })}
+    />
+  );
+}
+
+function LensShapeChoice({
+  value,
+  onChange,
+  visual,
+}: {
+  value: QuickEditSpotlight;
+  onChange(patch: SpotlightAppearancePatch): void;
+  visual?: boolean;
+}) {
+  const label = translate('gallery.videoReview.clickLensShape');
+  const shape = value.lensShape ?? 'rounded';
+  return (
+    <SegmentedRow<'circle' | 'rounded'>
+      columns={2}
+      layout={visual ? 'stacked' : 'inline'}
+      label={label}
+      ariaLabel={label}
+      showOptionLabels={visual}
+      value={shape}
+      options={[
+        {
+          value: 'circle',
+          label: translate('gallery.videoReview.clickLens_circle'),
+          icon: visual ? <Circle size={19} strokeWidth={1.5} aria-hidden /> : undefined,
+        },
+        {
+          value: 'rounded',
+          label: translate('gallery.videoReview.focusLensRounded'),
+          icon: visual ? (
+            <RectangleHorizontal size={21} strokeWidth={1.5} aria-hidden />
+          ) : undefined,
+        },
+      ]}
+      onChange={(lensShape) => {
+        if (lensShape !== shape) onChange({ lensShape });
+      }}
+    />
+  );
+}
+
+function LensDiameterField(props: {
   value: QuickEditSpotlight;
   onChange(patch: SpotlightAppearancePatch): void;
   onPreview?: ((patch: SpotlightAppearancePatch | null) => void) | undefined;
@@ -152,40 +245,17 @@ function LensShapeFields(props: {
     };
   };
   return (
-    <>
-      <SegmentedRow<'circle' | 'rounded'>
-        columns={2}
-        layout="stacked"
-        label={translate('gallery.videoReview.clickLensShape')}
-        ariaLabel={translate('gallery.videoReview.clickLensShape')}
-        value={value.lensShape ?? 'rounded'}
-        options={[
-          { value: 'circle', label: translate('gallery.videoReview.clickLens_circle') },
-          { value: 'rounded', label: translate('gallery.videoReview.focusLensRounded') },
-        ]}
-        onChange={(lensShape) => {
-          if (lensShape !== (value.lensShape ?? 'rounded')) props.onChange({ lensShape });
-        }}
-      />
-      {value.lensShape === 'circle' ? (
-        <div className="grid gap-1">
-          <PreviewNumericRow
-            label={translate('gallery.videoReview.focusLensDiameter')}
-            min={1}
-            max={100}
-            step={1}
-            precision={1}
-            unit="%"
-            value={Math.max(value.area.width, value.area.height) * 100}
-            onPreview={(size) => props.onPreview?.(size === null ? null : sizePatch(size))}
-            onChange={(size) => props.onChange(sizePatch(size))}
-          />
-          <p className="m-0 text-[12px] leading-4 text-[var(--sniptale-color-text-secondary)]">
-            {translate('gallery.videoReview.focusLensDiameterHint')}
-          </p>
-        </div>
-      ) : null}
-    </>
+    <PreviewNumericRow
+      label={translate('gallery.videoReview.focusLensDiameter')}
+      min={1}
+      max={100}
+      step={1}
+      precision={1}
+      unit="%"
+      value={Math.max(value.area.width, value.area.height) * 100}
+      onPreview={(size) => props.onPreview?.(size === null ? null : sizePatch(size))}
+      onChange={(size) => props.onChange(sizePatch(size))}
+    />
   );
 }
 
@@ -199,9 +269,8 @@ export function SpotlightRevealFields(props: {
   return (
     <SegmentedRow<QuickEditSpotlight['reveal'] | 'none'>
       columns={props.enabled === undefined ? 2 : 3}
-      layout="stacked"
-      label={translate('gallery.videoReview.focusReveal')}
-      ariaLabel={translate('gallery.videoReview.focusReveal')}
+      label={translate('gallery.videoReview.spotlightRevealLabel')}
+      ariaLabel={translate('gallery.videoReview.spotlightRevealLabel')}
       value={props.enabled === false ? 'none' : props.value}
       options={[
         ...(props.enabled === undefined
@@ -216,7 +285,7 @@ export function SpotlightRevealFields(props: {
                 ),
               },
             ]),
-        { value: 'fade', label: translate('gallery.videoReview.focusFade') },
+        { value: 'fade', label: translate('gallery.videoReview.spotlightFade') },
         {
           value: 'contract',
           label: translate(

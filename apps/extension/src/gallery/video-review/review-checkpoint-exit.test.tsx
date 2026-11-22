@@ -114,6 +114,25 @@ async function mount(withReceipt = true, archived = false) {
   const load = integration.load.getMockImplementation()!;
   integration.load.mockImplementation(async (...args: Parameters<typeof loadVideoReviewSource>) => {
     const loaded: Awaited<ReturnType<typeof loadVideoReviewSource>> = await load(...args);
+    const [projectId, , newProjectSource] = args;
+    if (newProjectSource) {
+      const { project: _project, ...workspace } = loaded.snapshot.workspace;
+      return {
+        ...loaded,
+        original: { mediaId: newProjectSource, createdAt: workspace.createdAt, generation: null },
+        snapshot: {
+          workspace: {
+            ...workspace,
+            aggregateId: projectId,
+            sourceMediaId: newProjectSource,
+            history: [],
+            cursor: 0,
+            revision: 1,
+          },
+          draft: null,
+        },
+      };
+    }
     return {
       ...loaded,
       snapshot: {
@@ -155,50 +174,6 @@ async function mount(withReceipt = true, archived = false) {
       };
     });
   }
-  integration.create.mockImplementation(
-    async (args: { aggregateId: string; archiveId: string }) => {
-      const before = sync.sessions.at(-1)!.getSnapshot().snapshot;
-      const sourceId = before.workspace.sourceMediaId ?? before.workspace.aggregateId;
-      const { sourceMediaId: _source, ...workspace } = before.workspace;
-      const created = {
-        workspace: {
-          ...workspace,
-          aggregateId: sourceId,
-          history: [],
-          cursor: 0,
-          revision: workspace.revision + 1,
-          createdAt: workspace.createdAt + 1,
-        },
-        draft: null,
-      };
-      const generic = receipt(++serial, args.aggregateId);
-      const archive = receipt(++serial, args.archiveId);
-      const currentLoad = integration.load.getMockImplementation()!;
-      integration.load.mockImplementationOnce(
-        async (...loadArgs: Parameters<typeof loadVideoReviewSource>) => {
-          const loaded: Awaited<ReturnType<typeof loadVideoReviewSource>> = await currentLoad(
-            ...loadArgs
-          );
-          return {
-            ...loaded,
-            snapshot: { ...created, checkpointReceipt: receipt(++serial, sourceId) },
-          };
-        }
-      );
-      return {
-        ...created,
-        ...(withReceipt
-          ? {
-              checkpointReceipt: generic,
-              archiveCheckpointReceipt: archive,
-              ...(args.aggregateId !== sourceId
-                ? { retainedEditorCheckpointReceipt: generic }
-                : {}),
-            }
-          : {}),
-      };
-    }
-  );
   await act(async () =>
     fixture.root.render(
       <VideoReview
@@ -220,6 +195,7 @@ it(
     const rpc = deferred<unknown>();
     sync.exit.mockReturnValueOnce(rpc.promise);
     try {
+      await f.click('comments');
       await act(async () => close(f).click());
       expect(sync.exit).toHaveBeenCalledExactlyOnceWith(receipt(1));
       expect(f.back).not.toHaveBeenCalled();
@@ -300,6 +276,7 @@ it('does not dismiss a newer accepted native revision after an older exit RPC re
         },
       })
     );
+    await act(async () => sync.sessions[0]!.flush());
     expect(sync.sessions[0]!.getCheckpointExitReceipt()).toEqual(receipt(2));
     await act(async () => rpc.resolve({ kind: 'checkpoint-exit', outcome: 'requested' }));
     expect(f.back).not.toHaveBeenCalled();
@@ -349,11 +326,13 @@ it('preserves unsaved note text after native failure and requests exit only afte
   try {
     await f.click('addComment');
     await f.fill('Keep this note');
-    integration.draft.mockRejectedValueOnce(new Error('Native refused'));
+    const writeSnapshot = integration.snapshot.getMockImplementation()!;
+    integration.snapshot.mockRejectedValue(new Error('Native refused'));
     await act(async () => close(f).click());
     expect(sync.exit).not.toHaveBeenCalled();
     expect(f.back).not.toHaveBeenCalled();
     expect(f.host.querySelector('textarea')?.value).toBe('Keep this note');
+    integration.snapshot.mockImplementation(writeSnapshot);
     await act(async () => close(f).click());
     expect(sync.exit).toHaveBeenCalledOnce();
     expect(f.back).toHaveBeenCalledOnce();
@@ -403,7 +382,7 @@ it(
       const committed = f.snapshot.workspace.history.length;
       await act(async () => close(f).click());
       expect(f.snapshot.workspace.history).toHaveLength(committed);
-      expect(f.snapshot.draft?.annotation.text).toBe('Recovery edit');
+      expect(f.persistedSnapshot.draft?.annotation.text).toBe('Recovery edit');
       expect(sync.exit).toHaveBeenCalledOnce();
       expect(f.back).toHaveBeenCalledOnce();
     } finally {
@@ -423,13 +402,14 @@ it(
       await f.click('save');
       await f.click('editComment');
       await f.fill('Retained recovery');
-      integration.draft.mockRejectedValueOnce(new Error('Native refused'));
+      const writeSnapshot = integration.snapshot.getMockImplementation()!;
+      integration.snapshot.mockRejectedValue(new Error('Native refused'));
       await act(async () => close(f).click());
       expect(sync.exit).not.toHaveBeenCalled();
       expect(f.back).not.toHaveBeenCalled();
-      await act(async () => sync.sessions[0]!.flushAutosave(['draft']));
-      expect(sync.sessions[0]!.getSnapshot().dirty).toBe(false);
+      expect(sync.sessions[0]!.getSnapshot().dirty).toBe(true);
       expect(sync.sessions[0]!.getCheckpointExitReceipt()).toBeNull();
+      integration.snapshot.mockImplementation(writeSnapshot);
       await act(async () => close(f).click());
       expect(sync.exit).toHaveBeenCalledOnce();
       expect(f.back).toHaveBeenCalledOnce();
@@ -458,7 +438,7 @@ it('reacquires the existing-note action for later input after an obsolete exit a
     expect(f.back).not.toHaveBeenCalled();
     await f.fill('Later recovery edit');
     await act(async () => sync.sessions[0]!.flushAutosave(['draft']));
-    expect(sync.sessions[0]!.getSnapshot().dirty).toBe(false);
+    expect(f.persistedSnapshot.draft?.annotation.text).toBe('Later recovery edit');
     expect(sync.sessions[0]!.getCheckpointExitReceipt()).toBeNull();
     await act(async () => close(f).click());
     expect(sync.exit).toHaveBeenCalledTimes(2);
@@ -478,56 +458,56 @@ async function clickNew(fixture: Awaited<ReturnType<typeof mount>>) {
 }
 
 it.each([false, true])(
-  'uses exact New fixed roles before selecting the returned default in the actual UI; archived=%s',
+  'requests the retained receipt before opening an unsaved project on the same source; independent=%s',
   async (archived) => {
     const f = await mount(true, archived);
     const rpc = deferred<unknown>();
     sync.exit.mockReturnValueOnce(rpc.promise);
     try {
+      await f.click('comments');
       await clickNew(f);
-      expect(integration.create).toHaveBeenCalledOnce();
-      const args = integration.create.mock.calls[0]![0];
-      expect(sync.exit.mock.calls[0]![0].rootId).toBe(args.archiveId);
+      expect(sync.exit).toHaveBeenCalledExactlyOnceWith(
+        receipt(1, archived ? 'recording:editor-a' : 'recording:r')
+      );
       expect(integration.load).toHaveBeenCalledOnce();
       expect(close(f).disabled).toBe(true);
       expect(f.button('addComment').disabled).toBe(true);
       await act(async () => rpc.resolve({ kind: 'checkpoint-exit', outcome: 'requested' }));
-      expect(sync.exit.mock.calls.map((call) => call[0].rootId)).toEqual([
-        args.archiveId,
-        ...(archived ? ['recording:editor-a'] : []),
-      ]);
-      expect(sync.exit.mock.calls.some((call) => call[0].rootId === 'recording:r')).toBe(false);
       expect(integration.load).toHaveBeenCalledTimes(2);
-      expect(sync.sessions.at(-1)!.getSnapshot().snapshot.workspace.aggregateId).toBe(
-        'recording:r'
-      );
+      expect(integration.load.mock.lastCall).toEqual([
+        expect.stringMatching(/^recording:quick-project:/),
+        expect.any(AbortSignal),
+        'recording:r',
+      ]);
+      expect(integration.create).not.toHaveBeenCalled();
+      expect(sync.sessions.at(-1)!.getCheckpointExitReceipt()).toBeNull();
     } finally {
       await f.cleanup();
     }
   }
 );
 
-it('preserves the native New command identity on refusal and continues after advisory role RPC rejection', async () => {
+it('keeps the current project on a failed save and opens after an advisory RPC refusal', async () => {
   const f = await mount();
+  const save = vi.spyOn(sync.sessions[0]!, 'saveBuffered');
   try {
-    integration.create.mockRejectedValueOnce(new Error('Native refused'));
+    save.mockRejectedValueOnce(new Error('Native refused'));
     await clickNew(f);
     expect(sync.exit).not.toHaveBeenCalled();
     expect(integration.load).toHaveBeenCalledOnce();
     sync.exit.mockRejectedValueOnce(new Error('Worker unavailable'));
     await clickNew(f);
-    expect(integration.create.mock.calls[0]![0].archiveId).toBe(
-      integration.create.mock.calls[1]![0].archiveId
-    );
-    expect(integration.create).toHaveBeenCalledTimes(2);
-    expect(sync.exit).toHaveBeenCalledOnce();
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(sync.exit).toHaveBeenCalledExactlyOnceWith(receipt(1));
     expect(integration.load).toHaveBeenCalledTimes(2);
+    expect(integration.create).not.toHaveBeenCalled();
   } finally {
+    save.mockRestore();
     await f.cleanup();
   }
 });
 
-it('preserves a newly authored Review buffer and suppresses the second New role and selection after IPC', async () => {
+it('preserves new edits and keeps the current project after the advisory New request', async () => {
   const f = await mount(true, true);
   const rpc = deferred<unknown>();
   sync.exit.mockReturnValueOnce(rpc.promise);

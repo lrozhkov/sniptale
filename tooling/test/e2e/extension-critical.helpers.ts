@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { translate } from '../../../apps/extension/src/platform/i18n';
+import { translate } from './support/catalog-fixture';
 import { createExactBrowserFrameHarnessPayload } from '../harness/editor/scenarios/browser-frame-exact';
 import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';

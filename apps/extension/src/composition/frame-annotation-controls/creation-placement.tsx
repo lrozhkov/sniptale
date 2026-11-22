@@ -21,7 +21,7 @@ export function AnnotationCreationPlacement(props: AnnotationPlacementControl) {
           activeId={props.value}
           ariaLabel={translate('content.interactiveFrame.annotationPlacement')}
           density="compact"
-          appearance="neutral"
+          appearance="property"
           options={[
             {
               id: 'element',

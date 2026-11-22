@@ -6,6 +6,8 @@ import { parseProjectAssetEntry } from './read-guards';
 export interface ProjectAssetPublicationOptions {
   /** False keeps a frozen project representation out of the Library catalogue. */
   publishToLibrary?: boolean;
+  /** Keep a new import reachable for abandoned-source cleanup, without an Originals card. */
+  projectRetained?: true;
   originMediaId?: string;
   /** Private accepted speech is retained by this exact target and replacement. */
   requiredReviewSpeech?: { aggregateId: string; target: ReviewSpeechTarget; replacementId: string };
@@ -208,6 +210,21 @@ export function parseProjectAssetPayload(value: unknown): ProjectAssetPublicatio
         requiredReviewAnnotationEffect !== undefined))
   )
     return null;
+  const projectRetained = value['projectRetained'];
+  if (
+    projectRetained !== undefined &&
+    (projectRetained !== true ||
+      value['expectedAssetId'] !== null ||
+      value['publishToLibrary'] === false ||
+      entry.originMediaId !== undefined ||
+      librarySourceId !== undefined ||
+      requiredReview !== undefined ||
+      requiredReviewSpeech !== undefined ||
+      requiredReviewResource !== undefined ||
+      requiredReviewAnnotationEffect !== undefined ||
+      expectedLibrarySource !== undefined)
+  )
+    return null;
   return {
     entry,
     filename: value['filename'],
@@ -223,6 +240,7 @@ export function parseProjectAssetPayload(value: unknown): ProjectAssetPublicatio
     ...(requiredReviewResource ? { requiredReviewResource } : {}),
     ...(typeof librarySourceId === 'string' ? { librarySourceId } : {}),
     ...(expectedLibrarySource ? { expectedLibrarySource } : {}),
+    ...(projectRetained === true ? { projectRetained } : {}),
   };
 }
 

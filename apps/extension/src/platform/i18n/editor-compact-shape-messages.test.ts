@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { getDictionary, translate, type TranslationKey } from './index';
+import { getCatalogFixture, translateCatalogFixture } from './catalog-fixture.test-support';
+import type { TranslationKey } from './types';
 
 describe('editor compact shape messages', () => {
   it('defines the expanded arrow head labels', () => {
@@ -11,15 +12,15 @@ describe('editor compact shape messages', () => {
       ru: 'Скругленный',
       en: 'Rounded',
     });
-    expect(getDictionary('en').editor.compact.arrowStartHeadSize).toBe('Start size');
-    expect(getDictionary('en').editor.compact.arrowEndHeadSize).toBe('End size');
-    expect(getDictionary('en').editor.compact).not.toHaveProperty('arrowStyleStandard');
-    expect(getDictionary('en').editor.compact).not.toHaveProperty('arrowStyleCurved');
-    expect(getDictionary('en').editor.compact).not.toHaveProperty('arrowStyleOpen');
-    expect(getDictionary('en').editor.compact).not.toHaveProperty('arrowStyleBlock');
+    expect(getCatalogFixture('en').editor.compact.arrowStartHeadSize).toBe('Start size');
+    expect(getCatalogFixture('en').editor.compact.arrowEndHeadSize).toBe('End size');
+    expect(getCatalogFixture('en').editor.compact).not.toHaveProperty('arrowStyleStandard');
+    expect(getCatalogFixture('en').editor.compact).not.toHaveProperty('arrowStyleCurved');
+    expect(getCatalogFixture('en').editor.compact).not.toHaveProperty('arrowStyleOpen');
+    expect(getCatalogFixture('en').editor.compact).not.toHaveProperty('arrowStyleBlock');
   });
 });
 
 function localized(key: TranslationKey) {
-  return { en: translate(key, 'en'), ru: translate(key, 'ru') };
+  return { en: translateCatalogFixture(key, 'en'), ru: translateCatalogFixture(key, 'ru') };
 }

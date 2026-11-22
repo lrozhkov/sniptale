@@ -108,9 +108,10 @@ it.each(ranges)(
   }
 );
 
-it('retains the ordinary bounded scrub for auto presentation', () => {
+it('uses exact entry for bounded auto presentation', () => {
   render({ ...number, min: 0, max: 100 }, 20);
-  expect(host.querySelector('input[type="range"]')).not.toBeNull();
+  expect(host.querySelector('input[type="range"]')).toBeNull();
+  expect(host.querySelector('button[aria-label="Amount increase"]')).not.toBeNull();
 });
 
 it('dispatches numeric toggle options without serializing the value as text', () => {

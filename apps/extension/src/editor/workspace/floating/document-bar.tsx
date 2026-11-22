@@ -195,7 +195,10 @@ function saveConflictCopyOperation(args: ConflictCopyOperation): Promise<void> {
         pageTitle: args.pageTitle,
         sourceAggregateId,
       });
-      if (result === 'stale') return;
+      if (result === 'stale') {
+        args.setOperationFeedback({ aggregateId: sourceAggregateId, state: 'idle' });
+        return;
+      }
       args.setStorageClass('library');
       args.setOperationFeedback({ aggregateId: sourceAggregateId, state: 'idle' });
     } catch (error) {
@@ -272,6 +275,7 @@ function useDocumentStorageClass(aggregateId: string | null, pageTitle: string, 
           port: {
             saveNow: (serialize) => autosaveService.saveNow(serialize),
             getDurableRevision: () => autosaveService.getDurableRevision(),
+            getSourceGeneration: () => autosaveService.getSourceGeneration(),
             renderPresentation: () =>
               editorController.renderForExport({ format: 'png', quality: 1 }),
             serializeDocument: () => editorController.exportDocument(),

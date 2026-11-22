@@ -1,3 +1,4 @@
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { animationRuntimeDuration } from '../../contracts/effect-runtime/animation';
 import { resolveEffectControlDefault } from '@sniptale/runtime-contracts/effect-controls';
 import type { EffectBundleCatalogEntry } from '../../features/video/project/effect-bundle/catalog';
@@ -37,17 +38,21 @@ export async function applyReviewAnnotationCatalogDocument(
     instanceId?: string;
     start: number;
     end?: number;
+    endMax?: number;
+    timeDomain?: 'result';
     locale: string;
     presetId?: string;
     attachment?: ReviewAnnotationEffect['attachment'];
     /** Unzoomed source plane for content; canonical output canvas for viewport. */
     plane: { width: number; height: number };
     signal: AbortSignal;
+    assertCurrentTarget?(): void;
   },
   deps = acquisition
 ): Promise<string> {
   const { session, signal } = args;
   signal.throwIfAborted();
+  args.assertCurrentTarget?.();
   const source = session.getSnapshot().snapshot.workspace;
   const selected = args.catalog.documents.find((entry) => entry.id === args.documentId);
   if (!args.catalog.enabled || selected?.enabled === false)
@@ -60,15 +65,24 @@ export async function applyReviewAnnotationCatalogDocument(
     throw new ReviewAnnotationAcquisitionError('unsupported-kind');
   const text = loaded.catalogDocument.source;
   if (text === undefined) throw new Error('Annotation source is unavailable.');
+  const limit =
+    args.timeDomain === 'result'
+      ? buildReviewTimeMap(source.source.duration, session.getSnapshot().document.edits).at(-1)!
+          .resultEnd
+      : source.source.duration;
   const end =
     args.end ??
-    Math.min(source.source.duration, args.start + animationRuntimeDuration(loaded.document));
+    Math.min(
+      source.source.duration,
+      args.endMax ?? Infinity,
+      args.start + animationRuntimeDuration(loaded.document)
+    );
   if (
     !Number.isFinite(args.start) ||
     !Number.isFinite(end) ||
     args.start < 0 ||
     end <= args.start ||
-    end > source.source.duration ||
+    end > limit ||
     !Number.isFinite(args.plane.width) ||
     !Number.isFinite(args.plane.height) ||
     args.plane.width <= 0 ||
@@ -76,6 +90,7 @@ export async function applyReviewAnnotationCatalogDocument(
   )
     throw new ReviewAnnotationAcquisitionError('invalid-range');
   const current = () => {
+    args.assertCurrentTarget?.();
     const workspace = session.getSnapshot().snapshot.workspace;
     if (
       workspace.aggregateId !== source.aggregateId ||
@@ -123,6 +138,7 @@ export async function applyReviewAnnotationCatalogDocument(
     id: args.instanceId ?? crypto.randomUUID(),
     snapshotId: snapshot.id,
     enabled: true,
+    ...(args.timeDomain === 'result' ? { timeDomain: 'result' as const } : {}),
     start: args.start,
     end,
     attachment: args.attachment ?? 'content',

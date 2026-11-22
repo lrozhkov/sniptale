@@ -66,7 +66,10 @@ it('renders each palette color once as a picker without a duplicate heading or v
   const node = document.createElement('div');
   const root = createRoot(node);
   act(() => root.render(<PalettesSettings />));
-  expect(node.textContent?.match(/#123456/gi)).toHaveLength(1);
+  const pickers = node.querySelectorAll('[data-ui="shared.ui.color-selector.picker-trigger"]');
+  expect(pickers).toHaveLength(1);
+  expect(pickers[0]?.getAttribute('title')).toMatch(/^#123456$/i);
+  expect(node.textContent).not.toMatch(/#123456/i);
   expect(node.textContent).not.toMatch(/#1(?![0-9a-f])/i);
   expect(node.querySelector('h2')).toBeNull();
   expect(node.textContent).toContain('settings.editor.drawingQuickColorsDescription');

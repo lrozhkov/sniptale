@@ -301,10 +301,10 @@ function GuideBlockHeight({
         step={1}
         precision={0}
         normalizeValue={Math.round}
-        scrub={{ min: 0, max: GUIDE_LIMITS.maxDimension, step: 1 }}
         disabled={disabled}
         focusAppearance="accent-box"
         onPreviewValue={setPreview}
+        onCancelValue={() => setPreview(null)}
         onCommitValue={commit}
       />
       <ProductActionButton

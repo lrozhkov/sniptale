@@ -11,11 +11,16 @@ vi.mock('../infrastructure/indexed-db/mutation', () => ({
         objectStore: (name: string) => ({
           get: async (key: string) => io.rows.get(name)?.get(JSON.stringify(key)),
           getAll: async () => [...(io.rows.get(name)?.values() ?? [])],
-          put: async (value: { assetId?: string; id?: string; ownerId?: string }) => {
+          put: async (value: {
+            assetId?: string;
+            id?: string;
+            ownerId?: string;
+            aggregateId?: string;
+          }) => {
             const key =
               name === 'asset_owners'
                 ? JSON.stringify(['media-library', value.ownerId, 'source'])
-                : JSON.stringify(value.id ?? value.assetId);
+                : JSON.stringify(value.aggregateId ?? value.id ?? value.assetId);
             io.rows.get(name)?.set(key, value);
           },
         }),
@@ -27,6 +32,7 @@ vi.mock('../infrastructure/indexed-db/mutation', () => ({
 import {
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   MEDIA_LIBRARY_STORE,
   SCENARIO_ASSETS_STORE,
 } from '../infrastructure/indexed-db/core';
@@ -37,6 +43,7 @@ beforeEach(() => {
   for (const name of [
     ASSET_OWNERS_STORE,
     ASSET_REFS_STORE,
+    IMAGE_WORKSPACE_IDENTITIES_STORE,
     MEDIA_LIBRARY_STORE,
     SCENARIO_ASSETS_STORE,
   ]) {
@@ -71,6 +78,7 @@ it('publishes an existing scenario child into the library once while preserving 
   ).toMatchObject({
     id: 'scenario-asset:old-image',
     source: { kind: 'stored-asset', assetId: 'physical-image' },
+    savedIndependently: false,
   });
   expect(
     io.rows

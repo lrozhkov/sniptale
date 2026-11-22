@@ -50,7 +50,7 @@ Recovery is a fresh `npm ci --ignore-scripts` followed by normalization. A proce
 
 Live audio capture sets `MediaStreamTrackProcessor.maxBufferSize` to 128 native packets. This bounded buffer retains samples during short document stalls.
 
-Native admission permits one second of PCM or 129 packets, whichever admits more data. The extra packet covers an encoder sample pending before the native backlog arrives. The fallback keeps the one-second limit. A separate limit always bounds admitted PCM to 4 MiB. PCM size uses four bytes per sample per channel. Queue overflow rejects `errorPromise`.
+Native admission permits one second of pending PCM plus 128 additional packets. The additional packets cover a native backlog while earlier PCM awaits encoder or writer progress. Each packet admitted above one second occupies an additional slot until processing finishes. The fallback keeps the one-second limit. A separate limit always bounds admitted PCM to 4 MiB. PCM size uses four bytes per sample per channel. Queue overflow rejects `errorPromise`.
 
 Capture continues to discard paused samples independently of the writer. Resume replaces the native reader on the same track to discard its paused buffer. Timestamp, codec, pause, and finalization contracts remain unchanged.
 

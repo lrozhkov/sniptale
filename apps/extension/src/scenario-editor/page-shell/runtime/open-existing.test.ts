@@ -5,7 +5,7 @@ vi.mock('../../../composition/persistence/scenario/store/public', () => ({
   listScenarioProjectSummaries: io.list,
 }));
 vi.mock('../../../composition/persistence/scenario/history', () => ({
-  getScenarioSavedVersions: io.history,
+  getScenarioEditingSnapshot: io.history,
 }));
 import { openExistingScenarioProject, readAvailableScenarioHistory } from './open-existing';
 
@@ -16,32 +16,43 @@ beforeEach(() => {
       { id: 'guide', availability: 'available', lifecycle: { trashedAt: undefined } },
     ]);
   io.history.mockReset().mockResolvedValue({
-    currentRevision: 17,
-    versions: [
-      { project: { id: 'guide', name: 'Current' } },
-      { project: { id: 'guide', name: 'Older' } },
-    ],
+    project: { id: 'guide', name: 'Current' },
+    workspaceRevision: 17,
+    editingHistory: {
+      version: 1,
+      past: [{ id: 'guide', name: 'Older' }],
+      future: [{ id: 'guide', name: 'After' }],
+    },
   });
 });
 
-it('returns saved revisions in the same order as direct-link loading', async () => {
+it('returns exact current and both editing branches from the native snapshot', async () => {
   await expect(readAvailableScenarioHistory('guide')).resolves.toEqual({
-    current: { project: { id: 'guide', name: 'Current' }, workspaceRevision: 17 },
-    previous: [{ id: 'guide', name: 'Older' }],
+    project: { id: 'guide', name: 'Current' },
+    workspaceRevision: 17,
+    editingHistory: {
+      version: 1,
+      past: [{ id: 'guide', name: 'Older' }],
+      future: [{ id: 'guide', name: 'After' }],
+    },
   });
 });
-
-it('acquires the resource session before reading saved history and opening the project', async () => {
+it('acquires the resource session before reading and opening the editing snapshot', async () => {
   const enter = vi.fn(async () => true);
   const open = vi.fn(async () => {});
   await openExistingScenarioProject('guide', enter, open);
   expect(enter.mock.invocationCallOrder[0]).toBeLessThan(io.list.mock.invocationCallOrder[0]!);
   expect(io.list.mock.invocationCallOrder[0]).toBeLessThan(io.history.mock.invocationCallOrder[0]!);
   expect(io.history.mock.invocationCallOrder[0]).toBeLessThan(open.mock.invocationCallOrder[0]!);
-  expect(open).toHaveBeenCalledWith(
-    { project: { id: 'guide', name: 'Current' }, workspaceRevision: 17 },
-    [{ id: 'guide', name: 'Older' }]
-  );
+  expect(open).toHaveBeenCalledWith({
+    project: { id: 'guide', name: 'Current' },
+    workspaceRevision: 17,
+    editingHistory: {
+      version: 1,
+      past: [{ id: 'guide', name: 'Older' }],
+      future: [{ id: 'guide', name: 'After' }],
+    },
+  });
 });
 
 it('rejects a recent project moved to trash before activation', async () => {

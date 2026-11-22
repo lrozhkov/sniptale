@@ -11,6 +11,7 @@ interface ResourceLimits {
   maximumManagedBytes: number;
   maximumCanvases: number;
   createCanvas?: () => HTMLCanvasElement;
+  maximumPresentationSurfaces?: 5;
 }
 
 /** Exclusive nonfront/inflight lease; release only after presentation work and frontend ownership end. */
@@ -300,13 +301,14 @@ class PreviewRenderResources implements RenderResources {
         surface.height === size.height
     );
     if (reusable) return this.gpuLease(reusable);
+    const maximum = this.limits.maximumPresentationSurfaces ?? 3;
     const backendSurfaces = () =>
       this.surfaces.filter((surface) => surface.kind === 'gpu' && surface.renderer === renderer);
     for (const surface of backendSurfaces()) {
-      if (backendSurfaces().length < 3) break;
+      if (backendSurfaces().length < maximum) break;
       if (!surface.active) this.remove(surface);
     }
-    if (backendSurfaces().length >= 3) throw new PreviewRenderResourceError();
+    if (backendSurfaces().length >= maximum) throw new PreviewRenderResourceError();
     this.admit(0, 1);
     const canvas = this.limits.createCanvas?.() ?? document.createElement('canvas');
     let presentation: GpuPreviewPresentationSurface | undefined;

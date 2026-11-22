@@ -3,6 +3,8 @@ import { glTransitionUniforms } from '../../features/video/project/transition/gl
 import { createPreparedSourceBudget } from '../../features/video/composition/export-enhancement/prepared-source';
 import type { ExportEnhancer } from '../../features/video/composition/export-enhancement/enhancer';
 import { prepareReviewExportSourceSampling } from './export-source-sampling';
+import { reviewSplitRasterAt } from './camera-split-screen';
+import { reviewActiveAnnotationText } from './draw-annotation-text';
 import type { VideoCompositionFrameSource } from '../../features/video/composition/draw/media-source';
 import {
   reviewGpuAnnotationLayer,
@@ -81,9 +83,16 @@ interface ReviewGpuRenderInput {
   };
 }
 type ReviewGpuSceneInput = Omit<ReviewGpuRenderInput, 'context'>;
-type ReviewGpuPresentationInput = ReviewGpuSceneInput & { acquireOutput: PreviewGpuCanvasFactory };
+type ReviewGpuPresentationInput = ReviewGpuSceneInput & {
+  acquireOutput: PreviewGpuCanvasFactory;
+  playback?: boolean;
+};
 type BitmapOutput = { kind: 'bitmap'; context: CanvasRenderingContext2D };
-type PresentationOutput = { kind: 'presentation'; acquireOutput: PreviewGpuCanvasFactory };
+type PresentationOutput = {
+  kind: 'presentation';
+  acquireOutput: PreviewGpuCanvasFactory;
+  playback: boolean;
+};
 
 /** Completed pixels retain their backend until publication releases this receipt. */
 export interface ReviewGpuPresentedFrame {
@@ -101,11 +110,11 @@ type Dimensions = PreviewSceneDimensions;
 /** Request-owned artwork permits authored camera and overlay motion between pending frames. */
 export function reviewGpuPreviewConcurrency(
   scene: PreviewScene,
-  annotationMaximumInFlight: 1 | 2 = 1
+  annotationMaximumInFlight: 1 | 2 = 1,
+  allowCameraCaptureOverlap = false
 ): 1 | 2 {
   const plan = scene.outerFadePlan;
-  return scene.webcam?.enabled ||
-    scene.captions?.settings?.enabled ||
+  return (scene.webcam?.enabled && !allowCameraCaptureOverlap) ||
     (annotationMaximumInFlight !== 2 &&
       scene.annotationEffects?.lane.enabled &&
       scene.annotationEffects.lane.instances.some((instance) => instance.enabled)) ||
@@ -123,6 +132,7 @@ export function createReviewGpuPreview(args: {
   resources: RenderResources;
   reserve(bytes: number): { release(): void };
   maximumInFlight?: 1 | 2;
+  maximumPresentationSurfaces?: 5;
 }) {
   let renderer: GpuPreviewRenderer | null = null;
   let initialization: Promise<GpuPreviewRenderer | null> | null = null;
@@ -251,23 +261,26 @@ export function createReviewGpuPreview(args: {
       // Preparation is advisory; foreground publication already succeeded.
     }
   };
-  function execute(input: ReviewGpuSceneInput, output: BitmapOutput): Promise<boolean>;
+  function execute(
+    input: ReviewGpuSceneInput,
+    output: BitmapOutput | { kind: 'pipelines' }
+  ): Promise<boolean>;
   function execute(
     input: ReviewGpuSceneInput,
     output: PresentationOutput
   ): Promise<false | ReviewGpuPresentedFrame>;
   async function execute(
     input: ReviewGpuSceneInput,
-    output: BitmapOutput | PresentationOutput
+    output: BitmapOutput | PresentationOutput | { kind: 'pipelines' }
   ): Promise<boolean | ReviewGpuPresentedFrame> {
     if (disabled || disposed) return false;
     const { scene, dimensions, geometry } = input;
+    // Caption layout is immutable; each request slot owns its caption canvas and GPU texture.
     const safe =
       reviewGpuPreviewConcurrency(scene, input.annotations?.maximumInFlight) === 2 &&
       !input.camera &&
-      !input.transition &&
+      (!input.transition || (output.kind === 'presentation' && !input.annotations)) &&
       !input.cameraOverride &&
-      !input.captions &&
       (!input.annotations || input.annotations.maximumInFlight === 2);
     if (
       active &&
@@ -325,6 +338,9 @@ export function createReviewGpuPreview(args: {
       initialization ??= createGpuPreviewRenderer({
         reserve: args.reserve,
         maximumInFlight: args.maximumInFlight ?? 1,
+        ...(args.maximumPresentationSurfaces
+          ? { maximumPresentationSurfaces: args.maximumPresentationSurfaces }
+          : {}),
       });
       try {
         renderer = await initialization;
@@ -463,8 +479,23 @@ export function createReviewGpuPreview(args: {
               cache: { key: 'captions', revision: art.captionRevision },
             }
           : undefined;
+      const lane = scene.annotationEffects?.lane;
+      const transformMain =
+        input.transition?.blend.plan.type === 'gl' ||
+        reviewSplitRasterAt(
+          scene.webcam,
+          input.sourceTime,
+          !!input.camera,
+          dimensions.backing,
+          geometry.resultTime
+        );
+      const finalAnnotationText =
+        transformMain && lane?.enabled
+          ? reviewActiveAnnotationText(lane.textClips ?? [], geometry.resultTime)
+          : [];
       const sceneInputs = {
         dimensions,
+        playback: output.kind === 'presentation' && output.playback && !input.exportEnhancer,
         base,
         radius,
         header: input.header,
@@ -480,6 +511,7 @@ export function createReviewGpuPreview(args: {
         painter: art.painter,
         image: input.image,
         resultTime: geometry.resultTime,
+        omitAnnotationText: finalAnnotationText.length > 0,
         primitives,
         cameraOverride: input.cameraOverride,
         fps: input.fps,
@@ -617,7 +649,7 @@ export function createReviewGpuPreview(args: {
                 },
               }
             : {}),
-          layers: sources.map((source, index) => ({
+          layers: scopeTransitionEndpointCaches(sources).map((source, index) => ({
             source,
             rect: full,
             inverse: identity,
@@ -667,6 +699,7 @@ export function createReviewGpuPreview(args: {
         sourceTime: input.sourceTime,
         resultTime: geometry.resultTime,
         primitives,
+        finalAnnotationText,
         ...(caption ? { caption } : {}),
         watermark: input.watermark ?? null,
         ...(input.camera ? { camera: input.camera } : {}),
@@ -717,6 +750,12 @@ export function createReviewGpuPreview(args: {
             }
           },
         };
+      }
+      if (output.kind === 'pipelines') {
+        if (!renderer.preparePipelines) return false;
+        // The device builds immutable variants from the descriptors before any texture borrow ends.
+        void renderer.preparePipelines(request).catch(() => {});
+        return true;
       }
       const bitmap = await renderer.render(request);
       try {
@@ -784,9 +823,17 @@ export function createReviewGpuPreview(args: {
     render(input: ReviewGpuRenderInput) {
       return execute(input, { kind: 'bitmap', context: input.context });
     },
+    /** Compile the sampled graph against the live device without acquiring a presentation surface. */
+    prepareBoundaryPipelines(input: ReviewGpuSceneInput) {
+      return execute(input, { kind: 'pipelines' });
+    },
     /** The caller attaches each nonfront destination before the GPU writes its completed image. */
     renderPresentation(input: ReviewGpuPresentationInput) {
-      return execute(input, { kind: 'presentation', acquireOutput: input.acquireOutput });
+      return execute(input, {
+        kind: 'presentation',
+        acquireOutput: input.acquireOutput,
+        playback: input.playback === true,
+      });
     },
     releaseScene() {
       sceneLifetime.abort();
@@ -802,4 +849,71 @@ export function createReviewGpuPreview(args: {
       disposeRetiredRenderer();
     },
   };
+}
+
+/** Scope conflicting endpoint artwork while retaining one upload for shared immutable rasters. */
+function scopeTransitionEndpointCaches(
+  roots: readonly (GpuPreviewGroup | ImageBitmap)[]
+): (GpuPreviewGroup | ImageBitmap)[] {
+  const owners = new Map<
+    string,
+    {
+      source: GpuPreviewLayer['source'];
+      revision: NonNullable<GpuPreviewLayer['cache']>['revision'];
+    }
+  >();
+  const conflicts = new Set<string>();
+  const visited = new WeakSet<GpuPreviewGroup>();
+  const observe = (raster: Pick<GpuPreviewLayer, 'source' | 'cache'>) => {
+    if (!raster.cache) return;
+    const previous = owners.get(raster.cache.key);
+    if (
+      previous &&
+      (previous.source !== raster.source || previous.revision !== raster.cache.revision)
+    )
+      conflicts.add(raster.cache.key);
+    else owners.set(raster.cache.key, { source: raster.source, revision: raster.cache.revision });
+  };
+  const collect = (group: GpuPreviewGroup) => {
+    if (visited.has(group)) return;
+    visited.add(group);
+    for (const layer of group.layers) {
+      observe(layer);
+      if (layer.alphaMask) observe(layer.alphaMask);
+      if (layer.operationClip) observe(layer.operationClip);
+      if ('kind' in layer.source && layer.source.kind === 'group') collect(layer.source);
+    }
+  };
+  for (const root of roots) if ('kind' in root && root.kind === 'group') collect(root);
+  if (!conflicts.size) return [...roots];
+  return roots.map((root, side) => {
+    if (!('kind' in root && root.kind === 'group')) return root;
+    const groups = new WeakMap<GpuPreviewGroup, GpuPreviewGroup>();
+    const cache = (value: NonNullable<GpuPreviewLayer['cache']>) =>
+      conflicts.has(value.key)
+        ? { ...value, key: JSON.stringify(['cut-endpoint', side, value.key]) }
+        : value;
+    const group = (source: GpuPreviewGroup): GpuPreviewGroup => {
+      const known = groups.get(source);
+      if (known) return known;
+      const scoped: GpuPreviewGroup = { ...source, layers: [] };
+      groups.set(source, scoped);
+      scoped.layers = source.layers.map((layer) => ({
+        ...layer,
+        source:
+          'kind' in layer.source && layer.source.kind === 'group'
+            ? group(layer.source)
+            : layer.source,
+        ...(layer.cache ? { cache: cache(layer.cache) } : {}),
+        ...(layer.alphaMask?.cache
+          ? { alphaMask: { ...layer.alphaMask, cache: cache(layer.alphaMask.cache) } }
+          : {}),
+        ...(layer.operationClip?.cache
+          ? { operationClip: { ...layer.operationClip, cache: cache(layer.operationClip.cache) } }
+          : {}),
+      }));
+      return scoped;
+    };
+    return group(root);
+  });
 }

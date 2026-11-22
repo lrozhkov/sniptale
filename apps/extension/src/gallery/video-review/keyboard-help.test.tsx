@@ -114,14 +114,20 @@ it('navigates available utility commands with arrows and returns focus on Escape
 
 it('calls each project command once and leaves only help available while busy', () => {
   const onNewProject = vi.fn(),
+    onOpenEditHistory = vi.fn(),
     onBackup = vi.fn();
   const render = (busy = false) =>
-    root.render(<ReviewKeyboardHelp {...{ busy, onNewProject, onBackup }} />);
+    root.render(<ReviewKeyboardHelp {...{ busy, onNewProject, onOpenEditHistory, onBackup }} />);
   act(() => render());
   expect(host.querySelector('[data-ui="gallery.videoReview.newProject"]')).toBeNull();
   open();
   act(() => item('videoEditor.app.newProjectAction').click());
   expect(onNewProject).toHaveBeenCalledOnce();
+  expect(document.activeElement).toBe(trigger());
+  open();
+  act(() => item('gallery.videoReview.editHistoryTitle').click());
+  expect(onOpenEditHistory).toHaveBeenCalledOnce();
+  expect(document.querySelector('[role="menu"]')).toBeNull();
   expect(document.activeElement).toBe(trigger());
   open();
   act(() => item('gallery.app.selectionBackup').click());
@@ -130,14 +136,18 @@ it('calls each project command once and leaves only help available while busy', 
   act(() => render(true));
   open();
   const create = item('videoEditor.app.newProjectAction'),
+    history = item('gallery.videoReview.editHistoryTitle'),
     backup = item('gallery.app.selectionBackup');
   expect(create.disabled).toBe(true);
+  expect(history.disabled).toBe(true);
   expect(backup.disabled).toBe(true);
   act(() => {
     create.click();
+    history.click();
     backup.click();
   });
   expect(onNewProject).toHaveBeenCalledOnce();
+  expect(onOpenEditHistory).toHaveBeenCalledOnce();
   expect(onBackup).toHaveBeenCalledOnce();
   key('Home');
   expect(document.activeElement).toBe(item('gallery.keyboard.title'));
@@ -152,4 +162,18 @@ it('closes the menu on an outside pointer action without stealing outside focus'
   act(() => document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
   expect(document.querySelector('[role="menu"]')).toBeNull();
   expect(document.activeElement).not.toBe(trigger());
+});
+
+it('offers guarded exit in the existing utility menu and disables it while busy', () => {
+  const onClose = vi.fn();
+  act(() => root.render(<ReviewKeyboardHelp onClose={onClose} />));
+  open();
+  act(() => item('common.actions.close').click());
+  expect(onClose).toHaveBeenCalledOnce();
+  expect(document.querySelector('[role="menu"]')).toBeNull();
+  act(() => root.render(<ReviewKeyboardHelp onClose={onClose} busy />));
+  open();
+  expect(item('common.actions.close').disabled).toBe(true);
+  act(() => item('common.actions.close').click());
+  expect(onClose).toHaveBeenCalledOnce();
 });

@@ -1,3 +1,4 @@
+import { decodePortableImageHistory } from './root-codecs/image-history';
 import type { ArchiveReader, ArchiveRootDescriptor } from '../../../composition/archive-transfer';
 import { isWindowHeaderFavicon } from '@sniptale/runtime-contracts/window-header';
 import { assertMetadataJson, parseBoundedJson } from './codec';
@@ -23,9 +24,14 @@ function validateDocumentAssets(
       envelope.descriptor.rootKind === 'media' &&
       envelope.descriptor.mediaSubtype === 'library-item'
     ) {
-      const metadata = parsePortableMediaMetadata(envelope.metadata);
-      if (metadata.workspace)
+      const metadata = parsePortableMediaMetadata(envelope.metadata, {
+        allowLibraryRelationships: true,
+      });
+      if (metadata.workspace) {
         decodePortableEditorDocument({ document: metadata.workspace.document, assetsByObjectId });
+        if (metadata.workspace.history)
+          decodePortableImageHistory({ history: metadata.workspace.history, assetsByObjectId });
+      }
     }
     if (envelope.descriptor.rootKind === 'scenario-project') {
       const metadata = parsePortableScenarioProjectMetadata(envelope.metadata);

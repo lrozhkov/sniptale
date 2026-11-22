@@ -1,10 +1,10 @@
 import {
   createTranslator,
-  SUPPORTED_LOCALES,
   translate,
   type AppLocale,
   type TranslationKey,
 } from '../../../platform/i18n/popup';
+import { VideoRecordingFailureCode } from '@sniptale/runtime-contracts/video/types/types';
 import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import { getViewportPresetErrorMessage } from '../../../features/viewport-presets/error-message';
 import { getPopupMediaAccessErrorKey } from '../../recording/media-devices';
@@ -19,16 +19,6 @@ const PAGE_ACCESS_REQUIRED_PATTERNS = [
   'Page access is required.',
   'Page access is required for export.',
   'Page access is required for tab recording.',
-];
-
-const LOCALIZED_RUNTIME_ERROR_MESSAGES: ReadonlyArray<{
-  sourceKey: TranslationKey;
-  key: TranslationKey;
-}> = [
-  {
-    sourceKey: 'background.runtime.recordingStartTimeout',
-    key: 'popup.video.startRecordingTimeout',
-  },
 ];
 
 function getErrorMessage(error: unknown): string {
@@ -67,11 +57,8 @@ export function getPopupRuntimeErrorMessage(
     return translator('popup.home.pageAccessRequired');
   }
 
-  const localizedError = LOCALIZED_RUNTIME_ERROR_MESSAGES.find((entry) =>
-    SUPPORTED_LOCALES.some((locale) => createTranslator(locale)(entry.sourceKey) === message)
-  );
-  if (localizedError) {
-    return translator(localizedError.key);
+  if (message === VideoRecordingFailureCode.START_ACTIVATION_TIMEOUT) {
+    return translator('popup.video.startRecordingTimeout');
   }
 
   return createUserFacingErrorMessage({

@@ -1,4 +1,13 @@
 // @vitest-environment jsdom
+import {
+  loadCompositionCatalogFixture,
+  prepareCompositionTranslations,
+} from '../../catalog-fixture.test-support';
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadCompositionCatalogFixture>[0]) =>
+    loadCompositionCatalogFixture(locale),
+}));
+
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -364,4 +373,8 @@ it('keeps the full original and trim after successful preparation until explicit
   expect(io.session().save.resetSession).not.toHaveBeenCalled();
   expect(close).not.toHaveBeenCalled();
   expect(io.session().save.audioBlob).toBe(source);
+});
+
+beforeEach(async () => {
+  await prepareCompositionTranslations('video-editor', 'en');
 });

@@ -12,7 +12,7 @@ import {
   createExactBrowserFrameHarnessPayload,
 } from '../extension-critical.helpers';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('sniptale-locale-preference', 'en'));

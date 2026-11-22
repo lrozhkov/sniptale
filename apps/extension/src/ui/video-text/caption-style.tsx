@@ -14,7 +14,11 @@ export function CaptionStyleFields(props: {
   const patch = (value: Partial<ReviewCaptionStyle>) =>
     props.onChange({ ...props.style, ...value });
   return (
-    <fieldset disabled={props.disabled} className="min-w-0 space-y-1" data-ui={props.dataUi}>
+    <fieldset
+      disabled={props.disabled}
+      className="min-w-0 sniptale-parameter-stack"
+      data-ui={props.dataUi}
+    >
       <SegmentedRow
         ariaLabel={translate('gallery.videoReview.captionPosition')}
         columns={2}

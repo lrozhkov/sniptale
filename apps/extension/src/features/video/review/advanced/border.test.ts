@@ -51,7 +51,7 @@ it('deactivates blocked camera links while preserving camera conversion constrai
   const b = camera('b', 5, 7);
   const s = { ...camera('s', 3, 4), spotlight: createQuickEditSpotlight() };
   const regions = [s, b, a];
-  expect(resolveQuickEditFocusLink(regions, 'a')).toBeNull();
+  expect(resolveQuickEditFocusLink(regions, 'a')?.target.id).toBe('b');
   expect(quickEditFocusConflicts(regions, camera('s', 3, 4))).toBe(true);
   expect(updateQuickEditZoomRegion(regions, 's', { spotlight: null })).toEqual(regions);
   expect(quickEditFocusConflicts(regions, camera('touch', 7, 8))).toBe(false);
@@ -347,7 +347,9 @@ it('refuses link creation across any focus while preserving unobstructed neighbo
   const overlay = { ...camera('overlay', 2, 4), border: createQuickEditBorder() };
   const original = [a, overlay, b, c];
   expect(updateQuickEditZoomRegion(original, 'a', { linkTo: 'c' })).toEqual(original);
-  expect(updateQuickEditZoomRegion(original, 'a', { linkTo: 'b' })).toEqual(original);
+  expect(
+    updateQuickEditZoomRegion(original, 'a', { linkTo: 'b' }).find((r) => r.id === 'a')?.linkTo
+  ).toBe('b');
   const linked = updateQuickEditZoomRegion(
     original.filter((region) => region.id !== 'overlay'),
     'a',
@@ -465,13 +467,13 @@ it('packs obstructed stored chains as independent focus intervals', () => {
     z2: 0,
     a: 0,
     b: 0,
-    gap: 0,
+    gap: 1,
   });
   const moved = regions.map((region) =>
     region.id === 'gap' ? { ...region, start: 11, end: 12 } : region
   );
   expect(packQuickEditFocusRows(moved).get('gap')).toBe(0);
-  expect(packQuickEditFocusRows(regions).get('gap')).toBe(0);
+  expect(packQuickEditFocusRows(regions).get('gap')).toBe(1);
 });
 
 it('retains authored solid hold on admission while rendering it stationary', () => {

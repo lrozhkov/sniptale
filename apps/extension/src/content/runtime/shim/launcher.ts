@@ -2,7 +2,6 @@ import { createElement as createLucideElement } from 'lucide';
 import { getQuickActionIconNode } from '../../../features/quick-actions-presets/icons';
 import { isTrustedDomEvent } from '../../platform/trusted-events';
 import { PAGE_CORNERS, type PageCorner } from '../../../contracts/page-launch';
-import { readContentShimTranslation } from '../../../platform/i18n/content-shim';
 import type { TranslationDictionary } from '../../../platform/i18n/types';
 import {
   installCornerGroupDrag,
@@ -28,7 +27,11 @@ function menuProjection(options: ShimLauncherOptions): string {
     locale,
     options.actions
       .filter((action) => action.status)
-      .map((action) => [action.id, getShimQuickActionName(action, locale), action.icon]),
+      .map((action) => [
+        action.id,
+        getShimQuickActionName(action, options.presentation.translate),
+        action.icon,
+      ]),
   ]);
 }
 
@@ -141,10 +144,7 @@ class ShimLauncherView {
     this.render();
   }
   private label(key: keyof TranslationDictionary['content']['pageLauncher']) {
-    return readContentShimTranslation(
-      this.options.presentation.locale,
-      `content.pageLauncher.${key}`
-    );
+    return this.options.presentation.translate(`content.pageLauncher.${key}`);
   }
   private closeMenu(restoreFocus = false) {
     this.menu?.remove();
@@ -253,7 +253,7 @@ class ShimLauncherView {
         'aria-hidden': 'true',
       });
       const label = document.createElement('span');
-      label.textContent = getShimQuickActionName(action, this.options.presentation.locale);
+      label.textContent = getShimQuickActionName(action, this.options.presentation.translate);
       item.append(glyph, label);
       if (index < 10) {
         const digit = String(index === 9 ? 0 : index + 1);

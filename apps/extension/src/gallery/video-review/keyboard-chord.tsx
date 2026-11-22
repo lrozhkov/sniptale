@@ -15,6 +15,7 @@ import {
 } from '../../features/video/review/interaction-keys';
 import { translate, useAppLocale } from '../../platform/i18n';
 import { ReviewButton, reviewIconButtonClassName } from './controls';
+import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 
 function KeyChoice({
   value,
@@ -66,7 +67,12 @@ function KeyChoice({
         ?.scrollIntoView({ block: 'nearest' });
   }, [open, active, query]);
   return (
-    <div ref={containerRef} className="relative min-w-0 flex-1" data-floating-ui-owner-id={id}>
+    <div
+      ref={containerRef}
+      className="sniptale-text-value"
+      data-framed
+      data-floating-ui-owner-id={id}
+    >
       <ProductInput
         ref={input}
         role="combobox"
@@ -81,7 +87,7 @@ function KeyChoice({
         placeholder={translate(
           adding ? 'gallery.videoReview.addChordKey' : 'gallery.videoReview.searchChordKey'
         )}
-        className="w-full"
+        className="sniptale-input-compact"
         onClick={() => {
           if (!open) {
             setQuery('');
@@ -220,41 +226,43 @@ export function ReviewKeyboardChord({
   };
   return (
     <div className="space-y-1.5" data-ui="gallery.videoReview.keyboardChord">
-      <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
-        {translate('gallery.videoReview.keyCombination')}
-      </p>
-      {values.map((value, index) => (
-        <div className="flex min-w-0 items-center gap-1" key={index}>
-          <KeyChoice
-            value={value}
-            excluded={values.filter((_, i) => i !== index)}
-            onChange={(v) => change(values.map((k, i) => (i === index ? v : k)))}
-          />
-          <ReviewButton
-            label={translate('gallery.videoReview.removeChordKey')}
-            className={reviewIconButtonClassName}
-            disabled={values.length === 1}
-            onClick={() => change(values.filter((_, i) => i !== index))}
-          >
-            <X size={14} />
-          </ReviewButton>
+      <InspectorParameterRow label={translate('gallery.videoReview.keyCombination')} stacked>
+        <div className="sniptale-parameter-stack">
+          {values.map((value, index) => (
+            <div className="sniptale-text-compound" key={index}>
+              <KeyChoice
+                value={value}
+                excluded={values.filter((_, i) => i !== index)}
+                onChange={(v) => change(values.map((k, i) => (i === index ? v : k)))}
+              />
+              <ReviewButton
+                label={translate('gallery.videoReview.removeChordKey')}
+                className={reviewIconButtonClassName}
+                disabled={values.length === 1}
+                onClick={() => change(values.filter((_, i) => i !== index))}
+              >
+                <X size={14} />
+              </ReviewButton>
+            </div>
+          ))}
+          {values.length < 8 ? (
+            <div className="sniptale-text-compound">
+              <KeyChoice
+                value=""
+                adding
+                excluded={values}
+                onChange={(value) => change([...values, value])}
+              />
+              <span
+                aria-hidden="true"
+                className="flex size-8 items-center justify-center text-[var(--sniptale-color-text-secondary)]"
+              >
+                <Plus size={14} />
+              </span>
+            </div>
+          ) : null}
         </div>
-      ))}
-      {values.length < 8 ? (
-        <div className="flex min-w-0 items-center gap-1">
-          <Plus
-            size={14}
-            aria-hidden="true"
-            className="shrink-0 text-[var(--sniptale-color-text-secondary)]"
-          />
-          <KeyChoice
-            value=""
-            adding
-            excluded={values}
-            onChange={(value) => change([...values, value])}
-          />
-        </div>
-      ) : null}
+      </InspectorParameterRow>
     </div>
   );
 }

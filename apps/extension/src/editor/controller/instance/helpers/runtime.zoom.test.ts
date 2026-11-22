@@ -1,5 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { EditorControllerInstance } from '../types';
+import type { deferEditorSnapshotHistory } from '../../history';
+import { createEditorDocumentFixture } from '../../../document/page-session/document.test-support';
 
 const mocks = vi.hoisted(() => ({
   applyToolMode: vi.fn(),
@@ -11,6 +13,18 @@ const mocks = vi.hoisted(() => ({
   syncRuntimeState: vi.fn(),
   withHistoryMuted: vi.fn(),
   zoomToFit: vi.fn(),
+  deferHistory: vi.fn<typeof deferEditorSnapshotHistory>(),
+  reportFailure: vi.fn(),
+}));
+
+vi.mock('../../history', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../history')>()),
+  deferEditorSnapshotHistory: mocks.deferHistory,
+}));
+
+vi.mock('../../../runtime/async-actions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../runtime/async-actions')>()),
+  reportEditorActionFailure: mocks.reportFailure,
 }));
 
 vi.mock('../../runtime/actions', async (importOriginal) => ({
@@ -45,6 +59,40 @@ import {
 } from './runtime';
 
 beforeEach(() => vi.resetAllMocks());
+
+it.each([false, true])(
+  'requeues the accepted snapshot when deferred history becomes ready, drawing=%s',
+  (drawing) => {
+    const snapshot = createEditorDocumentFixture();
+    const controller = {
+      canvas: { id: 'canvas' },
+      history: { id: 'history' },
+      historyMuted: 0,
+      drawSession: drawing ? { id: 'drawing' } : null,
+      exportDocument: vi.fn(() => snapshot),
+      syncRuntimeState: vi.fn(),
+      autosaveService: { scheduleAutosave: vi.fn() },
+    } as unknown as EditorControllerInstance;
+    mocks.deferHistory.mockReturnValueOnce(true);
+    commitHistoryForController(controller);
+    const deferred = mocks.deferHistory.mock.calls[0]?.[1];
+    if (!deferred) throw new Error('Missing deferred history capture');
+    expect(deferred.isCurrent()).toBe(true);
+    expect(controller.autosaveService?.scheduleAutosave).toHaveBeenCalledExactlyOnceWith(snapshot);
+    deferred.onCommitted?.();
+    expect(controller.exportDocument).toHaveBeenCalledOnce();
+    expect(controller.autosaveService?.scheduleAutosave).toHaveBeenCalledTimes(2);
+    expect(controller.autosaveService?.scheduleAutosave).toHaveBeenLastCalledWith(snapshot);
+    expect(controller.syncRuntimeState).toHaveBeenCalledTimes(drawing ? 1 : 2);
+    controller.canvas = null;
+    expect(deferred.isCurrent()).toBe(false);
+    controller.history = null;
+    expect(deferred.isCurrent()).toBe(false);
+    deferred.onFailure?.(new Error('Encoding failed'));
+    expect(mocks.reportFailure).toHaveBeenCalledWith('history-after-paint', expect.any(Error));
+    expect(controller.autosaveService?.scheduleAutosave).toHaveBeenCalledTimes(2);
+  }
+);
 
 it('mutes and restores controller history around an action', () => {
   const controller = { historyMuted: 0 } as EditorControllerInstance;

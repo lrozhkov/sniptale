@@ -98,11 +98,46 @@ it('previews without editing the project and applies the chosen time, track and 
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
-  const duration = host.querySelector<HTMLInputElement>('input[type=number]')!;
-  change(duration, '0');
+  const duration = host.querySelector<HTMLInputElement>(
+    '[aria-label="videoEditor.effectsLibrary.fxDuration"]'
+  )!;
+  const field = duration.closest('[data-stepper-placement="sides"]')!;
+  expect(field.querySelectorAll('button')).toHaveLength(2);
+  const pressDuration = (key: string) =>
+    act(() => duration.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })));
+  const commitDuration = (value: string) => {
+    act(() => duration.focus());
+    change(duration, value);
+    pressDuration('Enter');
+  };
+  act(() => duration.focus());
+  change(duration, '2');
+  pressDuration('Escape');
   expect(duration.value).toBe('3');
-  change(duration, '1');
+  commitDuration('1');
   expect(duration.value).toBe('1');
+  change(host.querySelector<HTMLInputElement>('input[type=range]')!, '0.95');
+  act(() => button('videoEditor.effectsLibrary.previewPlay').click());
+  const wheel = new WheelEvent('wheel', {
+    altKey: true,
+    deltaY: 100,
+    bubbles: true,
+    cancelable: true,
+  });
+  act(() => {
+    duration.focus();
+    field.dispatchEvent(wheel);
+  });
+  expect(wheel.defaultPrevented).toBe(true);
+  expect(duration.value).toBe('0.9');
+  expect(document.activeElement).toBe(duration);
+  expect(host.querySelector('output')!.dataset['progress']).toBe('1');
+  expect(host.querySelector('input[type=range]')!.getAttribute('aria-valuetext')).toBe('0.9 / 0.9');
+  expect(button('videoEditor.effectsLibrary.previewPause')).toBeUndefined();
+  act(() => vi.advanceTimersByTime(500));
+  expect(host.querySelector('output')!.dataset['progress']).toBe('1');
+  commitDuration('1');
+  change(host.querySelector<HTMLInputElement>('input[type=range]')!, '0');
   act(() => button('videoEditor.effectsLibrary.previewPlay').click());
   act(() => vi.advanceTimersByTime(500));
   expect(Number(host.querySelector('output')!.dataset['progress'])).toBeGreaterThan(0);

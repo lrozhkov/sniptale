@@ -160,3 +160,24 @@ it('does not equate independent identities sharing file metadata or bytes', asyn
   rows['video_projects'] = [withVideoProjectUsage(video)];
   expect(await readIndexedProjectUsage(media.id)).toEqual([]);
 });
+
+it('shows the Montage project that retains an original only in history', async () => {
+  const video = createVideoProjectEntryWithMediaClip();
+  rows['video_projects'] = [
+    withVideoProjectUsage({
+      ...video,
+      project: { ...video.project, assets: [], clips: [] },
+      history: {
+        version: 1,
+        epoch: 'history',
+        past: [{ assetId: 'change' }],
+        future: [],
+        sources: [{ kind: 'library-asset', id: media.id }],
+      },
+    }),
+  ];
+  expect(await readIndexedProjectUsage(media.id)).toEqual([
+    { id: video.id, kind: 'video', name: video.project.name, primary: false },
+  ]);
+  expect(getAll).not.toHaveBeenCalled();
+});

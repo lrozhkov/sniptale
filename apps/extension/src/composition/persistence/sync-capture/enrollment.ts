@@ -1,4 +1,6 @@
 import { readCheckpointInTransaction } from './checkpoints';
+import { parseMediaLibraryEntry } from '../media-library/read-guards';
+import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
 import type { IDBPTransaction } from 'idb';
 import { capturePreparedDatabase } from '../infrastructure/indexed-db/core';
 import {
@@ -31,6 +33,7 @@ import { captureRootKey, type CaptureRootKind } from './contracts';
 import { parseSyncCaptureRecord } from './guards';
 import {
   captureMediaInTransaction,
+  captureImageInTransaction,
   captureVideoProjectInTransaction,
   captureVideoReviewInTransaction,
   captureScenarioProjectInTransaction,
@@ -51,6 +54,7 @@ const sources = [
   { kind: 'video-project', store: VIDEO_PROJECTS_STORE },
   { kind: 'video-review', store: VIDEO_WORKSPACES_STORE },
   { kind: 'scenario-project', store: SCENARIO_PROJECTS_STORE },
+  { kind: 'image-project', store: IMAGE_WORKSPACES_STORE },
 ] as const;
 const captureStores = [
   ...new Set([
@@ -126,6 +130,8 @@ async function captureMissingRoot(
   if (await readCheckpointInTransaction(tx, scope, { rootKind, rootId })) return false;
   if (rootKind === 'media')
     return Boolean(await captureMediaInTransaction(tx, rootId, { checkpoint: 'freeze' }));
+  if (rootKind === 'image-project')
+    return Boolean(await captureImageInTransaction(tx, rootId, { checkpoint: 'freeze' }));
   if (rootKind === 'video-project')
     return Boolean(await captureVideoProjectInTransaction(tx, rootId, { checkpoint: 'freeze' }));
   if (rootKind === 'scenario-project')
@@ -199,7 +205,11 @@ async function captureDiscoveredRoot(
     await admission(tx, scope, authorization);
     // Deletion between discovery and capture must not become a resurrection.
     const exists: unknown = await tx.objectStore(source.store).get(key);
-    if (exists === undefined) {
+    if (
+      exists === undefined ||
+      (source.kind === 'media' && parseMediaLibraryEntry(exists)?.savedIndependently === false) ||
+      (source.kind === 'image-project' && !parseImageWorkspaceEntry(exists)?.sourceMediaId)
+    ) {
       await tx.done;
       return 'existing';
     }

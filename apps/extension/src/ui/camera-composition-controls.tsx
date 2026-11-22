@@ -8,37 +8,39 @@ import { PreviewNumericRow } from './compact-inspector-controls/numeric-preview'
 
 /** Both editors retain their own mutation and preview transactions. */
 export function CameraFollowTargetControls(props: {
+  showUnavailableStatus?: boolean;
   following: boolean;
   cursorAvailable: boolean;
   cursorPending?: boolean | undefined;
   onChange(following: boolean): void;
 }) {
+  const label = translate('editor.scene.cameraFollowTarget');
   return (
     <div
       className="sniptale-parameter-stack"
       data-ui="camera.followTarget"
       aria-busy={props.cursorPending}
     >
-      <SegmentedRow<'cursor' | 'manual'>
-        label={translate('editor.scene.cameraFollowTarget')}
+      <SegmentedRow<'manual' | 'cursor'>
+        label={label}
         columns={2}
-        ariaLabel={translate('editor.scene.cameraFollowTarget')}
+        ariaLabel={label}
         value={props.following ? 'cursor' : 'manual'}
         options={[
+          { value: 'manual', label: translate('editor.scene.cameraFollowManual') },
           {
             value: 'cursor',
             label: translate('editor.scene.cameraFollowCursor'),
             disabled: !props.cursorAvailable,
           },
-          { value: 'manual', label: translate('editor.scene.cameraFollowManual') },
         ]}
         onChange={(value) => props.onChange(value === 'cursor')}
       />
-      {!props.cursorAvailable && !props.cursorPending ? (
+      {props.showUnavailableStatus !== false && !props.cursorAvailable && !props.cursorPending ? (
         <p
           role="status"
           data-ui="camera.cursorStatus"
-          className="text-xs text-[var(--sniptale-color-text-muted)]"
+          className="min-w-0 px-2 text-xs/4 text-[var(--sniptale-color-text-muted)] [overflow-wrap:anywhere]"
         >
           {translate('videoEditor.sidebar.cursorFocusUnavailable')}
         </p>
@@ -69,6 +71,7 @@ export function CameraCompositionControls(props: {
   const number = (key: 'amount' | 'smoothness') => (
     <PreviewNumericRow
       enterBehavior="blur"
+      rangePresentation="field"
       label={translate(
         key === 'amount'
           ? 'editor.scene.cameraCompositionAmount'

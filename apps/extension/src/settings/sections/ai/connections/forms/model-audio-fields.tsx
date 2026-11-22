@@ -1,9 +1,4 @@
-import {
-  ProductField,
-  ProductInput,
-  ProductSelect,
-  ProductTextarea,
-} from '@sniptale/ui/product-form-controls';
+import { ProductField, ProductInput, ProductSelect } from '@sniptale/ui/product-form-controls';
 import type {
   AIModelAudioParameters,
   AIModelOperation,
@@ -12,6 +7,7 @@ import type {
 } from '../../../../../contracts/settings/model-operation';
 import { translate } from '../../../../../platform/i18n';
 import { AI_MODEL_OPERATIONS } from '../../../../../contracts/settings/ai-catalog';
+import { SettingsDraftTextarea } from '../../../../section-surface/draft-textarea';
 
 type Props = {
   availableOperations?: readonly AIModelOperation[];
@@ -183,8 +179,8 @@ function TranscriptionFields(props: Props) {
         </>
       )}
       <ProductField label={translate('settings.aiProviders.modelAudioPrompt')}>
-        <ProductTextarea
-          aria-label={translate('settings.aiProviders.modelAudioPrompt')}
+        <SettingsDraftTextarea
+          label={translate('settings.aiProviders.modelAudioPrompt')}
           rows={2}
           value={parameters.prompt ?? ''}
           onChange={(event) => change({ ...parameters, prompt: event.target.value })}
@@ -241,8 +237,8 @@ function SpeechFields(props: Props) {
         />
       </ProductField>
       <ProductField label={translate('settings.aiProviders.modelAudioInstructions')}>
-        <ProductTextarea
-          aria-label={translate('settings.aiProviders.modelAudioInstructions')}
+        <SettingsDraftTextarea
+          label={translate('settings.aiProviders.modelAudioInstructions')}
           rows={2}
           value={parameters.instructions ?? ''}
           onChange={(event) => {

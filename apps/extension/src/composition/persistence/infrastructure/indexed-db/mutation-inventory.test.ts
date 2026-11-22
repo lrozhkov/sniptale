@@ -25,6 +25,8 @@ const delegatedMutationHelpers = new Set([
   'apps/extension/src/composition/persistence/image-workspaces/backup-restore.ts',
   // Installed only by admitted initDB; delegates writes to the caller's native transaction.
   'apps/extension/src/composition/persistence/infrastructure/indexed-db/indexed-row-projections.ts',
+  // The v72 upgrade writes only through its caller's native upgrade transaction.
+  'apps/extension/src/composition/persistence/infrastructure/indexed-db/legacy-library-projects-migration.ts',
   'apps/extension/src/composition/persistence/projects/asset-references.ts',
   'apps/extension/src/composition/persistence/recordings/backup-restore.ts',
   // Facts update only the source store's admitted caller transaction.

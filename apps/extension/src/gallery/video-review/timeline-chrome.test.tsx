@@ -25,7 +25,6 @@ it('groups compact history and autosave with equal short separators', () => {
     cursor: 0,
     length: 0,
     onHistory: vi.fn(),
-    onAddNote: vi.fn(),
     autosave: {
       enabled: true,
       error: null,
@@ -47,13 +46,10 @@ it('groups compact history and autosave with equal short separators', () => {
       'gallery.videoReview.toolbar.separator'
     );
     const separators = host.querySelectorAll('[data-ui="gallery.videoReview.toolbar.separator"]');
-    expect(separators).toHaveLength(3);
+    expect(separators).toHaveLength(2);
     expect(autosave.nextElementSibling?.getAttribute('data-compact-only')).toBe('true');
-    const note = host.querySelector('[aria-label="gallery.videoReview.addComment"]')!;
-    expect(note.nextElementSibling?.getAttribute('data-ui')).toBe(
-      'gallery.videoReview.toolbar.separator'
-    );
-    expect(note.nextElementSibling?.nextElementSibling?.getAttribute('aria-label')).toBe(
+    expect(host.querySelector('[aria-label="gallery.videoReview.addComment"]')).toBeNull();
+    expect(host.querySelector('button')?.getAttribute('aria-label')).toBe(
       'gallery.videoReview.undo'
     );
     for (const separator of separators) {
@@ -232,8 +228,9 @@ it('keeps ruler and lane markers aligned across source-time bounds without captu
 });
 
 it('moves the playhead on published frames without a React render and preserves paused navigation', async () => {
-  const { createReviewPlaybackPresentationClock, ReviewPlaybackPresentationClockContext } =
-    await import('./playback-presentation-clock');
+  const { ReviewPlaybackPresentationClockContext } = await import('./playback-presentation-clock');
+  const { createReviewPlaybackPresentationClock } =
+    await import('./playback-presentation-clock.test-support');
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   let playing = true,
     renders = 0;
@@ -276,8 +273,9 @@ it('moves the playhead on published frames without a React render and preserves 
 });
 
 it('updates the clock from presented frames without a root render and rejects stale React time', async () => {
-  const { createReviewPlaybackPresentationClock, ReviewPlaybackPresentationClockContext } =
-    await import('./playback-presentation-clock');
+  const { ReviewPlaybackPresentationClockContext } = await import('./playback-presentation-clock');
+  const { createReviewPlaybackPresentationClock } =
+    await import('./playback-presentation-clock.test-support');
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal(
     'ResizeObserver',
@@ -315,12 +313,17 @@ it('updates the clock from presented frames without a root render and rejects st
         </ReviewPlaybackPresentationClockContext.Provider>
       )
     );
+  const mutations = new MutationObserver(() => {});
   try {
     render(0);
     const readout = host.querySelector('.review-playback-clock-value')!;
+    const text = readout.firstChild;
+    expect(text).toBeInstanceOf(Text);
+    mutations.observe(readout, { subtree: true, characterData: true, childList: true });
     const count = renders;
     clock.publish(2.34);
     expect(readout.textContent).toBe('0:02.34 / 0:10.00');
+    expect(readout.firstChild).toBe(text);
     expect(renders).toBe(count);
     clock.publish(3.45);
     render(1);
@@ -331,7 +334,15 @@ it('updates the clock from presented frames without a root render and rejects st
     render(6);
     clock.publish(7);
     expect(readout.textContent).toBe('0:06.00 / 0:10.00');
+    expect(readout.firstChild).toBe(text);
+    expect(text?.isConnected).toBe(true);
+    const records = mutations.takeRecords();
+    expect(records.length).toBeGreaterThan(0);
+    expect(
+      records.every((record) => record.type === 'characterData' && record.target === text)
+    ).toBe(true);
   } finally {
+    mutations.disconnect();
     act(() => root.unmount());
     expect(() => clock.publish(8)).not.toThrow();
     host.remove();

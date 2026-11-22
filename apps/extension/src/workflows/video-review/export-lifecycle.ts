@@ -44,11 +44,16 @@ import {
   releaseAssetReadyProtection,
 } from '../../composition/persistence/assets';
 import { initDB } from '../../composition/persistence/infrastructure/indexed-db/core';
-import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
+import type {
+  VideoWorkspaceOpening,
+  VideoWorkspaceSnapshot,
+} from '../../composition/persistence/review-workspaces/contracts';
 import { replayReviewHistory, reviewDocumentBaseline } from '../../features/video/review/document';
-import { createReviewFragment } from '../../features/video/review/fragment';
+import {
+  createReviewFragment,
+  type ReviewFragmentSelection,
+} from '../../features/video/review/fragment';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
-import type { ReviewAnchor } from '../../features/video/review/types';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
 import {
   buildQuickEditAudioPlan,
@@ -108,20 +113,6 @@ const persistence = {
       decode: decodeReviewAudioClipBuffer,
     }),
 };
-
-/** Output time of a source position inside the full edit map. */
-function reviewOutputTimeAt(
-  map: ReturnType<typeof buildReviewTimeMap>,
-  sourceTime: number
-): number {
-  for (const segment of map) {
-    if (segment.kind === 'cut') continue;
-    if (sourceTime < segment.sourceStart) return segment.resultStart;
-    if (sourceTime < segment.sourceEnd)
-      return segment.resultStart + (sourceTime - segment.sourceStart) / segment.rate;
-  }
-  return map.at(-1)?.resultEnd ?? 0;
-}
 
 /**
  * Builds the applied external-audio mix plan and opens bounded native PCM readers
@@ -282,12 +273,13 @@ function createReviewExportTiming(
 
 type ReviewExportInput = {
   snapshot: VideoWorkspaceSnapshot;
+  pendingOriginal?: NonNullable<VideoWorkspaceOpening['original']>;
   renderSettings?: ReviewRenderSettings;
   index: ReviewMediaIndex;
   signal: AbortSignal;
   destination?: 'gallery' | 'download';
   diagnostics?: ReviewExportDiagnostics;
-  selection?: Extract<ReviewAnchor, { kind: 'range' }>;
+  selection?: ReviewFragmentSelection;
   onProgress?(fraction: number): void;
   onTimeEstimate?(estimate: VideoProjectExportTimeEstimate | null): void;
   onPublishing?(): void;
@@ -298,10 +290,16 @@ async function prepareReviewExport(args: ReviewExportInput, deps: typeof persist
   const snapshot = structuredClone(args.snapshot);
   const workspace = snapshot.workspace;
   signal.throwIfAborted();
-  const original = await deps.loadVideoReviewSource(workspace.aggregateId, signal);
+  const original = args.pendingOriginal
+    ? await deps.loadVideoReviewSource(workspace.aggregateId, signal, args.pendingOriginal.mediaId)
+    : await deps.loadVideoReviewSource(workspace.aggregateId, signal);
   if (
     original.snapshot.workspace.sourceAssetId !== workspace.sourceAssetId ||
     original.snapshot.workspace.revision !== workspace.revision ||
+    original.original?.mediaId !== args.pendingOriginal?.mediaId ||
+    original.original?.createdAt !== args.pendingOriginal?.createdAt ||
+    original.original?.generation !== args.pendingOriginal?.generation ||
+    (!args.pendingOriginal && original.snapshot.workspace.generation !== workspace.generation) ||
     original.source.duration !== index.duration
   )
     throw new Error('Review source or committed revision changed.');
@@ -343,13 +341,13 @@ async function prepareReviewExport(args: ReviewExportInput, deps: typeof persist
     segments: fullMap,
     applied: resolveQuickEditEffectiveFeatures(advanced).actionsApplied,
   });
-  const fragmentOffset = fragment ? reviewOutputTimeAt(fullMap, fragment.start) : 0;
+  const fragmentOffset = fragment?.result.start ?? 0;
   const action = {
     plan: actionPlan,
     offset: fragmentOffset,
     bounds: {
       start: fragmentOffset,
-      end: fragment ? reviewOutputTimeAt(fullMap, fragment.end) : actionPlan.duration,
+      end: fragment?.result.end ?? actionPlan.duration,
     },
   };
   const recordingAudioRequest =
@@ -416,9 +414,7 @@ async function prepareReviewExport(args: ReviewExportInput, deps: typeof persist
     },
     {
       start: fragmentOffset,
-      end: fragment
-        ? reviewOutputTimeAt(fullMap, fragment.end)
-        : (fullMap.at(-1)?.resultEnd ?? index.duration),
+      end: fragment?.result.end ?? fullMap.at(-1)?.resultEnd ?? index.duration,
     }
   );
   if (cameraConflicts.length && !(original.historyProject && original.telemetry))

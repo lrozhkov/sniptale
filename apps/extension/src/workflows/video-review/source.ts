@@ -1,5 +1,6 @@
+import { legacyQuickEditProjectId } from '../../composition/persistence/media-library/legacy-projects';
+import { ensureNativeEditingRootAvailable } from '../sync-transfer/editing-admission';
 import { createReviewRecordingHistoryProject } from './recording-review';
-import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
 import { projectRecordingObservationClock } from '../../features/video/project/observation-clock';
 import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
 import { getMediaLibraryEntry } from '../../composition/persistence/media-library';
@@ -9,13 +10,40 @@ import { getProjectAsset } from '../../composition/persistence/projects';
 import { getProjectExport } from '../../composition/persistence/projects/index.exports';
 import type { VideoWorkspaceDiagnostic } from '../../composition/persistence/review-workspaces/parser';
 import {
-  openVideoWorkspace,
   readVideoWorkspace,
+  readVideoWorkspaceOpening,
   VideoWorkspaceError,
 } from '../../composition/persistence/review-workspaces/store';
 import { parseReviewSource } from '../../features/video/review/validation';
 import type { MediaAssetSource } from '../../composition/persistence/media-library/contracts';
 import { parseReviewProvenance } from '../../features/video/review/provenance';
+import type { ReviewSource } from '../../features/video/review/types';
+
+/** Immutable recording identity used for later history publication. */
+export interface ReviewRecordingHistorySource {
+  recordingId: string;
+  assetId: string;
+  filename: string;
+}
+
+/** Refreshes history without reopening the workspace or decoding its media. */
+export async function refreshVideoReviewRecordingHistory(
+  identity: ReviewRecordingHistorySource,
+  source: ReviewSource,
+  signal: AbortSignal
+) {
+  signal.throwIfAborted();
+  const recording = await getRecording(identity.recordingId);
+  if (!recording || recording.assetId !== identity.assetId)
+    throw new VideoReviewLoadError('telemetry', 'changed-source');
+  const raw = await getRecordingTelemetry(identity.recordingId);
+  signal.throwIfAborted();
+  const telemetry = raw ? projectRecordingObservationClock(raw) : null;
+  const historyProject = telemetry
+    ? createReviewRecordingHistoryProject(telemetry, source, identity.filename)
+    : null;
+  return { telemetry, historyProject };
+}
 
 type ReviewLoadStage = 'library' | 'source' | 'metadata' | 'telemetry' | 'workspace' | 'session';
 type ReviewLoadReason =
@@ -110,16 +138,35 @@ export async function inspectReviewVideo(file: File, signal: AbortSignal) {
   }
 }
 
-/** Loads immutable original bytes and opens the session only for that same source object. */
-export async function loadVideoReviewSource(aggregateId: string, signal: AbortSignal) {
+/** Loads the exact original bytes and prepares an editor without publishing a new project. */
+export async function loadVideoReviewSource(
+  aggregateId: string,
+  signal: AbortSignal,
+  newProjectSource?: string
+) {
   let stage: ReviewLoadStage = 'library';
   try {
     signal.throwIfAborted();
-    const existing = await readVideoWorkspace(aggregateId);
-    const sourceMediaId = existing?.workspace.sourceMediaId ?? aggregateId;
+    let targetId = aggregateId;
+    let existing = await readVideoWorkspace(targetId);
+    const sourceMediaId = existing
+      ? (existing.workspace.sourceMediaId ?? aggregateId)
+      : (newProjectSource ?? aggregateId);
     const media = await getMediaLibraryEntry(sourceMediaId);
     if (!media?.mimeType.startsWith('video/'))
       throw new VideoReviewLoadError('library', 'unavailable');
+    if (!existing && !newProjectSource) {
+      const migratedId = legacyQuickEditProjectId({ id: sourceMediaId, source: media.source });
+      const migrated = await readVideoWorkspace(migratedId);
+      if (
+        migrated?.workspace.aggregateId === migratedId &&
+        migrated.workspace.sourceMediaId === sourceMediaId
+      ) {
+        existing = migrated;
+        targetId = migratedId;
+        await ensureNativeEditingRootAvailable({ rootKind: 'video-review', rootId: targetId });
+      }
+    }
     stage = 'source';
     const original = await readReviewMediaOriginal(media.source);
     if (!original) throw new VideoReviewLoadError('source', 'unavailable');
@@ -140,16 +187,35 @@ export async function loadVideoReviewSource(aggregateId: string, signal: AbortSi
       : null;
     signal.throwIfAborted();
     stage = 'workspace';
-    const snapshot = await openVideoWorkspace(aggregateId, source, original.assetId);
-    publishMediaHubLibraryChanged('update', [aggregateId]);
+    const sourceKind = media.source.kind === 'project-export' ? 'export' : media.source.kind;
+    const id =
+      existing || newProjectSource
+        ? targetId
+        : `${sourceKind}:quick-project:${crypto.randomUUID()}`;
+    const opening = await readVideoWorkspaceOpening({
+      aggregateId: id,
+      ...(existing ? { requireExisting: true } : { sourceMediaId }),
+      ...(newProjectSource ? { sourceMediaId: newProjectSource } : {}),
+      source,
+      expectedSourceAssetId: original.assetId,
+    });
     signal.throwIfAborted();
     return {
       file: original.file,
-      filename: snapshot.workspace.project?.name ?? media.filename,
+      filename: opening.snapshot.workspace.project?.name ?? media.filename,
       source,
       ...(provenance ? { provenance } : {}),
-      snapshot,
+      ...opening,
       telemetry,
+      ...(media.source.kind === 'recording' && !media.recordingMetadata
+        ? {
+            recordingHistorySource: {
+              recordingId: media.source.recordingId,
+              assetId: original.assetId,
+              filename: media.filename,
+            },
+          }
+        : {}),
       ...(historyProject ? { historyProject } : {}),
       ...(media.recordingMetadata ? { recordingMetadata: media.recordingMetadata } : {}),
     };

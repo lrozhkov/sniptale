@@ -1,7 +1,7 @@
 import { parseVideoProjectEntry } from '../projects/read-guards';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
 import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
-import { videoSourceReferences } from './dependencies';
+import { collectVideoProjectWorkspaceSources } from '../projects/history-contracts';
 
 export const USAGE_REFERENCE_INDEX = 'usageReferenceKeys';
 export const USAGE_INDEX_MARKER = 'indexed:v2';
@@ -18,14 +18,8 @@ export function withVideoProjectUsage<T extends object>(
   const entry = parseVideoProjectEntry(value);
   const keys = new Set([USAGE_INDEX_MARKER]);
   if (entry) {
-    const project = entry.project;
-    for (const asset of project.assets) {
-      for (const ref of videoSourceReferences(asset.source))
-        keys.add(usageReferenceKey(ref.kind, ref.id));
-    }
-    if (project.baseRecordingId) keys.add(usageReferenceKey('recording', project.baseRecordingId));
-    if (project.source.kind === 'recording')
-      keys.add(usageReferenceKey('recording', project.source.recordingId));
+    for (const ref of collectVideoProjectWorkspaceSources(entry))
+      keys.add(usageReferenceKey(ref.kind, ref.id));
   }
   return { ...value, usageReferenceKeys: [...keys] };
 }

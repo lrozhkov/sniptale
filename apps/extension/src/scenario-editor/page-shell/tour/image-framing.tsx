@@ -66,6 +66,7 @@ export function TourImageFraming({
       ))}
       <TourInspectorNumericRow
         label={t('scenario.editor.tourImageScale')}
+        rangePresentation="field"
         value={placement.zoom * 100}
         unit="%"
         min={100}

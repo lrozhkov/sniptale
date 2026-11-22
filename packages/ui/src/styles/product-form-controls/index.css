@@ -1,9 +1,32 @@
 @import './range.css';
 @import './select.css';
+@import './segments.css';
+
+.sniptale-textarea {
+  --sniptale-textarea-resize-grip: linear-gradient(
+      to top left,
+      transparent 2px,
+      var(--sniptale-color-text-muted) 2px 3px,
+      transparent 3px 5px,
+      var(--sniptale-color-text-muted) 5px 6px,
+      transparent 6px
+    )
+    right bottom / 8px 8px no-repeat;
+}
 
 .sniptale-input,
 .sniptale-textarea {
   cursor: text;
+}
+
+.sniptale-input[type='number'] {
+  appearance: textfield;
+}
+
+.sniptale-input[type='number']::-webkit-inner-spin-button,
+.sniptale-input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .sniptale-input::placeholder,
@@ -21,9 +44,9 @@
 
 .sniptale-input.sniptale-input-compact {
   min-height: 32px;
-  padding: 6px 10px;
-  border-radius: 9px;
-  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 13px;
   line-height: 18px;
 }
 

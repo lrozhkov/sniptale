@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
 import type { EffectBundleCatalogEntry } from './index';
 import { getEffectCatalogThemes, queryEffectCatalog } from './query';
+import { SUPPORTED_LOCALES } from '@sniptale/runtime-contracts/i18n';
 const source = readFileSync(
   'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
   'utf8'
@@ -133,3 +134,17 @@ it('hides all styles of disabled documents while Settings can still query and en
   expect(getEffectCatalogThemes([disabled], 'en', { includeDisabled: true })).toHaveLength(4);
   expect(queryEffectCatalog(catalog, filter, 'en')).toHaveLength(3);
 });
+
+it.each(SUPPORTED_LOCALES)(
+  'uses English collection labels when metadata lacks locale %s',
+  (locale) => {
+    const fallback = { ...catalog, label: { en: 'Unique collection label', ru: '' } };
+    expect(
+      queryEffectCatalog(
+        fallback,
+        { query: 'unique collection label', kind: 'all', theme: 'all' },
+        locale
+      )
+    ).toHaveLength(3);
+  }
+);

@@ -35,7 +35,7 @@ vi.mock('./autosave', () => ({ useGuideAutosave: io.autosave }));
 vi.mock('./resource-session', () => ({ useGuideResourceSession: () => enterSession }));
 const enterSession = (id: string | null) => io.enter(id);
 vi.mock('../../../composition/persistence/scenario/history', () => ({
-  getScenarioSavedVersions: io.load,
+  getScenarioEditingSnapshot: io.load,
 }));
 vi.mock('../../../composition/persistence/scenario/store/project-records/assets', () => ({
   getScenarioAssetBlob: io.asset,
@@ -72,8 +72,9 @@ beforeEach(() => {
   window.history.replaceState({}, '', '/?projectId=guide');
   const project = createGuideProject('Original', 'guide', 1);
   io.load.mockResolvedValue({
-    currentRevision: 1,
-    versions: [{ project, revision: 1, savedAt: 1 }],
+    project,
+    workspaceRevision: 1,
+    editingHistory: { version: 1 as const, past: [], future: [] },
   });
   io.autosave.mockImplementation((input: Parameters<typeof useGuideAutosave>[0]) => {
     autosave = input;
@@ -206,8 +207,9 @@ it('ignores delayed unsupported metadata after another project opens', async () 
   expect(state.status).toBe('loading');
   const project = createGuideProject('Next project', 'next', 2);
   io.load.mockResolvedValue({
-    currentRevision: 1,
-    versions: [{ project, revision: 1, savedAt: 2 }],
+    project,
+    workspaceRevision: 1,
+    editingHistory: { version: 1 as const, past: [], future: [] },
   });
   io.list.mockResolvedValue([{ id: 'next', availability: 'available' }]);
   await act(async () => state.openExisting('next'));
@@ -238,7 +240,11 @@ function savedTour(revision = 1) {
   const project = createGuideProject('Tour', 'guide', revision);
   project.tour = createTourDocument();
   project.tour.slides = [createTourImageSlide('image')];
-  return { currentRevision: revision, versions: [{ project, revision, savedAt: revision }] };
+  return {
+    project,
+    workspaceRevision: revision,
+    editingHistory: { version: 1 as const, past: [], future: [] },
+  };
 }
 it('keeps global header and source placement reversible through Undo, Redo and saved reopen', async () => {
   io.load.mockResolvedValue(savedTour());
@@ -261,8 +267,9 @@ it('keeps global header and source placement reversible through Undo, Redo and s
   act(() => state.redo());
   expect(state.project?.tour).toEqual(tour);
   io.load.mockResolvedValue({
-    currentRevision: 2,
-    versions: [{ project: structuredClone(edited), revision: 2, savedAt: 2 }],
+    project: structuredClone(edited),
+    workspaceRevision: 2,
+    editingHistory: { version: 1 as const, past: [], future: [] },
   });
   await act(async () => state.reload());
   expect(state.project?.tour).toEqual(tour);
@@ -303,12 +310,12 @@ it('rejects a delayed background result after project deletion or restore', asyn
     })
   );
   const restored = savedTour(3);
-  restored.versions[0]!.project.name = 'Restored';
+  restored.project.name = 'Restored';
   io.load.mockResolvedValue(restored);
   await act(async () => state.reload());
   await act(async () => {
     finish!({
-      project: { ...restored.versions[0]!.project, name: 'Late old result' },
+      project: { ...restored.project, name: 'Late old result' },
       workspaceRevision: 2,
     });
     expect(await pending).toBe(false);
@@ -321,7 +328,7 @@ it('refuses an old background import after the project identity is recreated', a
   await mount();
   const previousGeneration = state.commitChange;
   const recreated = savedTour(1);
-  recreated.versions[0]!.project.name = 'Recreated';
+  recreated.project.name = 'Recreated';
   io.load.mockResolvedValue(recreated);
   await act(async () => state.reload());
   await act(async () => expect(await previousGeneration(backgroundCommand())).toBe(false));
@@ -373,8 +380,9 @@ it('keeps loaded slide media while a newly referenced stage background is loadin
   tour.slides = [slide];
   project.tour = tour;
   io.load.mockResolvedValue({
-    currentRevision: 1,
-    versions: [{ project, revision: 1, savedAt: 1 }],
+    project,
+    workspaceRevision: 1,
+    editingHistory: { version: 1 as const, past: [], future: [] },
   });
   let finish!: (blob: Blob) => void;
   io.asset.mockImplementation((id: string) =>
@@ -430,8 +438,9 @@ it('rejects obsolete media reads and releases only removed or unmounted resource
   tour.slides = [slide];
   project.tour = tour;
   io.load.mockResolvedValue({
-    currentRevision: 1,
-    versions: [{ project, revision: 1, savedAt: 1 }],
+    project,
+    workspaceRevision: 1,
+    editingHistory: { version: 1 as const, past: [], future: [] },
   });
   const pending = new Map<string, (blob: Blob) => void>();
   io.asset.mockImplementation((id: string) =>
@@ -494,8 +503,9 @@ it('waits for the old native acknowledgement before switching resource sessions'
   const next = createGuideProject('Next', 'next', 3);
   io.list.mockResolvedValue([{ id: 'next', availability: 'available' }]);
   io.load.mockResolvedValue({
-    currentRevision: 1,
-    versions: [{ project: next, revision: 1, savedAt: 3 }],
+    project: next,
+    workspaceRevision: 1,
+    editingHistory: { version: 1 as const, past: [], future: [] },
   });
   await act(async () => {
     acknowledge(state.project);
@@ -556,3 +566,31 @@ it.each(['accepted', 'rejected', 'changed', 'changed-rejected', 'reloaded'] as c
     if (outcome.startsWith('changed')) expect(state.project?.name).toBe('New edit during exit');
   }
 );
+
+it('hydrates both native branches and adopts the canonical checkpoint of a generic command', async () => {
+  const snapshot = savedTour();
+  const before = { ...snapshot.project, name: 'Before loading' };
+  const after = { ...snapshot.project, name: 'Redo after loading' };
+  io.load.mockResolvedValue({
+    ...snapshot,
+    editingHistory: { version: 1, past: [before], future: [after] },
+  });
+  await mount();
+  expect(state.canUndo).toBe(true);
+  expect(state.canRedo).toBe(true);
+  act(() => state.redo());
+  expect(state.project?.name).toBe('Redo after loading');
+  act(() => state.undo());
+  expect(state.project?.name).toBe('Tour');
+  const predecessor = { ...snapshot.project, name: 'Native command predecessor' };
+  const committed = { ...snapshot.project, name: 'Native command result', updatedAt: 2 };
+  io.importImages.mockResolvedValue({
+    project: committed,
+    workspaceRevision: 2,
+    editingHistory: { version: 1, past: [predecessor], future: [] },
+  });
+  await act(async () => expect(await state.commitChange(backgroundCommand())).toBe(true));
+  expect(state.canRedo).toBe(false);
+  act(() => state.undo());
+  expect(state.project?.name).toBe('Native command predecessor');
+});

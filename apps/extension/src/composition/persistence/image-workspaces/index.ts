@@ -8,6 +8,7 @@ import {
 } from './read';
 
 export type { ImageWorkspaceEntry, StoredImageWorkspaceEntry } from './contracts';
+export { readImageOriginalSource } from './read';
 
 export async function recoverAndGetImageWorkspace(
   aggregateId: string

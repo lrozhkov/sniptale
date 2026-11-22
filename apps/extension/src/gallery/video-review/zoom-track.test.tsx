@@ -3,11 +3,23 @@ import { createQuickEditSpotlight } from '../../features/video/project/scene/foc
 import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadGalleryCatalogFixture,
+  prepareGalleryTranslations,
+} from '../test-support/translations.test-support';
+
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadGalleryCatalogFixture>[0]) =>
+    loadGalleryCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareGalleryTranslations('ru'));
 import { ReviewZoomTrack } from './zoom-track';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import type { ReviewEdit } from '../../features/video/review/types';
 import { createTrackProjection } from './track-projection';
+import * as focusLayout from '../../features/video/review/advanced/focus-layout';
 import { reconcileReviewFocus } from '../../features/video/review/focus-edits';
 
 vi.mock('../../platform/i18n', async (importOriginal) => {
@@ -76,6 +88,7 @@ function renderTrack(
     projection?: ReturnType<typeof createTrackProjection>;
     duration?: number;
     compact?: boolean;
+    selectedId?: string;
   }
 ) {
   act(() => {
@@ -97,7 +110,7 @@ function renderTrack(
           snapTimes={overrides?.snapTimes}
           toOutputTime={overrides?.toOutputTime ?? ((source: number) => source)}
           projection={overrides?.projection}
-          selectedId={null}
+          selectedId={overrides?.selectedId ?? null}
           onSelect={vi.fn()}
           onDragCommit={onDragCommit}
           {...(overrides?.enabled === undefined ? {} : { enabled: overrides.enabled })}
@@ -161,10 +174,11 @@ it.each([false, true])(
     expect(Number.parseFloat(block.style.left)).toBeCloseTo(30);
     expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
     await track.event(block, 'pointerup', 300, true);
-    expect(commit).toHaveBeenCalledWith('a', { start: 2.5, end: 3.5 }, 'move', {
-      start: 3,
-      end: 5,
-    });
+    expect(commit).toHaveBeenCalledWith(
+      'a',
+      { start: 2.5, end: 3.5, timeDomain: 'result' },
+      'move'
+    );
     renderTrack([{ ...zoom('a', 2.5, 3.5), sourceAnchor: { start: 3, end: 5 } }], commit, null, {
       projection,
       toOutputTime: projection.output,
@@ -221,6 +235,7 @@ it('exposes a connect affordance on an eligible gap and creates the link', async
   renderTrack([zoom('a', 0, 2), zoom('b', 4, 6)], vi.fn(), 6, {
     onLink,
     onSelectLink,
+    selectedId: 'a',
   });
   const gap = host.querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.zoomLink"]')!;
   expect(gap.getAttribute('data-connected')).toBe('false');
@@ -230,22 +245,22 @@ it('exposes a connect affordance on an eligible gap and creates the link', async
   expect(onSelectLink).toHaveBeenCalledWith('a');
 });
 
-it('keeps a connected gap visible and selects its settings instead of unlinking', async () => {
+it('keeps a connected gap visible and removes its transition on repeated click', async () => {
   const onLink = vi.fn((_id: string, _target: string | null) => undefined);
   const onSelectLink = vi.fn((_id: string) => undefined);
   const linked: QuickEditZoomRegion = { ...zoom('a', 0, 2), linkTo: 'b' };
   renderTrack([linked, zoom('b', 4, 6)], vi.fn(), 6, {
     onLink,
     onSelectLink,
+    selectedId: 'a',
     linkSelectedId: 'a',
   });
   const gap = host.querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.zoomLink"]')!;
   expect(gap.getAttribute('data-connected')).toBe('true');
   expect(gap.getAttribute('aria-pressed')).toBe('true');
   await act(async () => gap.click());
-  // Clicking the connected gap opens settings; it must not silently unlink.
-  expect(onSelectLink).toHaveBeenCalledWith('a');
-  expect(onLink).not.toHaveBeenCalled();
+  expect(onSelectLink).not.toHaveBeenCalled();
+  expect(onLink).toHaveBeenCalledWith('a', null);
 });
 
 it('hides the affordance for dormant, touching, or disabled pairs', () => {
@@ -387,10 +402,7 @@ it('keeps a cut-boundary fixed end and speed-projected minimum consistent with t
     Number.parseFloat(host.querySelector<HTMLElement>('[data-resizing]')!.style.left)
   ).toBeCloseTo(376);
   await track.event(block, 'pointerup', 900, true);
-  expect(commit).toHaveBeenCalledWith('a', { start: 1.88, end: 2 }, 'start', {
-    start: 3.76,
-    end: 4,
-  });
+  expect(commit).toHaveBeenCalledWith('a', { start: 1.88, end: 2, timeDomain: 'result' }, 'start');
   expect(projection.source(commit.mock.calls[0]![1].end, 'end')).toBe(4);
   expect(host.querySelector('[data-zoom-guide]')).toBeNull();
 });
@@ -535,10 +547,19 @@ for (const spotlight of [false, true]) {
       expect(Number.parseFloat(block.style.left)).toBeCloseTo(60);
       expect(block.dataset['cutSuppressed']).toBe('true');
       await track.event(block, 'pointerup', 700, true);
-      expect(commit).toHaveBeenCalledExactlyOnceWith('a', { start: 3, end: 4 }, 'move', {
-        start: 6,
-        end: 8,
-      });
+      expect(commit).toHaveBeenCalledExactlyOnceWith(
+        'a',
+        {
+          start: 3,
+          end: 5,
+          timeDomain: 'result',
+          visualAnchor: [
+            { start: 6, end: 7, offset: 0, rate: 1 },
+            { start: 7, end: 8, offset: 1, rate: 1 },
+          ],
+        },
+        'move'
+      );
     }
   );
 }
@@ -602,33 +623,36 @@ it.each([false, true])(
   }
 );
 
-it('repacks transient overlapping overlay ranges and restores rows on Escape', async () => {
-  const overlay = (id: string, start: number, end: number) => ({
-    ...zoom(id, start, end),
-    sourceAnchor: { start, end },
-    spotlight: createQuickEditSpotlight(),
-  });
-  const commit = vi.fn();
-  const projection = createTrackProjection(10, []);
-  const track = renderTrack([overlay('a', 0, 2), overlay('b', 3, 5)], commit, null, {
-    projection,
-  });
-  const [first, second] = track.blocks;
-  first!.setPointerCapture = vi.fn();
-  first!.hasPointerCapture = vi.fn(() => false);
-  expect(first!.style.top).toBe(second!.style.top);
-  await track.event(first!, 'pointerdown', 0);
-  await track.event(first!, 'pointermove', 300, true);
-  expect(first!.style.top).not.toBe(second!.style.top);
-  expect(track.lane.style.height).toBe('72px');
-  expect(commit).not.toHaveBeenCalled();
-  await act(async () =>
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-  );
-  expect(first!.style.top).toBe(second!.style.top);
-  await track.event(first!, 'pointerup', 300, true);
-  expect(commit).not.toHaveBeenCalled();
-});
+it.each([false, true])(
+  'repacks transient anchored ranges and restores rows on Escape (projection=%s)',
+  async (projected) => {
+    const overlay = (id: string, start: number, end: number) => ({
+      ...zoom(id, start, end),
+      sourceAnchor: { start, end },
+      spotlight: createQuickEditSpotlight(),
+    });
+    const commit = vi.fn();
+    const projection = projected ? createTrackProjection(10, []) : undefined;
+    const track = renderTrack([overlay('a', 0, 2), overlay('b', 3, 5)], commit, null, {
+      ...(projection ? { projection } : {}),
+    });
+    const [first, second] = track.blocks;
+    first!.setPointerCapture = vi.fn();
+    first!.hasPointerCapture = vi.fn(() => false);
+    expect(first!.style.top).toBe(second!.style.top);
+    await track.event(first!, 'pointerdown', 0);
+    await track.event(first!, 'pointermove', 300, true);
+    expect(first!.style.top).not.toBe(second!.style.top);
+    expect(track.lane.style.height).toBe('72px');
+    expect(commit).not.toHaveBeenCalled();
+    await act(async () =>
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    );
+    expect(first!.style.top).toBe(second!.style.top);
+    await track.event(first!, 'pointerup', 300, true);
+    expect(commit).not.toHaveBeenCalled();
+  }
+);
 
 it('offers the immediate Spotlight neighbor instead of a stored link across it', async () => {
   const overlay = (id: string, start: number, end: number) => ({
@@ -641,7 +665,7 @@ it('offers the immediate Spotlight neighbor instead of a stored link across it',
     [{ ...overlay('a', 0, 2), linkTo: 'b' }, overlay('c', 3, 4), overlay('b', 6, 8)],
     vi.fn(),
     null,
-    { onLink, onSelectLink }
+    { onLink, onSelectLink, selectedId: 'a' }
   );
   const link = host.querySelector<HTMLButtonElement>(
     '[data-ui="gallery.videoReview.zoomLink"][data-connected="false"]'
@@ -649,19 +673,14 @@ it('offers the immediate Spotlight neighbor instead of a stored link across it',
   expect(
     host.querySelector('[data-ui="gallery.videoReview.zoomLink"][data-connected="true"]')
   ).toBeNull();
-  expect(link.style.left).toBe('20%');
-  expect(Number.parseFloat(link.style.width)).toBeCloseTo(10);
+  expect(link.style.left).toBe('min(20% + 2px, 30% - 22px)');
+  expect(link.style.width).toBe('20px');
   expect(track.blocks[0]!.style.top).toBe(track.blocks[2]!.style.top);
   expect(track.blocks[0]!.style.top).toBe(track.blocks[1]!.style.top);
   await act(async () => link.click());
   expect(onSelectLink).toHaveBeenCalledWith('a');
   expect(onLink).toHaveBeenCalledWith('a', 'c');
-  const incoming = [
-    ...host.querySelectorAll<HTMLButtonElement>('[data-ui="gallery.videoReview.zoomLink"]'),
-  ].find((button) => button.style.left === '40%')!;
-  expect(incoming).toBeDefined();
-  await act(async () => incoming.click());
-  expect(onLink).toHaveBeenCalledWith('c', 'b');
+  expect(host.querySelectorAll('[data-ui="gallery.videoReview.zoomLink"]')).toHaveLength(1);
 });
 
 it('offers no Border links or camera link across an intervening camera', async () => {
@@ -797,10 +816,57 @@ it('snaps a focus trim to a source loop edge through a speed projection', async 
   await view.event(end, 'pointerdown', 200);
   await view.event(block, 'pointermove', 395);
   await view.event(block, 'pointerup', 395);
-  expect(commit).toHaveBeenCalledWith(
-    'a',
-    expect.objectContaining({ end: 3 }),
-    'end',
-    expect.any(Object)
-  );
+  expect(commit).toHaveBeenCalledWith('a', expect.objectContaining({ end: 3 }), 'end');
 });
+
+it('retains focus row geometry while selection changes and invalidates authored ranges', () => {
+  const pack = vi.spyOn(focusLayout, 'packQuickEditFocusRows');
+  const regions = [zoom('first', 0, 2), zoom('second', 1, 3)];
+  const commit = vi.fn();
+  renderTrack(regions, commit, null, { selectedId: 'first' });
+  pack.mockClear();
+  renderTrack(regions, commit, null, { selectedId: 'second' });
+  expect(pack).not.toHaveBeenCalled();
+  renderTrack([...regions, zoom('third', 1.5, 4)], commit, null, { selectedId: 'second' });
+  expect(pack).toHaveBeenCalledOnce();
+});
+
+it('packs automatic 3D and zoom using the same intervals as their visible blocks', () => {
+  const track = renderTrack(
+    [
+      { ...zoom('manual', 0, 2), sourceAnchor: { start: 0, end: 2 } },
+      {
+        ...zoom('automatic', 4, 6),
+        effect: '3d',
+        sourceAnchor: { start: 1, end: 3 },
+        spatialClock: { offset: 0, rate: 1, duration: 2 },
+        cursorComposition: { mode: 'orbit', amount: 0.5, smoothness: 0.6 },
+      },
+    ],
+    vi.fn(),
+    null
+  );
+  const [manual, automatic] = track.blocks;
+  expect(manual!.style.left).toBe('0%');
+  expect(automatic!.style.left).toBe('10%');
+  expect(manual!.style.top).not.toBe(automatic!.style.top);
+});
+
+it.each([false, true])(
+  'reserves rows for visible dormant Spotlight blocks (projection=%s)',
+  (projected) => {
+    const projection = projected ? createTrackProjection(10, []) : undefined;
+    const spotlight = {
+      ...zoom('hidden-by-cut', 1, 4),
+      spotlight: createQuickEditSpotlight(),
+      dormant: true,
+      sourceAnchor: { start: 1, end: 4 },
+    };
+    const track = renderTrack([spotlight, zoom('visible-camera', 2, 3)], vi.fn(), null, {
+      ...(projection ? { projection } : {}),
+    });
+    expect(track.blocks).toHaveLength(2);
+    expect(track.blocks[0]!.style.top).not.toBe(track.blocks[1]!.style.top);
+    expect(track.lane.style.height).toBe('72px');
+  }
+);

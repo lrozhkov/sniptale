@@ -7,6 +7,12 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
 
 import { resolveVideoRecordingFailureMessage } from './recording-failure';
 
+it('maps the activation timeout code to localized copy without source-locale text', () => {
+  expect(resolveVideoRecordingFailureMessage('start-activation-timeout')).toBe(
+    'background.runtime.recordingStartTimeout'
+  );
+});
+
 it('maps the camera frame-rate failure code to localized copy', () => {
   expect(resolveVideoRecordingFailureMessage('camera-frame-rate-unsupported')).toBe(
     'background.runtime.cameraFrameRateUnsupported'

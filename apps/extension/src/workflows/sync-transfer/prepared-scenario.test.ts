@@ -7,6 +7,8 @@ import {
   portableSyncDependencyIds,
   portableSyncEditingObjectIds,
 } from './prepared-root';
+import { portableSyncRootDependencyIds } from './prepared-scenario';
+import { createEmptyVideoProject } from '../../features/video/project/factories/creation';
 
 function envelope(borrowedMediaId?: string) {
   const project = createGuideProject('Portable Guide', 'guide', 1);
@@ -180,4 +182,39 @@ it('still validates saved HTML object inventory before removing it from editing 
       ],
     })
   ).rejects.toThrow();
+});
+
+it('requires historical-only Scenario parents and exact child closure in portable history', () => {
+  const project = createEmptyVideoProject('Current without Scenario');
+  const parsed = {
+    kind: 'video-project' as const,
+    entry: { project },
+    metadata: {
+      history: {
+        version: 1 as const,
+        past: [{ objectId: 'inverse' }],
+        future: [],
+        sources: [
+          { kind: 'scenario-project' as const, id: 'historical-parent' },
+          { kind: 'scenario-asset' as const, id: 'historical-child' },
+        ],
+      },
+    },
+  };
+  const dependency = {
+    rootKind: 'scenario-project' as const,
+    rootId: 'historical-parent',
+    basis: ['head'],
+    childIds: ['historical-child'],
+  };
+  expect(portableSyncRootDependencyIds(parsed, [dependency])).toEqual(['historical-parent']);
+  expect(() => portableSyncRootDependencyIds(parsed, [])).toThrow('Scenario dependency');
+  expect(() => portableSyncRootDependencyIds(parsed, [{ ...dependency, childIds: [] }])).toThrow(
+    'Scenario dependency'
+  );
+  expect(() =>
+    portableSyncRootDependencyIds(parsed, [
+      { ...dependency, rootId: 'other-parent', childIds: ['historical-child'] },
+    ])
+  ).toThrow('Scenario dependency');
 });

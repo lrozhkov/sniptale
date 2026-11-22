@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { createGlTransitionSelection } from '../../../../apps/extension/src/features/video/project/transition/gl-catalog';
 import type { VideoProject } from '../../../../apps/extension/src/features/video/project/types';
 import { createSourceImageFilter } from '../../../../apps/extension/src/features/image-filters/contract';
@@ -11,7 +12,7 @@ import {
 import { createVideoProjectMotionRegion } from '../../../../apps/extension/src/features/video/project/motion';
 import { bindMotionRegionToClip } from '../../../../apps/extension/src/features/video/project/motion/source-binding';
 import { hydrateVideoProject } from '../../../../apps/extension/src/features/video/project/hydration';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { readNativeVideoProject } from '../support/native-video-project';
 import {
@@ -344,16 +345,16 @@ for (const [index, size] of [
       await chooseInspectorValue(
         page,
         inspector,
-        label('gallery.videoReview.focusLensPlacement'),
-        label('videoEditor.sidebar.cursorFocusFollow')
+        label('editor.scene.cameraFollowTarget'),
+        label('editor.scene.cameraFollowCursor')
       );
       await expect.poll(async () => (await read()).motionRegions![0]!.focusMode).toBe('CURSOR');
       await page.screenshot({ path: info.outputPath('native-optical-lens.png'), fullPage: false });
       await chooseInspectorValue(
         page,
         inspector,
-        label('gallery.videoReview.focusLensPlacement'),
-        label('videoEditor.sidebar.cursorFocusFixed')
+        label('editor.scene.cameraFollowTarget'),
+        label('editor.scene.cameraFollowManual')
       );
       await chooseInspectorValue(
         page,
@@ -472,8 +473,8 @@ for (const [index, size] of [
         .poll(async () => (await read()).motionRegions![0]!.spotlightTarget)
         .toBe('scene');
       const editNumber = async (key: Parameters<typeof translate>[0], value: string) => {
-        const field = inspector.getByRole('textbox', { name: label(key), exact: true });
-        await field.fill(value);
+        const field = numericControl(inspector, label(key));
+        await (await openNumericControl(inspector, label(key))).fill(value);
         await field.press('Enter');
         return field;
       };
@@ -536,7 +537,7 @@ for (const [index, size] of [
       await chooseInspectorValue(
         page,
         enter,
-        label('gallery.videoReview.focusReveal'),
+        label('gallery.videoReview.spotlightRevealLabel'),
         label('gallery.videoReview.focusContract')
       );
       const duration = enter.getByRole('textbox', {
@@ -549,7 +550,7 @@ for (const [index, size] of [
       await chooseInspectorValue(
         page,
         enter,
-        label('gallery.videoReview.focusReveal'),
+        label('gallery.videoReview.spotlightRevealLabel'),
         label('gallery.videoReview.borderAppear')
       );
       await expect(duration).toBeDisabled();
@@ -557,15 +558,15 @@ for (const [index, size] of [
       await chooseInspectorValue(
         page,
         enter,
-        label('gallery.videoReview.focusReveal'),
-        label('gallery.videoReview.focusFade')
+        label('gallery.videoReview.spotlightRevealLabel'),
+        label('gallery.videoReview.spotlightFade')
       );
       await expect(duration).toBeEnabled();
       await expect.poll(async () => (await read()).motionRegions![0]!.zoomInDuration).toBe(0.3);
       await chooseInspectorValue(
         page,
         exit,
-        label('gallery.videoReview.focusReveal'),
+        label('gallery.videoReview.spotlightRevealLabel'),
         label('gallery.videoReview.focusExpand')
       );
       await expect

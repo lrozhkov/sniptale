@@ -130,7 +130,7 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
           step={1}
           precision={2}
           unit="px"
-          scrub={{ min: 0, max: 100, step: 1 }}
+          stepperPlacement="sides"
           disabled={props.locked || !props.onEditMediaClip}
           normalizeValue={(value) =>
             value === Number(windowCornerRadius.toFixed(2)) ? windowCornerRadius : value
@@ -222,6 +222,7 @@ export function MediaFitScaleControls(
   return (
     <SliderField
       label={translate('videoEditor.sidebar.fitScalePercentLabel')}
+      rangePresentation="field"
       value={props.fitScalePercent}
       min={props.min ?? 10}
       max={300}
@@ -259,12 +260,13 @@ export function MediaShadowControls(
       />
       <SliderField
         label={translate('videoEditor.sidebar.mediaShadowIntensityLabel')}
+        rangePresentation="field"
         value={props.shadowIntensity}
         min={0}
         max={100}
         step={1}
         disabled={props.disabled}
-        formatValue={(value) => `${Math.round(value)}%`}
+        formatValue={(value) => `${value}%`}
         onChange={(value) => props.onUpdateMediaClipShadowIntensity?.(props.clipId, value)}
       />
       <ColorField

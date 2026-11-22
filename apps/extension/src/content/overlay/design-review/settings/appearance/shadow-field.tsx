@@ -1,6 +1,7 @@
 import { CompactColorSelector } from '../../../../../ui/color-selector';
 import { CompactInput, CompactSelect } from '../../../../../ui/compact-inspector-controls';
 import { translate } from '../../../../../platform/i18n';
+import { stepCssLength } from '../css-length';
 import { Field, PAGE_STYLE_CONTROL_CLASS_NAME, PAGE_STYLE_SELECT_CLASS_NAME } from '../field-shell';
 import {
   createDefaultBoxShadow,
@@ -190,6 +191,11 @@ function ShadowLengthInput(props: {
       className={PAGE_STYLE_CONTROL_CLASS_NAME}
       disabled={props.disabled}
       inputMode="decimal"
+      onNumericStep={(direction) => {
+        const numericValue = Number(props.value.replace(/px$/, ''));
+        const value = Number.isFinite(numericValue) ? `${numericValue}px` : props.value;
+        props.onChange(normalizeLengthInput(stepCssLength(value, undefined, direction)));
+      }}
       value={props.value.replace(/px$/, '')}
       onChange={(event) => props.onChange(normalizeLengthInput(event.currentTarget.value))}
     />

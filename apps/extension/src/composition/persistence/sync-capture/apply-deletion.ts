@@ -1,4 +1,8 @@
+import { checkSyncConnectionAdmission } from '../remote-connection/store';
+import type { SyncConnectionIdentity } from '../remote-connection/model';
+import { parseApplyPreparedImageReplicaInput } from './apply-image';
 import { readCheckpointInTransaction } from './checkpoints';
+import { readImageWorkspaceIdentity } from '../image-workspaces/identity';
 import { readAppliedCaptureReceipt } from './guards';
 import { assetResidencyCopyId } from '../assets/residency-records';
 import {
@@ -23,7 +27,12 @@ import { freezeVideoReviewInTransaction, digestCapturedVideoReviewRows } from '.
 import { parsePreparedVideoReviewReplicaRoot } from './prepared-review';
 import { parsePreparedVideoProjectReplicaRoot } from './prepared-project';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
-import { isImageCaptureSource } from './image-snapshot';
+import {
+  digestImageProjectSnapshot,
+  readImageProjectSnapshot,
+  isImageCaptureSource,
+} from './image-snapshot';
+import { isCaptureRootKind } from './checkpoint-contracts';
 import { readCompatibleImageReplicaPredecessorInTransaction } from './freeze';
 import type { IDBPTransaction } from 'idb';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -38,6 +47,7 @@ import {
   RECORDING_RECOVERY_SESSIONS_STORE,
   RECORDING_RECOVERY_BLOCKS_STORE,
   SYNC_CAPTURE_STORE,
+  SYNC_CONNECTION_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_EXPORT_INPUTS_STORE,
   PROJECT_ASSETS_STORE,
@@ -50,6 +60,7 @@ import {
   VIDEO_PROJECTS_STORE,
   VIDEO_PROJECT_REVISIONS_STORE,
   SCENARIO_ASSETS_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   IMAGE_WORKSPACES_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
@@ -92,6 +103,7 @@ type Transaction = IDBPTransaction<unknown, string[], 'readwrite'>;
 
 /** Target-local predecessor checked against a selected remote tombstone before this command. */
 export interface ApplyCatalogDeletionInput {
+  authorization?: SyncConnectionIdentity;
   rootKind: CaptureRootKind;
   rootId: string;
   operationId: string;
@@ -112,7 +124,7 @@ function ordinal(value: number): boolean {
 }
 function prepare(input: ApplyCatalogDeletionInput): ApplyCatalogDeletionInput {
   if (
-    !['media', 'video-project', 'video-review', 'scenario-project'].includes(input.rootKind) ||
+    !isCaptureRootKind(input.rootKind) ||
     !input.rootId ||
     input.rootId.length > 256 ||
     !input.spaceId ||
@@ -186,6 +198,8 @@ async function assertCausalState(
 }
 
 async function assertNoWorkspaceSidecars(tx: Transaction, aggregateId: string): Promise<void> {
+  const identity = await readImageWorkspaceIdentity(tx, aggregateId).catch(() => refuse());
+  if (identity && !identity.retired) refuse();
   for (const store of [
     IMAGE_WORKSPACES_STORE,
     VIDEO_WORKSPACES_STORE,
@@ -383,6 +397,34 @@ async function deleteMediaRoot(
   await releaseMediaSource(tx, rows.media, operation);
 }
 
+async function deleteLinkedImageProject(
+  tx: Transaction,
+  input: ApplyCatalogDeletionInput,
+  state: SyncCaptureRootState | null,
+  operation: ReturnType<typeof buildPhysicalDeleteOperation>
+): Promise<number | undefined> {
+  const { rootId, expectedWorkspaceRevision } = input;
+  if ((await tx.objectStore(MEDIA_LIBRARY_STORE).get(rootId)) !== undefined) refuse();
+  const raw: unknown = await tx.objectStore(IMAGE_WORKSPACES_STORE).get(rootId);
+  if (raw === undefined) {
+    await assertAbsentMediaRoot(tx, rootId, state);
+    if (expectedWorkspaceRevision !== null) refuse();
+    return state?.nativeRevision;
+  }
+  if (!state || state.deleted) refuse();
+  for (const store of [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_DRAFTS_STORE, THUMBNAILS_STORE])
+    if ((await tx.objectStore(store).get(rootId)) !== undefined) refuse();
+  await assertNoWorkspaceHistory(tx, rootId);
+  const rows = await readImageProjectSnapshot(tx, rootId);
+  if (
+    rows.workspace.revision !== expectedWorkspaceRevision ||
+    state.nativeDigest !== digestImageProjectSnapshot(rows)
+  )
+    refuse();
+  await deleteMediaSidecars(tx, rootId, operation);
+  return Math.max(state.nativeRevision ?? 0, rows.workspace.revision);
+}
+
 interface DeletionIdentity {
   rootKey: string;
   receiptKey: string;
@@ -433,6 +475,16 @@ function hasPendingPublication(
     return journals.some((journal) => pendingReview(journal, input.rootId));
   if (input.rootKind === 'video-project')
     return journals.some((journal) => pendingProject(journal, input.rootId));
+  if (input.rootKind === 'image-project')
+    return journals.some((journal) => {
+      if (journal.domain !== 'sync-replica')
+        return mediaHasPendingPublication(journal, { id: input.rootId });
+      const payload = journal.payload;
+      if (!isRecord(payload)) return true;
+      if (payload['kind'] !== 'image') return false;
+      const candidate = parseApplyPreparedImageReplicaInput(payload['input']);
+      return !candidate || candidate.workspace?.aggregateId === input.rootId;
+    });
   const target = {
     id: input.rootId,
     ...(input.rootId.startsWith('recording:')
@@ -474,6 +526,7 @@ async function admitDeletion(
   const duplicate = await readDeletionReceipt(tx, input, identity);
   if (duplicate !== null) return { status: 'duplicate' as const, generation: duplicate };
   if (!profile.enabled || profile.connectionGeneration !== input.connectionGeneration) refuse();
+  await checkSyncConnectionAdmission(tx, input, input.authorization ?? null);
   if (await readCheckpointInTransaction(tx, input, input)) refuse();
   if (hasPendingPublication(input, journals)) refuse();
   const previous = await assertCausalState(tx, input, identity.rootKey);
@@ -545,6 +598,7 @@ async function commitDeletion(
       RECORDING_RECOVERY_SESSIONS_STORE,
       RECORDING_RECOVERY_BLOCKS_STORE,
       SYNC_CAPTURE_STORE,
+      SYNC_CONNECTION_STORE,
       MEDIA_LIBRARY_STORE,
       PROJECT_EXPORT_INPUTS_STORE,
       PROJECT_ASSETS_STORE,
@@ -557,6 +611,7 @@ async function commitDeletion(
       VIDEO_PROJECTS_STORE,
       VIDEO_PROJECT_REVISIONS_STORE,
       SCENARIO_ASSETS_STORE,
+      IMAGE_WORKSPACE_IDENTITIES_STORE,
       IMAGE_WORKSPACES_STORE,
       VIDEO_WORKSPACES_STORE,
       VIDEO_WORKSPACE_DRAFTS_STORE,
@@ -579,6 +634,8 @@ async function commitDeletion(
       nativeRevision = await deleteScenarioRoot(tx, input, admission.previous, operation);
     else if (input.rootKind === 'video-review')
       nativeRevision = await deleteReviewRoot(tx, input, admission.previous, operation);
+    else if (input.rootKind === 'image-project')
+      nativeRevision = await deleteLinkedImageProject(tx, input, admission.previous, operation);
     else if (input.rootKind === 'video-project')
       await deleteProjectRoot(tx, input, admission.previous, operation);
     else await deleteMediaRoot(tx, input, admission.previous, operation);

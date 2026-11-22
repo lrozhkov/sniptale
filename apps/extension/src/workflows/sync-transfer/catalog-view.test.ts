@@ -363,3 +363,45 @@ it('keeps a conflict visible when its first catalog head is already the local pu
   expect(card?.versions).toHaveLength(2);
   expect(card?.materialized).not.toBe(true);
 });
+
+it('hides a remote-only Image project in Trash while keeping its conflict visible', async () => {
+  const { roots, operations } = installDisplayCatalog();
+  roots.clear();
+  operations.clear();
+  const id = 'remote-work';
+  const root = {
+    rootId: id,
+    rootKind: 'image-project',
+    heads: ['operation'],
+    deleted: false,
+    blocked: false,
+    conflict: false,
+    unavailableDependencies: [],
+  };
+  roots.set(id, root);
+  operations.set('operation', {
+    operationText: '{}',
+    operation: { operationId: 'operation', envelope: { fixtureId: id } },
+  });
+  mocks.portable.mockResolvedValue({
+    kind: 'image',
+    metadata: {
+      linkedSourceMediaId: 'original',
+      entry: {
+        filename: 'original.png',
+        tags: [],
+        kind: 'image',
+        mimeType: 'image/png',
+        size: 3,
+        createdAt: 1,
+        updatedAt: 2,
+        lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 2, trashedAt: 2 },
+      },
+    },
+  });
+  await expect(readPersistedSyncCatalogCards()).resolves.toEqual([]);
+  root.conflict = true;
+  await expect(readPersistedSyncCatalogCards()).resolves.toEqual([
+    expect.objectContaining({ kind: 'image-project', conflict: true }),
+  ]);
+});

@@ -8,7 +8,7 @@ import { getResponseError } from './format';
 import { createUserFacingErrorMessage } from '../../platform/i18n/user-facing-error';
 import { CameraLivePanel } from './live-panel';
 import { FloatingRecordingWindow } from './floating-window';
-import { CameraPostRecordPanel } from './post-record-panel';
+import { CameraPostRecordPanel, CameraRecordingFailurePanel } from './post-record-panel';
 import { consumeCameraRecorderRouteState } from './route-state';
 import type { RuntimeControlMessage } from './types';
 import { useDeviceLabels } from './use-device-labels';
@@ -64,12 +64,18 @@ export function CameraRecorderApp({ messaging }: { messaging: RuntimeMessagingTr
   return (
     <CommandPressScope value={true}>
       <FloatingRecordingWindow>
+        {routeState.failureReason ? (
+          <CameraRecordingFailurePanel reason={routeState.failureReason} />
+        ) : null}
         {postRecordResult ? (
           <CameraPostRecordPanel result={postRecordResult} onAcknowledge={acknowledgePostRecord} />
         ) : null}
-        <div hidden={postRecordResult !== null} className="h-full">
+        <div
+          hidden={postRecordResult !== null || routeState.failureReason !== undefined}
+          className="h-full"
+        >
           <CameraRecorderLiveScreen
-            visible={postRecordResult === null}
+            visible={postRecordResult === null && routeState.failureReason === undefined}
             messaging={messaging}
             teleprompterEnabled={routeState.teleprompter === true}
             capability={capability}

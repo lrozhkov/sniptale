@@ -39,6 +39,16 @@ export async function assertMatchingArchiveAsset(
     readAssetFile(shared, 'published-source'),
   ]);
   if (stagedFile.size !== staged.size || sharedFile.size !== shared.size) throw new Error(message);
+  await assertMatchingArchiveBlobs(stagedFile, sharedFile, message);
+}
+
+/** Compare already admitted inline and file-backed archive sources in bounded chunks. */
+export async function assertMatchingArchiveBlobs(
+  stagedFile: Blob,
+  sharedFile: Blob,
+  message: string
+): Promise<void> {
+  if (stagedFile.size !== sharedFile.size) throw new Error(message);
   const chunkSize = 1024 * 1024;
   for (let offset = 0; offset < stagedFile.size; offset += chunkSize) {
     const [a, b] = await Promise.all([

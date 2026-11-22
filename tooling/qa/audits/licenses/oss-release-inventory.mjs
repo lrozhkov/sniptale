@@ -63,6 +63,7 @@ function collectCurrentReleaseInventory(root, policy) {
     .filter(
       (entry) =>
         entry.startsWith('apps/extension/public/fonts/') ||
+        entry.startsWith('apps/extension/public/gallery-fonts/') ||
         entry === INTERFACE_FONT_PATH ||
         entry === DOCUMENT_FONT_PATH
     )

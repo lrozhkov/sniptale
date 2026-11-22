@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
 import {
@@ -17,7 +18,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 
@@ -710,11 +711,8 @@ for (const variant of [
         .poll(() => dialog.locator('video').evaluate((video) => video.currentTime))
         .toBeGreaterThan(beforeFraming);
       expect(await dialog.locator('video').evaluate((video) => video.paused)).toBe(true);
-      const scale = inspector.getByRole('textbox', {
-        name: label('gallery.videoReview.zoomScale'),
-        exact: true,
-      });
-      await scale.fill('');
+      const scale = numericControl(inspector, label('gallery.videoReview.zoomScale'));
+      await (await openNumericControl(inspector, label('gallery.videoReview.zoomScale'))).fill('');
       await scale.pressSequentially('2.25');
       await scale.press('Tab');
       await expect(scale).toHaveValue('2.25');
@@ -723,7 +721,7 @@ for (const variant of [
         exact: true,
       });
       const enterDuration = enter.getByRole('textbox', {
-        name: label('gallery.videoReview.zoomTransitionDuration'),
+        name: label('gallery.videoReview.focusPhaseDuration'),
         exact: true,
       });
       await enterDuration.fill('1.5');
@@ -848,15 +846,15 @@ for (const variant of [
         linkInspector.locator('[data-ui="gallery.videoReview.zoomLinkDuration"]')
       ).not.toBeEmpty();
       const easing = linkInspector.getByRole('group', {
-        name: label('gallery.videoReview.zoomLinkEasing'),
+        name: label('gallery.videoReview.focusCurveType'),
         exact: true,
       });
       await easing
-        .getByRole('button', { name: label('gallery.videoReview.transitionLinear'), exact: true })
+        .getByRole('button', { name: label('gallery.videoReview.focusCurveLinear'), exact: true })
         .click();
       await expect(
         easing.getByRole('button', {
-          name: label('gallery.videoReview.transitionLinear'),
+          name: label('gallery.videoReview.focusCurveLinear'),
           exact: true,
         })
       ).toHaveAttribute('aria-pressed', 'true');
@@ -881,7 +879,7 @@ for (const variant of [
       await link.click();
       await expect(
         easing.getByRole('button', {
-          name: label('gallery.videoReview.transitionLinear'),
+          name: label('gallery.videoReview.focusCurveLinear'),
           exact: true,
         })
       ).toHaveAttribute('aria-pressed', 'true');
@@ -1564,9 +1562,9 @@ for (const variant of [
       );
       const focus = dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]');
       await expect(focus).toBeVisible();
-      await expect(
-        focus.getByRole('textbox', { name: label('gallery.videoReview.zoomScale'), exact: true })
-      ).toHaveValue('1.5');
+      await expect(numericControl(focus, label('gallery.videoReview.zoomScale'))).toHaveValue(
+        '1.5'
+      );
       await page.screenshot({ path: testInfo.outputPath('contextual-focus.png') });
       await action.click();
       await expect(
@@ -2161,16 +2159,25 @@ for (const variant of [
         exact: true,
       });
       await entry
-        .getByRole('group', { name: label('gallery.videoReview.focusReveal'), exact: true })
+        .getByRole('group', {
+          name: label('gallery.videoReview.spotlightRevealLabel'),
+          exact: true,
+        })
         .getByRole('button', { name: label('gallery.videoReview.focusContract'), exact: true })
         .click();
       await expect(
         exit
-          .getByRole('group', { name: label('gallery.videoReview.focusReveal'), exact: true })
-          .getByRole('button', { name: label('gallery.videoReview.focusFade'), exact: true })
+          .getByRole('group', {
+            name: label('gallery.videoReview.spotlightRevealLabel'),
+            exact: true,
+          })
+          .getByRole('button', { name: label('gallery.videoReview.spotlightFade'), exact: true })
       ).toHaveAttribute('aria-pressed', 'true');
       await exit
-        .getByRole('group', { name: label('gallery.videoReview.focusReveal'), exact: true })
+        .getByRole('group', {
+          name: label('gallery.videoReview.spotlightRevealLabel'),
+          exact: true,
+        })
         .getByRole('button', { name: label('gallery.videoReview.focusExpand'), exact: true })
         .click();
       await expect(dialog.locator('[data-ui="gallery.videoReview.exportFooter"]')).toHaveCount(0);
@@ -3691,7 +3698,7 @@ for (const variant of [
         .click();
       const settings = dialog.locator('[data-ui="gallery.videoReview.cutTransition"]');
       const type = settings.getByRole('button', {
-        name: label('gallery.videoReview.zoomTransitionType'),
+        name: label('gallery.videoReview.cutTransition'),
         exact: true,
       });
       await expect(type).toContainText(label('gallery.videoReview.transitionNone'));
@@ -3725,6 +3732,10 @@ for (const variant of [
       await duration.fill('1');
       await duration.press('Tab');
       await expect(duration).toHaveValue('1');
+      await settings
+        .locator('summary')
+        .filter({ hasText: label('gallery.videoReview.presentationJoinTiming') })
+        .click();
       await expect(
         settings.getByRole('textbox', {
           name: label('gallery.videoReview.cutTransitionBefore'),
@@ -3919,7 +3930,7 @@ test('cut transition VFR fragment excludes cut and outside-fragment rasters', as
     const settings = dialog.locator('[data-ui="gallery.videoReview.cutTransition"]');
     await settings
       .getByRole('button', {
-        name: translate('gallery.videoReview.zoomTransitionType', 'en'),
+        name: translate('gallery.videoReview.cutTransition', 'en'),
         exact: true,
       })
       .click();
@@ -4278,12 +4289,11 @@ for (const locale of ['en', 'ru'] as const) {
       });
       await padding.fill('20');
       await padding.press('Enter');
-      const intensity = dialog.getByRole('textbox', {
-        name: label('gallery.videoReview.backgroundShadow'),
-        exact: true,
-      });
+      const intensity = numericControl(dialog, label('gallery.videoReview.backgroundShadow'));
       await expect(intensity).toHaveValue('0');
-      await intensity.fill('40');
+      await (
+        await openNumericControl(dialog, label('gallery.videoReview.backgroundShadow'))
+      ).fill('40');
       await intensity.press('Enter');
       await button('gallery.videoReview.backgroundShadowColor').click();
       const color = dialog.getByRole('textbox', {
@@ -4305,7 +4315,9 @@ for (const locale of ['en', 'ru'] as const) {
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.scene').click();
       await expect(intensity).toHaveValue('40');
-      await intensity.fill('0');
+      await (
+        await openNumericControl(dialog, label('gallery.videoReview.backgroundShadow'))
+      ).fill('0');
       await intensity.press('Enter');
       await expect
         .poll(() => window.evaluate((node) => getComputedStyle(node).boxShadow))
@@ -4437,11 +4449,8 @@ for (const zoomBehavior of ['fixed', 'follow-video'] as const) {
       const inspector = dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]');
       const preview = inspector.locator('[data-ui="gallery.videoReview.zoomPreview"]');
       await expect(preview).toHaveAttribute('data-status', 'ready');
-      const scale = inspector.getByRole('textbox', {
-        name: label('gallery.videoReview.zoomScale'),
-        exact: true,
-      });
-      await scale.fill('4');
+      const scale = numericControl(inspector, label('gallery.videoReview.zoomScale'));
+      await (await openNumericControl(inspector, label('gallery.videoReview.zoomScale'))).fill('4');
       await scale.press('Enter');
       await inspector
         .locator('summary')
@@ -4736,10 +4745,7 @@ for (const variant of [
       await duration.press('Enter');
       await expect(movement.locator('[aria-pressed="true"]')).toHaveCount(0);
       await expect(
-        fine.getByRole('textbox', {
-          name: label('videoEditor.sidebar.cursorFocusSmoothing'),
-          exact: true,
-        })
+        numericControl(fine, label('videoEditor.sidebar.cursorFocusSmoothing'))
       ).toBeAttached();
       await fine.scrollIntoViewIfNeeded();
       await page.screenshot({ path: info.outputPath('scene-camera-fine.png'), fullPage: false });
@@ -4777,9 +4783,29 @@ for (const locale of ['en', 'ru'] as const) {
       await page.goto(
         `${host.origin}${GALLERY_HARNESS_PATH}?mediaId=${encodeURIComponent(sourceId)}&mode=edit&theme=${theme}`
       );
-      const title = page.locator('header h2 button').filter({ hasText: 'beta-v1.webm' });
-      await expect(title).toHaveAccessibleName('beta-v1.webm');
-      await title.click();
+      const projectInfo = page.getByRole('tabpanel', {
+        name: label('gallery.videoReview.aboutProject'),
+        exact: true,
+      });
+      const openProjectInfo = async () => {
+        await page
+          .getByRole('tab', { name: label('gallery.videoReview.aboutProject'), exact: true })
+          .click();
+        await expect(projectInfo).toBeVisible();
+      };
+      const review = page.locator('[data-ui="gallery.videoReview.dialog"]');
+      const projectId = () => new URL(page.url()).searchParams.get('mediaId');
+      const saveCut = async (start: number, end: number) => {
+        await review
+          .getByRole('button', { name: label('gallery.videoReview.cutMode'), exact: true })
+          .click();
+        await timelineGesture(page, start, end);
+        await expect.poll(projectId).toMatch(/^recording:quick-project:/);
+        return projectId()!;
+      };
+      await openProjectInfo();
+      expect(await readNativeReviewWorkspace(page, sourceId)).toBeNull();
+      await projectInfo.getByRole('button', { name: 'beta-v1.webm', exact: true }).click();
       const name = page.getByRole('textbox', {
         name: label('videoEditor.app.projectNameLabel'),
         exact: true,
@@ -4787,12 +4813,16 @@ for (const locale of ['en', 'ru'] as const) {
       await expect(name).toBeFocused();
       await name.fill('First project');
       await name.press('Enter');
-      await expect(page.locator('header h2')).toHaveText('First project');
+      await expect(
+        projectInfo.getByRole('button', { name: 'First project', exact: true })
+      ).toBeVisible();
+      expect(projectId()).toBe(sourceId);
+      expect(await readNativeReviewWorkspace(page, sourceId)).toBeNull();
+      const firstId = await saveCut(2.1, 4.1);
       await expect
-        .poll(async () => (await readNativeReviewWorkspace(page, sourceId))?.project?.name)
+        .poll(async () => (await readNativeReviewWorkspace(page, firstId))?.project?.name)
         .toBe('First project');
       await page.screenshot({ path: info.outputPath('renamed-project.png'), fullPage: false });
-      const review = page.locator('[data-ui="gallery.videoReview.dialog"]');
       await expect(
         review.locator('header').getByRole('button', {
           name: label('videoEditor.app.newProjectAction'),
@@ -4822,61 +4852,175 @@ for (const locale of ['en', 'ru'] as const) {
           exact: true,
         })
         .click();
-      await expect(page.locator('header h2')).toHaveText('beta-v1.webm');
-      const archiveId = await page.evaluate(
-        async ({ dbName, sourceId }) => {
-          const db = await new Promise<IDBDatabase>((resolve, reject) => {
-            const request = indexedDB.open(dbName);
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-          });
-          const result = await new Promise<unknown[]>((resolve, reject) => {
-            const request = db
-              .transaction('video_workspaces')
-              .objectStore('video_workspaces')
-              .getAll();
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-          });
-          db.close();
-          const archived = result.find(
-            (value) =>
-              value &&
-              typeof value === 'object' &&
-              'sourceMediaId' in value &&
-              value.sourceMediaId === sourceId
-          );
-          if (
-            !archived ||
-            typeof archived !== 'object' ||
-            !('aggregateId' in archived) ||
-            typeof archived.aggregateId !== 'string'
-          )
-            throw new Error('Previous project missing');
-          return archived.aggregateId;
-        },
-        { dbName: betaV1Fixture.databaseName, sourceId }
-      );
-      expect((await readNativeReviewWorkspace(page, archiveId))?.project?.name).toBe(
-        'First project'
-      );
-      await page.reload();
-      await expect(page.locator('header h2')).toHaveText('beta-v1.webm');
+      await openProjectInfo();
+      await expect(
+        projectInfo.getByRole('button', { name: 'beta-v1.webm', exact: true })
+      ).toBeVisible();
+      expect(projectId()).toBe(sourceId);
+      expect(await readNativeReviewWorkspace(page, sourceId)).toBeNull();
+      const newProjectId = await saveCut(5.1, 7.1);
+      expect(newProjectId).not.toBe(firstId);
+      const first = (await readNativeReviewWorkspace(page, firstId))!;
+      const second = (await readNativeReviewWorkspace(page, newProjectId))!;
+      expect(first.project?.name).toBe('First project');
+      expect(second.project?.name).toBe('beta-v1.webm');
+      expect(first.sourceMediaId).toBe(sourceId);
+      expect(second.sourceMediaId).toBe(sourceId);
+      expect(first.sourceAssetId).toBe(second.sourceAssetId);
+      expect(first.history[0]?.after).not.toEqual(second.history[0]?.after);
       await page.goto(
-        `${host.origin}${GALLERY_HARNESS_PATH}?mediaId=${encodeURIComponent(archiveId)}&mode=edit&theme=${theme}`
+        `${host.origin}${GALLERY_HARNESS_PATH}?mediaId=${encodeURIComponent(newProjectId)}&mode=edit&theme=${theme}`
       );
-      await expect(page.locator('header h2')).toHaveText('First project');
-      await page.locator('header h2 button').click();
+      await openProjectInfo();
+      await expect(
+        projectInfo.getByRole('button', { name: 'beta-v1.webm', exact: true })
+      ).toBeVisible();
+      await page.goto(
+        `${host.origin}${GALLERY_HARNESS_PATH}?mediaId=${encodeURIComponent(sourceId)}&theme=${theme}`
+      );
+      const quickEdit = page.locator('[data-ui="gallery.videoReview.enter"]');
+      await quickEdit.click();
+      const inspector = page.locator('[data-ui="gallery.preview.inspector"]');
+      const firstChoice = inspector.getByTitle('First project');
+      await expect(firstChoice).toBeVisible();
+      await expect(inspector.getByTitle('beta-v1.webm')).toBeVisible();
+      await firstChoice.press('Enter');
+      await openProjectInfo();
+      await expect(
+        projectInfo.getByRole('button', { name: 'First project', exact: true })
+      ).toBeVisible();
+      await projectInfo.getByRole('button', { name: 'First project', exact: true }).click();
       await name.fill('Discard this');
       await name.press('Escape');
-      await expect(page.locator('header h2')).toHaveText('First project');
-      await page.screenshot({ path: info.outputPath('archived-project.png'), fullPage: false });
-      await page.setViewportSize({ width: 1200, height: 560 });
-      expect(
-        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
-      ).toBe(true);
+      await expect(
+        projectInfo.getByRole('button', { name: 'First project', exact: true })
+      ).toBeVisible();
+      await page.screenshot({ path: info.outputPath('retained-project.png'), fullPage: false });
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}
+
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`CUT preserves authored visual plates at ${viewport.width}`, async ({ page }, info) => {
+    const host = await startHostServer();
+    const dialog = page.locator('[data-ui="gallery.videoReview.dialog"]');
+    const button = (key: Parameters<typeof translate>[0]) =>
+      dialog.getByRole('button', { name: translate(key, 'en'), exact: true });
+    const selectTrack = (track: string) =>
+      dialog.locator(`[data-review-header-track="${track}"] [data-review-track-select]`).click();
+    try {
+      await page.setViewportSize(viewport);
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: { 'sniptale-locale-preference': 'en' },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await button('gallery.videoReview.advancedEditing').click();
+
+      const laneGesture = async (
+        lane: ReturnType<typeof dialog.locator>,
+        start: number,
+        end: number
+      ) => {
+        await lane.scrollIntoViewIfNeeded();
+        const bounds = (await lane.boundingBox())!;
+        await page.mouse.move(bounds.x + (bounds.width * start) / 12, bounds.y + bounds.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(bounds.x + (bounds.width * end) / 12, bounds.y + bounds.height / 2, {
+          steps: 10,
+        });
+        await page.mouse.up();
+      };
+      await timelineGesture(page, 1);
+      await addReviewFocus(page, 'en');
+      const zoomLane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
+      const focus = zoomLane.locator('[data-review-removal-key^="focus:"]');
+      await expect(focus).toHaveCount(1);
+      await laneGesture(zoomLane, 2, 3);
+      await expect
+        .poll(() => focus.evaluate((node: HTMLElement) => parseFloat(node.style.left)))
+        .toBeGreaterThan(10);
+
+      await timelineGesture(page, 2);
+      await selectTrack('cursorMotion');
+      await button('gallery.videoReview.cursorMotionAdd').click();
+      const cursor = dialog.locator('[data-review-removal-key^="cursor-motion:"]');
+      await expect(cursor).toHaveCount(1);
+
+      await selectTrack('annotationEffects');
+      await button('gallery.videoReview.annotationEffectsAdd').click();
+      await page.getByRole('option', { name: 'Title', exact: true }).click();
+      const annotationLane = dialog.locator(
+        '[data-ui="gallery.videoReview.annotationEffectsLane"]'
+      );
+      const annotation = annotationLane.locator('[data-annotation-effect-id]');
+      await expect(annotation).toHaveCount(1);
+
+      const authored = () =>
+        Promise.all(
+          [focus, cursor, annotation].map((plate) =>
+            plate.evaluate((node: HTMLElement) => [
+              parseFloat(node.style.left).toFixed(3),
+              parseFloat(node.style.width).toFixed(3),
+            ])
+          )
+        );
+      const original = await authored();
+      await selectTrack('source');
+      const sourceLane = dialog.locator('[data-ui="gallery.videoReview.sourceLane"]');
+      await sourceLane.scrollIntoViewIfNeeded();
+      await timelineGesture(page, 1, 7);
+      await button('gallery.videoReview.cutMode').click();
+      const cut = sourceLane.locator('[data-ui="gallery.videoReview.editBlock"]');
+      await expect(cut).toHaveCount(1);
+      expect(Number(await cut.getAttribute('data-review-snap-start'))).toBeLessThan(1.5);
+      expect(Number(await cut.getAttribute('data-review-snap-end'))).toBeGreaterThan(6.5);
+      await expect(focus).toHaveAttribute('data-cut-suppressed', 'true');
+      await expect.poll(authored).toEqual(original);
+      await expect(zoomLane.locator('[aria-hidden="true"].opacity-80')).toHaveCount(1);
+      await expect(annotationLane.locator('[aria-hidden="true"].opacity-80')).toHaveCount(1);
+      await expect(cursor.locator('..').locator('[aria-hidden="true"].opacity-80')).toHaveCount(1);
+      await dialog.locator('[data-ui="gallery.videoReview.resizeTimeline"]').press('End');
+      await cursor.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('cut-visual-plates.png'), fullPage: false });
+
+      await cut.click();
+      const edge = cut.getByRole('button', {
+        name: translate('gallery.videoReview.resizeEnd', 'en'),
+        exact: true,
+      });
+      const handle = (await edge.boundingBox())!;
+      const source = (await sourceLane.boundingBox())!;
+      await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(source.x + source.width / 3, handle.y + handle.height / 2, {
+        steps: 8,
+      });
+      await page.mouse.up();
+      await expect
+        .poll(async () => Number(await cut.getAttribute('data-review-snap-end')))
+        .toBeLessThan(5);
+      await expect.poll(authored).toEqual(original);
+
+      await cut.click();
+      await page.keyboard.press('Delete');
+      await expect(cut).toHaveCount(0);
+      await expect.poll(authored).toEqual(original);
+      await expect(focus).toHaveAttribute('data-cut-suppressed', 'false');
+      await cursor.click();
+      await expect(cursor).toHaveAttribute('aria-pressed', 'true');
+    } finally {
+      host.server.close();
     }
   });
 }

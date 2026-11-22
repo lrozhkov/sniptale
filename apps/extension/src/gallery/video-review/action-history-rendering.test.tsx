@@ -9,14 +9,16 @@ import { REVIEW_KEY_DEFAULT } from '../../features/video/project/action-feedback
 import { REVIEW_CLICK_DEFAULT } from '../../features/video/review/advanced/click-animation';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 
-const categoryRenders = vi.hoisted(() => vi.fn());
-vi.mock('@sniptale/ui/categorized-inspector', async (load) => {
-  const original = await load<typeof import('@sniptale/ui/categorized-inspector')>();
+const sectionRenders = vi.hoisted(() => vi.fn());
+vi.mock('./inspector-section-navigation', async (load) => {
+  const original = await load<typeof import('./inspector-section-navigation')>();
   return {
     ...original,
-    CategorizedInspector: (props: ComponentProps<typeof original.CategorizedInspector>) => {
-      categoryRenders();
-      return <original.CategorizedInspector {...props} />;
+    ReviewInspectorSectionNavigation: (
+      props: ComponentProps<typeof original.ReviewInspectorSectionNavigation>
+    ) => {
+      sectionRenders();
+      return <original.ReviewInspectorSectionNavigation {...props} />;
     },
   };
 });
@@ -130,16 +132,17 @@ it('preserves equal presentation context and propagates actual presentation fami
     );
   try {
     render('history');
-    const initial = categoryRenders.mock.calls.length;
+    const initial = sectionRenders.mock.calls.length;
     expect(initial).toBeGreaterThan(0);
     render('history');
     render('history');
-    expect(categoryRenders).toHaveBeenCalledTimes(initial);
+    expect(sectionRenders).toHaveBeenCalledTimes(initial);
     render('scene');
-    expect(categoryRenders.mock.calls.length).toBeGreaterThan(initial);
+    expect(sectionRenders.mock.calls.length).toBeGreaterThan(initial);
     render('scene', 'all');
     expect(host.querySelector('[data-presentation="all"]')).not.toBeNull();
     expect(host.textContent).toContain('First content');
+    expect(host.querySelector('[role="tablist"]')).toBeNull();
     expect(host.textContent).toContain('Second content');
   } finally {
     act(() => root.unmount());

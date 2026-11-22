@@ -11,6 +11,7 @@ import {
   VIDEO_EDITOR_PLAYBACK_RATE_MAX,
   VIDEO_EDITOR_PLAYBACK_RATE_MIN,
 } from '../../../../project/state/clip-property/playback-rate';
+import { NumberInput } from './number';
 import { SliderField } from '../shared/sliders';
 
 function renderClipFadeFields(
@@ -21,7 +22,7 @@ function renderClipFadeFields(
   if (!selectedClip) return null;
   return (
     <div className="sniptale-parameter-stack space-y-3">
-      <SliderField
+      <NumberInput
         label={translate('videoEditor.sidebar.fadeInLabel')}
         disabled={selectedTrackLocked}
         value={selectedClip.fadeInMs / 1000}
@@ -31,15 +32,13 @@ function renderClipFadeFields(
             ? getAudioFadeLimitSeconds(selectedClip.duration)
             : Math.min(5, selectedClip.duration)
         }
-        scrubMax={Math.min(5, selectedClip.duration)}
-        scrubValue={selectedClip.fadeInMs / 1000}
         step={0.05}
         onChange={(value) =>
           onUpdateClipFades(selectedClip.id, { fadeInMs: Math.max(0, Math.round(value * 1000)) })
         }
-        formatValue={(value) => `${value.toFixed(2)} s`}
+        unit="s"
       />
-      <SliderField
+      <NumberInput
         label={translate('videoEditor.sidebar.fadeOutLabel')}
         disabled={selectedTrackLocked}
         value={selectedClip.fadeOutMs / 1000}
@@ -49,13 +48,11 @@ function renderClipFadeFields(
             ? getAudioFadeLimitSeconds(selectedClip.duration)
             : Math.min(5, selectedClip.duration)
         }
-        scrubMax={Math.min(5, selectedClip.duration)}
-        scrubValue={selectedClip.fadeOutMs / 1000}
         step={0.05}
         onChange={(value) =>
           onUpdateClipFades(selectedClip.id, { fadeOutMs: Math.max(0, Math.round(value * 1000)) })
         }
-        formatValue={(value) => `${value.toFixed(2)} s`}
+        unit="s"
       />
     </div>
   );

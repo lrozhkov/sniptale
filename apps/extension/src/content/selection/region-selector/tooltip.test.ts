@@ -25,6 +25,52 @@ vi.mock('@sniptale/ui/content-size-tooltip/dom', () => ({
 import { createRegionSelectorTooltip as createTooltip } from './tooltip';
 
 const mounted: ReturnType<typeof createTooltip>[] = [];
+
+it('steps the real focused DOM field while preserving even paired dimensions and aspect lock', async () => {
+  const real = await vi.importActual<typeof import('@sniptale/ui/content-size-tooltip/dom')>(
+    '@sniptale/ui/content-size-tooltip/dom'
+  );
+  createContentSizeTooltipDomMock.mockImplementationOnce(real.createContentSizeTooltipDom);
+  let current = { x: 100, y: 100, width: 300, height: 300 };
+  let control: ReturnType<typeof createTooltip> | undefined;
+  const sync = () => {
+    if (control)
+      real.syncContentSizeTooltipValues({
+        tooltip: control,
+        width: current.width,
+        height: current.height,
+        maintainAspectRatio: true,
+      });
+  };
+  control = createRegionSelectorTooltip({
+    aspectRatioState: { maintainAspectRatio: true, aspectRatio: 1 },
+    getCurrentRegion: () => current,
+    mountInto: document.body,
+    onCancel: vi.fn(),
+    onConfirm: vi.fn(),
+    onRegionChange: (next) => {
+      current = next;
+      sync();
+    },
+  });
+  sync();
+  const input = control.widthInput;
+  act(() => input.focus());
+  const wheel = new WheelEvent('wheel', {
+    altKey: true,
+    bubbles: true,
+    cancelable: true,
+    deltaY: -120,
+  });
+  act(() => input.dispatchEvent(wheel));
+  expect(wheel.defaultPrevented).toBe(true);
+  expect(input.step).toBe('2');
+  expect(current.width).toBe(302);
+  expect(current.height).toBe(302);
+  expect(control.heightInput.value).toBe('302');
+  expect(document.activeElement).toBe(input);
+});
+
 function createRegionSelectorTooltip(args: Parameters<typeof createTooltip>[0]) {
   let tooltip: ReturnType<typeof createTooltip>;
   act(() => {

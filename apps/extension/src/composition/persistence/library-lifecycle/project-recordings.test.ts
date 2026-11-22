@@ -66,6 +66,7 @@ it('repairs existing linked recording drafts and keeps unrelated drafts temporar
     lifecycle: { storageClass: 'library', savedAt: 100 },
   });
   expect(values.get('media_library')?.get(media.id)).toMatchObject({
+    savedIndependently: false,
     lifecycle: { storageClass: 'library', savedAt: 100 },
   });
   expect(values.get('media_library')?.get(unrelated.id)).toEqual(unrelated);

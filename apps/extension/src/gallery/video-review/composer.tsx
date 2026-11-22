@@ -67,40 +67,43 @@ export function ReviewComposer(props: {
             props.onChange({ ...props.annotation, text });
           }}
           onSelect={voice.moveCaret}
-        />
-        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 px-2">
-          <VoiceInputButton
-            dataUi="gallery.videoReview.voice"
-            disabled={props.busy}
-            state={voice.state}
-            labels={{
-              start: translate('gallery.videoReview.voiceStart'),
-              stop: translate('gallery.videoReview.voiceStop'),
-              error: translate('gallery.videoReview.voiceError'),
-            }}
-            onStart={voice.start}
-            onStop={voice.stop}
-            onCancel={voice.cancel}
-          />
-          <div className="ml-auto flex items-center gap-1">
-            <ReviewButton
-              label={translate('gallery.videoReview.discard')}
+          accessoryPersistent={
+            voice.state.active || voice.state.pending || voice.state.errorCode !== null
+          }
+          accessory={
+            <VoiceInputButton
+              dataUi="gallery.videoReview.voice"
               disabled={props.busy}
-              onClick={() => {
-                voice.cancel();
-                props.onDiscard();
+              state={voice.state}
+              labels={{
+                start: translate('gallery.videoReview.voiceStart'),
+                stop: translate('gallery.videoReview.voiceStop'),
+                error: translate('gallery.videoReview.voiceError'),
               }}
+              onStart={voice.start}
+              onStop={voice.stop}
+              onCancel={voice.cancel}
             />
-            <ReviewButton
-              label={translate('gallery.videoReview.save')}
-              primary
-              disabled={props.busy || !props.annotation.text.trim()}
-              onClick={() => {
-                voice.cancel();
-                props.onSave();
-              }}
-            />
-          </div>
+          }
+        />
+        <div className="review-composer-actions flex min-w-0 flex-wrap items-center justify-end gap-1">
+          <ReviewButton
+            label={translate('gallery.videoReview.discard')}
+            disabled={props.busy}
+            onClick={() => {
+              voice.cancel();
+              props.onDiscard();
+            }}
+          />
+          <ReviewButton
+            label={translate('gallery.videoReview.save')}
+            primary
+            disabled={props.busy || !props.annotation.text.trim()}
+            onClick={() => {
+              voice.cancel();
+              props.onSave();
+            }}
+          />
         </div>
       </div>
       {props.annotation.region ? (

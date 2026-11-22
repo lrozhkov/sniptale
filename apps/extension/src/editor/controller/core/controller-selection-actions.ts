@@ -27,6 +27,8 @@ import {
   undoForController,
 } from '../instance/actions/selection';
 import { ImageEditorControllerLifecycleActions } from './controller-lifecycle-actions';
+import { readEditorHistoryEntries } from '../history';
+import { seekEditorControllerSnapshot } from '../public-api/document';
 
 export abstract class ImageEditorControllerSelectionActions extends ImageEditorControllerLifecycleActions {
   applyActiveSettingsToSelection() {
@@ -52,6 +54,15 @@ export abstract class ImageEditorControllerSelectionActions extends ImageEditorC
   async redo() {
     flushEditorFreehandCompletion(this.canvas);
     await redoForController(this.getControllerInstance());
+  }
+
+  getHistoryEntries() {
+    return readEditorHistoryEntries(this.history);
+  }
+
+  async seekHistory(index: number) {
+    flushEditorFreehandCompletion(this.canvas);
+    await seekEditorControllerSnapshot(this.getPublicApiAdapter(), index);
   }
 
   async resetToOriginal() {

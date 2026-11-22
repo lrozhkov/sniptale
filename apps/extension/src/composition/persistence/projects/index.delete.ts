@@ -9,7 +9,7 @@ import { retainVideoProjectRevisionInTransaction } from './revisions';
 import { captureDeletionInTransaction } from '../sync-capture/capture';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import {
-  collectProjectOwnedAssetIds,
+  collectProjectEntryOwnedAssetIds,
   deleteProjectAssetsUnreferencedByOtherProjects,
 } from './asset-references';
 import { createProjectDeletionStores } from './mutation-stores';
@@ -29,6 +29,19 @@ import {
   MediaAssetDeletionBlockedError,
   StaleMediaAssetDeletePreviewError,
 } from '../media-library/deletion-errors';
+import { removeEditorDocumentOwnership } from '../document-assets/ownership';
+import {
+  VIDEO_PROJECT_HISTORY_OWNER_KIND,
+  videoProjectHistoryAssetBindings,
+} from './history-contracts';
+import { ASSET_OWNERS_STORE, ASSET_REFS_STORE } from '../infrastructure/indexed-db/core.stores';
+import { readProjectSourceIds } from './new-reference-admission';
+import { createRecordingMediaId } from '../../../features/media-hub/media-id';
+
+interface DeletedVideoProject {
+  deletedProjectAssetIds: string[];
+  originalMediaIds: string[];
+}
 
 /** Delete an admitted project in the caller transaction without capture or transaction completion. */
 export async function deleteVideoProjectInTransaction(
@@ -37,8 +50,22 @@ export async function deleteVideoProjectInTransaction(
   operation: PhysicalDeleteAssetOperation
 ): Promise<string[]> {
   const projects = tx.objectStore(VIDEO_PROJECTS_STORE);
-  const existing = parseVideoProjectEntry(await projects.get(id));
-  const projectAssetIds = collectProjectOwnedAssetIds(existing?.project);
+  const raw: unknown = await projects.get(id);
+  const existing = parseVideoProjectEntry(raw);
+  if (raw !== undefined && (!existing || existing.id !== id))
+    throw new MediaAssetDeletionBlockedError('source-unavailable');
+  const projectAssetIds = collectProjectEntryOwnedAssetIds(existing);
+  if (existing?.history)
+    await removeEditorDocumentOwnership({
+      document: { assets: videoProjectHistoryAssetBindings(existing.history) },
+      ownerKind: VIDEO_PROJECT_HISTORY_OWNER_KIND,
+      ownerId: id,
+      physicalDelete: operation,
+      stores: {
+        owners: tx.objectStore(ASSET_OWNERS_STORE),
+        refs: tx.objectStore(ASSET_REFS_STORE),
+      },
+    });
   if (existing)
     await retainVideoProjectRevisionInTransaction(tx, id, existing.workspaceRevision ?? 0);
   await projects.delete(id);
@@ -46,7 +73,7 @@ export async function deleteVideoProjectInTransaction(
   return deleteProjectAssetsUnreferencedByOtherProjects({ tx, operation, projectAssetIds });
 }
 
-export async function deleteVideoProject(id: string): Promise<string[]> {
+export async function deleteVideoProject(id: string): Promise<DeletedVideoProject> {
   const db = await initDB();
   return runWithPersistenceMutationTransition((transitionPermit) =>
     runWithDurableAssetLifecycleLock(async (lifecyclePermit) => {
@@ -55,7 +82,7 @@ export async function deleteVideoProject(id: string): Promise<string[]> {
         const entry = parseVideoProjectEntry(raw);
         if (raw !== undefined && (!entry || entry.id !== id))
           throw new MediaAssetDeletionBlockedError('source-unavailable');
-        return [...new Set(collectProjectOwnedAssetIds(entry?.project))].sort();
+        return collectProjectEntryOwnedAssetIds(entry).sort();
       };
       let projectAssetIds = await readSelection();
       const recoverSelection = async () =>
@@ -77,16 +104,24 @@ export async function deleteVideoProject(id: string): Promise<string[]> {
       if (!claims.valid || claims.pending)
         throw new MediaAssetDeletionBlockedError('pending-publication');
       const physicalDelete = buildPhysicalDeleteOperation([]);
-      const deletedProjectAssetIds = await runWithIndexedDbMutation(async (db) => {
-        const { assetOperationStore, projectStore, tx } = createProjectDeletionStores(db);
+      const deleted = await runWithIndexedDbMutation(async (db) => {
+        const stores = createProjectDeletionStores(db);
+        const { assetOperationStore, projectStore, tx } = stores;
         try {
           const raw: unknown = await projectStore.get(id);
           const existing = parseVideoProjectEntry(raw);
           if (raw !== undefined && (!existing || existing.id !== id))
             throw new MediaAssetDeletionBlockedError('source-unavailable');
-          const currentIds = [...new Set(collectProjectOwnedAssetIds(existing?.project))].sort();
+          const currentIds = collectProjectEntryOwnedAssetIds(existing).sort();
           if (JSON.stringify(currentIds) !== JSON.stringify(projectAssetIds))
             throw new StaleMediaAssetDeletePreviewError();
+          const originalMediaIds = new Set<string>();
+          if (existing) {
+            const sources = await readProjectSourceIds(existing.project, stores, existing.history);
+            for (const mediaId of sources.mediaIds) originalMediaIds.add(mediaId);
+            for (const recordingId of sources.recordingIds)
+              originalMediaIds.add(createRecordingMediaId(recordingId));
+          }
           const deletedProjectAssetIds = await deleteVideoProjectInTransaction(
             tx,
             id,
@@ -95,7 +130,7 @@ export async function deleteVideoProject(id: string): Promise<string[]> {
           if (physicalDelete.assetIds.length > 0) await assetOperationStore.put(physicalDelete);
           if (existing) await captureDeletionInTransaction(tx, 'video-project', id);
           await tx.done;
-          return deletedProjectAssetIds;
+          return { deletedProjectAssetIds, originalMediaIds: [...originalMediaIds] };
         } catch (error) {
           try {
             tx.abort();
@@ -108,7 +143,7 @@ export async function deleteVideoProject(id: string): Promise<string[]> {
       });
       if (physicalDelete.assetIds.length > 0)
         await completePhysicalDeleteOperation(physicalDelete, lifecyclePermit);
-      return deletedProjectAssetIds;
+      return deleted;
     })
   );
 }

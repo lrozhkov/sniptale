@@ -1,6 +1,10 @@
-import { Download, Film, Library, Trash2, X, type LucideIcon } from 'lucide-react';
+import { Download, Film, Library, Trash2, X, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
+import type {
+  VideoPostRecordResult,
+  VideoRecordingInterruptionReason,
+} from '@sniptale/runtime-contracts/video/types/types';
+import { openGalleryPage } from '../../platform/navigation/extension-pages';
 import { translate } from '../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
@@ -22,6 +26,73 @@ const POST_RECORD_PANEL_CLASS = [
   'border border-[var(--sniptale-color-border-soft)]',
   'bg-[var(--sniptale-color-surface-panel)] p-4',
 ].join(' ');
+
+export function CameraRecordingFailurePanel({
+  reason,
+}: {
+  reason: VideoRecordingInterruptionReason;
+}) {
+  const [pending, setPending] = useState(false);
+  const [actionError, setActionError] = useState(false);
+  const opening = useRef(false);
+  const openLibrary = async () => {
+    if (opening.current) return;
+    opening.current = true;
+    setPending(true);
+    setActionError(false);
+    try {
+      await openGalleryPage({ folder: 'recording' });
+      window.close();
+    } catch {
+      setActionError(true);
+    } finally {
+      opening.current = false;
+      setPending(false);
+    }
+  };
+  return (
+    <main className={POST_RECORD_MAIN_CLASS} data-ui="camera-recorder.failure">
+      <section className={POST_RECORD_PANEL_CLASS} aria-labelledby="recording-failure-title">
+        <div role="alert" className="flex flex-col items-center gap-2 text-center">
+          <TriangleAlert
+            className="size-6 text-[var(--sniptale-color-danger)]"
+            aria-hidden="true"
+          />
+          <h1 id="recording-failure-title" className="m-0 text-[14px] leading-5 font-medium">
+            {translate('popup.video.recordingInterruptedTitle')}
+          </h1>
+          <p className="m-0 text-[14px] leading-5 text-[var(--sniptale-color-text-muted-strong)]">
+            {translate(
+              reason === 'audio-capacity'
+                ? 'popup.video.recordingInterruptedAudio'
+                : 'popup.video.recordingInterruptedUnknown'
+            )}
+          </p>
+          <p className="m-0 text-[14px] leading-5 text-[var(--sniptale-color-text-muted-strong)]">
+            {translate('popup.video.recordingInterruptedRecovery')}
+          </p>
+        </div>
+        <div className="flex flex-col gap-2" aria-busy={pending}>
+          <CameraPostRecordOpenButton
+            icon={Library}
+            disabled={pending}
+            label={translate('popup.video.postRecordOpenGallery')}
+            onClick={() => void openLibrary()}
+          />
+          <ProductActionButton tone="secondary" compact onClick={() => window.close()}>
+            <X className="size-4 shrink-0" aria-hidden="true" />
+            {translate('popup.video.postRecordClose')}
+          </ProductActionButton>
+        </div>
+        {actionError ? (
+          <p role="alert" className="m-0 text-[14px] leading-5 text-[var(--sniptale-color-danger)]">
+            {translate('popup.video.postRecordActionError')}
+          </p>
+        ) : null}
+      </section>
+    </main>
+  );
+}
 
 export function CameraPostRecordPanel({
   onAcknowledge,

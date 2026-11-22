@@ -89,6 +89,28 @@ it('shows only All for a confirmed empty library and places headings before late
   expect(container?.textContent).toContain(translate('gallery.preview.materialsHeading'));
 });
 
+it('puts Image projects under Projects and Images under Originals', () => {
+  const onFolderFilterChange = vi.fn();
+  renderList({
+    counts: { ...EMPTY_COUNTS, all: 2, 'image-project': 1, screenshot: 1 },
+    onFolderFilterChange,
+  });
+  const text = container?.textContent ?? '';
+  const project = translate('gallery.preview.folderImageProject');
+  const original = translate('gallery.preview.folderScreenshot');
+  expect(text.indexOf(translate('gallery.preview.projectsHeading'))).toBeLessThan(
+    text.indexOf(project)
+  );
+  expect(text.indexOf(project)).toBeLessThan(
+    text.indexOf(translate('gallery.preview.materialsHeading'))
+  );
+  expect(text.indexOf(translate('gallery.preview.materialsHeading'))).toBeLessThan(
+    text.indexOf(original)
+  );
+  act(() => folderButton(project)?.click());
+  expect(onFolderFilterChange).toHaveBeenCalledExactlyOnceWith('image-project');
+});
+
 it('keeps the same unknown-count skeleton through initial error and retry', () => {
   renderList({ countsKnown: false, countsLoading: true });
   const placeholder = container?.querySelector('[data-ui="gallery.sidebar.folderLoading"]');

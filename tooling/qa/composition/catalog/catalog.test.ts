@@ -162,7 +162,7 @@ describe('canonical QA control catalog', () => {
       });
     }
     expect(focused.find(({ lane }) => lane === 'light')?.resources.memoryMiB).toBe(1024);
-    expect(full.find(({ lane }) => lane === 'light')?.resources.memoryMiB).toBe(3072);
+    expect(full.find(({ lane }) => lane === 'light')?.resources.memoryMiB).toBe(5120);
     for (const profile of [...focused, ...full]) {
       expect(profile.controls.length, profile.lane).toBeGreaterThan(0);
       expect(profile.resources.memoryMiB, profile.lane).toBeGreaterThan(0);

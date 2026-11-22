@@ -63,11 +63,12 @@ describe('design reference server boundary', () => {
     expect((await get(port, '/docs/design/index.md', 'POST')).status).toBe(405);
   });
 
-  it('serves only the two canonical UI styles and reflects source changes', async () => {
+  it('serves only the canonical UI styles and reflects source changes', async () => {
     const { root, port } = await fixture();
     for (const resource of [
       '/packages/ui/src/styles/design-tokens.css',
       '/packages/ui/src/styles/product-form-controls/range.css',
+      '/packages/ui/src/styles/product-form-controls/segments.css',
     ]) {
       const source = join(root, resource.slice(1));
       await mkdir(dirname(source), { recursive: true });

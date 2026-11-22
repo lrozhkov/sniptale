@@ -167,6 +167,27 @@ for (const locale of ['en', 'ru'] as const) {
       const editor = page.getByRole('textbox', { name: tr(c, 'popup.video.teleprompterScript') });
       await expect(command(page, c, 'popup.video.teleprompterRead')).toBeDisabled();
       await editor.fill(script);
+      await editor.hover();
+      await capture(page, info, 'teleprompter-script-overflow');
+      await expect
+        .poll(() =>
+          editor.evaluate((node) => ({
+            width: getComputedStyle(node, '::-webkit-scrollbar').width,
+            cursor: getComputedStyle(node, '::-webkit-scrollbar-thumb').cursor,
+            corner: getComputedStyle(node, '::-webkit-scrollbar-corner').backgroundColor,
+          }))
+        )
+        .toEqual({ width: '6px', cursor: 'default', corner: 'rgba(0, 0, 0, 0)' });
+      await editor.evaluate((node) => (node.scrollTop = 0));
+      await page.mouse.wheel(0, 150);
+      await expect.poll(() => editor.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+      const clearScript = page.locator('.sniptale-field-clear');
+      await expect(clearScript).toHaveCSS('width', '24px');
+      await clearScript.click();
+      await expect(editor).toHaveValue('');
+      await expect(editor).toBeFocused();
+      await expect(command(page, c, 'popup.video.teleprompterRead')).toBeDisabled();
+      await editor.fill(script);
       await command(page, c, 'popup.video.teleprompterRead').click();
       const reader = page.getByRole('region', {
         name: tr(c, 'popup.video.teleprompterScript'),
@@ -292,6 +313,13 @@ for (const locale of ['en', 'ru'] as const) {
         await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
         const suffix = theme === 'light' ? '-light' : '';
         await page.setViewportSize(size);
+        if (theme === 'light' && size.width === 1920) {
+          await command(page, c, 'popup.video.teleprompterEdit').click();
+          await editor.hover();
+          await expect(clearScript).toHaveCSS('opacity', '1');
+          await capture(page, info, 'teleprompter-script-overflow-light-1920x900');
+          await command(page, c, 'popup.video.teleprompterRead').click();
+        }
         await command(page, c, 'popup.video.teleprompterReset').click();
         await expect(reader).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
@@ -395,6 +423,19 @@ for (const locale of ['en', 'ru'] as const) {
         await capture(pip, info, 'teleprompter-floating-settings-480x640');
         await pip.keyboard.press('Escape');
         await expect(pip.getByRole('slider')).toHaveCount(0);
+        await command(pip, c, 'popup.video.teleprompterEdit').click();
+        const floatingEditor = pip.getByRole('textbox', {
+          name: tr(c, 'popup.video.teleprompterScript'),
+        });
+        const updatedScript = `${script}\nFinal line added after reading.`;
+        await expect(floatingEditor).toHaveValue(updatedScript);
+        await floatingEditor.hover();
+        await pip.locator('.sniptale-field-clear').click();
+        await expect(floatingEditor).toHaveValue('');
+        await expect(floatingEditor).toBeFocused();
+        await floatingEditor.fill(updatedScript);
+        await capture(pip, info, 'teleprompter-floating-script-overflow');
+        await command(pip, c, 'popup.video.teleprompterRead').click();
         await pip.close();
         await expect(reader).toContainText('Final line added after reading.');
         await expect(floating).toBeEnabled();

@@ -1,5 +1,5 @@
 import { expect, test } from '../support/extension-fixture';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 for (const viewport of [
   { width: 1280, height: 560 },

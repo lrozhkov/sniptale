@@ -9,6 +9,7 @@ import type { EditorDocument } from '../../features/editor/document/types';
 interface PromoteEditorImageToLibraryPort {
   saveNow: (serialize: () => EditorDocument) => Promise<void>;
   getDurableRevision: () => number | null;
+  getSourceGeneration: () => string | null;
   serializeDocument: () => EditorDocument;
   renderPresentation: () => Promise<string>;
 }
@@ -22,13 +23,15 @@ export async function promoteEditorImageToLibrary(args: {
   if (revision === null) {
     throw new Error('Image workspace revision is unavailable.');
   }
+  const generation = args.port.getSourceGeneration();
 
   const previewBlob = await dataUrlToBlob(await args.port.renderPresentation());
   await commitImagePresentation({
     aggregateId: args.aggregateId,
     expectedWorkspaceRevision: revision,
+    expectedGeneration: generation,
     previewBlob,
     thumbnailBlob: await createImageThumbnailBlob(previewBlob),
   });
-  await promoteImageAggregate(args.aggregateId, revision);
+  await promoteImageAggregate(args.aggregateId, revision, generation);
 }

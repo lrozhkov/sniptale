@@ -1,4 +1,8 @@
 import { isPortableRecordingEventsAttachment } from '../media-hub-backup/v6/root-codecs/recording-events';
+import {
+  isCaptureRootKind,
+  type CaptureRootKind,
+} from '../../composition/persistence/sync-capture/checkpoint-contracts';
 import { portableSyncRootDependencyIds } from './prepared-scenario';
 import {
   captureProfileBounds,
@@ -9,7 +13,10 @@ import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseBoundedJson } from '../media-hub-backup/v6/codec';
 import type { MediaHubBackupRootEnvelope } from '../media-hub-backup/v6/contracts';
 import { parsePortableSyncRoot, portableSyncDependencyIds } from './prepared-root';
-import { hasCursorAttachmentMetadata } from '../media-hub-backup/v6/layout';
+import {
+  hasCursorAttachmentMetadata,
+  hasImageHistoryMetadata,
+} from '../media-hub-backup/v6/layout';
 import { isPortableCursorTrajectoryAttachment } from '../media-hub-backup/v6/root-codecs/cursor-trajectory';
 
 const MAX_TEXT_BYTES = 4 * 1024 * 1024;
@@ -18,10 +25,10 @@ const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/u;
 /** Logical changes contain portable metadata and hashes, never native file locations. */
 interface SyncOperation {
   format: 'sniptale-sync-operation';
-  version: 1 | 2;
+  version: 1 | 2 | 3 | 4;
   spaceId: string;
   operationId: string;
-  rootKind: 'media' | 'video-project' | 'video-review' | 'scenario-project';
+  rootKind: CaptureRootKind;
   rootId: string;
   reviewSourceMediaId?: string;
   kind: 'edit' | 'restore' | 'delete';
@@ -33,7 +40,18 @@ interface SyncOperation {
 }
 
 /** History-bearing roots require a reader that understands their typed attachment inventory. */
-export function syncOperationVersionForRoot(envelope: MediaHubBackupRootEnvelope | null): 1 | 2 {
+export function syncOperationVersionForRoot(
+  envelope: MediaHubBackupRootEnvelope | null,
+  rootKind?: CaptureRootKind
+): SyncOperation['version'] {
+  if (
+    rootKind === 'image-project' ||
+    (envelope &&
+      isRecord(envelope.metadata) &&
+      ('savedIndependently' in envelope.metadata || 'linkedSourceMediaId' in envelope.metadata))
+  )
+    return 4;
+  if (envelope && hasImageHistoryMetadata(envelope.metadata)) return 3;
   return envelope && hasCursorAttachmentMetadata(envelope.metadata) ? 2 : 1;
 }
 
@@ -137,15 +155,13 @@ export async function parseSyncOperationText(text: string): Promise<SyncOperatio
   ]);
   check(
     value['format'] === 'sniptale-sync-operation' &&
-      (value['version'] === 1 || value['version'] === 2)
+      (value['version'] === 1 ||
+        value['version'] === 2 ||
+        value['version'] === 3 ||
+        value['version'] === 4)
   );
   check(identity(value['spaceId']) && identity(value['operationId']) && identity(value['rootId']));
-  check(
-    value['rootKind'] === 'media' ||
-      value['rootKind'] === 'video-project' ||
-      value['rootKind'] === 'video-review' ||
-      value['rootKind'] === 'scenario-project'
-  );
+  check(isCaptureRootKind(value['rootKind']));
   check(value['kind'] === 'edit' || value['kind'] === 'restore' || value['kind'] === 'delete');
   const hasReviewSource = 'reviewSourceMediaId' in value;
   check(hasReviewSource === (value['rootKind'] === 'video-review' && value['kind'] !== 'delete'));
@@ -161,7 +177,7 @@ export async function parseSyncOperationText(text: string): Promise<SyncOperatio
       ? null
       : await parsePortableSyncRoot(value['envelope'], reviewSourceMediaId);
   const envelope = portable?.envelope ?? null;
-  const version = syncOperationVersionForRoot(envelope);
+  const version = syncOperationVersionForRoot(envelope, value['rootKind']);
   check(value['version'] === version);
   const recording = envelope && isRecord(envelope.metadata) ? envelope.metadata['recording'] : null;
   if (isRecord(recording) && recording['cursorAttachment'] !== undefined) {
@@ -196,7 +212,9 @@ export async function parseSyncOperationText(text: string): Promise<SyncOperatio
       envelope &&
         (portable?.kind === 'video-review'
           ? value['rootKind'] === 'video-review'
-          : envelope.descriptor.rootKind === value['rootKind']) &&
+          : portable?.kind === 'image' && portable.metadata.linkedSourceMediaId
+            ? value['rootKind'] === 'image-project'
+            : envelope.descriptor.rootKind === value['rootKind']) &&
         envelope.descriptor.rootId === value['rootId']
     );
     check(

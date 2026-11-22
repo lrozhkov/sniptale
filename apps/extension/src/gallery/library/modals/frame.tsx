@@ -17,7 +17,11 @@ export function GalleryModalFrame(props: GalleryModalFrameProps) {
       onClose={props.onClose}
       maxHeight="calc(100vh - 40px)"
       scrollable
-      dialogClassName={['sniptale-compact-workspace', props.maxWidthClassName, props.panelClassName]
+      dialogClassName={[
+        'sniptale-compact-workspace gallery-library-modal',
+        props.maxWidthClassName,
+        props.panelClassName,
+      ]
         .filter(Boolean)
         .join(' ')}
     >

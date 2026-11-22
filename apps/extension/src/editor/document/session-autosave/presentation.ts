@@ -27,6 +27,7 @@ function isCurrentPresentation(
     !state.hydration &&
     state.contextGeneration === contextGeneration &&
     state.activeContext?.aggregateId === context.aggregateId &&
+    (state.activeContext?.sourceGeneration ?? null) === (context.sourceGeneration ?? null) &&
     state.activeContext.durableRevision === revision &&
     state.autosaveRevision === editRevision &&
     state.pendingDocument === null
@@ -59,6 +60,7 @@ async function updateImagePresentation(
     await commitImagePresentation({
       aggregateId: context.aggregateId,
       expectedWorkspaceRevision: revision,
+      expectedGeneration: context.sourceGeneration ?? null,
       previewBlob,
       thumbnailBlob,
     });

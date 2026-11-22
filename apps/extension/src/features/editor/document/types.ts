@@ -211,6 +211,8 @@ export interface EditorViewportState {
 }
 
 export interface EditorHistoryState {
+  /** Owner revision, including entry changes that leave a capped cursor and size unchanged. */
+  revision?: number;
   canUndo: boolean;
   canRedo: boolean;
   index: number;

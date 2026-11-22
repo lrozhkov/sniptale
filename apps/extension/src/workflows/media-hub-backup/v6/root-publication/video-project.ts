@@ -1,6 +1,5 @@
 import { captureVideoProjectInTransaction } from '../../../../composition/persistence/sync-capture/capture';
-import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../../features/video/project/effect-instance/integrity';
-import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { SCENARIO_CAPTURE_STORES } from '../../../../composition/persistence/sync-capture/scenario-snapshot';
 import { verifyPreparedMediaReviewAnnotations } from './media-review-assets';
 import { createVideoWorkspaceStore } from '../../../../composition/persistence/review-workspaces/storage';
 import {
@@ -8,8 +7,12 @@ import {
   SYNC_CAPTURE_STORE,
   SYNC_OUTBOX_STORE,
   STORE_NAME,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   IMAGE_WORKSPACES_STORE,
   SCENARIO_ASSETS_STORE,
+  SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import {
   restoredOriginMediaId,
@@ -46,7 +49,6 @@ import { runWithIndexedDbMutation } from '../../../../composition/persistence/in
 import { putVideoProjectBackupRestore } from '../../../../composition/persistence/projects/backup-restore';
 import { parseVideoProjectEntry } from '../../../../composition/persistence/projects/read-guards';
 import {
-  decodePortableVideoProjectAssetRefs,
   preparePortableVideoProjectAsset,
   preparePortableVideoProjectExport,
   parsePortableVideoProjectMetadata,
@@ -56,8 +58,15 @@ import type { StagedArchiveObject } from '../staging';
 import { rebaseTemporaryLifecycle } from '../restore-lifecycle';
 import { preparePortableAggregatePresentation } from './presentation';
 import { transformPortableVideoProjectReferences } from './video-project-references';
+import {
+  prepareVideoProjectHistoryStaged,
+  readPortableVideoProjectCurrent,
+  readPortableVideoProjectHistory,
+  restoredHistoryProjectAssetIds,
+} from './video-project-history';
 
 const VIDEO_PROJECT_RESTORE_STORES = [
+  ...SCENARIO_CAPTURE_STORES,
   VIDEO_PROJECT_REVISIONS_STORE,
   SYNC_CAPTURE_STORE,
   SYNC_OUTBOX_STORE,
@@ -75,8 +84,12 @@ const VIDEO_PROJECT_RESTORE_STORES = [
   ASSET_REFS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_OPERATIONS_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   IMAGE_WORKSPACES_STORE,
   SCENARIO_ASSETS_STORE,
+  SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
 ] as const;
 
 function newId() {
@@ -97,6 +110,7 @@ function required(staged: ReadonlyMap<string, StagedArchiveObject>, objectId: st
 
 export const videoProjectRootPublisher: ArchiveRootPublisher = {
   profile: 'video-project',
+  prepareStaged: prepareVideoProjectHistoryStaged,
   async checkpointSkipIfExisting({ envelope, session }) {
     const metadata = parsePortableVideoProjectMetadata(envelope.metadata);
     return runWithIndexedDbMutation(async (db) => {
@@ -122,16 +136,18 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
   async publish({ envelope, session, staged, lifecyclePermit }) {
     const metadata = parsePortableVideoProjectMetadata(envelope.metadata);
     const objects = stagedMap(staged);
-    const assetIdMap = new Map(
-      metadata.projectAssets.map((asset) => [
-        asset.entry.id,
-        asset.libraryMediaId
-          ? restoredProjectMediaId(asset.libraryMediaId, session.rootIdMap, 'project-asset:')
-          : session.strategy === 'duplicate'
-            ? newId()
-            : asset.entry.id,
-      ])
-    );
+    const assetIdMap = metadata.history
+      ? restoredHistoryProjectAssetIds(metadata, staged, session)
+      : new Map(
+          metadata.projectAssets.map((asset) => [
+            asset.entry.id,
+            asset.libraryMediaId
+              ? restoredProjectMediaId(asset.libraryMediaId, session.rootIdMap, 'project-asset:')
+              : session.strategy === 'duplicate'
+                ? newId()
+                : asset.entry.id,
+          ])
+        );
     const exportIdMap = new Map(
       metadata.projectExports.map((item) => [
         item.entry.id,
@@ -142,35 +158,19 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
             : item.entry.id,
       ])
     );
-    const snapshots = await Promise.all(
-      (metadata.entry.project.effectSnapshots ?? []).map(async (snapshot) => ({
-        ...snapshot,
-        assets: await Promise.all(
-          snapshot.assets.map(async ({ objectId, ...asset }) => {
-            const file = await readAssetFile(required(objects, objectId).ref, asset.id);
-            return {
-              ...asset,
-              // Restore cleanup removes the staging file after publication.
-              blob: new Blob([await file.arrayBuffer()], { type: file.type }),
-            };
-          })
-        ),
-      }))
-    );
-    const decodedProject = decodePortableVideoProjectAssetRefs(metadata.entry.project);
-    if (!isRecord(decodedProject)) throw new Error('Restored video project metadata is invalid.');
-    const portableEntry = parseVideoProjectEntry({
-      ...metadata.entry,
-      project: { ...decodedProject, effectSnapshots: snapshots },
-    });
-    if (!portableEntry) throw new Error('Restored video project metadata is invalid.');
-    await verifyVideoProjectEffectSnapshotIntegrity(portableEntry.project);
+    const portableEntry = await readPortableVideoProjectCurrent(metadata, staged);
     const transformedProject = transformPortableVideoProjectReferences(
       portableEntry.project,
       assetIdMap,
       session.rootIdMap,
       session.childIdMap
     );
+    const history = await readPortableVideoProjectHistory({
+      metadata,
+      staged,
+      current: transformedProject,
+      restored: { assetIds: assetIdMap, session },
+    });
     const sourceExists = await runWithIndexedDbMutation(async (db) =>
       Boolean(await db.get(VIDEO_PROJECTS_STORE, metadata.entry.id))
     );
@@ -181,6 +181,7 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
       ...rebaseTemporaryLifecycle(metadata.entry),
       id: targetProjectId,
       project: { ...transformedProject, id: targetProjectId },
+      ...(history ? { history: history.history } : {}),
     });
     if (!entry) throw new Error('Restored video project metadata is invalid.');
     const assets = await prepareProjectAssets(metadata, objects, assetIdMap, session.rootIdMap);
@@ -269,10 +270,12 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
             assets,
             entry,
             exports,
+            ...(history ? { historyRefs: history.refs } : {}),
             ...(presentation ? { presentation } : {}),
             ...(thumbnail ? { thumbnail } : {}),
           },
           stores: {
+            imageIdentities: tx.objectStore(IMAGE_WORKSPACE_IDENTITIES_STORE),
             assets: tx.objectStore(PROJECT_ASSETS_STORE),
             exports: tx.objectStore(PROJECT_EXPORTS_STORE),
             media: tx.objectStore(MEDIA_LIBRARY_STORE),
@@ -323,6 +326,7 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
       retainedAssetIds: [
         ...(imported ? assets.map((asset) => asset.ref.assetId) : []),
         ...(imported ? exports.map((item) => item.ref.assetId) : []),
+        ...(imported && history ? history.refs.map((ref) => ref.assetId) : []),
       ],
     };
   },

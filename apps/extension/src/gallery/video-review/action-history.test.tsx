@@ -234,7 +234,9 @@ it('keeps batch edits explicit across filters, mixed fields and event navigation
     );
   const change = (key: string, value: string) =>
     act(() => {
-      const node = host.querySelector<HTMLElement>(`[aria-label="gallery.videoReview.${key}"]`)!;
+      const node = host.querySelector<HTMLElement>(
+        `[aria-label="gallery.videoReview.${key}"]:not([role="tab"])`
+      )!;
       if (!(node instanceof HTMLInputElement) && !(node instanceof HTMLSelectElement)) {
         const option = [...node.querySelectorAll<HTMLButtonElement>('button')].find(
           (button) => button.textContent === `gallery.videoReview.click_${value}`
@@ -267,6 +269,7 @@ it('keeps batch edits explicit across filters, mixed fields and event navigation
     expect(host.textContent).toContain('gallery.videoReview.historyHiddenSelected');
     click('historySelectAll');
     click('historyConfigure');
+    expect(host.querySelector('[data-section="click:animation"]')).not.toBeNull();
     change('clickEffect', 'ripple');
     expect(onChange).toHaveBeenLastCalledWith(['c0'], { effect: 'ripple' });
     click('historyBack');
@@ -291,6 +294,7 @@ it('keeps batch edits explicit across filters, mixed fields and event navigation
     expect(host.querySelector('[data-ui="gallery.videoReview.clickFields"]')).toBeNull();
     click('historyConfigure');
     expect(host.querySelector('ol')).toBeNull();
+    expect(host.querySelector('[data-section="click:animation"]')).not.toBeNull();
     change('clickEffect', 'ripple');
     expect(onChange).toHaveBeenLastCalledWith(
       markers.map((m) => m.ref.id),
@@ -298,15 +302,31 @@ it('keeps batch edits explicit across filters, mixed fields and event navigation
     );
     render(true);
     expect(host.textContent).toContain('gallery.videoReview.clickMixed');
+    act(() =>
+      host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-click:timing"]')!.click()
+    );
     change('clickBefore', '50');
     expect(onChange).toHaveBeenLastCalledWith(expect.any(Array), { before: 0.05 });
+    act(() =>
+      host
+        .querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-click:position"]')!
+        .click()
+    );
     change('clickX', '10');
     expect(onChange).toHaveBeenLastCalledWith(expect.any(Array), { x: 0.1 });
+    act(() =>
+      host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-click:timing"]')!.click()
+    );
     change('clickEasing', 'linear');
     expect(onChange).toHaveBeenLastCalledWith(expect.any(Array), { easing: 'linear' });
+    act(() =>
+      host
+        .querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-click:appearance"]')!
+        .click()
+    );
     change('clickColor', '#00ff00');
     expect(onChange).toHaveBeenLastCalledWith(expect.any(Array), { color: '#00ff00', opacity: 1 });
-    click('clickReset');
+    click('selectionReset');
     expect(onChange).toHaveBeenLastCalledWith(expect.any(Array), null);
     click('historyBack');
     expect(host.querySelectorAll('li')).toHaveLength(57);
@@ -416,6 +436,9 @@ it('keeps legacy transparency visible in the color field and removes its multipl
           onChange={change}
         />
       )
+    );
+    act(() =>
+      host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-appearance"]')!.click()
     );
     const color = host.querySelector<HTMLInputElement>(
       '[aria-label="gallery.videoReview.clickColor"]'
@@ -549,24 +572,37 @@ it('configures recorded keys without pointer locations, separately from selected
     );
     expect(host.textContent).toContain('gallery.videoReview.historyClicks');
     expect(host.textContent).toContain('gallery.videoReview.historyKeys');
-    const sectionIcon = (id: string) =>
-      host.querySelector(`[data-section="${id}"] > details > summary > svg:first-child`);
-    expect(sectionIcon('click:animation')?.classList.contains('lucide-mouse-pointer-2')).toBe(true);
-    expect(sectionIcon('key:display')?.classList.contains('lucide-keyboard')).toBe(true);
-    for (const group of ['appearance', 'timing', 'position', 'actions']) {
-      expect(sectionIcon(`click:${group}`)).not.toBeNull();
-      expect(sectionIcon(`key:${group}`)).toBeNull();
+    const sectionTab = (id: string) =>
+      host.querySelector<HTMLButtonElement>(`[role="tab"][aria-controls$="-${id}"]`)!;
+    expect(
+      sectionTab('click:animation').querySelector('svg')?.classList.contains('lucide-waves')
+    ).toBe(true);
+    expect(
+      sectionTab('key:display').querySelector('svg')?.classList.contains('lucide-keyboard')
+    ).toBe(true);
+    for (const group of ['appearance', 'timing', 'position']) {
+      expect(sectionTab(`click:${group}`)).not.toBeNull();
+      expect(sectionTab(`key:${group}`)).not.toBeNull();
     }
-    const icons = Array.from(
-      host.querySelectorAll('[data-section] > details > summary > svg:first-child')
-    ).map((icon) => icon.getAttribute('class'));
-    expect(new Set(icons).size).toBe(icons.length);
+    expect(sectionTab('click:actions')).toBeNull();
+    expect(sectionTab('key:actions')).toBeNull();
+    expect(host.querySelectorAll('[role="tabpanel"]')).toHaveLength(1);
+    act(() => sectionTab('key:display').click());
     const display = host.querySelector('[aria-label="gallery.videoReview.keyDisplay"]')!;
     act(() =>
       display.querySelector<HTMLButtonElement>('[title="gallery.videoReview.keyCaption"]')!.click()
     );
     expect(onKeyChange).toHaveBeenCalledExactlyOnceWith(['key'], { enabled: true });
     expect(onChange).not.toHaveBeenCalled();
+    act(() =>
+      host
+        .querySelector<HTMLButtonElement>(
+          '[data-section="actions"] [aria-label="gallery.videoReview.selectionReset"]'
+        )!
+        .click()
+    );
+    expect(onKeyChange).toHaveBeenLastCalledWith(['key'], null);
+    expect(onChange).toHaveBeenCalledExactlyOnceWith(['click'], null);
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { startHostServer } from '../support/host-server';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 for (const variant of [
   { width: 1280, height: 560, theme: 'dark', locale: 'ru' },

@@ -266,21 +266,16 @@ describe('unified Gallery deletion requests', () => {
     ]);
     expect(deleteMediaLibraryAssetsBatchSafelyMock).not.toHaveBeenCalled();
   });
-  it('warns about secondary references before explicitly confirmed permanent deletion', async () => {
+  it('refuses permanent deletion while a project outside the selection uses the file', async () => {
     const usage = { id: 'video-1', kind: 'video' as const, name: 'Montage', primary: false };
     listMediaAssetProjectUsageBatchMock.mockResolvedValueOnce(new Map([['asset-1', [usage]]]));
     const { controller } = createController();
     const media = createMediaItem({ entityId: 'asset-1' });
     await createDeleteManyAction(controller)([media], runBusyAction);
     const prepared = await controller.state.storage.deletionRequest!.preparePermanent();
-    expect(prepared?.warning).toContain('Montage');
+    expect(prepared).toMatchObject({ warning: expect.stringContaining('Montage'), confirm: null });
     expect(deleteMediaLibraryAssetsBatchSafelyMock).not.toHaveBeenCalled();
     expect(moveLibraryItemsToTrashMock).not.toHaveBeenCalled();
-    await prepared!.confirm();
-    expect(deleteMediaLibraryAssetsBatchSafelyMock).toHaveBeenCalledWith(
-      ['asset-1'],
-      new Map([['asset-1', [usage]]])
-    );
   });
   it('blocks primary dependencies outside a confirmed bulk selection before any deletion', async () => {
     listMediaAssetProjectUsageBatchMock.mockResolvedValueOnce(
@@ -302,9 +297,9 @@ describe('unified Gallery deletion requests', () => {
       ],
       runBusyAction
     );
-    await expect(controller.state.storage.deletionRequest!.preparePermanent()).rejects.toThrow(
-      'Outside'
-    );
+    const prepared = await controller.state.storage.deletionRequest!.preparePermanent();
+    expect(prepared).toMatchObject({ warning: expect.stringContaining('Outside'), confirm: null });
+    expect(prepared?.warning).not.toContain('Included');
     expect(deletePersistedVideoProjectMock).not.toHaveBeenCalled();
     expect(deleteMediaLibraryAssetsBatchSafelyMock).not.toHaveBeenCalled();
   });
@@ -322,7 +317,7 @@ describe('unified Gallery deletion requests', () => {
     await createDeleteManyAction(controller)(selected, runBusyAction);
     expect(controller.state.storage.deletionRequest!.moveToTrash).toBeNull();
     const prepared = await controller.state.storage.deletionRequest!.preparePermanent();
-    await prepared!.confirm();
+    await prepared!.confirm!();
     expect(deleteScenarioProjectRecordMock).toHaveBeenCalledWith('guide');
     expect(deletePersistedVideoProjectMock).toHaveBeenCalledWith('primary');
     expect(deleteMediaLibraryAssetsBatchSafelyMock).toHaveBeenCalledWith(
@@ -353,7 +348,7 @@ describe('unified Gallery deletion requests', () => {
     await createDeleteManyAction(controller)([item], runBusyAction);
     const prepared = await controller.state.storage.deletionRequest!.preparePermanent();
     controller.state.selection.selectedItems = [createMediaItem({ id: 'second' })];
-    expect(await prepared!.confirm()).toBe(false);
+    expect(await prepared!.confirm!()).toBe(false);
     expect(deleteMediaLibraryAssetsBatchSafelyMock).not.toHaveBeenCalled();
   });
 });
@@ -364,7 +359,7 @@ it('discards prepared deletion after closing the choice even if the selection st
   await createDeleteManyAction(controller)([createMediaItem()], runBusyAction);
   const prepared = await controller.state.storage.deletionRequest!.preparePermanent();
   controller.actions.surface.setDeletionRequest(null);
-  expect(await prepared!.confirm()).toBe(false);
+  expect(await prepared!.confirm!()).toBe(false);
   expect(deleteMediaLibraryAssetsBatchSafelyMock).not.toHaveBeenCalled();
 });
 
@@ -380,7 +375,7 @@ it('refreshes actual committed state after a later bulk deletion fails', async (
     runBusyAction
   );
   const prepared = await controller.state.storage.deletionRequest!.preparePermanent();
-  await expect(prepared!.confirm()).rejects.toThrow('media failed');
+  await expect(prepared!.confirm!()).rejects.toThrow('media failed');
   expect(deleteScenarioProjectRecordMock).toHaveBeenCalledWith('committed-guide');
   expect(controller.actions.storage.refresh).toHaveBeenCalledOnce();
 });
@@ -390,7 +385,7 @@ it('deletes a selected export independently and subsumes catalogue children in a
   const item = createScenarioExportItem();
   const { controller } = createController();
   await createDeleteManyAction(controller)([item], runBusyAction);
-  await (await controller.state.storage.deletionRequest!.preparePermanent())!.confirm();
+  await (await controller.state.storage.deletionRequest!.preparePermanent())!.confirm!();
   expect(deleteExportMock).toHaveBeenCalledExactlyOnceWith(item.entityId);
   expect(deleteScenarioProjectRecordMock).not.toHaveBeenCalled();
   vi.clearAllMocks();
@@ -398,7 +393,7 @@ it('deletes a selected export independently and subsumes catalogue children in a
     [item, createScenarioItem({ entityId: item.project.id })],
     runBusyAction
   );
-  await (await controller.state.storage.deletionRequest!.preparePermanent())!.confirm();
+  await (await controller.state.storage.deletionRequest!.preparePermanent())!.confirm!();
   expect(deleteScenarioProjectRecordMock).toHaveBeenCalledExactlyOnceWith(item.project.id);
   expect(deleteExportMock).not.toHaveBeenCalled();
 });
@@ -440,7 +435,7 @@ it.each([false, true])('routes quick-edit commands independently (mixed=%s)', as
   );
   await createDeleteManyAction(controller)(targets, runBusyAction);
   const prepared = await controller.state.storage.deletionRequest!.preparePermanent();
-  await prepared!.confirm();
+  await prepared!.confirm!();
   expect(deleteQuickEditMock).toHaveBeenCalledExactlyOnceWith({
     kind: 'quick-edit-project',
     id: 'source',

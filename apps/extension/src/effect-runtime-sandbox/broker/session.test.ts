@@ -12,7 +12,8 @@ import {
 import { createAnimationDocument } from './request-boundary.test-support';
 import { EffectRuntimePreparationError } from './prepare-frame';
 import { createEffectRuntimeBrokerSession } from './session';
-import type { EffectRuntimeWorkerLike } from './worker-request';
+import type { EffectRuntimeWorkerLike } from './worker-startup';
+import { finishWorkerStartupOnFirstListener } from './worker.test-support';
 
 class FakeBitmap implements ImageBitmap {
   readonly close = vi.fn();
@@ -27,6 +28,9 @@ class ReplyWorker implements EffectRuntimeWorkerLike {
   onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
   onmessageerror: ((event: MessageEvent<unknown>) => void) | null = null;
   readonly terminate = vi.fn();
+  constructor(ready = true) {
+    if (ready) finishWorkerStartupOnFirstListener(this);
+  }
   postMessage(): void {
     const request = createWorkerRequest();
     this.onmessage?.(
@@ -294,8 +298,8 @@ it.each([undefined, 'gpu-scene', 'gpu-scene-plan'] as const)(
   }
 );
 
-it('does not charge an idle GPU worker failure to request or failure admission', () => {
-  const worker = new ReplyWorker();
+it('retains idle GPU startup refusal without admitting or charging a frame', () => {
+  const worker = new ReplyWorker(false);
   const session = createEffectRuntimeBrokerSession({
     compositionBackend: 'gpu-scene',
     workerFactory: () => worker,
@@ -305,8 +309,31 @@ it('does not charge an idle GPU worker failure to request or failure admission',
   expect(session.snapshot()).toEqual({
     activeRequests: 0,
     consecutiveFailures: 0,
-    circuitOpen: false,
+    circuitOpen: true,
   });
+});
+
+it('retains worker constructor refusal across broker frames while a new broker can recover', async () => {
+  const workerFactory = vi.fn(() => {
+    throw new Error('startup');
+  });
+  const session = createEffectRuntimeBrokerSession({
+    compositionBackend: 'gpu-scene',
+    workerFactory,
+    prepare: vi.fn().mockResolvedValue(createWorkerRequest()),
+  });
+  const message = await createMessage();
+  await expect(session.execute(message)).resolves.toMatchObject({
+    code: 'circuitOpen',
+    startupFailureCode: 'crashed',
+  });
+  await expect(session.execute(message)).resolves.toMatchObject({ code: 'circuitOpen' });
+  expect(workerFactory).toHaveBeenCalledOnce();
+  const recovered = createEffectRuntimeBrokerSession({
+    workerFactory: () => new ReplyWorker(),
+    prepare: vi.fn().mockResolvedValue(createWorkerRequest()),
+  });
+  await expect(recovered.execute(message)).resolves.toMatchObject({ kind: 'frame' });
 });
 
 it('rejects bitmap commands on a plan-only connection before request admission', async () => {

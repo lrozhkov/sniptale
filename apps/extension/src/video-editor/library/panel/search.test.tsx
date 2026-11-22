@@ -21,6 +21,7 @@ it('clears the scoped media query through native input and retains focus', () =>
     act(() => root.render(<Search />));
     const input = host.querySelector<HTMLInputElement>('input')!;
     expect(input.type).toBe('search');
+    expect(input.getAttribute('spellcheck')).toBe('false');
     expect(input.value).toBe('screen');
     act(() => host.querySelector<HTMLButtonElement>('.sniptale-field-clear')!.click());
     expect(input.value).toBe('');
@@ -32,12 +33,12 @@ it('clears the scoped media query through native input and retains focus', () =>
   }
 });
 
-it('keeps the pending library search construction outside the migrated scope', () => {
+it('uses the project search when the library is outside the inspector layout', () => {
   const host = document.createElement('div');
   const root = createRoot(host);
   try {
     act(() => root.render(<LibraryPanelSearch query="screen" onQueryChange={() => {}} />));
-    expect(host.querySelector('.video-library-search')).toBeNull();
+    expect(host.querySelector('.sniptale-inspector-search')).toBeNull();
     expect(host.querySelector('label[for="video-editor-library-search"]')).not.toBeNull();
   } finally {
     act(() => root.unmount());

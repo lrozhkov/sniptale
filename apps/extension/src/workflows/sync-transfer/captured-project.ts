@@ -11,6 +11,7 @@ import {
   RECORDING_TELEMETRY_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
   ASSET_REFS_STORE,
+  ASSET_OWNERS_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
@@ -29,6 +30,12 @@ import { parseRootEnvelope } from '../media-hub-backup/v6/codec';
 import { buildVideoProjectRootInventory } from '../media-hub-backup/v6/inventory/video-projects';
 import { createMediaHubBackupExportOptions } from '../media-hub-backup/v6/options';
 import { parsePortableVideoProjectMetadata } from '../media-hub-backup/v6/root-codecs/projects';
+import { portableVideoProjectHistoryPointers } from '../media-hub-backup/v6/root-codecs/video-project-history';
+import {
+  VIDEO_PROJECT_HISTORY_OWNER_KIND,
+  videoProjectHistoryAssetBindings,
+  videoProjectHistoryChangeRefs,
+} from '../../composition/persistence/projects/history-contracts';
 
 /** Feed the accepted project graph to the existing backup inventory without live reads. */
 export async function encodeCapturedProjectRoot(
@@ -83,6 +90,14 @@ export async function encodeCapturedProjectRoot(
     bind(asset.objectId, assets.get(asset.entry.id)?.assetId);
   for (const entry of portable.projectExports)
     bind(entry.objectId, exports.get(entry.entry.id)?.assetId);
+  if (portable.history && rows.project.history) {
+    const pointers = portableVideoProjectHistoryPointers(portable.history);
+    for (const [index, change] of videoProjectHistoryChangeRefs(rows.project.history).entries()) {
+      const objectId = pointers[index]!.objectId;
+      if (!bindings.some((binding) => binding.objectId === objectId))
+        bind(objectId, change.assetId);
+    }
+  }
   const envelope = parseRootEnvelope({
     descriptor: { ...roots[0]!.descriptor, metadataPath: 'Metadata/sync-root.json' },
     metadata,
@@ -111,6 +126,12 @@ export function createFrozenSnapshotDatabase(
   const assetMediaIds = snapshot.assets.map((asset) => `project-asset:${asset.id}`);
   const exportMediaIds = snapshot.exports.map((entry) => `export:${entry.id}`);
   const reviewIds = new Set([...assetMediaIds, ...exportMediaIds]);
+  // The admitted frozen graph proves these bindings; never consult a later live owner row.
+  const owners = videoProjectHistoryAssetBindings(snapshot.project.history).map((binding) => ({
+    ...binding,
+    ownerKind: VIDEO_PROJECT_HISTORY_OWNER_KIND,
+    ownerId: projectId,
+  }));
   const rows = new Map<string, unknown[]>([
     [VIDEO_PROJECTS_STORE, [snapshot.project]],
     [STORE_NAME, snapshot.recordings ?? []],
@@ -119,6 +140,7 @@ export function createFrozenSnapshotDatabase(
     [PROJECT_EXPORTS_STORE, [...snapshot.exports, ...(snapshot.sourceExports ?? [])]],
     [MEDIA_LIBRARY_STORE, snapshot.media],
     [ASSET_REFS_STORE, snapshot.refs],
+    [ASSET_OWNERS_STORE, owners],
     [THUMBNAILS_STORE, snapshot.thumbnails ?? []],
     [AGGREGATE_PRESENTATIONS_STORE, snapshot.presentation ? [snapshot.presentation] : []],
     [VIDEO_WORKSPACES_STORE, (snapshot.reviews ?? []).map((review) => review.workspace)],
@@ -142,6 +164,10 @@ export function createFrozenSnapshotDatabase(
     ],
     [MEDIA_LIBRARY_STORE, new Set([...snapshot.media.map((entry) => entry.id), ...reviewIds])],
     [ASSET_REFS_STORE, new Set(snapshot.refs.map((entry) => entry.assetId))],
+    [
+      ASSET_OWNERS_STORE,
+      new Set(owners.map((entry) => JSON.stringify([entry.ownerKind, entry.ownerId, entry.role]))),
+    ],
     [THUMBNAILS_STORE, new Set([`video-project:${projectId}`, ...exportMediaIds])],
     [AGGREGATE_PRESENTATIONS_STORE, new Set([JSON.stringify(['video-project', projectId])])],
     [VIDEO_WORKSPACES_STORE, reviewIds],
@@ -161,9 +187,14 @@ export function createFrozenSnapshotDatabase(
       key[0] === 'video-project' &&
       typeof key[1] === 'string'
         ? JSON.stringify(key)
-        : typeof key === 'string'
-          ? key
-          : null;
+        : store === ASSET_OWNERS_STORE &&
+            Array.isArray(key) &&
+            key.length === 3 &&
+            key.every((part) => typeof part === 'string')
+          ? JSON.stringify(key)
+          : typeof key === 'string'
+            ? key
+            : null;
     if (encoded === null || !allowedKeys.get(store)?.has(encoded))
       throw new Error(`Frozen snapshot key is unsupported for store: ${store}.`);
     return encoded;
@@ -173,6 +204,14 @@ export function createFrozenSnapshotDatabase(
     const accepted = checkedKey(store, key);
     return selected.find((entry) => {
       if (typeof entry !== 'object' || entry === null) return false;
+      if (store === ASSET_OWNERS_STORE)
+        return (
+          JSON.stringify([
+            Reflect.get(entry, 'ownerKind'),
+            Reflect.get(entry, 'ownerId'),
+            Reflect.get(entry, 'role'),
+          ]) === accepted
+        );
       if (store === AGGREGATE_PRESENTATIONS_STORE)
         return (
           JSON.stringify([

@@ -432,6 +432,11 @@ it.each([
     createMediaItem({ lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 2 } }),
   ],
   [
+    'independent original claim',
+    { ...createMediaItem(), savedIndependently: false },
+    { ...createMediaItem(), savedIndependently: true },
+  ],
+  [
     'scenario project revision',
     createScenarioItemWithProjectUpdatedAt(1),
     createScenarioItemWithProjectUpdatedAt(2),

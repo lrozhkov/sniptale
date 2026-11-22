@@ -76,6 +76,7 @@ it('prepares, binds, and restores the current document with the retained pause i
   markTabNavigationManuallyPaused();
   expect(bindTabNavigationDocument(7, 'document-1')).toBe(true);
   expect(completeTabNavigationDocument(7, 'document-1', verifier)).toBe(true);
+  expect(completeTabNavigationDocument(7, 'document-1', verifier)).toBe(true);
 
   await vi.waitFor(() => expect(mocks.restore).toHaveBeenCalledOnce());
   expect(mocks.restore.mock.calls[0]?.[1]).toMatchObject({

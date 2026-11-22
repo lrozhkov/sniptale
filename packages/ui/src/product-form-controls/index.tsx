@@ -7,6 +7,7 @@ import type {
   TextareaHTMLAttributes,
 } from 'react';
 import { resolveRangeVisualStyle } from '../range-control/style';
+import { NumberInput, type NumberInputProps } from '../number-input';
 
 export { ProductSelect } from './select';
 export type { ProductSelectOption, ProductSelectProps } from './select';
@@ -18,7 +19,7 @@ export interface ProductFieldProps {
   children: ReactNode;
 }
 
-export interface ProductInputProps extends InputHTMLAttributes<HTMLInputElement> {
+export interface ProductInputProps extends NumberInputProps {
   invalid?: boolean;
   onValueCommit?: (value: string) => void | Promise<void>;
 }
@@ -96,8 +97,9 @@ export const ProductInput = forwardRef<HTMLInputElement, ProductInputProps>(func
   const lastCommittedValueRef = useCommitDeduper();
 
   return (
-    <input
+    <NumberInput
       {...props}
+      type={props.type ?? 'text'}
       ref={ref}
       onBlur={(event) => {
         onBlur?.(event);

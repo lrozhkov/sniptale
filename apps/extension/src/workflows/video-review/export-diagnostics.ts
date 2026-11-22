@@ -1,5 +1,6 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { QuickEditExportUnavailable } from './export-unavailable';
+import { EffectRuntimeFrameError } from '../../features/video/composition/effect-runtime/runtime/frame-error';
 
 type ExportRoute = 'copy' | 'render' | 'presentation';
 type Destination = 'gallery' | 'download' | 'preview';
@@ -93,6 +94,14 @@ export async function cleanupReviewExportFailure(
   throw primary;
 }
 
+function reviewEffectFailureCode(error: unknown) {
+  for (let depth = 0; depth < 8 && error instanceof Error; depth++) {
+    if (error instanceof EffectRuntimeFrameError) return error.code;
+    error = error.cause;
+  }
+  return undefined;
+}
+
 /** One disposable attempt owns controlled terminal summaries, never publication or retention. */
 export function createReviewExportDiagnostics(
   input: { destination: Destination; signal?: AbortSignal; route?: ExportRoute },
@@ -107,6 +116,7 @@ export function createReviewExportDiagnostics(
     if (stage === 'download-release') outcome = 'download-release-failed';
     if (reported.has(outcome) || expected(error, input.signal)) return;
     reported.add(outcome);
+    const effectCode = reviewEffectFailureCode(error);
     const values = Object.entries(metrics)
       .map(([key, value]) => `${key}=${value}`)
       .join(' ');
@@ -117,6 +127,7 @@ export function createReviewExportDiagnostics(
       `destination=${input.destination}`,
       `stage=${stage}`,
       `code=${stage}-failed`,
+      ...(effectCode ? [`effectCode=${effectCode}`] : []),
       ...(values ? [values] : []),
     ].join(' ');
     try {

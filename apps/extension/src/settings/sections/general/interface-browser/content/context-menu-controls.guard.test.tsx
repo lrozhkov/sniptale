@@ -2,7 +2,11 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadSettingsCatalogFixture,
+  prepareSettingsTranslations,
+} from '../../../../catalog-fixture.test-support';
 
 import { buildAppearanceContextMenuOptions, buildPopupStartupOptions } from '../copy';
 import { ContextMenuControls } from './context-menu-controls';
@@ -96,3 +100,10 @@ it('keeps the global menu disabled while allowing a saved tree draft', async () 
   ownerToggle?.click();
   expect(updateContextMenu).toHaveBeenCalledWith({ enabled: true });
 });
+
+vi.mock('../../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadSettingsCatalogFixture>[0]) =>
+    loadSettingsCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareSettingsTranslations('ru'));

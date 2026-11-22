@@ -4,8 +4,14 @@ export function reviewCueWindow(
   sourceTime: number,
   offset: number,
   before: number,
-  after: number
+  after: number,
+  timeDomain?: 'result'
 ) {
+  if (timeDomain === 'result') {
+    const duration = segments.at(-1)?.resultEnd ?? 0;
+    const anchor = sourceTime + offset;
+    return { anchor, start: Math.max(0, anchor - before), end: Math.min(duration, anchor + after) };
+  }
   const index = segments.findIndex(
     (part) => sourceTime >= part.sourceStart && sourceTime < part.sourceEnd
   );

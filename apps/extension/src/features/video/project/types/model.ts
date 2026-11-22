@@ -37,7 +37,7 @@ import type {
   VideoProjectEffectSnapshot,
 } from '../effect-instance/types';
 
-/** Source-clock authoring stays independent from immutable capture facts and current clip placements. */
+/** Retained interaction authoring stays independent from immutable capture facts and current clip placements. */
 export interface VideoProjectSourceInteractionDocument {
   id: string;
   binding: { assetId: string; sourceInstanceId: string };
@@ -281,7 +281,15 @@ export interface VideoProjectVideoClip extends VideoProjectBaseClip, VideoProjec
   /** Camera-native source seconds survive cuts, rates and project moves. */
   cameraHiddenRanges?: CameraHiddenRange[];
   /** Authored camera anchors use main-source seconds; media seconds subtract the offset. */
-  cameraTiming?: { offsetSeconds: number; transitions: 'bounded' };
+  cameraTiming?: {
+    offsetSeconds: number;
+    transitions: 'bounded';
+    timeDomain?: 'result';
+    /** Immutable layout origin. Placement, source trims and playback rate map back to this clock. */
+    layoutClock?: { time: number; sourceTime: number; rate: number };
+  };
+  /** Immutable result origin for retained source interaction authoring. */
+  sourceInteractionTiming?: { time: number; sourceTime: number; rate: number };
   cameraPositions?: CameraPosition[];
   cameraAppearance?: CameraAppearance;
   /** Reflect camera pixels within their window; the source clock and placement stay unchanged. */
@@ -435,7 +443,8 @@ export interface VideoProject {
     | 52
     | 53
     | 54
-    | 55;
+    | 55
+    | 56;
   sourceInteractionDocuments?: VideoProjectSourceInteractionDocument[];
   sourceVoiceoverDocuments?: VideoProjectSourceVoiceoverDocument[];
   sourceAudioDocuments?: VideoProjectSourceAudioDocument[];

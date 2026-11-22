@@ -1,8 +1,12 @@
 import { audioEffects } from './build/audio-effects.ts';
+import { compactColorCatalog } from './build/color-catalog.ts';
 import { glTransitions } from './build/gl-transitions.ts';
 import { lottieSchema } from './build/lottie-schema.ts';
 import { normalizeMediabunny } from '../../tooling/ci/mediabunny/normalize.mjs';
-import { createZodRuntimeFallbackPlugin } from './build/injected-build-support.ts';
+import {
+  createBlobOnlyInlineWorkerPlugin,
+  createZodRuntimeFallbackPlugin,
+} from './build/injected-build-support.ts';
 import { i18nCatalogs } from './build/i18n-catalogs.ts';
 import { tourPlayerScript } from './build/tour-player-script.ts';
 import { videoEffectResources } from './build/video-effect-resources.ts';
@@ -47,7 +51,7 @@ const BUNDLED_FONT_FILES = [
   { folder: 'golos-text', fileName: 'golos-text-vf.woff2' },
 ] as const;
 const RELEASE_OXC_MINIFY_OPTIONS = {
-  codegen: true,
+  codegen: { asciiOnly: false },
   compress: {
     dropConsole: true,
     dropDebugger: true,
@@ -135,6 +139,7 @@ function createRollupOptions(mode: string) {
   return {
     input: extensionRollupInputs(BUILD_LAYOUT, mode),
     output: {
+      charset: 'utf8' as const,
       entryFileNames: 'assets/[name].js',
       chunkFileNames: 'assets/[name]-[hash].js',
       assetFileNames: 'assets/[name].[ext]',
@@ -149,8 +154,10 @@ export default defineConfig(({ mode }) => ({
   publicDir: resolvePath(BUILD_LAYOUT.appRoot, 'public'),
   base: './',
   plugins: [
+    compactColorCatalog(),
     i18nCatalogs(BUILD_LAYOUT.repositoryRoot),
     createZodRuntimeFallbackPlugin(),
+    createBlobOnlyInlineWorkerPlugin(),
     tourPlayerScript(),
     videoEffectResources(join(APP_ROOT, 'public/video-effects')),
     lottieSchema(),

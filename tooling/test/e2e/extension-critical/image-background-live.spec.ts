@@ -1,5 +1,6 @@
+import { numericControl } from '../support/inspector-numeric';
 import { writeFile } from 'node:fs/promises';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 import { startHostServer } from '../support/host-server';
@@ -243,10 +244,7 @@ for (const { name, size } of [
           '[data-ui="editor.frame-panel"] [data-ui="shared.ui.compact-inspector.numeric-row"]'
         )
         .filter({
-          has: page.getByRole('textbox', {
-            name: translate('editor.scene.backgroundBlurAmount', 'en'),
-            exact: true,
-          }),
+          has: numericControl(page, translate('editor.scene.backgroundBlurAmount', 'en')),
         });
       await blurRow.scrollIntoViewIfNeeded();
       await blurRow.hover();

@@ -1,3 +1,4 @@
+import { retimeReviewResultRange } from './timeline-placement';
 import type { QuickEditAudioClip } from './advanced/types';
 import type { ReviewTextDocument, ReviewTextFragment } from './text-types';
 import type { ReviewTimeSegment } from './time-segment';
@@ -65,14 +66,20 @@ export function projectAnchoredReviewText(
   fragment: ReviewTextFragment,
   map: readonly ReviewTimeSegment[]
 ) {
-  const slices = projectReviewVoiceover([textClip(fragment)], map).map((slice) => ({
+  const voice = fragment.origin?.kind === 'voiceover';
+  const slices = projectReviewVoiceover(
+    [textClip(fragment)],
+    map,
+    voice ? 'continue' : 'source'
+  ).map((slice) => ({
     start: slice.timelineStart,
     end: slice.timelineStart + slice.duration,
   }));
   const source = reviewTextSourceInterval(fragment, map);
   for (const part of map) {
+    if (voice) break;
     if (part.kind !== 'freeze') continue;
-    const time = part.frameTime ?? part.sourceStart;
+    const time = part.sourceStart;
     if (source.start <= time && time < source.end)
       slices.push({ start: part.resultStart, end: part.resultEnd });
   }
@@ -93,16 +100,42 @@ export function retimeReviewTextDocument(
   before: readonly ReviewTimeSegment[],
   after: readonly ReviewTimeSegment[],
   previousEdit: ReviewEdit | null,
-  nextEdit: ReviewEdit | null
+  nextEdit: ReviewEdit | null,
+  preserveResultText = false
 ): ReviewTextDocument {
   return {
     ...document,
-    fragments: document.fragments.map((original) => {
+    fragments: document.fragments.flatMap((original) => {
+      if (preserveResultText && original.timeDomain === 'result' && !original.sourceAnchor) {
+        const range = retimeReviewResultRange(original, before, after);
+        if (range.end <= range.start) return [];
+        let previousWordEnd = range.start;
+        return [
+          {
+            ...original,
+            ...range,
+            ...(original.words
+              ? {
+                  words: original.words.flatMap((word) => {
+                    const projected = retimeReviewResultRange(word, before, after);
+                    const start = Math.max(previousWordEnd, projected.start);
+                    const end = Math.min(range.end, projected.end);
+                    if (end <= start) return [];
+                    previousWordEnd = end;
+                    return [{ ...word, start, end }];
+                  }),
+                }
+              : {}),
+          },
+        ];
+      }
       const fragment = anchorText(original, before);
       if (!fragment.sourceAnchor) return original;
       const clip = normalizeReviewVoiceoverTempo(textClip(fragment), previousEdit, nextEdit);
       const sourceAnchor = { ...fragment.sourceAnchor, spans: clip.sourceAnchor! };
-      const slices = projectReviewVoiceover([clip], after);
+      const holdPolicy =
+        preserveResultText && fragment.origin?.kind === 'voiceover' ? 'continue' : 'source';
+      const slices = projectReviewVoiceover([clip], after, holdPolicy);
       const start = slices.length
         ? Math.min(...slices.map((slice) => slice.timelineStart))
         : fragment.start;
@@ -111,7 +144,7 @@ export function retimeReviewTextDocument(
         : fragment.end;
       const { words: _words, ...base } = fragment;
       const words = sourceAnchor.words?.flatMap((word) => {
-        const ranges = reviewVoiceoverNativeIntervals(clip, word, after);
+        const ranges = reviewVoiceoverNativeIntervals(clip, word, after, holdPolicy);
         return ranges.length
           ? [{ text: word.text, start: ranges[0]!.start, end: ranges.at(-1)!.end }]
           : [];

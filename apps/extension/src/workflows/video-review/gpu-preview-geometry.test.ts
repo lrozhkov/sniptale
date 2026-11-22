@@ -182,3 +182,29 @@ it('budgets dense-gradient pixel storage and clamps each high-resolution motion 
   expect(movingPlan.maximumManagedBytes - staticPlan.maximumManagedBytes).toBe(2 * 2048 * 1024 * 4);
   expect(movingPlan.maximumCanvases - staticPlan.maximumCanvases).toBe(2);
 });
+
+it('budgets ordered native text rasters for both transition endpoints and pending outputs', async () => {
+  const { createReviewAnnotationTextClip } =
+    await import('../../features/video/review/annotation-effects/text-animation');
+  const plain = reviewGpuPreviewAllocation(scene, dimensions, 2);
+  const title = createReviewAnnotationTextClip('title', 'Some text', 0, 1, 0);
+  const titled = {
+    ...scene,
+    annotationEffects: {
+      snapshots: [],
+      segments: [],
+      lane: {
+        enabled: true,
+        instances: [],
+        textClips: [title, { ...title, id: 'second', order: 1 }],
+      },
+    },
+  };
+  const plan = reviewGpuPreviewAllocation(titled, dimensions, 2);
+  expect(plan.maximumCanvases - plain.maximumCanvases).toBe(4);
+  expect(plan.maximumManagedBytes - plain.maximumManagedBytes).toBe(
+    dimensions.backing.width * dimensions.backing.height * 4 * 8
+  );
+  titled.annotationEffects.lane.enabled = false;
+  expect(reviewGpuPreviewAllocation(titled, dimensions, 2)).toEqual(plain);
+});

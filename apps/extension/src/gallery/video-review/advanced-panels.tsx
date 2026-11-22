@@ -6,7 +6,8 @@ import { ReviewPresentationBinding } from './presentation-binding';
 import { WatermarkInspector } from '../../ui/watermark/inspector';
 import type { ComponentProps } from 'react';
 import {
-  Scan,
+  Crop,
+  SlidersHorizontal,
   Wallpaper,
   Stamp,
   AudioLines,
@@ -16,7 +17,7 @@ import {
   Navigation,
 } from 'lucide-react';
 import { ReviewCaptionSceneControls } from './caption-controls';
-import { ReviewInspectorSections } from './inspector-sections';
+import { ReviewInspectorSections, type ReviewInspectorSection } from './inspector-sections';
 import type { ReactNode } from 'react';
 import { translate } from '../../platform/i18n';
 import type {
@@ -119,6 +120,7 @@ export function ReviewAdvancedPanels(input: ReviewAdvancedPanelsProps) {
 
 /** Scene controls are independent of the selected zoom and its property panel. */
 export function ReviewSceneProperties(props: {
+  renderSections?: ((sections: readonly ReviewInspectorSection[]) => ReactNode) | undefined;
   track?: import('../../features/video/review/advanced/types').QuickEditTrack;
   cropPreview?: { file: File; time: number } | undefined;
   cursorPath?: ReactNode;
@@ -149,6 +151,11 @@ export function ReviewSceneProperties(props: {
     update: (current: QuickEditAdvancedState['background']) => QuickEditAdvancedState['background']
   ): void;
 }) {
+  const renderSections =
+    props.renderSections ??
+    ((sections: readonly ReviewInspectorSection[]) => (
+      <ReviewInspectorSections sections={sections} />
+    ));
   return (
     <>
       {props.presentation?.editor.pending &&
@@ -158,18 +165,36 @@ export function ReviewSceneProperties(props: {
           onClick={props.presentation.editor.cancel}
         />
       ) : null}
-      <fieldset disabled={props.busy} className="min-w-0">
+      <fieldset
+        disabled={props.busy}
+        className={
+          props.renderSections ? 'm-0 flex min-h-0 min-w-0 flex-1 flex-col border-0 p-0' : 'min-w-0'
+        }
+      >
         {props.failed ? (
           <p role="alert">{translate('gallery.videoReview.backgroundImportFailed')}</p>
         ) : null}
-        <ReviewInspectorSections
-          sections={[
+        {renderSections(
+          [
+            {
+              id: 'canvas',
+              label: translate('gallery.videoReview.canvas'),
+              icon: Crop,
+              content: (
+                <ReviewCanvasSettings
+                  cropPreview={props.cropPreview}
+                  source={props.source}
+                  canvas={props.canvas}
+                  onChange={props.onCanvas}
+                />
+              ),
+            },
             ...(props.onSourceFilters
               ? [
                   {
                     id: 'source-filters',
                     label: translate('videoEditor.sidebar.sourceFiltersTitle'),
-                    icon: Scan,
+                    icon: SlidersHorizontal,
                     content: (
                       <SourceImageFilterFields
                         value={props.sourceFilters}
@@ -180,19 +205,6 @@ export function ReviewSceneProperties(props: {
                   },
                 ]
               : []),
-            {
-              id: 'canvas',
-              label: translate('gallery.videoReview.canvas'),
-              icon: Scan,
-              content: (
-                <ReviewCanvasSettings
-                  cropPreview={props.cropPreview}
-                  source={props.source}
-                  canvas={props.canvas}
-                  onChange={props.onCanvas}
-                />
-              ),
-            },
             {
               id: 'window-header',
               label: translate('gallery.videoReview.windowHeader'),
@@ -323,8 +335,8 @@ export function ReviewSceneProperties(props: {
                       ? ['audio']
                       : []
               ).includes(section.id)
-          )}
-        />
+          )
+        )}
       </fieldset>
     </>
   );

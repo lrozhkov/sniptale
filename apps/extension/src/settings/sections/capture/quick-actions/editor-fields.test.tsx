@@ -213,7 +213,7 @@ function verifyQuickActionEditorFieldInteractions() {
   ).toEqual(
     expect.objectContaining({
       controlSize: 'sm',
-      menuClassName: '!max-h-52',
+      menuClassName: 'settings-viewport-preset-options !max-h-52',
       menuPlacement: 'auto',
       menuScrollable: true,
     })

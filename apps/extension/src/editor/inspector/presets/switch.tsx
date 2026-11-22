@@ -3,8 +3,18 @@ import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import type { EditorInspectorPresetViewMode } from './types';
 
 const templateViewGroups: ReadonlyArray<{ id: EditorInspectorPresetViewMode; label: string }> = [
-  { id: 'parameters', label: translate('editor.compact.templateParameters') },
-  { id: 'templates', label: translate('editor.compact.templateSingle') },
+  {
+    id: 'parameters',
+    get label() {
+      return translate('editor.compact.templateParameters');
+    },
+  },
+  {
+    id: 'templates',
+    get label() {
+      return translate('editor.compact.templateSingle');
+    },
+  },
 ];
 
 export function EditorInspectorPresetViewSwitch(props: {

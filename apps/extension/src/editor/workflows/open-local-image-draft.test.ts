@@ -80,17 +80,18 @@ it('flushes the current draft and creates the new identity only after the image 
   expect(controller.openImage.mock.invocationCallOrder[0]).toBeLessThan(
     mocks.beginDraft.mock.invocationCallOrder[0]!
   );
-  const initialSave = controller.autosaveService?.saveNow;
-  expect(initialSave).toBeDefined();
-  expect(mocks.beginDraft.mock.invocationCallOrder[0]).toBeLessThan(
-    initialSave!.mock.invocationCallOrder[0]!
-  );
   expect(mocks.beginDraft).toHaveBeenCalledWith({
     autosaveService: controller.autosaveService,
     renderPresentation: expect.any(Function),
     sourceTitle: 'local.png',
+    source: {
+      dataUrl: createEditorDocumentFixture().sourceImageData,
+      width: createEditorDocumentFixture().sourceWidth,
+      height: createEditorDocumentFixture().sourceHeight,
+    },
   });
-  expect(controller.autosaveService?.saveNow).toHaveBeenCalledWith(expect.any(Function));
+  expect(controller.autosaveService?.saveNow).not.toHaveBeenCalled();
+  expect(controller.autosaveService?.persistSnapshot).not.toHaveBeenCalled();
   const renderPresentation = mocks.beginDraft.mock.calls[0]?.[0].renderPresentation;
   await renderPresentation();
   expect(controller.renderForExport).toHaveBeenCalledWith(

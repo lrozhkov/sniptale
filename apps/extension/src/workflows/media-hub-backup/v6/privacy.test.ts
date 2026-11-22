@@ -74,6 +74,11 @@ it('applies source-metadata privacy to historical captures as well as the curren
     workspaceRevision: 2,
     project: { ...project, updatedAt: 2 },
     history: [{ revision: 1, savedAt: 1, project }],
+    editingHistory: {
+      version: 1 as const,
+      past: [project],
+      future: [{ ...project, name: 'Future' }],
+    },
   };
   const original = structuredClone(entry);
   const redacted = projectScenarioPrivacy(
@@ -83,6 +88,8 @@ it('applies source-metadata privacy to historical captures as well as the curren
   expect(JSON.stringify(redacted)).not.toContain('Private source title');
   expect(JSON.stringify(redacted)).not.toContain('private.test');
   expect(redacted.history?.[0]?.project.items).toHaveLength(1);
+  expect(redacted.editingHistory?.past).toHaveLength(1);
+  expect(redacted.editingHistory?.future[0]?.name).toBe('Future');
   expect(entry).toEqual(original);
   expect(
     JSON.stringify(projectScenarioPrivacy(entry, createMediaHubBackupExportOptions()))

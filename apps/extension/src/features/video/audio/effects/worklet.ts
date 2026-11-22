@@ -133,11 +133,10 @@ class ProcessingWorklet extends AudioWorkletProcessor {
       message.kind === 'play' &&
       this.phase === 'primed' &&
       message.startFrame >= this.primeStart &&
-      message.startFrame < this.cursor &&
       message.endFrame <= this.duration
     ) {
       // MessagePort delivery can miss the scheduled quantum. Keep the original clock;
-      // process() skips elapsed PCM and reports underrun if the retained queue is exhausted.
+      // process() skips elapsed PCM and stays silent while missing processed PCM catches up.
       this.when = message.whenFrame;
       this.primeStart = message.startFrame;
       this.end = message.endFrame;
@@ -264,7 +263,9 @@ class ProcessingWorklet extends AudioWorkletProcessor {
       if (!renderer) throw new Error('Audio renderer is not prepared.');
       const planes = await renderer.render(start, end);
       this.check();
-      this.chunks.push({ start, end, planes });
+      // Advance DSP state sequentially, but do not retain PCM whose playback time has passed.
+      if (this.phase !== 'playing' || end > this.primeStart + currentFrame - this.when)
+        this.chunks.push({ start, end, planes });
       this.cursor = end;
     }
     if (
@@ -309,9 +310,8 @@ class ProcessingWorklet extends AudioWorkletProcessor {
       while (this.chunks[0] && frame >= this.chunks[0].end) this.chunks.shift();
       const chunk = this.chunks[0];
       if (!chunk || frame < chunk.start) {
-        this.send({ kind: 'underrun', generation: this.generation, frame });
-        this.release();
-        return false;
+        // Missing PCM stays silent. The audio clock and clip boundary continue to advance.
+        continue;
       }
       for (let channel = 0; channel < this.channels; channel++)
         output[channel]![index] = chunk.planes[channel]![frame - chunk.start]!;

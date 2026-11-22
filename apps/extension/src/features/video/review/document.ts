@@ -1,3 +1,9 @@
+import { anchorReviewVisual, anchorReviewVisualSource } from './visual-anchor';
+import {
+  projectReviewVisualRange,
+  retimeReviewResultRange,
+  retimeReviewResultPoint,
+} from './timeline-placement';
 import { retimeReviewTextDocument } from './text-timing';
 import { sameHistoryArray, sameHistoryRecord } from '@sniptale/foundation/history/equal';
 import { loadQuickEditAdvancedContentState } from './advanced/validation';
@@ -6,7 +12,7 @@ import { buildReviewTimeMap } from './timeline';
 import { reconcileReviewFocus } from './focus-edits';
 import type { ReviewDocument, ReviewOperation, ReviewSource } from './types';
 import { createQuickEditAdvancedContent } from './advanced/defaults';
-import type { QuickEditAdvancedContent } from './advanced/types';
+import type { QuickEditAdvancedContent, QuickEditCursorMotion } from './advanced/types';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 
 const historyMessages = {
@@ -119,13 +125,51 @@ function replaceAdvancedContent(
   return after;
 }
 
-function equalAdvancedContentValue(left: unknown, right: unknown): boolean {
+const immutableContentValues = new WeakSet<object>();
+const immutableContentComparisons = new WeakMap<object, WeakMap<object, boolean>>();
+
+function isImmutableContentValue(value: object): boolean {
+  if (immutableContentValues.has(value)) return true;
+  if (!Object.isFrozen(value)) return false;
+  for (const key of Object.keys(value)) {
+    const field = Object.getOwnPropertyDescriptor(value, key);
+    // Frozen accessors can still return changing content.
+    if (!field || !('value' in field)) return false;
+    const child: unknown = field.value;
+    if (child !== null && typeof child === 'object' && !isImmutableContentValue(child))
+      return false;
+  }
+  immutableContentValues.add(value);
+  return true;
+}
+
+/** Compares validated advanced history values, including properties absent in older entries. */
+export function equalAdvancedContentValue(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object')
+    return sameAdvancedContentValue(left, right);
+  const immutable = isImmutableContentValue(left) && isImmutableContentValue(right);
+  const previous = immutable ? immutableContentComparisons.get(left)?.get(right) : undefined;
+  if (previous !== undefined) return previous;
+  const equal = sameAdvancedContentValue(left, right);
+  if (immutable) {
+    let comparisons = immutableContentComparisons.get(left);
+    if (!comparisons) {
+      comparisons = new WeakMap();
+      immutableContentComparisons.set(left, comparisons);
+    }
+    comparisons.set(right, equal);
+  }
+  return equal;
+}
+
+function sameAdvancedContentValue(left: unknown, right: unknown): boolean {
   if (left === right) return true;
   if (Array.isArray(left) && Array.isArray(right))
-    return sameHistoryArray(left, right, equalAdvancedContentValue);
+    return sameHistoryArray(left, right, sameAdvancedContentValue);
   if (!isRecord(left) || !isRecord(right) || Array.isArray(left) || Array.isArray(right))
     return false;
-  return sameHistoryRecord(left, right, equalAdvancedContentValue);
+  return sameHistoryRecord(left, right, sameAdvancedContentValue);
 }
 
 /** Encodes admitted source gain edits without unchanged content; compound edits retain a full snapshot. */
@@ -219,6 +263,23 @@ export function applyReviewOperation(
     if (edit.kind === 'cut') removed += edit.end - edit.start;
   }
   if (removed >= source.duration) throw new ReviewHistoryError('entire-video-cut');
+  const preserveVisuals =
+    operation.preserveVisualAnchors &&
+    (operation.before?.kind === 'cut' || operation.after?.kind === 'cut');
+  const visualMap = preserveVisuals
+    ? buildReviewTimeMap(source.duration, document.edits)
+    : undefined;
+  const initial = document.advancedContent;
+  const needsSourceVisualMap =
+    visualMap &&
+    (initial.annotationEffects?.instances.some((item) => !item.timeDomain && !item.visualAnchor) ||
+      initial.cursorMotions?.some((motion) => !motion.timeDomain && !motion.visualAnchor));
+  const sourceVisualMap = needsSourceVisualMap
+    ? buildReviewTimeMap(
+        source.duration,
+        document.edits.filter((edit) => edit.kind !== 'cut')
+      )
+    : visualMap;
   let advancedContent = operation.preserveFocusAnchors
     ? {
         ...document.advancedContent,
@@ -230,11 +291,135 @@ export function applyReviewOperation(
             before: document.edits,
             after: edits,
             edit: operation.after,
+            ...(visualMap ? { preserveVisualAnchors: true as const } : {}),
             ...(operation.preserveUnderCuts ? { preserveUnderCuts: true as const } : {}),
           }),
         },
       }
     : document.advancedContent;
+  if (advancedContent.annotationEffects) {
+    const previous = buildReviewTimeMap(source.duration, document.edits);
+    const next = buildReviewTimeMap(source.duration, edits);
+    advancedContent = {
+      ...advancedContent,
+      annotationEffects: {
+        ...advancedContent.annotationEffects,
+        instances: advancedContent.annotationEffects.instances.flatMap((item) => {
+          if (item.visualAnchor) return [item];
+          if (visualMap) {
+            if (item.timeDomain === 'result') return [anchorReviewVisual(item, visualMap)];
+            if (!sourceVisualMap) return [item];
+            const interval = projectReviewVisualRange(item, sourceVisualMap);
+            return interval
+              ? [
+                  anchorReviewVisual(
+                    { ...item, ...interval, timeDomain: 'result' as const },
+                    sourceVisualMap
+                  ),
+                ]
+              : [item];
+          }
+          if (item.timeDomain !== 'result') return [item];
+          const range = retimeReviewResultRange(item, previous, next);
+          return range.end > range.start ? [{ ...item, ...range }] : [];
+        }),
+      },
+    };
+  }
+  if (advancedContent.cursorMotions?.length) {
+    const previous = buildReviewTimeMap(source.duration, document.edits);
+    const next = buildReviewTimeMap(source.duration, edits);
+    const resultCursorClock =
+      (sourceVisualMap ?? previous).some((part) => part.kind === 'freeze') ||
+      advancedContent.cursorMotions.some((motion) => motion.timeDomain === 'result');
+    advancedContent = {
+      ...advancedContent,
+      cursorMotions: advancedContent.cursorMotions.flatMap<QuickEditCursorMotion>((motion) => {
+        if (motion.visualAnchor) return [motion];
+        if (visualMap) {
+          if (motion.timeDomain === 'result') return [anchorReviewVisual(motion, visualMap)];
+          const resultMotion = { ...motion, timeDomain: 'result' as const };
+          if (!resultCursorClock)
+            return [{ ...resultMotion, visualAnchor: anchorReviewVisualSource(motion) }];
+          if (!sourceVisualMap) return [motion];
+          const interval = projectReviewVisualRange(motion, sourceVisualMap);
+          return interval
+            ? [anchorReviewVisual({ ...resultMotion, ...interval }, sourceVisualMap)]
+            : [motion];
+        }
+        if (motion.timeDomain !== 'result') return [motion];
+        const range = retimeReviewResultRange(motion, previous, next);
+        return range.end > range.start ? [{ ...motion, ...range }] : [];
+      }),
+    };
+  }
+  if (advancedContent.webcam?.timeDomain === 'result') {
+    const camera = advancedContent.webcam;
+    const previous = buildReviewTimeMap(source.duration, document.edits);
+    const next = buildReviewTimeMap(source.duration, edits);
+    advancedContent = {
+      ...advancedContent,
+      webcam: {
+        ...camera,
+        hiddenRanges: camera.hiddenRanges.flatMap((item) => {
+          const range = retimeReviewResultRange(item, previous, next);
+          return range.end > range.start ? [{ ...item, ...range }] : [];
+        }),
+        positions: camera.positions
+          .flatMap((item) => {
+            const time = retimeReviewResultPoint(item.time, previous, next);
+            if (time === null) return [];
+            const range = retimeReviewResultRange(
+              { start: item.time, end: item.time + Math.max(1e-7, item.transition.duration) },
+              previous,
+              next
+            );
+            return [
+              {
+                ...item,
+                time,
+                transition: {
+                  ...item.transition,
+                  duration: item.transition.duration
+                    ? Math.min(60, Math.max(0, range.end - range.start))
+                    : 0,
+                },
+              },
+            ];
+          })
+          .sort((a, b) => a.time - b.time)
+          .filter(
+            (item, index, items) => index === items.length - 1 || item.time < items[index + 1]!.time
+          ),
+      },
+    };
+  }
+  if (advancedContent.interactionTimeline) {
+    const previous = buildReviewTimeMap(source.duration, document.edits);
+    const next = buildReviewTimeMap(source.duration, edits);
+    const limit = next.at(-1)?.resultEnd ?? 0;
+    const retime = <T extends { start: number; end: number; timeDomain?: 'result' }>(items: T[]) =>
+      items.flatMap((item) => {
+        if (item.timeDomain !== 'result') return [item];
+        const time = retimeReviewResultPoint(item.start, previous, next);
+        return time !== null && time < limit
+          ? [
+              {
+                ...item,
+                start: time,
+                end: Math.min(limit, time + item.end - item.start),
+              },
+            ]
+          : [];
+      });
+    advancedContent = {
+      ...advancedContent,
+      interactionTimeline: {
+        presses: retime(advancedContent.interactionTimeline.presses),
+        overrides: retime(advancedContent.interactionTimeline.overrides),
+      },
+    };
+  }
   if (operation.preserveTextAnchors && advancedContent.text) {
     advancedContent = {
       ...advancedContent,
@@ -243,12 +428,43 @@ export function applyReviewOperation(
         buildReviewTimeMap(source.duration, document.edits),
         buildReviewTimeMap(source.duration, edits),
         operation.before,
-        operation.after
+        operation.after,
+        operation.preserveResultText === true
       ),
     };
     const admitted = loadQuickEditAdvancedContentState(advancedContent);
     if (!admitted) throw new ReviewHistoryError('text-invalid');
     advancedContent = admitted;
+  }
+  {
+    const previous = buildReviewTimeMap(source.duration, document.edits);
+    const next = buildReviewTimeMap(source.duration, edits);
+    const retime = (clips: QuickEditAdvancedContent['audio']['music']) =>
+      clips.flatMap((clip) => {
+        if (clip.timeDomain !== 'result') return [clip];
+        const range = retimeReviewResultRange(
+          { start: clip.timelineStart, end: clip.timelineStart + clip.duration },
+          previous,
+          next
+        );
+        const limit = next.at(-1)?.resultEnd ?? 0;
+        if (range.start >= limit || range.end <= range.start) return [];
+        return [
+          {
+            ...clip,
+            timelineStart: range.start,
+            duration: Math.min(clip.duration, limit - range.start),
+          },
+        ];
+      });
+    advancedContent = {
+      ...advancedContent,
+      audio: {
+        ...advancedContent.audio,
+        music: retime(advancedContent.audio.music),
+        voiceover: retime(advancedContent.audio.voiceover),
+      },
+    };
   }
   if (operation.preserveVoiceoverAnchors) {
     const previous = buildReviewTimeMap(source.duration, document.edits);

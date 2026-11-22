@@ -93,16 +93,25 @@ export function removeScenarioAssetReferences(
   for (const version of detached.history ?? []) {
     if (removeFromProject(version.project, assetIds)) changed = true;
   }
+  for (const project of [
+    ...(detached.editingHistory?.past ?? []),
+    ...(detached.editingHistory?.future ?? []),
+  ]) {
+    if (removeFromProject(project, assetIds)) changed = true;
+  }
   if (!changed) return parsed;
   const revised = createScenarioProjectEntry({
     existing: parsed,
-    project: detached.project,
+    project: parsed.project,
     updatedAt,
     historyPolicy: 'preserve',
+    historyOwnership: 'exclusive',
   });
-  const { history: _oldHistory, ...withoutHistory } = revised;
+  const { history: _oldHistory, editingHistory: _oldEditingHistory, ...withoutHistory } = revised;
   const next: ScenarioProjectEntry = {
     ...withoutHistory,
+    project: { ...detached.project, updatedAt: revised.project.updatedAt },
+    ...(detached.editingHistory === undefined ? {} : { editingHistory: detached.editingHistory }),
     ...(detached.history?.length ? { history: detached.history } : {}),
   };
   const validated = parseScenarioProjectEntry(next);

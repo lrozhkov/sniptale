@@ -46,7 +46,7 @@ for (const published of [false, true])
         await reader.evaluate(async (url) => (await import(url)).readReaderSource(), held.url)
       ).toEqual({ status: 'ready', ...actor.source });
       expect(await page.evaluate(async (url) => (await import(url)).trim(), actor.url)).toEqual({
-        historyLength: 50,
+        historyLength: 1000,
         snapshots: 0,
       });
       expect(

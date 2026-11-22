@@ -1,6 +1,7 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import { editReviewTextFragment } from '../../../features/video/review/text-document';
+import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
 import {
   replayReviewHistory,
   reviewDocumentBaseline,
@@ -13,6 +14,15 @@ import {
   prepareVideoWorkspaceTyping,
   withoutVideoWorkspaceTyping,
 } from './typing';
+
+vi.mock('../../../features/editor-history/policy', async (original) => {
+  const policy = await original<typeof import('../../../features/editor-history/policy')>();
+  return {
+    ...policy,
+    // Force one admitted typing group over the budget with an ordinary bounded text fixture.
+    EDITOR_HISTORY_LIMITS: { ...policy.EDITOR_HISTORY_LIMITS, maxBytes: 8 * 1024 * 1024 },
+  };
+});
 
 const firstAction = '00000000-0000-4000-8000-000000000001';
 const secondAction = '00000000-0000-4000-8000-000000000002';
@@ -121,7 +131,7 @@ it('retains an oversized group as current baseline without resurrecting its suff
   const second = edit(compacted, 'Short', true);
   const hypothetical = [{ ...first.candidate.history[0], after: second.change.after }];
   expect(new TextEncoder().encode(JSON.stringify(hypothetical)).byteLength).toBeLessThanOrEqual(
-    8 * 1024 * 1024
+    EDITOR_HISTORY_LIMITS.maxBytes
   );
   expect(second.candidate.history).toEqual([]);
   expect(second.candidate.baseline?.advancedContent.text?.fragments[0]?.text).toBe('Short');

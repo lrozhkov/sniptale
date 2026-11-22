@@ -9,6 +9,7 @@ import {
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { LoaderCircle } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
+import { InspectorFieldClear } from '../../../../ui/compact-inspector-controls/text-field';
 
 export function ProjectNameDialog(props: {
   copy: boolean;
@@ -27,6 +28,7 @@ export function ProjectNameDialog(props: {
   const input = useRef<HTMLInputElement>(null);
   const titleId = useId();
   const nameId = useId();
+  const nameLabel = translate('videoEditor.app.projectNameLabel');
   const title = translate(
     props.copy ? 'videoEditor.app.copyProjectAction' : 'videoEditor.app.newProjectAction'
   );
@@ -62,7 +64,11 @@ export function ProjectNameDialog(props: {
     }
   };
   return (
-    <div ref={root} data-ui="video-editor.project-name-dialog">
+    <div
+      ref={root}
+      className="sniptale-compact-workspace"
+      data-ui="video-editor.project-name-dialog"
+    >
       <ProductModal
         width="min(420px, calc(100vw - 32px))"
         labelledBy={titleId}
@@ -109,16 +115,18 @@ export function ProjectNameDialog(props: {
         >
           <ProductModalBody compact>
             <label htmlFor={nameId} className="text-xs text-[var(--sniptale-color-text-secondary)]">
-              {translate('videoEditor.app.projectNameLabel')}
+              {nameLabel}
             </label>
-            <ProductInput
-              ref={input}
-              id={nameId}
-              value={name}
-              disabled={busy}
-              onChange={(event) => setName(event.target.value)}
-              className="sniptale-save-dialog-input w-full"
-            />
+            <div className="sniptale-text-value" data-framed>
+              <ProductInput
+                ref={input}
+                id={nameId}
+                value={name}
+                disabled={busy}
+                onChange={(event) => setName(event.target.value)}
+              />
+              {name && !busy ? <InspectorFieldClear label={nameLabel} target={input} /> : null}
+            </div>
             {error ? (
               <p role="alert" className="text-xs text-[var(--sniptale-color-text-danger)]">
                 {translate('common.errors.actionFailed')}

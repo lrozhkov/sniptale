@@ -6,12 +6,27 @@ import {
 } from '../../../composition/persistence/sync-capture/checkpoint-publication';
 import type { EditorDocument } from '../../../features/editor/document/types';
 import type { AssetRef } from '../../../composition/persistence/assets';
+import type {
+  CommitImageWorkspaceInput,
+  CommitImageWorkspaceResult,
+} from '../../../composition/persistence/image-aggregates';
 import type { createAutosaveCoordinator } from '@sniptale/platform/data/autosave';
+import type { EditorImageHistoryCheckpoint } from '../../../features/editor-history/image-checkpoint';
+
+export type EditorHistoryCapture = () => EditorImageHistoryCheckpoint | null;
+export type EditorHistoryCaptureSource = (
+  document: EditorDocument,
+  mode: 'background' | 'explicit'
+) => EditorHistoryCapture;
 
 export interface ActiveEditorSessionContext {
   aggregateId: string;
   capturedAt?: number;
   durableRevision: number;
+  sourceGeneration?: string | null;
+  original?: CommitImageWorkspaceInput['original'];
+  newOriginal?: CommitImageWorkspaceInput['newOriginal'];
+  onFirstPublication?: () => void;
   requireExistingRoot?: boolean;
   sourceUrl: string | null;
   sourceTitle: string | null;
@@ -23,7 +38,12 @@ export type EditorAutosaveCapture = {
   contextGeneration: number;
   hydrationGeneration: number;
   document: EditorDocument;
+  history?: EditorImageHistoryCheckpoint;
   revision: number;
+};
+
+export type EditorSaveSnapshot = Pick<EditorAutosaveCapture, 'document' | 'history'> & {
+  isCurrent(): boolean;
 };
 
 export interface AutosaveCheckpointEdit {
@@ -42,6 +62,13 @@ export interface EditorCheckpointExit {
 }
 
 export type EditorSessionAutosaveState = {
+  pendingCommit: {
+    capture: EditorAutosaveCapture;
+    commit: () => Promise<CommitImageWorkspaceResult>;
+  } | null;
+  prepareHistory: EditorHistoryCaptureSource | null;
+  pendingHistoryCapture: EditorHistoryCapture | undefined;
+  historyAssetsByValue: ReadonlyMap<string, AssetRef>;
   lastCheckpointReceipt: SyncCheckpointReceipt | null;
   checkpointEdit: AutosaveCheckpointEdit | null;
   activeContext: ActiveEditorSessionContext | null;
@@ -70,8 +97,14 @@ export type EditorSessionAutosaveState = {
   releaseHydratedDocument: (() => void) | null;
 };
 
-export function createAutosaveState(): EditorSessionAutosaveState {
+export function createAutosaveState(
+  options: { prepareHistory?: EditorHistoryCaptureSource } = {}
+): EditorSessionAutosaveState {
   return {
+    pendingCommit: null,
+    prepareHistory: options.prepareHistory ?? null,
+    pendingHistoryCapture: undefined,
+    historyAssetsByValue: new Map(),
     lastCheckpointReceipt: null,
     checkpointEdit: null,
     activeContext: null,

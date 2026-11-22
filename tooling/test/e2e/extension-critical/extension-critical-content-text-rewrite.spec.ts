@@ -3,11 +3,8 @@ import type { Page, Locator, BrowserContext, TestInfo } from '@playwright/test';
 import { expect, test } from '../support/extension-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
-import {
-  translate,
-  type AppLocale,
-  type TranslationKey,
-} from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
+import type { AppLocale, TranslationKey } from '../../../../apps/extension/src/platform/i18n';
 
 test.setTimeout(180_000);
 const replacement = '<b>Plain replacement text</b>';
@@ -366,6 +363,19 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       const submit = ui(page, 'content.ai-text.submit');
       await expect(popover).toBeVisible();
       await expect(prompt).toBeFocused();
+      await prompt.fill(
+        Array.from({ length: 24 }, (_, index) => `Rewrite line ${index}`).join('\n')
+      );
+      expect(
+        await prompt.evaluate((node) => getComputedStyle(node, '::-webkit-scrollbar').width)
+      ).toBe('6px');
+      await prompt.hover();
+      await prompt.evaluate((node) => {
+        node.scrollTop = 0;
+      });
+      await page.mouse.wheel(0, 100);
+      await expect.poll(() => prompt.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+      await prompt.fill('');
       const templates = ui(page, 'ai-modal.template-picker');
       await expect(templates.getByRole('button')).toBeEnabled();
       await templates.getByRole('button').click();

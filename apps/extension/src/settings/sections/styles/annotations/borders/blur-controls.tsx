@@ -11,17 +11,23 @@ import type { HighlighterEffectsProps } from './types';
 const blurTypeOptions = [
   {
     value: 'gaussian',
-    label: translate('highlighter.section.blurTypeGaussian'),
+    get label() {
+      return translate('highlighter.section.blurTypeGaussian');
+    },
     icon: <Droplet size={14} />,
   },
   {
     value: 'distortion',
-    label: translate('highlighter.section.blurTypeDistortion'),
+    get label() {
+      return translate('highlighter.section.blurTypeDistortion');
+    },
     icon: <Waves size={14} />,
   },
   {
     value: 'solid',
-    label: translate('highlighter.section.blurTypeSolid'),
+    get label() {
+      return translate('highlighter.section.blurTypeSolid');
+    },
     icon: <Square size={14} />,
   },
 ] as const;

@@ -284,6 +284,7 @@ it('preserves the actual replace restore when it commits during pending Save pre
     assets: empty(),
     exports: { ...empty(), index: () => ({ getAll: async () => [] }) },
     media: empty(),
+    imageIdentities: empty(),
     videoWorkspaces: empty(),
     videoDrafts: empty(),
     operations: empty(),
@@ -855,7 +856,9 @@ it.each(['active', 'remembered'] as const)(
       expect(retained.assetIds).toEqual([]);
       expect(retained.privateSources?.map((entry) => entry.projectAssetId).sort()).toEqual(images);
     }
-    await expect(deleteVideoProject(roots[0]!.id)).resolves.toEqual([]);
+    await expect(deleteVideoProject(roots[0]!.id)).resolves.toMatchObject({
+      deletedProjectAssetIds: [],
+    });
     expect(fixture.rows.get('video_projects')!.has(roots[1]!.id)).toBe(true);
     const reopened = await getVideoProject(roots[1]!.id);
     if (reopened.status !== 'ready')
@@ -883,7 +886,9 @@ it.each(['active', 'remembered'] as const)(
     } finally {
       read.mockRestore();
     }
-    await expect(deleteVideoProject(roots[1]!.id)).resolves.toEqual(images);
+    await expect(deleteVideoProject(roots[1]!.id)).resolves.toMatchObject({
+      deletedProjectAssetIds: images,
+    });
     for (const image of images) expect(fixture.rows.get('project_assets')!.has(image)).toBe(false);
   }
 );

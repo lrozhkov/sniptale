@@ -16,6 +16,12 @@ function Harness({ active = true }: { active?: boolean }) {
             <button type="button" {...order.interaction(track)}>
               {track}
             </button>
+            <button
+              type="button"
+              data-pin={track}
+              aria-pressed={order.pinned.has(track)}
+              onClick={() => order.togglePin(track)}
+            />
           </div>
         ))}
       </div>
@@ -56,23 +62,86 @@ it('moves only the view order with keyboard while retaining each mounted row', a
   await act(async () =>
     node.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
   );
-  expect(order()[0]).toBe('music');
+  expect(order().slice(0, 2)).toEqual(['source', 'music']);
   expect(host.querySelector('[data-review-header-track="music"] button')).toBe(node);
   await act(async () =>
     node.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
   );
-  expect(order().slice(0, 2)).toEqual(['keyboard', 'music']);
+  expect(order().slice(0, 3)).toEqual(['source', 'keyboard', 'music']);
+});
+it('moves tracks to the group boundary on pin and unpin', async () => {
+  const pin = (track: string) => host.querySelector<HTMLButtonElement>(`[data-pin="${track}"]`)!;
+  expect(pin('source').getAttribute('aria-pressed')).toBe('true');
+  expect(pin('music').getAttribute('aria-pressed')).toBe('false');
+  await act(async () => pin('music').click());
+  expect(order().slice(0, 3)).toEqual(['source', 'music', 'keyboard']);
+  await act(async () => pin('source').click());
+  expect(order().slice(0, 3)).toEqual(['music', 'source', 'keyboard']);
+  await act(async () => pin('music').click());
+  expect(order().slice(0, 3)).toEqual(['music', 'source', 'keyboard']);
+});
+
+it('keeps the target when the pointer hovers near a boundary between unequal rows', async () => {
+  const height = (node: Element) =>
+    node.getAttribute('data-review-header-track') === 'keyboard'
+      ? 24
+      : node.getAttribute('data-review-header-track') === 'mouse'
+        ? 56
+        : 32;
+  vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockImplementation(function (
+    this: HTMLElement
+  ) {
+    const siblings = [...(this.parentElement?.children ?? [])];
+    const y = siblings.slice(0, siblings.indexOf(this)).reduce((top, row) => top + height(row), 0);
+    return new DOMRect(0, y, 120, height(this));
+  });
+  const handle = host.querySelector<HTMLButtonElement>(
+    '[data-review-header-track="keyboard"] button'
+  )!;
+  await act(async () => pointer(handle, 'pointerdown', 44));
+  await act(async () => pointer(handle, 'pointermove', 68));
+  expect(order().slice(0, 3)).toEqual(['source', 'mouse', 'keyboard']);
+  await act(async () => pointer(handle, 'pointermove', 63));
+  expect(order().slice(0, 3)).toEqual(['source', 'mouse', 'keyboard']);
+  await act(async () => pointer(handle, 'pointermove', 55));
+  expect(order().slice(0, 3)).toEqual(['source', 'keyboard', 'mouse']);
+  await act(async () => pointer(handle, 'pointerup', 55));
+});
+
+it('reorders with pointer and keyboard without crossing the pin boundary', async () => {
+  await act(async () => host.querySelector<HTMLButtonElement>('[data-pin="mouse"]')!.click());
+  const handle = (track: string) =>
+    host.querySelector<HTMLButtonElement>(`[data-review-header-track="${track}"] button`)!;
+  const press = (track: string, key: string) =>
+    act(async () =>
+      handle(track).dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
+    );
+  await act(async () => pointer(handle('mouse'), 'pointerdown', 48));
+  await act(async () => pointer(handle('mouse'), 'pointermove', 80));
+  expect(order().slice(0, 3)).toEqual(['source', 'mouse', 'keyboard']);
+  await act(async () => pointer(handle('mouse'), 'pointermove', 16));
+  await act(async () => pointer(handle('mouse'), 'pointerup', 16));
+  expect(order().slice(0, 3)).toEqual(['mouse', 'source', 'keyboard']);
+  await press('source', 'End');
+  await press('keyboard', 'ArrowUp');
+  expect(order().slice(0, 3)).toEqual(['mouse', 'source', 'keyboard']);
+  await press('source', 'Home');
+  expect(order().slice(0, 3)).toEqual(['source', 'mouse', 'keyboard']);
+  await act(async () => pointer(handle('keyboard'), 'pointerdown', 80));
+  await act(async () => pointer(handle('keyboard'), 'pointermove', 16));
+  await act(async () => pointer(handle('keyboard'), 'pointerup', 16));
+  expect(order().slice(0, 3)).toEqual(['source', 'mouse', 'keyboard']);
 });
 it.each(['Escape', 'blur', 'pointercancel'])(
   'previews pointer order and restores it on %s',
   async (cancel) => {
     const node = host.querySelector<HTMLButtonElement>(
-      '[data-review-header-track="source"] button'
+      '[data-review-header-track="keyboard"] button'
     )!;
     await act(async () => pointer(node, 'pointerdown', 48));
     expect(host.querySelector('.review-track-reordering')).not.toBeNull();
     await act(async () => pointer(node, 'pointermove', 112));
-    expect(order().slice(0, 4)).toEqual(['keyboard', 'mouse', 'webcam', 'source']);
+    expect(order().slice(0, 4)).toEqual(['source', 'mouse', 'webcam', 'keyboard']);
     await act(async () => {
       if (cancel === 'Escape')
         window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
@@ -84,21 +153,25 @@ it.each(['Escape', 'blur', 'pointercancel'])(
   }
 );
 it('retains accepted pointer order after release and ignores later lost capture', async () => {
-  const node = host.querySelector<HTMLButtonElement>('[data-review-header-track="source"] button')!;
+  const node = host.querySelector<HTMLButtonElement>(
+    '[data-review-header-track="keyboard"] button'
+  )!;
   await act(async () => pointer(node, 'pointerdown', 48));
   await act(async () => pointer(node, 'pointermove', 112));
   await act(async () => pointer(node, 'pointerup', 112));
   await act(async () => pointer(node, 'lostpointercapture', 112));
-  expect(order().slice(0, 4)).toEqual(['keyboard', 'mouse', 'webcam', 'source']);
+  expect(order().slice(0, 4)).toEqual(['source', 'mouse', 'webcam', 'keyboard']);
 });
 
 it('keeps the pointer gesture through a portal DOM move and cancels when settings close', async () => {
-  const node = host.querySelector<HTMLButtonElement>('[data-review-header-track="source"] button')!;
+  const node = host.querySelector<HTMLButtonElement>(
+    '[data-review-header-track="keyboard"] button'
+  )!;
   await act(async () => pointer(node, 'pointerdown', 48));
   await act(async () => pointer(node, 'pointermove', 112));
   await act(async () => pointer(node, 'lostpointercapture', 112));
-  await act(async () => pointer(node, 'pointermove', 0));
-  expect(order()[0]).toBe('source');
+  await act(async () => pointer(node, 'pointermove', 48));
+  expect(order().slice(0, 2)).toEqual(['source', 'keyboard']);
   await act(async () => root.render(<Harness active={false} />));
   expect(order()).toEqual(REVIEW_TRACK_ORDER);
 });

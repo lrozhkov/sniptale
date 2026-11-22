@@ -1,6 +1,6 @@
 import { initDB } from '../infrastructure/indexed-db/core';
 
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { createProjectExportEntry } from '../projects/index.test-support';
 
@@ -27,7 +27,11 @@ vi.mock('../assets', async (original) => ({
   listReadyJournals: vi.fn().mockResolvedValue([]),
   readAssetFile: io.read,
 }));
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.stubGlobal('navigator', {});
+});
+afterEach(() => vi.unstubAllGlobals());
 
 function setup() {
   const fixture = createMediaReplicaFixture();

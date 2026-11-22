@@ -97,7 +97,7 @@ it('prepares the backup closure without changing editing usage and checks actual
   io.ready.mockResolvedValue(true);
   await ensureNativeBackupRootAvailable(root);
   expect(io.needs).toHaveBeenCalledWith(root, 'backup');
-  expect(io.backup).toHaveBeenCalledWith(root);
+  expect(io.backup).toHaveBeenCalledWith(root, true);
   expect(io.ready).toHaveBeenCalledWith(root, 'backup');
   expect(io.touch).not.toHaveBeenCalled();
 });
@@ -169,7 +169,7 @@ it('preserves resident local publication without a sync connection in production
   io.needs.mockResolvedValue(false);
   const writer = vi.fn(async () => 'local');
   await expect(runWithNativePublicationResources([root], writer)).resolves.toBe('local');
-  expect(io.needs).toHaveBeenCalledWith(root, 'backup');
+  expect(io.needs).toHaveBeenCalledWith(root, 'cache');
   expect(io.client).not.toHaveBeenCalled();
 });
 

@@ -1,3 +1,6 @@
+import { retireImageWorkspaceIdentity } from '../image-workspaces/identity';
+import { parseMediaLibraryEntry } from './read-guards';
+import { imageWorkspaceAssetBindings } from '../image-workspaces/assets';
 import { retireNativeRecordingHistoryInTransaction } from '../recordings/native-history/retirement';
 import { retireRecordingEventSourcesInTransaction } from '../recordings/recording-events/retirement';
 import { RECORDING_EVENTS_SNAPSHOT_ROLE } from '../recordings/recording-events/contracts';
@@ -6,7 +9,11 @@ import { RECORDING_CURSOR_SNAPSHOT_ROLE } from '../recordings/cursor-trajectory/
 import { parseAssetOwner } from '../assets/guards';
 import { parseRecordingTelemetryEntry } from '../recordings/telemetry.guards';
 export { mediaHasPendingPublication } from '../assets/ready-media-claims';
-import { readDeletionDependencyRows, readDeletionExportInputRows } from './deletion-index';
+import {
+  readDeletionDependencyRows,
+  readDeletionExportInputRows,
+  readImageSourceClaims,
+} from './deletion-index';
 import { deleteRecoveryInTransaction } from '../recordings/recovery/storage';
 import { createVideoWorkspaceStore } from '../review-workspaces/storage';
 import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
@@ -23,7 +30,7 @@ import {
 import { parseVideoWorkspace } from '../review-workspaces/parser';
 import { createProjectAssetMediaId } from '../../../features/media-hub/media-id';
 import type { PhysicalDeleteAssetOperation } from '../assets';
-import { MediaAssetDeletionBlockedError } from './deletion-errors';
+import { MediaAssetDeletionBlockedError, PrimaryMediaAssetDeleteError } from './deletion-errors';
 import {
   IMAGE_WORKSPACES_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
@@ -180,6 +187,9 @@ export async function deleteMediaSidecars(
   mediaId: string,
   physicalDelete: PhysicalDelete
 ): Promise<Set<string>> {
+  const { linked, unknown } = await readImageSourceClaims(tx, mediaId);
+  if (unknown) throw new MediaAssetDeletionBlockedError('source-unavailable');
+  if (linked) throw new PrimaryMediaAssetDeleteError();
   const review = parseVideoWorkspace(await createVideoWorkspaceStore(tx).get(mediaId));
   const privateCandidates = new Set(
     [...(review ? collectReviewAssetReferences(review) : [])].map((id) =>
@@ -189,9 +199,12 @@ export async function deleteMediaSidecars(
   const imageWorkspace = parseImageWorkspaceEntry(
     await tx.objectStore(IMAGE_WORKSPACES_STORE).get(mediaId)
   );
+  const media = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId));
+  if (imageWorkspace || media?.kind === 'image' || media?.kind === 'screenshot')
+    await retireImageWorkspaceIdentity(tx, mediaId);
   if (imageWorkspace) {
     await removeEditorDocumentOwnership({
-      document: imageWorkspace.document,
+      document: { assets: imageWorkspaceAssetBindings(imageWorkspace) },
       ownerId: mediaId,
       ownerKind: 'image-workspace',
       physicalDelete,

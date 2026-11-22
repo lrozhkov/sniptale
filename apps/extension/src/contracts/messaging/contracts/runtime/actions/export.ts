@@ -1,3 +1,4 @@
+import { isAppLocale } from '@sniptale/runtime-contracts/i18n';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { createGuardParser } from '@sniptale/runtime-contracts/messaging/parsers/utils';
 import {
@@ -81,7 +82,7 @@ function isRuntimePopupExportBuildPackageRequest(
 
 const isPagePackageJobStatusResponseEnvelope = createRuntimeResponseGuard({
   optional: {
-    locale: isNullable((value) => value === 'en' || value === 'ru'),
+    locale: isNullable(isAppLocale),
     status: isNullable(isPagePackageJobStatus),
   },
 });
@@ -111,7 +112,7 @@ export const runtimeActionExportMessageContracts = {
           includeWebCopy: (value) => typeof value === 'boolean',
           intent: (value) => value === 'export' || value === 'save',
           jobId: isPopupExportJobId,
-          locale: (value) => value === 'en' || value === 'ru',
+          locale: isAppLocale,
           captureTiming: isPagePackageCaptureTiming,
           sources: isPagePackageCaptureSources,
           options: isExportOptions,
@@ -175,7 +176,7 @@ export const runtimeActionExportMessageContracts = {
       createMessageGuard({
         type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED,
         required: {
-          locale: (value) => value === 'en' || value === 'ru',
+          locale: isAppLocale,
           status: isPagePackageJobStatus,
         },
       })

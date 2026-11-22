@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, Suspense, startTransition, useRef } from 'react';
+import { ReviewPlaybackPresentationClockContext } from './playback-presentation-clock';
+import { createReviewPlaybackPresentationClock } from './playback-presentation-clock.test-support';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReviewAnchor } from '../../features/video/review/types';
 import { ReviewTimelineHoverGuide } from './timeline-hover';
 import { ReviewTimeline } from './timeline';
-import { useReviewTimelineGeometry } from './timeline-geometry';
+import * as i18n from '../../platform/i18n';
+import { useReviewTimelineNavigation, useReviewTimelineGeometry } from './timeline-geometry';
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
   translate: (key: string) => key,
@@ -219,6 +222,91 @@ it('does not observe geometry before the viewport mounts', () => {
   expect(environment.host!.childElementCount).toBe(0);
 });
 
+it('follows live playback without parent renders and leaves user scrolling in control', () => {
+  const clock = createReviewPlaybackPresentationClock(() => true);
+  let playing = false,
+    renders = 0,
+    now = 0;
+  vi.spyOn(performance, 'now').mockImplementation(() => (now += 101));
+  let navigation!: ReturnType<typeof useReviewTimelineNavigation>;
+  function Harness() {
+    renders++;
+    const viewport = useRef<HTMLDivElement>(null);
+    navigation = useReviewTimelineNavigation(
+      {
+        duration: 10,
+        time: 0,
+        playing,
+        onSeek: vi.fn(),
+      },
+      { viewport, gutter: 0, width: 800 }
+    );
+    return <div ref={viewport} />;
+  }
+  const render = () =>
+    act(() =>
+      environment.root!.render(
+        <ReviewPlaybackPresentationClockContext value={clock}>
+          <Harness />
+        </ReviewPlaybackPresentationClockContext>
+      )
+    );
+  render();
+  act(() => navigation.onZoom(2));
+  playing = true;
+  render();
+  const node = environment.host!.firstElementChild as HTMLDivElement;
+  const before = renders;
+  act(() => clock.publish(6));
+  expect(node.scrollLeft).toBe(800);
+  expect(renders).toBe(before);
+  node.scrollLeft = 200;
+  act(() => navigation.follow.onScroll());
+  act(() => clock.publish(8));
+  expect(node.scrollLeft).toBe(200);
+  expect(renders).toBe(before);
+});
+
+it('keeps source traversal visible after a freeze when a removed span has no result position', () => {
+  const clock = createReviewPlaybackPresentationClock(() => true);
+  clock.publish(2.5);
+  const { props } = renderTimeline({
+    duration: 4,
+    time: 2.5,
+    playing: true,
+    edits: [
+      {
+        id: 'freeze',
+        kind: 'freeze',
+        start: 1,
+        end: 1,
+        requestedStart: 1,
+        requestedEnd: 1,
+        duration: 2,
+        frameTime: 0.98,
+        frameDuration: 0.04,
+      },
+      { id: 'cut', kind: 'cut', start: 2, end: 3, requestedStart: 2, requestedEnd: 3 },
+    ],
+  });
+  const renderClock = (value: typeof clock & { readResult?(): number | null }) =>
+    act(() =>
+      environment.root!.render(
+        <ReviewPlaybackPresentationClockContext value={value}>
+          <ReviewTimeline {...props} />
+        </ReviewPlaybackPresentationClockContext>
+      )
+    );
+  const left = () =>
+    environment.host!.querySelector<HTMLElement>('[data-ui="gallery.videoReview.playhead"]')!.style
+      .transform;
+  renderClock(clock);
+  const sourcePosition = left();
+  expect(Number.parseFloat(sourcePosition.slice('translateX('.length))).toBeGreaterThan(0);
+  renderClock({ ...clock, readResult: () => null });
+  expect(left()).toBe(sourcePosition);
+});
+
 it('previews the boundary that basic cut drawing will select', () => {
   const { host } = renderTimeline({
     sourceRangeTool: true,
@@ -354,7 +442,7 @@ it('marks the selected source edit while preserving neutral surfaces', () => {
   const blocks = host.querySelectorAll<HTMLElement>('[data-ui="gallery.videoReview.editBlock"]');
   expect(blocks[0]!.querySelector('button')!.getAttribute('aria-pressed')).toBe('false');
   expect(blocks[1]!.querySelector('button')!.getAttribute('aria-pressed')).toBe('true');
-  expect(blocks[1]!.className).toContain('border-[var(--sniptale-color-accent)]');
+  expect(blocks[1]!.classList.contains('review-timeline-item-selected')).toBe(true);
   expect(blocks[0]!.className).toContain('var(--sniptale-color-danger)_12%');
   expect(blocks[1]!.className).toContain('var(--sniptale-color-info)_12%');
   expect(host.querySelector('[data-ui="gallery.videoReview.sourceRange"]')).toBeNull();
@@ -863,10 +951,12 @@ it('keeps source selection and comment identities while inserted time expands th
   };
   const note = { id: 'note', text: 'After hold', anchor: { kind: 'point' as const, time: 3.5 } };
   const onSeekResult = vi.fn();
+  const onEdit = vi.fn();
   const { host, props } = renderTimeline({
     edits: [freeze, cut],
     annotations: [note],
     onSeekResult,
+    onEdit,
     resultTime: 2,
     playbackRange: { start: 0.5, end: 3.5 },
     boundaries: [0, 1, 4],
@@ -879,7 +969,8 @@ it('keeps source selection and comment identities while inserted time expands th
   expect(block).not.toBeNull();
   expect(Number.parseFloat(block.style.width)).toBeCloseTo(100 / 3);
   act(() => block.querySelector<HTMLButtonElement>('button')!.click());
-  expect(onSeekResult).toHaveBeenCalledWith(1);
+  expect(onEdit).toHaveBeenCalledWith(freeze);
+  expect(onSeekResult).not.toHaveBeenCalled();
   act(() => host.querySelector<HTMLButtonElement>('[title="After hold"]')!.click());
   expect(props.onComment).toHaveBeenCalledWith(note);
   const plane = planeWithMetrics(host);
@@ -978,4 +1069,225 @@ it('resizes a freeze duration through the shared end handle without moving its s
   }
   expect(onFreezeDurationChange).toHaveBeenCalledExactlyOnceWith(freeze, 3);
   expect(freeze).toMatchObject({ start: 1, end: 1, frameTime: 0.98, duration: 2 });
+});
+
+it('reports an unchanged visible source window once while the playhead traverses inserted time', () => {
+  const onHistoryRange = vi.fn();
+  const edits = [
+    {
+      id: 'hold',
+      kind: 'freeze' as const,
+      start: 2,
+      end: 2,
+      requestedStart: 2,
+      requestedEnd: 2,
+      duration: 2,
+      frameTime: 1.96,
+      frameDuration: 0.04,
+    },
+  ];
+  const { props } = renderTimeline({ edits, resultTime: 2, onHistoryRange });
+  expect(onHistoryRange).toHaveBeenCalledExactlyOnceWith({ start: 0, end: 4 });
+  for (let frame = 1; frame <= 8; frame++) {
+    act(() =>
+      environment.root!.render(<ReviewTimeline {...props} time={2} resultTime={2 + frame / 10} />)
+    );
+  }
+  expect(onHistoryRange).toHaveBeenCalledOnce();
+});
+
+it('does not read scroll geometry when playback follow is disabled by a selected interval', () => {
+  const viewport = { current: document.createElement('div') };
+  const read = vi.fn(() => 0);
+  Object.defineProperty(viewport.current, 'scrollLeft', { get: read, set() {} });
+  function Harness() {
+    useReviewTimelineNavigation(
+      {
+        duration: 12,
+        time: 3.865,
+        playing: true,
+        playbackRange: { start: 3.865, end: 6.105 },
+        onSeek() {},
+      },
+      { viewport, gutter: 0, width: 800 }
+    );
+    return null;
+  }
+  act(() => environment.root!.render(<Harness />));
+  expect(read).not.toHaveBeenCalled();
+});
+
+it('resizes an interval inside freeze time, pauses before drafting and commits once in result time', () => {
+  const freeze = {
+    id: 'hold',
+    kind: 'freeze' as const,
+    start: 1,
+    end: 1,
+    requestedStart: 1,
+    requestedEnd: 1,
+    duration: 2,
+    frameTime: 0.98,
+    frameDuration: 0.04,
+  };
+  const onPause = vi.fn();
+  const onPlaybackRange = vi.fn();
+  const onHoverTime = vi.fn();
+  const { host, props } = renderTimeline({
+    edits: [freeze],
+    playing: true,
+    time: 1,
+    resultTime: 2,
+    playbackRange: { start: 1, end: 1, result: { start: 1, end: 3 } },
+    onPause,
+    onPlaybackRange,
+    onHoverTime,
+  });
+  const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
+  const gutter = parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
+  const geometry = vi.fn(() => new DOMRect(100, 0, 600 + gutter, 400));
+  Object.assign(plane, { getBoundingClientRect: geometry });
+  const handle = host.querySelector<HTMLElement>('[data-playback-range-edge="start"]')!;
+  Object.assign(handle, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  const pointer = (type: string, x: number) =>
+    act(() =>
+      handle.dispatchEvent(
+        new MouseEvent(type, {
+          bubbles: true,
+          clientX: x,
+          button: 0,
+          buttons: type === 'pointerup' ? 0 : 1,
+        })
+      )
+    );
+  pointer('pointerdown', 300);
+  expect(onPause).toHaveBeenCalledOnce();
+  pointer('pointermove', 350);
+  expect(onPlaybackRange).not.toHaveBeenCalled();
+  expect(props.onSeek).not.toHaveBeenCalled();
+  expect(onHoverTime.mock.calls.every(([time]) => time === null)).toBe(true);
+  pointer('pointerup', 350);
+  expect(onPlaybackRange).toHaveBeenCalledExactlyOnceWith({
+    start: 1,
+    end: 1,
+    result: { start: 1.5, end: 3 },
+  });
+  expect(geometry).toHaveBeenCalledOnce();
+});
+
+it('keeps event lane presentation asleep for seek-only parent updates and publishes the latest marker action', () => {
+  const markers: Parameters<typeof ReviewTimeline>[0]['markers'] = [
+    { ref: { kind: 'action', id: 'click' }, eventType: 'CLICK', start: 1, end: 1 },
+  ];
+  const edits: NonNullable<Parameters<typeof ReviewTimeline>[0]['edits']> = [];
+  const annotations: Parameters<typeof ReviewTimeline>[0]['annotations'] = [];
+  const first = vi.fn();
+  const latest = vi.fn();
+  const calls = vi.spyOn(i18n, 'translate');
+  const { host } = renderTimeline({ time: 0, markers, edits, annotations, onMarker: first });
+  const count = () =>
+    calls.mock.calls.filter(
+      ([key]) =>
+        key === 'gallery.videoReview.historyKeyboard' || key === 'gallery.videoReview.historyMouse'
+    ).length;
+  const initial = count();
+  renderTimeline({ time: 3, markers, edits, annotations, onMarker: latest });
+  expect.soft(count()).toBe(initial);
+  const button = host.querySelector<HTMLButtonElement>('[data-history-family="mouse"] button')!;
+  act(() => button.click());
+  expect(latest).toHaveBeenCalledWith(markers[0]);
+  expect(first).not.toHaveBeenCalled();
+  calls.mockRestore();
+});
+
+it('keeps event commands committed when a seek-only parent render is abandoned', async () => {
+  const markers: Parameters<typeof ReviewTimeline>[0]['markers'] = [
+    { ref: { kind: 'action', id: 'click' }, eventType: 'CLICK', start: 1, end: 1 },
+  ];
+  const { props, host } = renderTimeline({ markers, edits: [] });
+  const committed = vi.fn();
+  const abandoned = vi.fn();
+  const latest = vi.fn();
+  const attempted = vi.fn();
+  const pending = new Promise<void>(() => {});
+  function Wait({ suspend }: { suspend: boolean }) {
+    if (suspend) {
+      attempted();
+      throw pending;
+    }
+    return null;
+  }
+  const view = (onMarker: typeof committed, suspend: boolean, time: number) => (
+    <Suspense fallback={<span data-pending-events />}>
+      <ReviewTimeline {...props} onMarker={onMarker} time={time} />
+      <Wait suspend={suspend} />
+    </Suspense>
+  );
+  await act(async () => environment.root!.render(view(committed, false, 0)));
+  const button = host.querySelector<HTMLButtonElement>('[data-history-family="mouse"] button')!;
+  await act(async () => {
+    startTransition(() => environment.root!.render(view(abandoned, true, 3)));
+  });
+  expect(attempted).toHaveBeenCalled();
+  expect(host.querySelector('[data-pending-events]')).toBeNull();
+  act(() => button.click());
+  expect(committed).toHaveBeenCalledWith(markers[0]);
+  expect(abandoned).not.toHaveBeenCalled();
+  await act(async () => environment.root!.render(view(latest, false, 3)));
+  act(() => button.click());
+  expect(latest).toHaveBeenCalledWith(markers[0]);
+  expect(abandoned).not.toHaveBeenCalled();
+});
+
+it('selects a freeze body without moving it or changing its duration on drag', async () => {
+  const freeze = {
+    id: 'hold',
+    kind: 'freeze' as const,
+    start: 1,
+    end: 1,
+    requestedStart: 1,
+    requestedEnd: 1,
+    duration: 2,
+    frameTime: 0.98,
+    frameDuration: 0.04,
+  };
+  const onFreezeDurationChange = vi.fn();
+  const onChangeEdit = vi.fn();
+  const onEdit = vi.fn();
+  const { host } = renderTimeline({
+    edits: [freeze],
+    onFreezeDurationChange,
+    onChangeEdit,
+    onEdit,
+  });
+  const block = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.freezeBlock"]')!;
+  vi.spyOn(block.parentElement!, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(0, 0, 600, 48)
+  );
+  const capture = vi.fn();
+  Object.assign(block, {
+    setPointerCapture: capture,
+    hasPointerCapture: () => false,
+    releasePointerCapture: vi.fn(),
+  });
+  const before = block.style.cssText;
+  for (const [type, x] of [
+    ['pointerdown', 200],
+    ['pointermove', 300],
+    ['pointerup', 300],
+  ] as const) {
+    const event = new MouseEvent(type, { bubbles: true, clientX: x, button: 0 });
+    Object.defineProperty(event, 'pointerId', { value: 1 });
+    await act(async () =>
+      (type === 'pointerdown' ? block.querySelector('button')! : block).dispatchEvent(event)
+    );
+  }
+  expect(capture).not.toHaveBeenCalled();
+  expect(block.style.cssText).toBe(before);
+  expect(onEdit).toHaveBeenCalledExactlyOnceWith(freeze);
+  expect(onFreezeDurationChange).not.toHaveBeenCalled();
+  expect(onChangeEdit).not.toHaveBeenCalled();
 });

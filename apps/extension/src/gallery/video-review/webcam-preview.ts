@@ -63,6 +63,7 @@ export interface ReviewWebcamFrameLease {
 }
 
 type CaptureRequest = {
+  resultTime?: number;
   sourceTime?: number;
   settings?: QuickEditWebcam;
   generation?: number;
@@ -114,6 +115,7 @@ function createWebcamSource(
     !hybridView && typeof VideoDecoder !== 'undefined' && typeof VideoFrame !== 'undefined';
   const nativeCompatibility = !hybridView && typeof VideoFrame !== 'undefined';
   let unsupported = false;
+  let decodedCameraReady = false;
   let provider: PreviewSourceProvider | undefined;
   const abort = new AbortController();
   let metadata = { duration: 0, frameDuration: 1 / 30 };
@@ -258,7 +260,8 @@ function createWebcamSource(
       const mapped = quickEditWebcamFrameAt(
         request.settings,
         request.sourceTime,
-        metadata.duration
+        metadata.duration,
+        request.resultTime
       );
       if (!mapped) {
         events.ready(false);
@@ -347,6 +350,9 @@ function createWebcamSource(
   };
 
   return {
+    get canOverlapCapture() {
+      return decodedCameraReady && !unsupported && !disposed;
+    },
     captureAccepted: capture.captureAccepted,
     async captureFrame(
       request: CaptureRequest & { sourceTime: number; settings: QuickEditWebcam },
@@ -370,7 +376,12 @@ function createWebcamSource(
           : capture.captureAccepted(frozen, resources);
       await acquired;
       interest.throwIfAborted();
-      const mapped = quickEditWebcamFrameAt(frozen.settings, frozen.sourceTime, metadata.duration);
+      const mapped = quickEditWebcamFrameAt(
+        frozen.settings,
+        frozen.sourceTime,
+        metadata.duration,
+        frozen.resultTime
+      );
       if (!mapped) {
         events.ready(false);
         return { status: 'hidden' };
@@ -407,6 +418,7 @@ function createWebcamSource(
           mapped,
           resources
         );
+        decodedCameraReady = true;
         events.ready(true);
         return { status: 'ready', frame: admitted };
       } catch (error) {
@@ -542,7 +554,8 @@ function createWebcamCapture(
     const mapped = quickEditWebcamFrameAt(
       currentSettings,
       request.sourceTime ?? main.currentTime,
-      duration()
+      duration(),
+      request.resultTime
     );
     if (
       disposed ||

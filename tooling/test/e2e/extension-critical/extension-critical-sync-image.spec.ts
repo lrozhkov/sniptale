@@ -70,6 +70,7 @@ async function bootstrap(page: Page) {
   await applyHarnessBootstrap(page, {
     preserveMediaLibrary: true,
     editorDispatchBootstrapPayload: false,
+    storage: { 'sniptale-locale-preference': 'ru' },
   });
 }
 async function publicationAvailable(page: Page) {

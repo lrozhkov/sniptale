@@ -1,3 +1,15 @@
+import {
+  hasLegacyLibraryCapture,
+  isUneditedLegacyImage,
+  legacyImageProjectId,
+  legacyQuickEditProjectId,
+} from '../../../../composition/persistence/media-library/legacy-projects';
+import { decodePortableImageHistory } from '../root-codecs/image-history';
+import { hydratePersistedImageHistory } from '../../../../composition/persistence/image-workspaces/history-codec';
+import {
+  readImageWorkspaceIdentity,
+  restoreImageWorkspaceIdentity,
+} from '../../../../composition/persistence/image-workspaces/identity';
 import { createRecordingEventsStore } from '../../../../composition/persistence/recordings/recording-events/store';
 import { stageRecordingEventsStream } from '../../../../composition/persistence/recordings/recording-events/snapshot';
 import {
@@ -32,8 +44,13 @@ import {
   captureMediaInTransaction,
   captureVideoReviewInTransaction,
   allocateRestoredImageRevision,
+  readEnabledCaptureProfile,
 } from '../../../../composition/persistence/sync-capture/capture';
-import { parseCapturedMediaRows } from '../../../../composition/persistence/sync-capture/guards';
+import { captureRootKey } from '../../../../composition/persistence/sync-capture/contracts';
+import {
+  readCaptureRootState,
+  parseCapturedMediaRows,
+} from '../../../../composition/persistence/sync-capture/guards';
 import {
   publishPreparedMediaSourceInTransaction,
   publishPreparedMediaProjectChildInTransaction,
@@ -43,6 +60,7 @@ import {
   promoteLibraryLifecycle,
 } from '../../../../composition/persistence/library-lifecycle/contracts';
 import { createVideoWorkspaceStore } from '../../../../composition/persistence/review-workspaces/storage';
+import { parseVideoWorkspace } from '../../../../composition/persistence/review-workspaces/parser';
 import { freezeScenarioMediaRepresentations } from '../../../../composition/persistence/scenario/library-publication';
 import { sameMediaSource } from '../../../../composition/persistence/media-library/dependencies';
 import {
@@ -53,10 +71,12 @@ import {
 import { replaceSanitizedSnapshotPackage } from './page-package';
 import {
   VIDEO_WORKSPACES_STORE,
+  VIDEO_REVIEW_IDENTITIES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
+  PROJECT_EXPORT_INPUTS_STORE,
   VIDEO_PROJECTS_STORE,
   SCENARIO_ASSETS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core.stores';
@@ -81,6 +101,7 @@ import {
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   RECORDING_TELEMETRY_STORE,
@@ -114,7 +135,11 @@ import { createRecordingMediaId } from '../../../../features/media-hub/media-id'
 import { putWebSnapshotBackupRestore } from '../../../../composition/persistence/web-snapshots/backup-restore';
 import { parseStoredWebSnapshotRecord } from '../../../../composition/persistence/web-snapshots';
 import type { StoredWebSnapshotRecord } from '../../../../composition/persistence/web-snapshots/contracts';
-import { parsePortableMediaMetadata, preparePortableMediaOriginal } from '../root-codecs/media';
+import {
+  linkedQuickEditPrefix,
+  parsePortableMediaMetadata,
+  preparePortableMediaOriginal,
+} from '../root-codecs/media';
 import type { ArchiveRootPublisher } from '../restore';
 import type { StagedArchiveObject } from '../staging';
 import { rebaseTemporaryLifecycle } from '../restore-lifecycle';
@@ -128,6 +153,13 @@ import {
   publishMediaReviewAssets,
   publishStandaloneMediaVideoReview,
 } from './media-review-assets';
+import {
+  assertLinkedProjectSourceCurrent,
+  hasLinkedEditorClaims,
+  prepareLinkedProjectSource,
+  prepareProtectedArchiveSource,
+  type LinkedProjectSource,
+} from './linked-project';
 
 type MutableStore = {
   delete(key: IDBValidKey): Promise<unknown>;
@@ -192,6 +224,11 @@ function remapMediaIdentity(
   duplicate: boolean
 ) {
   if (!duplicate) return metadata.entry;
+  if (metadata.linkedSourceMediaId) {
+    const prefix = metadata.videoReview ? linkedQuickEditPrefix(metadata.entry.source.kind) : '';
+    if (prefix === null) throw new Error('Invalid linked Quick Edit source.');
+    return { ...metadata.entry, id: `${prefix}${newId()}` };
+  }
   if (metadata.projectAsset) {
     const id = newId();
     return {
@@ -244,13 +281,19 @@ async function hasMediaSourceConflict(metadata: PortableMedia): Promise<boolean>
       db.get(IMAGE_WORKSPACES_STORE, metadata.entry.id),
       db.get(VIDEO_WORKSPACES_STORE, metadata.entry.id),
       db.get(VIDEO_WORKSPACE_DRAFTS_STORE, metadata.entry.id),
-      metadata.projectAsset ? db.get(PROJECT_ASSETS_STORE, metadata.projectAsset.id) : undefined,
-      metadata.projectExport ? db.get(PROJECT_EXPORTS_STORE, metadata.projectExport.id) : undefined,
+      metadata.projectAsset && !metadata.linkedSourceMediaId
+        ? db.get(PROJECT_ASSETS_STORE, metadata.projectAsset.id)
+        : undefined,
+      metadata.projectExport && !metadata.linkedSourceMediaId
+        ? db.get(PROJECT_EXPORTS_STORE, metadata.projectExport.id)
+        : undefined,
       db.get(
         AGGREGATE_PRESENTATIONS_STORE,
         createAggregatePresentationKey({ id: metadata.entry.id, kind: 'image' })
       ),
-      relatedId && metadata.recording ? db.get(STORE_NAME, relatedId) : undefined,
+      relatedId && metadata.recording && !metadata.linkedSourceMediaId
+        ? db.get(STORE_NAME, relatedId)
+        : undefined,
       relatedId && metadata.webSnapshot ? db.get(WEB_SNAPSHOTS_STORE, relatedId) : undefined,
     ]);
     return values.some((value) => value !== undefined);
@@ -346,18 +389,22 @@ async function prepareThumbnail(args: {
   return thumbnail;
 }
 
-function prepareWorkspace(args: {
+async function prepareWorkspace(args: {
   mediaId: string;
   metadata: PortableMedia;
   objects: StagedObjectMap;
-}): { refs: AssetRef[]; workspace: StoredImageWorkspaceEntry | null } {
+  linkedSource?: LinkedProjectSource;
+}): Promise<{ refs: AssetRef[]; workspace: StoredImageWorkspaceEntry | null }> {
   if (!args.metadata.workspace) return { refs: [], workspace: null };
   const portableAssets = args.metadata.workspace.document.assets;
+  const history = args.metadata.workspace.history;
+  const objectIds = new Set([
+    ...portableAssets.map(({ objectId }) => objectId),
+    ...(history?.snapshots.map(({ objectId }) => objectId) ?? []),
+    ...(history?.values.map(({ objectId }) => objectId) ?? []),
+  ]);
   const assetsByObjectId = new Map(
-    portableAssets.map(({ objectId }) => [
-      objectId,
-      requireObject(args.objects, objectId).ref.assetId,
-    ])
+    [...objectIds].map((objectId) => [objectId, requireObject(args.objects, objectId).ref.assetId])
   );
   const document = decodePortableEditorDocument({
     document: args.metadata.workspace.document,
@@ -366,12 +413,22 @@ function prepareWorkspace(args: {
   const workspace = parseImageWorkspaceEntry({
     ...args.metadata.workspace,
     aggregateId: args.mediaId,
+    ...(args.linkedSource
+      ? { sourceMediaId: args.linkedSource.media.id, lifecycle: args.metadata.entry.lifecycle }
+      : {}),
     document,
+    ...(history ? { history: decodePortableImageHistory({ history, assetsByObjectId }) } : {}),
   });
   if (!workspace) throw new Error('Restored image workspace is invalid.');
-  const refs = [...new Set(portableAssets.map(({ objectId }) => objectId))].map(
-    (objectId) => requireObject(args.objects, objectId).ref
-  );
+  const refs = [
+    ...new Map(
+      [...objectIds].map((objectId) => {
+        const ref = requireObject(args.objects, objectId).ref;
+        return [ref.assetId, ref] as const;
+      })
+    ).values(),
+  ];
+  if (workspace.history) await hydratePersistedImageHistory({ history: workspace.history, refs });
   return { refs, workspace };
 }
 
@@ -409,6 +466,15 @@ async function prepareMediaRoot(args: {
   rootIdMap: Readonly<Record<string, string>>;
 }) {
   const original = requireObject(args.objects, args.metadata.originalObjectId);
+  const linkedSource = args.metadata.linkedSourceMediaId
+    ? await prepareLinkedProjectSource({
+        archivedSourceId: args.metadata.linkedSourceMediaId,
+        roots: args.rootIdMap,
+        original: original.ref,
+        sourceKind: args.metadata.entry.source.kind,
+        mediaKind: args.metadata.entry.kind,
+      })
+    : undefined;
   const targetEntry = remapMediaIdentity(
     args.metadata,
     args.strategy === 'duplicate' && (await hasMediaSourceConflict(args.metadata))
@@ -439,6 +505,9 @@ async function prepareMediaRoot(args: {
     ...restoredEntry,
     source: restoredSource,
     ...(screenshotBlob ? { blob: screenshotBlob } : {}),
+    ...(args.metadata.savedIndependently === undefined
+      ? {}
+      : { savedIndependently: args.metadata.savedIndependently }),
   });
   if (!media) throw new Error('Restored media metadata is invalid.');
   const recording = prepareRecording({
@@ -451,20 +520,42 @@ async function prepareMediaRoot(args: {
     objects: args.objects,
     targetEntry: restoredEntry,
   });
+  let { workspace, refs } = await prepareWorkspace({
+    mediaId: restoredEntry.id,
+    metadata: args.metadata,
+    objects: args.objects,
+    ...(linkedSource ? { linkedSource } : {}),
+  });
+  const legacyImage =
+    !linkedSource && workspace
+      ? parseImageWorkspaceEntry({
+          ...workspace,
+          aggregateId: legacyImageProjectId(media.id),
+          sourceMediaId: media.id,
+          lifecycle: media.lifecycle,
+        })
+      : null;
+  const legacyImageId = legacyImage?.aggregateId ?? null;
+  if (workspace && legacyImage) {
+    const matchesOriginal =
+      media.imageContentState === 'original' ||
+      args.metadata.workspace?.document.sourceImage.objectId === args.metadata.originalObjectId;
+    const discard =
+      media.lifecycle?.trashedAt === undefined &&
+      matchesOriginal &&
+      isUneditedLegacyImage(workspace, media.filename);
+    workspace = discard ? null : legacyImage;
+    if (discard) refs = [];
+  }
   const [thumbnail, presentation] = await Promise.all([
     prepareThumbnail({ mediaId: restoredEntry.id, metadata: args.metadata, objects: args.objects }),
     preparePortableAggregatePresentation({
       getObjectRef: (objectId) => requireObject(args.objects, objectId).ref,
       invalidMessage: 'Restored aggregate presentation is invalid.',
       metadata: args.metadata.presentation,
-      targetId: restoredEntry.id,
+      targetId: legacyImageId ?? restoredEntry.id,
     }),
   ]);
-  const workspace = prepareWorkspace({
-    mediaId: restoredEntry.id,
-    metadata: args.metadata,
-    objects: args.objects,
-  });
   const reviewAssets = await prepareMediaReviewAssets({
     createId: newId,
     rootIdMap: { ...args.rootIdMap, [`media:library-item:${args.metadata.entry.id}`]: media.id },
@@ -472,24 +563,58 @@ async function prepareMediaRoot(args: {
     objects: args.objects,
   });
   const projectVideo = prepareProjectVideo(args.metadata, media, original);
+  const protectedOriginal =
+    args.strategy === 'replace' && !linkedSource
+      ? await runWithIndexedDbMutation((db) =>
+          prepareProtectedArchiveSource(db, {
+            mediaId: media.id,
+            original: original.ref,
+            sourceKind: args.metadata.entry.source.kind,
+            mediaKind: args.metadata.entry.kind,
+          })
+        )
+      : null;
+  const legacyReviewId =
+    !linkedSource && args.metadata.videoReview ? legacyQuickEditProjectId(media) : undefined;
+  const source = linkedSource ?? protectedOriginal;
+  const sourceAsset = source?.asset;
   const videoReview = prepareStandaloneMediaVideoReview({
     mediaId: media.id,
     metadata: args.metadata,
     original,
     reviewAssets,
+    ...(legacyReviewId ? { projectId: legacyReviewId } : {}),
+    ...(source && sourceAsset
+      ? {
+          linkedSource: {
+            mediaId: source.media.id,
+            assetId: sourceAsset.assetId,
+            ...(source.media.source.kind === 'recording'
+              ? { recordingId: source.media.source.recordingId }
+              : {}),
+          },
+        }
+      : {}),
   });
   if (videoReview) await verifyPreparedMediaReviewAnnotations(videoReview, reviewAssets);
+  const legacyProjectId = (workspace && legacyImageId) || (videoReview && legacyReviewId) || null;
   return {
-    media,
+    linkedSource,
+    protectedOriginal,
+    legacyProjectId,
+    media: legacyImageId
+      ? { ...media, workspaceRevision: 0, imageContentState: 'original' as const }
+      : media,
     original,
-    presentation,
+    presentation: legacyImageId && !workspace ? null : presentation,
     snapshot,
     thumbnail,
     ...projectVideo,
     reviewAssets,
     videoReview,
     ...recording,
-    ...workspace,
+    workspace,
+    refs,
   };
 }
 
@@ -532,6 +657,38 @@ function isCaptureOriginal(prepared: PreparedMediaRoot): boolean {
   );
 }
 
+async function captureRestoredMedia(
+  tx: Parameters<typeof captureMediaInTransaction>[0],
+  prepared: PreparedMediaRoot
+) {
+  const id = prepared.media.id;
+  const options = { origin: 'local-restore' } as const;
+  if (prepared.linkedSource) {
+    if (prepared.workspace) await captureImageInTransaction(tx, id, options);
+    else if (prepared.videoReview) await captureVideoReviewInTransaction(tx, id, options);
+    return;
+  }
+  // New hidden sources wait for their project. Existing causal roots must record the replacement.
+  let captureSource = !prepared.protectedOriginal;
+  if (captureSource && prepared.media.savedIndependently === false) {
+    const profile = await readEnabledCaptureProfile(tx);
+    captureSource = Boolean(
+      profile &&
+      (await readCaptureRootState(tx, captureRootKey(profile.spaceId, 'media', id), () => {
+        throw new Error('Restored original has an invalid sync predecessor.');
+      }))
+    );
+  }
+  if (captureSource && isCaptureImage(prepared.media))
+    await captureImageInTransaction(tx, id, options);
+  else if (isCaptureReview(prepared))
+    await captureVideoReviewInTransaction(tx, prepared.legacyProjectId ?? id, options);
+  else if (captureSource && isCaptureOriginal(prepared))
+    await captureMediaInTransaction(tx, id, options);
+  if (prepared.legacyProjectId && prepared.workspace)
+    await captureImageInTransaction(tx, prepared.legacyProjectId, options);
+}
+
 async function hasRelatedMediaConflict(stores: MediaRestoreStores, prepared: PreparedMediaRoot) {
   if (prepared.projectAsset)
     return Boolean(await stores.projectAssets.get(prepared.projectAsset.id));
@@ -568,8 +725,42 @@ async function detectMediaConflicts(stores: MediaRestoreStores, prepared: Prepar
   return {
     conflict: Boolean(current || relatedConflict || sidecarConflict),
     current,
+    currentRevision: current?.workspaceRevision ?? 0,
     relatedConflict,
     sidecarConflict,
+  };
+}
+
+async function detectLinkedProjectConflicts(
+  stores: MediaRestoreStores,
+  prepared: PreparedMediaRoot,
+  sourceMediaId: string,
+  id = prepared.media.id
+) {
+  const [media, rawImage, rawReview, draft] = await Promise.all([
+    stores.media.get(id),
+    stores.workspaces.get(id),
+    stores.videoWorkspaces.get(id),
+    stores.videoDrafts.get(id),
+  ]);
+  if (media !== undefined) throw new Error('A linked project cannot replace a Library original.');
+  const image = prepared.workspace ? parseImageWorkspaceEntry(rawImage) : null;
+  const sameImage = image?.sourceMediaId === sourceMediaId;
+  const sameReview =
+    prepared.videoReview && parseVideoWorkspace(rawReview)?.sourceMediaId === sourceMediaId;
+  if (
+    (rawImage !== undefined && !sameImage) ||
+    ((rawReview !== undefined || draft !== undefined) && !sameReview)
+  )
+    throw new Error('A linked project cannot replace an unrelated project.');
+  if (await hasMediaReviewAssetConflict(stores, prepared.reviewAssets, sourceMediaId))
+    throw new Error('Restored media review asset identity is already in use.');
+  return {
+    conflict: Boolean(sameImage || sameReview),
+    current: null,
+    currentRevision: sameImage ? image.revision : 0,
+    relatedConflict: false,
+    sidecarConflict: false,
   };
 }
 
@@ -579,9 +770,12 @@ async function publishPreparedMedia(args: {
   prepared: PreparedMediaRoot;
   stores: MediaRestoreStores;
 }) {
-  await publishPreparedMediaSourceInTransaction(args.prepared, args.stores);
-  if (args.prepared.thumbnail) await args.stores.thumbnails.put(args.prepared.thumbnail);
-  await publishPreparedMediaProjectChildInTransaction(args.prepared, args.stores);
+  const publishSource = !args.prepared.linkedSource && !args.prepared.protectedOriginal;
+  if (publishSource) {
+    await publishPreparedMediaSourceInTransaction(args.prepared, args.stores);
+    if (args.prepared.thumbnail) await args.stores.thumbnails.put(args.prepared.thumbnail);
+    await publishPreparedMediaProjectChildInTransaction(args.prepared, args.stores);
+  }
   await publishMediaReviewAssets(args.prepared.reviewAssets, {
     media: args.stores.media,
     owners: args.stores.owners,
@@ -591,7 +785,7 @@ async function publishPreparedMedia(args: {
     videoDrafts: args.stores.videoDrafts,
   });
   await publishStandaloneMediaVideoReview(args.prepared.videoReview, args.stores);
-  if (args.prepared.recording) {
+  if (args.prepared.recording && publishSource) {
     await putRecordingBackupRestore({
       entry: args.prepared.recording,
       ownerStore: args.stores.owners,
@@ -647,14 +841,17 @@ async function commitPreparedMediaRoot(args: {
         SYNC_CAPTURE_STORE,
         SYNC_OUTBOX_STORE,
         THUMBNAILS_STORE,
+        IMAGE_WORKSPACE_IDENTITIES_STORE,
         IMAGE_WORKSPACES_STORE,
         VIDEO_WORKSPACES_STORE,
+        VIDEO_REVIEW_IDENTITIES_STORE,
         VIDEO_WORKSPACE_HISTORY_STORE,
         VIDEO_WORKSPACE_DRAFTS_STORE,
         VIDEO_PROJECTS_STORE,
         SCENARIO_ASSETS_STORE,
         PROJECT_ASSETS_STORE,
         PROJECT_EXPORTS_STORE,
+        PROJECT_EXPORT_INPUTS_STORE,
         AGGREGATE_PRESENTATIONS_STORE,
         STORE_NAME,
         RECORDING_TELEMETRY_STORE,
@@ -685,25 +882,68 @@ async function commitPreparedMediaRoot(args: {
       projectAssets: tx.objectStore(PROJECT_ASSETS_STORE),
       projectExports: tx.objectStore(PROJECT_EXPORTS_STORE),
     };
+    async function checkpointSkippedRoot() {
+      if (args.cursorStage)
+        await retireJournalCursorTrajectoryStagesInTransaction(tx, args.cursorStage.journalId);
+      if (args.eventsStage)
+        await retireJournalRecordingEventStagesInTransaction(tx, args.eventsStage.journalId);
+      await appendCommittedArchiveRootInTransaction(
+        tx.objectStore(ASSET_OPERATIONS_STORE),
+        args.session.operationId,
+        {
+          rootKey: args.rootKey,
+          targetRootId: args.prepared.media.id,
+          imported: false,
+          conflicted: true,
+        }
+      );
+      await tx.done;
+      return { conflicted: true, imported: false };
+    }
     try {
-      const conflict = await detectMediaConflicts(stores, args.prepared);
-      if (conflict.conflict && args.session.strategy === 'skip') {
-        if (args.cursorStage)
-          await retireJournalCursorTrajectoryStagesInTransaction(tx, args.cursorStage.journalId);
-        if (args.eventsStage)
-          await retireJournalRecordingEventStagesInTransaction(tx, args.eventsStage.journalId);
-        await appendCommittedArchiveRootInTransaction(
-          tx.objectStore(ASSET_OPERATIONS_STORE),
-          args.session.operationId,
-          {
-            rootKey: args.rootKey,
-            targetRootId: args.prepared.media.id,
-            imported: false,
-            conflicted: true,
-          }
-        );
-        await tx.done;
-        return { conflicted: true, imported: false };
+      const linked = args.prepared.linkedSource;
+      if (linked) await assertLinkedProjectSourceCurrent(tx, linked);
+      const protectedSource = args.prepared.protectedOriginal;
+      const legacyProjectId = args.prepared.legacyProjectId;
+      if (protectedSource) {
+        await assertLinkedProjectSourceCurrent(tx, protectedSource);
+        if (!legacyProjectId) return await checkpointSkippedRoot();
+      }
+      const legacyProjectConflict = legacyProjectId
+        ? await detectLinkedProjectConflicts(
+            stores,
+            args.prepared,
+            args.prepared.media.id,
+            legacyProjectId
+          )
+        : null;
+      const nativeConflict = linked
+        ? await detectLinkedProjectConflicts(stores, args.prepared, linked.media.id)
+        : await detectMediaConflicts(stores, args.prepared);
+      const conflict = {
+        ...nativeConflict,
+        conflict: nativeConflict.conflict || Boolean(legacyProjectConflict?.conflict),
+      };
+      if (conflict.conflict && args.session.strategy === 'skip')
+        return await checkpointSkippedRoot();
+      if (args.session.strategy === 'replace' && conflict.current && conflict.sidecarConflict) {
+        const id = conflict.current.id;
+        const capture = tx.objectStore(SYNC_CAPTURE_STORE);
+        const rawImage: unknown = await stores.workspaces.get(id);
+        const rawVideo: unknown = await stores.videoWorkspaces.get(id);
+        const image = parseImageWorkspaceEntry(rawImage);
+        const video = parseVideoWorkspace(rawVideo);
+        const readCapture = (key: string) => capture.get(key);
+        if (
+          (image &&
+            image.sourceMediaId === undefined &&
+            (await hasLegacyLibraryCapture(readCapture, 'media', id))) ||
+          (video &&
+            video.sourceMediaId === undefined &&
+            (await hasLegacyLibraryCapture(readCapture, 'video-review', id)))
+        ) {
+          return await checkpointSkippedRoot();
+        }
       }
       if (conflict.conflict && args.session.strategy === 'duplicate') {
         throw new Error('Media restore conflict changed after preflight.');
@@ -715,26 +955,67 @@ async function commitPreparedMediaRoot(args: {
       ) {
         throw new Error('Media restore child belongs to another root.');
       }
-      if (isCaptureImage(args.prepared.media)) {
+      if (isCaptureImage(args.prepared.media) && !protectedSource) {
+        const id = args.prepared.media.id;
+        const rootKind = linked && args.prepared.workspace ? 'image-project' : 'media';
+        const retirement =
+          rootKind === 'image-project'
+            ? ((await readImageWorkspaceIdentity(tx, id))?.retiredRevision ?? 0)
+            : 0;
         const revision = await allocateRestoredImageRevision(
           tx,
-          args.prepared.media.id,
-          conflict.current?.workspaceRevision ?? 0
+          id,
+          Math.max(conflict.currentRevision, retirement),
+          rootKind
         );
         if (revision !== null) {
           const sourceRevision = args.prepared.media.workspaceRevision ?? 0;
           args.prepared.media = { ...args.prepared.media, workspaceRevision: revision };
-          if (args.prepared.workspace)
+          if (args.prepared.workspace && !legacyProjectId)
             args.prepared.workspace = { ...args.prepared.workspace, revision };
-          if (args.prepared.presentation)
+          if (args.prepared.presentation && !legacyProjectId)
             args.prepared.presentation =
               args.prepared.presentation.presentationRevision === sourceRevision
                 ? { ...args.prepared.presentation, presentationRevision: revision }
                 : null;
         }
       }
-      await rebaseRestoredVideoReview(tx, args.prepared);
-      if (conflict.current && args.session.strategy === 'replace') {
+      if (legacyProjectId && args.prepared.workspace) {
+        const retirement =
+          (await readImageWorkspaceIdentity(tx, legacyProjectId))?.retiredRevision ?? 0;
+        const revision = await allocateRestoredImageRevision(
+          tx,
+          legacyProjectId,
+          Math.max(legacyProjectConflict?.currentRevision ?? 0, retirement),
+          'image-project'
+        );
+        if (revision !== null) {
+          if (args.prepared.presentation?.presentationRevision === args.prepared.workspace.revision)
+            args.prepared.presentation = {
+              ...args.prepared.presentation,
+              presentationRevision: revision,
+            };
+          args.prepared.workspace = { ...args.prepared.workspace, revision };
+        }
+      }
+      await rebaseRestoredVideoReview(
+        tx,
+        args.prepared,
+        Boolean(legacyProjectConflict?.conflict || (linked && conflict.conflict))
+      );
+      const replacedProjectId = legacyProjectConflict?.conflict
+        ? legacyProjectId
+        : linked && conflict.conflict
+          ? args.prepared.media.id
+          : null;
+      const released = replacedProjectId
+        ? await deleteMediaSidecars(tx, replacedProjectId, args.operation)
+        : null;
+      if (legacyProjectId && args.prepared.workspace)
+        await restoreImageWorkspaceIdentity(tx, legacyProjectId);
+      if (conflict.current && !protectedSource && args.session.strategy === 'replace') {
+        if (await hasLinkedEditorClaims(tx, conflict.current))
+          throw new Error('A restored original acquired another project before replacement.');
         await freezeScenarioMediaRepresentations(tx, conflict.current);
         await deleteExistingMediaRoot({
           tx,
@@ -743,13 +1024,18 @@ async function commitPreparedMediaRoot(args: {
           stores,
         });
       }
-      const previousInlineCopy = await readAssetResidencyCopyInTransaction(
-        tx,
-        assetResidencyCopyId({ kind: 'inline-image', mediaId: args.prepared.media.id })
-      );
-      if (previousInlineCopy)
-        await retireAssetResidencyCopyInTransaction(tx, previousInlineCopy, permit);
+      if (!protectedSource) {
+        const previousInlineCopy = await readAssetResidencyCopyInTransaction(
+          tx,
+          assetResidencyCopyId({ kind: 'inline-image', mediaId: args.prepared.media.id })
+        );
+        if (previousInlineCopy)
+          await retireAssetResidencyCopyInTransaction(tx, previousInlineCopy, permit);
+        if (args.prepared.media.kind === 'image' || args.prepared.media.kind === 'screenshot')
+          await restoreImageWorkspaceIdentity(tx, args.prepared.media.id);
+      }
       await publishPreparedMedia({ ...args, stores });
+      if (released) await releaseUnpublishedProjectAssets(tx, released, args.operation);
       if (args.cursorStage) {
         if (!args.prepared.recording || !args.metadata.recording?.cursorAttachment)
           throw new Error('Restored cursor source has no recording owner.');
@@ -793,14 +1079,7 @@ async function commitPreparedMediaRoot(args: {
           conflicted: conflict.conflict,
         }
       );
-      if (isCaptureImage(args.prepared.media))
-        await captureImageInTransaction(tx, args.prepared.media.id, { origin: 'local-restore' });
-      else if (isCaptureReview(args.prepared))
-        await captureVideoReviewInTransaction(tx, args.prepared.media.id, {
-          origin: 'local-restore',
-        });
-      else if (isCaptureOriginal(args.prepared))
-        await captureMediaInTransaction(tx, args.prepared.media.id, { origin: 'local-restore' });
+      await captureRestoredMedia(tx, args.prepared);
       await tx.done;
       return { conflicted: conflict.conflict, imported: true };
     } catch (error) {
@@ -829,10 +1108,12 @@ function retainedMediaAssetIds(args: {
     ...(args.prepared.telemetry?.recordingEventsSnapshot
       ? [args.prepared.telemetry.recordingEventsSnapshot.ref.assetId]
       : []),
-    ...(args.prepared.media.source.kind === 'stored-asset' ||
-    args.prepared.recording ||
-    args.prepared.projectAsset ||
-    args.prepared.projectExport
+    ...(!args.prepared.linkedSource &&
+    !args.prepared.protectedOriginal &&
+    (args.prepared.media.source.kind === 'stored-asset' ||
+      args.prepared.recording ||
+      args.prepared.projectAsset ||
+      args.prepared.projectExport)
       ? [args.prepared.original.ref.assetId]
       : []),
     ...(args.prepared.snapshot && args.metadata.webSnapshot
@@ -850,10 +1131,17 @@ export const mediaLibraryRootPublisher: ArchiveRootPublisher = {
   profile: 'media:library-item',
   prepareStaged: replaceSanitizedSnapshotPackage,
   async checkpointSkipIfExisting({ envelope, session }) {
-    const metadata = parsePortableMediaMetadata(envelope.metadata);
+    const metadata = parsePortableMediaMetadata(envelope.metadata, {
+      allowLibraryRelationships: true,
+    });
     return runWithIndexedDbMutation(async (db) => {
-      const tx = db.transaction([MEDIA_LIBRARY_STORE, ASSET_OPERATIONS_STORE], 'readwrite');
-      if (!(await tx.objectStore(MEDIA_LIBRARY_STORE).get(metadata.entry.id))) {
+      const store = metadata.linkedSourceMediaId
+        ? metadata.workspace
+          ? IMAGE_WORKSPACES_STORE
+          : VIDEO_WORKSPACES_STORE
+        : MEDIA_LIBRARY_STORE;
+      const tx = db.transaction([store, ASSET_OPERATIONS_STORE], 'readwrite');
+      if (!(await tx.objectStore(store).get(metadata.entry.id))) {
         await tx.done;
         return false;
       }
@@ -872,7 +1160,9 @@ export const mediaLibraryRootPublisher: ArchiveRootPublisher = {
     });
   },
   async publish({ envelope, session, staged, journal, lifecyclePermit }) {
-    const metadata = parsePortableMediaMetadata(envelope.metadata);
+    const metadata = parsePortableMediaMetadata(envelope.metadata, {
+      allowLibraryRelationships: true,
+    });
     const objects = objectMap(staged);
     const prepared = await prepareMediaRoot({
       metadata,
@@ -881,7 +1171,10 @@ export const mediaLibraryRootPublisher: ArchiveRootPublisher = {
       rootIdMap: session.rootIdMap,
     });
     const operation = buildPhysicalDeleteOperation([]);
-    const attachment = metadata.recording?.cursorAttachment;
+    const attachment =
+      prepared.linkedSource || prepared.protectedOriginal
+        ? undefined
+        : metadata.recording?.cursorAttachment;
     let cursorStage: { writer: RecordingCursorTrajectoryWriter; journalId: string } | undefined;
     if (attachment) {
       const object = requireObject(objects, attachment.objectId);
@@ -915,7 +1208,10 @@ export const mediaLibraryRootPublisher: ArchiveRootPublisher = {
         },
       };
     }
-    const eventsAttachment = metadata.recording?.eventsAttachment;
+    const eventsAttachment =
+      prepared.linkedSource || prepared.protectedOriginal
+        ? undefined
+        : metadata.recording?.eventsAttachment;
     let eventsStage: { writer: RecordingEventsWriter; journalId: string } | undefined;
     if (eventsAttachment) {
       const object = requireObject(objects, eventsAttachment.objectId);

@@ -1,3 +1,4 @@
+import { imageWorkspaceAssetBindings } from '../image-workspaces/assets';
 import type { IDBPTransaction } from 'idb';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -11,7 +12,7 @@ import type { SyncCaptureRootState } from './contracts';
 import { parseAssetRef, parseAssetOwner } from '../assets/guards';
 import type { MediaLibraryEntry } from '../media-library/contracts';
 import { parseProjectAssetEntry } from '../projects/read-guards';
-import { parseMediaLibraryEntry } from '../media-library/read-guards';
+import { parseMediaLibraryEntry, withoutLocalOriginalClaim } from '../media-library/read-guards';
 import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
 import { parseAggregatePresentationEntry } from '../aggregate-presentations/parser';
 import {
@@ -24,6 +25,21 @@ import {
   AGGREGATE_PRESENTATIONS_STORE,
 } from '../infrastructure/indexed-db/core.stores';
 import { MAX_CAPTURE_METADATA_BYTES, MAX_CAPTURE_ROWS, type CapturedImageRows } from './contracts';
+
+/** A linked document owns its revision. Its original remains a separate media root. */
+export function imageCaptureIdentity(rows: Pick<CapturedImageRows, 'workspace' | 'media'>) {
+  if (rows.workspace?.sourceMediaId !== undefined)
+    return {
+      rootKind: 'image-project' as const,
+      rootId: rows.workspace.aggregateId,
+      revision: rows.workspace.revision,
+    };
+  return {
+    rootKind: 'media' as const,
+    rootId: rows.media.id,
+    revision: rows.media.workspaceRevision ?? 0,
+  };
+}
 
 /** Blob descriptors identify immutable slots; they do not attest binary content. */
 export function describeImageMetadata(value: unknown): unknown {
@@ -103,11 +119,27 @@ function parseImageRows(
   if (
     Object.keys(value).some(
       (key) =>
-        !['media', 'workspace', 'presentation', 'refs', 'originalRef', 'projectAsset'].includes(key)
+        ![
+          'media',
+          'workspace',
+          'presentation',
+          'refs',
+          'originalRef',
+          'projectAsset',
+          'savedIndependently',
+        ].includes(key)
     )
   )
     return null;
-  const media = parseMediaLibraryEntry(value['media']);
+  const entry = parseMediaLibraryEntry(value['media']);
+  if (!entry) return null;
+  const media = withoutLocalOriginalClaim(entry);
+  const savedIndependently = value['savedIndependently'];
+  if (
+    savedIndependently !== undefined &&
+    (typeof savedIndependently !== 'boolean' || media.lifecycle?.storageClass !== 'library')
+  )
+    return null;
   const originalRef =
     value['originalRef'] === undefined ? undefined : parseAssetRef(value['originalRef']);
   const projectAsset =
@@ -118,7 +150,6 @@ function parseImageRows(
     value['presentation'] === null ? null : parseAggregatePresentationEntry(value['presentation']);
   const rawRefs = value['refs'];
   if (
-    !media ||
     !isImageCaptureSource(media) ||
     (value['projectAsset'] !== undefined && !projectAsset) ||
     (media.source.kind === 'project-asset' ? !projectAsset : projectAsset !== undefined) ||
@@ -166,31 +197,44 @@ function parseImageRows(
   if (refs.some((ref) => ref === null)) return null;
   const admittedRefs = refs.filter((ref) => ref !== null);
   const ids = new Set(admittedRefs.map((ref) => ref.assetId));
-  const required = new Set(workspace?.document.assets.map((asset) => asset.assetId) ?? []);
+  const required = new Set(
+    workspace ? imageWorkspaceAssetBindings(workspace).map((asset) => asset.assetId) : []
+  );
   if (
     ids.size !== admittedRefs.length ||
     ids.size !== required.size ||
     [...required].some((id) => !ids.has(id))
   )
     return null;
+  const identity = imageCaptureIdentity({ workspace, media });
   if (
     workspace &&
-    (workspace.aggregateId !== media.id ||
-      workspace.revision !== media.workspaceRevision ||
-      !Number.isSafeInteger(workspace.revision))
+    (!Number.isSafeInteger(workspace.revision) ||
+      (workspace.sourceMediaId === undefined
+        ? workspace.aggregateId !== media.id || workspace.revision !== media.workspaceRevision
+        : workspace.sourceMediaId !== media.id ||
+          workspace.aggregateId === media.id ||
+          media.lifecycle?.storageClass !== 'library' ||
+          savedIndependently !== undefined))
   )
     return null;
   if (
     presentation &&
-    (presentation.aggregateId !== media.id ||
+    (presentation.aggregateId !== identity.rootId ||
       presentation.aggregateKind !== 'image' ||
       !Number.isSafeInteger(presentation.presentationRevision) ||
-      presentation.presentationRevision > (media.workspaceRevision ?? 0))
+      presentation.presentationRevision > identity.revision)
   )
     return null;
+  let portableWorkspace = workspace;
+  if (workspace) {
+    const { publicationId: _publicationId, ...entry } = workspace;
+    portableWorkspace = entry;
+  }
   return {
     media,
-    workspace,
+    ...(savedIndependently === undefined ? {} : { savedIndependently }),
+    workspace: portableWorkspace,
     presentation,
     refs: admittedRefs,
     ...(originalRef ? { originalRef } : {}),
@@ -208,7 +252,13 @@ async function readImageRowsInTransaction(
   tx: IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,
   mediaId: string
 ) {
-  const media = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId));
+  const rawWorkspace: unknown = await tx.objectStore(IMAGE_WORKSPACES_STORE).get(mediaId);
+  const workspace = parseImageWorkspaceEntry(rawWorkspace);
+  const sourceId = workspace?.sourceMediaId ?? mediaId;
+  const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
+  const media = parseMediaLibraryEntry(await mediaStore.get(sourceId));
+  if (sourceId !== mediaId && (await mediaStore.get(mediaId)) !== undefined)
+    throw new Error('Image project ID is already used by a media original.');
   let originalRef: unknown;
   let projectAsset: unknown;
   if (media?.source.kind === 'project-asset') {
@@ -234,33 +284,89 @@ async function readImageRowsInTransaction(
   if (media?.source.kind === 'stored-asset') {
     originalRef = await tx.objectStore(ASSET_REFS_STORE).get(media.source.assetId);
     const owner = parseAssetOwner(
-      await tx.objectStore(ASSET_OWNERS_STORE).get(['media-library', mediaId, 'source'])
+      await tx.objectStore(ASSET_OWNERS_STORE).get(['media-library', sourceId, 'source'])
     );
     if (
       !owner ||
       owner.ownerKind !== 'media-library' ||
-      owner.ownerId !== mediaId ||
+      owner.ownerId !== sourceId ||
       owner.role !== 'source' ||
       owner.assetId !== media.source.assetId
     )
       throw new Error('Invalid stored image source ownership.');
   }
-  const rawWorkspace: unknown = await tx.objectStore(IMAGE_WORKSPACES_STORE).get(mediaId);
-  const workspace = parseImageWorkspaceEntry(rawWorkspace);
-  const presentation: unknown = await tx
-    .objectStore(AGGREGATE_PRESENTATIONS_STORE)
-    .get(['image', mediaId]);
-  const refs: unknown[] = [];
-  for (const id of new Set(workspace?.document.assets.map((asset) => asset.assetId) ?? []))
-    refs.push(await tx.objectStore(ASSET_REFS_STORE).get(id));
+  const document = await readImageDocumentRows(tx, mediaId, rawWorkspace);
   return {
     media,
-    workspace: rawWorkspace ?? null,
-    presentation: presentation ?? null,
-    refs,
+    ...document,
     ...(originalRef === undefined ? {} : { originalRef }),
     ...(projectAsset === undefined ? {} : { projectAsset }),
   };
+}
+
+type ImageSnapshotTransaction = IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>;
+async function readImageDocumentRows(
+  tx: ImageSnapshotTransaction,
+  id: string,
+  rawWorkspace: unknown
+) {
+  const workspace = parseImageWorkspaceEntry(rawWorkspace);
+  const presentation: unknown = await tx
+    .objectStore(AGGREGATE_PRESENTATIONS_STORE)
+    .get(['image', id]);
+  const refs: unknown[] = [];
+  for (const id of new Set(
+    workspace ? imageWorkspaceAssetBindings(workspace).map((asset) => asset.assetId) : []
+  ))
+    refs.push(await tx.objectStore(ASSET_REFS_STORE).get(id));
+  return {
+    workspace: rawWorkspace ?? null,
+    presentation: presentation ?? null,
+    refs,
+  };
+}
+
+type CapturedImageProject = Pick<CapturedImageRows, 'presentation' | 'refs'> & {
+  workspace: NonNullable<CapturedImageRows['workspace']>;
+};
+
+/** Read the project document without requiring its separately managed original to be resident. */
+export async function readImageProjectSnapshot(
+  tx: ImageSnapshotTransaction,
+  id: string
+): Promise<CapturedImageProject> {
+  const raw: unknown = await tx.objectStore(IMAGE_WORKSPACES_STORE).get(id);
+  const workspace = parseImageWorkspaceEntry(raw);
+  if (!workspace?.sourceMediaId || workspace.aggregateId !== id || workspace.sourceMediaId === id)
+    throw new Error('Invalid linked image project snapshot.');
+  const document = await readImageDocumentRows(tx, id, raw);
+  const presentation = parseAggregatePresentationEntry(document.presentation);
+  const refs = document.refs.map(parseAssetRef);
+  if (
+    !isBoundedImageMetadata(document) ||
+    refs.some((ref) => ref === null) ||
+    (document.presentation !== null &&
+      (!presentation ||
+        presentation.aggregateKind !== 'image' ||
+        presentation.aggregateId !== id ||
+        presentation.presentationRevision > workspace.revision))
+  )
+    throw new Error('Invalid linked image project snapshot.');
+  const { publicationId: _publicationId, ...portableWorkspace } = workspace;
+  return { workspace: portableWorkspace, presentation, refs: refs.filter((ref) => ref !== null) };
+}
+
+function digestImageMetadata(value: unknown): string {
+  const bytes = new TextEncoder().encode(JSON.stringify(describeImageMetadata(value)));
+  return Array.from(sha256(bytes), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export function digestImageProjectSnapshot(rows: CapturedImageProject): string {
+  return digestImageMetadata({
+    workspace: rows.workspace,
+    presentation: rows.presentation,
+    refs: rows.refs,
+  });
 }
 
 /** Read a complete publishable after-image without admitting missing inline bytes. */
@@ -268,8 +374,15 @@ export async function freezeImageInTransaction(
   tx: IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,
   mediaId: string
 ): Promise<CapturedImageRows> {
-  const rows = parseCapturedImageRows(await readImageRowsInTransaction(tx, mediaId));
-  if (!rows || rows.media.id !== mediaId)
+  const raw = await readImageRowsInTransaction(tx, mediaId);
+  const rows = parseCapturedImageRows({
+    ...raw,
+    ...(raw.media?.savedIndependently === undefined ||
+    parseImageWorkspaceEntry(raw.workspace)?.sourceMediaId !== undefined
+      ? {}
+      : { savedIndependently: raw.media.savedIndependently }),
+  });
+  if (!rows || imageCaptureIdentity(rows).rootId !== mediaId)
     throw new Error('Unsupported screenshot aggregate snapshot.');
   return structuredClone(rows);
 }
@@ -278,8 +391,11 @@ export async function freezeImageInTransaction(
 export function digestCapturedImageRows(rows: CapturedImageRows): string {
   const accepted = parseCapturedImageRows(rows);
   if (!accepted) throw new Error('Invalid image snapshot.');
-  const bytes = new TextEncoder().encode(JSON.stringify(describeImageMetadata(accepted)));
-  return Array.from(sha256(bytes), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  // Visibility follows the causal operation. Keep original-only evidence compatible with old heads.
+  const { savedIndependently: _claim, ...original } = accepted;
+  return accepted.workspace?.sourceMediaId === undefined
+    ? digestImageMetadata(original)
+    : digestImageProjectSnapshot({ ...accepted, workspace: accepted.workspace });
 }
 
 function describedSlot(

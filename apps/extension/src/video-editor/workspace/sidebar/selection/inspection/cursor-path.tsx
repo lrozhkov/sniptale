@@ -36,6 +36,7 @@ import type { VideoProject } from '../../../../../features/video/project/types';
 import { applyVideoProjectMutationPatch } from '../../../../../features/video/project/mutation';
 import { translate, formatNumber } from '../../../../../platform/i18n';
 import { NumberInput } from '../inputs/number';
+import { SliderField } from '../shared/sliders';
 import { SelectInput, ToggleField } from '../shared/controls';
 import { OptionButtonsField } from '../shared/option-buttons';
 import { InspectorActionButton } from '../shared/actions';
@@ -248,14 +249,14 @@ export function InspectCursorPathSettings({ project }: { project: VideoProject }
           })
         }
       >
-        <NumberInput
+        <SliderField
           disabled={locked}
           label={translate('videoEditor.sidebar.cursorFocusSmoothing')}
+          rangePresentation="field"
           value={path.smoothing}
           min={0}
           max={1}
           step={0.01}
-          scrub={false}
           onChange={(smoothing) => change({ ...path, smoothing })}
         />
       </InspectCameraFollowSettings>

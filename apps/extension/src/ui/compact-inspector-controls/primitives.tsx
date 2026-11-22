@@ -10,7 +10,6 @@ import {
 } from '@sniptale/ui/product-form-controls';
 import {
   COMPACT_INSPECTOR_INTERACTIVE_CONTROL_CLASS_NAME,
-  COMPACT_INSPECTOR_SOLID_CONTROL_CLASS_NAME,
   resolveCompactInspectorInteractiveControlStyle,
 } from './interactive-control-style';
 import { cx } from './shared';
@@ -34,15 +33,7 @@ export interface CompactColorOptionProps extends React.ButtonHTMLAttributes<HTML
 export const CompactInput = React.forwardRef<HTMLInputElement, ProductInputProps>(
   function CompactInput({ className, ...props }, ref) {
     return (
-      <ProductInput
-        ref={ref}
-        {...props}
-        className={cx(
-          'h-10 w-full min-w-0 max-w-full px-3 text-sm leading-5',
-          COMPACT_INSPECTOR_SOLID_CONTROL_CLASS_NAME,
-          className
-        )}
-      />
+      <ProductInput ref={ref} {...props} className={cx('sniptale-input-compact', className)} />
     );
   }
 );
@@ -55,8 +46,8 @@ export const CompactTextarea = React.forwardRef<HTMLTextAreaElement, ProductText
         {...props}
         data-ui="shared.ui.compact-textarea"
         className={cx(
-          'min-h-[6.875rem] w-full min-w-0 max-w-full resize-y px-3 py-2 text-sm leading-5 outline-none',
-          COMPACT_INSPECTOR_SOLID_CONTROL_CLASS_NAME,
+          'sniptale-compact-text-scroll',
+          'w-full min-w-0 max-w-full resize-y',
           className
         )}
       />

@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
 import { test } from '../support/extension-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {

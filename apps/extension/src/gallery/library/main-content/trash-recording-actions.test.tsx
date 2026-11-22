@@ -2,7 +2,11 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
+import {
+  loadGalleryCatalogFixture,
+  prepareGalleryTranslations,
+} from '../../test-support/translations.test-support';
 import { createMediaItem } from '../actions/test-support';
 import { translate } from '../../../platform/i18n';
 
@@ -13,6 +17,11 @@ vi.mock('../ui', async (importOriginal) => ({
 
 import { GalleryGridCanvas, GalleryMediaList } from './grid-cards';
 import { createGridMetricsFixture } from '../test-support/items';
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: loadGalleryCatalogFixture,
+}));
+beforeAll(() => prepareGalleryTranslations('ru'));
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;

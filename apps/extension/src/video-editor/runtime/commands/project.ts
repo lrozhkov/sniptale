@@ -57,9 +57,10 @@ export async function loadProjectWorkspace(
   port: ProjectHandlerPort
 ): Promise<void> {
   return withProjectTransition(port, async (isCurrent) => {
-    const project = await openPersistedProject(projectId);
+    const workspace = await openPersistedProject(projectId);
+    const project = workspace.project;
     if (!isCurrent()) return;
-    port.applyLoadedProject(project, project.baseRecordingId);
+    port.applyLoadedProject(project, project.baseRecordingId, workspace);
     await Promise.all([
       port.libraries.refreshProjects(),
       port.libraries.refreshProjectExports(project.id),
@@ -80,12 +81,13 @@ export async function createProjectWorkspace(
     if (copyCurrent && (!source || source.id !== currentProject?.id)) {
       throw new Error(translate('common.errors.actionFailed'));
     }
-    const project =
+    const workspace =
       copyCurrent && source
         ? await copyProject(source, projectName ?? source.name)
         : await createBlankProject(projectName);
     if (!isCurrent()) return;
-    port.applyLoadedProject(project, project.baseRecordingId);
+    const project = workspace.project;
+    port.applyLoadedProject(project, project.baseRecordingId, workspace);
     const refreshes = await Promise.allSettled([
       port.libraries.refreshProjects(),
       port.libraries.refreshProjectExports(project.id),

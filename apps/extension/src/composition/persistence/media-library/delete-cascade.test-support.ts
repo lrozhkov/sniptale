@@ -60,6 +60,7 @@ export function mediaEntry(): MediaLibraryEntry {
 }
 
 function keyOf(store: string, value: Record<string, unknown>): string {
+  if (store === 'video_review_identities') return String(value['key']);
   if (store === 'recording_events')
     return JSON.stringify([
       value['recordingId'],
@@ -76,7 +77,11 @@ function keyOf(store: string, value: Record<string, unknown>): string {
     return JSON.stringify([value['aggregateId'], value['ordinal']]);
   if (store === 'asset_owners')
     return JSON.stringify([value['ownerKind'], value['ownerId'], value['role']]);
-  if (store === 'video_workspaces' || store === 'video_workspace_drafts')
+  if (
+    store === 'image_workspace_identities' ||
+    store === 'video_workspaces' ||
+    store === 'video_workspace_drafts'
+  )
     return String(value['aggregateId']);
   if (store === 'asset_operations') return String(value['operationId']);
   return String(value['id'] ?? value['assetId']);

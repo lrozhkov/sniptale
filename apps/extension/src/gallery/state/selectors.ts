@@ -127,7 +127,7 @@ export function getGalleryFacets(
   const tagCounts = new Map<string, number>();
   const statusCounts = new Map<string, number>();
   const categoryItems = context.folderFilter
-    ? items.filter((item) => matchesGalleryFolderFilter(context.folderFilter!, item.kind))
+    ? items.filter((item) => matchesGalleryFolderFilter(context.folderFilter!, item))
     : items;
   const facetItems =
     context.scope && context.scope !== 'all'
@@ -176,19 +176,27 @@ export function getGalleryFacets(
   ];
 }
 
-function matchesGalleryFolderFilter(
-  folderFilter: FolderFilter,
-  kind: GalleryItem['kind']
-): boolean {
+function isImageProject(item: GalleryItem): boolean {
+  return (
+    item.type === 'image-project' ||
+    (item.type === 'remote-root' && item.remote.selection.rootKind === 'image-project')
+  );
+}
+
+function matchesGalleryFolderFilter(folderFilter: FolderFilter, item: GalleryItem): boolean {
   if (folderFilter === 'all') {
     return true;
   }
 
-  if (folderFilter === 'scenario') {
-    return kind === 'scenario';
+  if (folderFilter === 'image-project' || isImageProject(item)) {
+    return folderFilter === 'image-project' && isImageProject(item);
   }
 
-  return FOLDER_FILTER_KIND_MAP[folderFilter].includes(kind);
+  if (folderFilter === 'scenario') {
+    return item.kind === 'scenario';
+  }
+
+  return FOLDER_FILTER_KIND_MAP[folderFilter].includes(item.kind);
 }
 
 export function getGalleryCounts(
@@ -208,6 +216,10 @@ export function getGalleryCounts(
 
   for (const item of items) {
     next.all += 1;
+    if (isImageProject(item)) {
+      next['image-project'] = (next['image-project'] ?? 0) + 1;
+      continue;
+    }
 
     if (item.kind === 'scenario') next.scenario += 1;
     if (item.kind === 'video-project') next['video-project'] = (next['video-project'] ?? 0) + 1;
@@ -336,7 +348,7 @@ export function getFilteredGalleryItems(args: {
     )
   );
   const result = taggedItems.filter((item) => {
-    if (!matchesGalleryFolderFilter(args.folderFilter, item.kind)) {
+    if (!matchesGalleryFolderFilter(args.folderFilter, item)) {
       return false;
     }
 

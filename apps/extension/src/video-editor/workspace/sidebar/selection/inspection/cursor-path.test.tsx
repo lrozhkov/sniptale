@@ -309,26 +309,35 @@ it.each([
   const { project } = editableInspector();
   act(() => root.render(<InspectCursorPathSettings project={project} />));
   const input = host.querySelector<HTMLInputElement>(
-    `input[aria-label="videoEditor.sidebar.${field} range"]`
+    `input[aria-label="videoEditor.sidebar.${field}"]`
   )!;
   expect(input).not.toBeNull();
   const before = useVideoEditorStore.getState().project;
   const history = useVideoEditorStore.getState().projectHistory.past.length;
   const baseline = input.value;
-  const key = (type: string, key: string) =>
-    act(() => input.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true })));
-  key('keydown', 'ArrowRight');
-  key('keydown', 'ArrowRight');
+  const start = () =>
+    act(() =>
+      input
+        .closest('.sniptale-framed-stepper')!
+        .querySelector('button[aria-label$=" increase"]')!
+        .dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+    );
+  const end = () => act(() => window.dispatchEvent(new MouseEvent('pointerup')));
+  const cancel = () =>
+    act(() =>
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))
+    );
+  start();
   expect(input.value).not.toBe(baseline);
   expect(useVideoEditorStore.getState().project).toBe(before);
   expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(history);
-  key('keydown', 'Escape');
-  key('keyup', 'ArrowRight');
+  cancel();
+  end();
   expect(input.value).toBe(baseline);
   expect(useVideoEditorStore.getState().project).toBe(before);
-  key('keydown', 'ArrowRight');
-  key('keyup', 'ArrowRight');
-  key('keyup', 'ArrowRight');
+  start();
+  end();
+  end();
   expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(history + 1);
   act(() => useVideoEditorStore.getState().undoProject());
   expect(useVideoEditorStore.getState().project?.cameraFollowDefaults).toEqual(

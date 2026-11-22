@@ -425,6 +425,9 @@ describe('media backup v6 restore orchestration', () => {
     });
 
     expect(publisher.prepareStaged).toHaveBeenCalledOnce();
+    expect(publisher.prepareStaged).toHaveBeenCalledWith(
+      expect.objectContaining({ session: expect.objectContaining({ operationId: 'restore-1' }) })
+    );
     expect(mocks.createJournal).toHaveBeenCalledWith(
       expect.objectContaining({ assetRefs: [replacement.ref] })
     );

@@ -265,3 +265,13 @@ it('refuses unavailable camera bytes and cancellation without inventing a filena
     readReviewWebcamInformation('project-asset:private', abort.signal)
   ).rejects.toThrow();
 });
+
+it('discovers and attaches from the display original before the related project is published', async () => {
+  const aggregateId = 'recording:quick-project:pending';
+  io.get.mockImplementation(async (mediaId: string) => (mediaId === 'display' ? root : null));
+  const args = { ...request(), aggregateId, sourceMediaId: 'display' };
+  expect((await findReviewWebcam(aggregateId, args.signal, args.sourceMediaId))?.id).toBe('camera');
+  await attachReviewWebcam(args);
+  expect(args.attach).toHaveBeenCalledWith('project-asset:private', source);
+  expect(io.prepare.mock.calls[0]?.[5]).toEqual({ aggregateId, clipId: 'webcam' });
+});

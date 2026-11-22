@@ -94,6 +94,7 @@ function readyAllocation(): SyncWorkspaceAllocation {
 function setup() {
   const rows = new Map<string, Map<string, unknown>>([
     ['sync_capture', new Map()],
+    ['image_workspaces', new Map()],
     ['sync_connection', new Map()],
     ['secret_protection', new Map()],
     ['sync_outbox', new Map()],
@@ -129,6 +130,7 @@ function setup() {
             const table = pending.get(name)!;
             return {
               get: async (key: string) => structuredClone(table.get(key)),
+              getAll: async () => structuredClone([...table.values()]),
               count: async () => table.size,
               getAllKeys: async () => [...table.keys()],
               delete: async (key: string) => {
@@ -481,6 +483,18 @@ it('refuses delayed enrollment after source abandonment', async () => {
   held.release();
   await expect(pending).rejects.toThrow('refused');
   expect(f.rows).toEqual(before);
+});
+
+it('keeps a concurrently published independent image when enabling sync enrollment', async () => {
+  const f = setup();
+  const held = holdEncryption();
+  const pending = enrollSyncWorkspaceConnection(f.source, authentication, policy);
+  await held.entered;
+  const project = { aggregateId: 'project', sourceMediaId: 'original' };
+  f.table('image_workspaces').set('project', project);
+  held.release();
+  await expect(pending).resolves.toMatchObject({ phase: 'active' });
+  expect(f.table('image_workspaces').get('project')).toEqual(project);
 });
 it('cannot reopen erased and recreated storage after crypto', async () => {
   const f = setup();

@@ -18,6 +18,7 @@ describe('browser webNavigation adapter', () => {
   it.each([
     ['subscribeToBeforeNavigate', 'onBeforeNavigate'],
     ['subscribeToCommitted', 'onCommitted'],
+    ['subscribeToDOMContentLoaded', 'onDOMContentLoaded'],
     ['subscribeToCompleted', 'onCompleted'],
     ['subscribeToErrorOccurred', 'onErrorOccurred'],
   ] as const)('returns deterministic unsubscribe for %s listeners', (method, eventName) => {

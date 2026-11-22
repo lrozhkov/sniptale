@@ -62,7 +62,9 @@ async function resolveTabCropRegion(
   deps.logger.debug('Requesting crop region before acquiring the one-time TAB_CROP stream ID');
   const cropSelection = await deps.requestRegionSelection(tabId);
   if (!cropSelection) {
-    await deps.notifyStartFailed(deps.localize('background.runtime.areaSelectionCancelled'));
+    await deps.notifyStartFailed(deps.localize('background.runtime.areaSelectionCancelled'), {
+      diagnosticCode: 'cancelled',
+    });
     return null;
   }
 

@@ -51,7 +51,7 @@ export function useViewportPresetEditorState(props: ViewportPresetEditorStatePar
   };
 
   const handleKeyDown = (event: KeyboardEvent) => {
-    if (event.key === 'Escape') {
+    if (event.key === 'Escape' && !event.defaultPrevented) {
       props.onClose();
     }
   };

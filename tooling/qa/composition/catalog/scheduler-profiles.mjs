@@ -22,7 +22,7 @@ const CAPACITY_PROFILES = Object.freeze({
     tests: { memoryMiB: 4096 },
     lint: { cpuTokens: 2, memoryMiB: 6144 },
     graph: { cpuTokens: 1, memoryMiB: 3072 },
-    light: { cpuTokens: 1, memoryMiB: 3072 },
+    light: { cpuTokens: 1, memoryMiB: 5120 },
   }),
 });
 

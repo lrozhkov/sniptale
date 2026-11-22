@@ -1,94 +1,83 @@
-.review-floating-selection-actions {
-  --review-actions-surface: var(--sniptale-color-surface-panel);
-  z-index: 80;
+.review-timeline-selection-actions {
   display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-  transition: none;
-  animation: none;
+  position: relative;
+  flex: 0 0 360px;
+  width: var(--review-selection-width, 360px);
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
+  min-width: var(--review-selection-min-width, 360px);
+  margin-block: 0;
+  margin-inline: 0;
+  padding: 0;
+  border: 0;
+  pointer-events: none;
+}
+.review-timeline-selection-actions[hidden] {
+  display: none;
+}
+.review-selection-action-slot {
+  display: inline-flex;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+}
+.review-selection-specific-actions {
+  pointer-events: auto;
+  position: absolute;
+  inset-inline-start: calc(50% + 92px);
+  inset-inline-end: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  display: flex;
+  align-items: center;
   gap: 2px;
   min-width: 0;
-  width: max-content;
-  max-width: calc(100vw - 16px);
-  align-items: center;
   margin: 0;
-  padding: 4px;
-  border: 1px solid var(--sniptale-color-border-soft);
-  border-radius: var(--sniptale-radius-sm);
-  background: var(--review-actions-surface);
-  box-shadow: var(--sniptale-shadow-floating);
+  padding: 0;
+  border: 0;
 }
-.review-floating-selection-actions[hidden],
-.review-floating-selection-actions:empty {
-  display: none;
+.review-selection-specific-actions:has(button) {
+  margin-inline-start: 6px;
+  padding-inline-start: 6px;
+  border-inline-start: 1px solid var(--sniptale-color-border-soft);
 }
-.review-floating-selection-actions .review-inspector-actions,
-.review-floating-selection-actions .review-inspector-actions > div {
+.review-timeline-selection-actions .review-inspector-actions,
+.review-timeline-selection-actions .review-inspector-actions > div {
   display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-  width: auto;
+  flex-flow: row nowrap;
   align-items: center;
+  width: auto;
   gap: 2px;
 }
-.review-floating-selection-actions button.review-command {
-  flex: 0 0 32px;
+.review-timeline-selection-actions button.review-command {
+  pointer-events: auto;
+  display: inline-flex !important;
+  flex: 0 0 32px !important;
+  align-items: center !important;
+  justify-content: center !important;
   width: 32px !important;
+  height: 32px !important;
   min-width: 32px !important;
   margin: 0 !important;
-  padding-inline: 0 !important;
+  padding: 0 !important;
+}
+.review-timeline-selection-actions .review-command-content {
+  display: flex;
+  align-items: center;
   justify-content: center;
-}
-.review-floating-selection-actions .review-command-content > span {
-  display: none;
-}
-
-.review-floating-selection-actions .review-command-content {
+  width: 100%;
+  height: 100%;
   font-size: 0;
   gap: 0;
 }
-
-@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .review-floating-selection-actions {
-    --review-actions-surface: color-mix(
-      in srgb,
-      var(--sniptale-color-surface-panel) 80%,
-      transparent
-    );
-    -webkit-backdrop-filter: blur(var(--sniptale-glass-blur)) saturate(1.15);
-    backdrop-filter: blur(var(--sniptale-glass-blur)) saturate(1.15);
-  }
+.review-timeline-selection-actions .review-command-content > span {
+  display: none;
 }
-
-.review-floating-selection-actions::before,
-.review-floating-selection-actions::after {
-  content: '';
-  position: absolute;
-  top: 100%;
-  left: var(--review-actions-tail-x, 50%);
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-  border: 6px solid transparent;
-  border-bottom: 0;
-  border-top-color: var(--sniptale-color-border-soft);
-  pointer-events: none;
-}
-.review-floating-selection-actions::after {
-  top: calc(100% - 1px);
-  border-inline-width: 5px;
-  border-top-color: var(--review-actions-surface);
-}
-.review-floating-selection-actions[data-tail-side='top']::before,
-.review-floating-selection-actions[data-tail-side='top']::after {
-  top: auto;
-  bottom: 100%;
-  border-top: 0;
-  border-bottom: 6px solid var(--sniptale-color-border-soft);
-}
-.review-floating-selection-actions[data-tail-side='top']::after {
-  bottom: calc(100% - 1px);
-  border-bottom-color: var(--review-actions-surface);
+.review-timeline-selection-actions .review-command-content > svg {
+  flex: none;
+  width: var(--review-toolbar-icon, 14px) !important;
+  height: var(--review-toolbar-icon, 14px) !important;
 }
 
 /* A conflicting camera copy remains selectable and movable on its own row. */
@@ -103,6 +92,7 @@
 }
 
 .review-selection-count {
+  pointer-events: auto;
   display: inline-flex;
   flex: none;
   align-items: center;
@@ -138,4 +128,14 @@
   outline: none;
   background: var(--sniptale-color-surface-hover);
   box-shadow: inset 0 0 0 1px var(--sniptale-color-border-soft);
+}
+
+.review-timeline-selection-actions
+  .review-selection-action-slot:has(> [data-selection-action])
+  > .review-selection-action-fallback,
+.review-timeline-selection-actions
+  .review-selection-action-slot
+  > [data-selection-action]
+  ~ [data-selection-action] {
+  display: none !important;
 }

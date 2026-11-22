@@ -56,6 +56,7 @@ export type VideoRecordingStatus = (typeof VideoRecordingStatus)[keyof typeof Vi
 
 export const VideoRecordingFailureCode = {
   CAMERA_FRAME_RATE_UNSUPPORTED: 'camera-frame-rate-unsupported',
+  START_ACTIVATION_TIMEOUT: 'start-activation-timeout',
 } as const;
 
 export type VideoRecordingFailureCode =
@@ -66,6 +67,9 @@ export type VideoPostRecordResult = {
   projectId: string | null;
   recordingId: string;
 };
+
+/** Fixed reasons for the advisory recording failure result. */
+export type VideoRecordingInterruptionReason = 'audio-capacity' | 'unknown';
 
 export const WebcamResolutionPreset = {
   AUTO: 'AUTO',

@@ -175,7 +175,7 @@ function parseProgress(value: unknown): PagePackageProgressV1 | null {
     !isExactKeys(
       value,
       ['current', 'errors', 'message', 'phase', 'total'],
-      ['activeStepKey', 'completedStepKeys', 'failedStepKeys']
+      ['activeStepKey', 'completedStepKeys', 'failedStepKeys', 'collectingPageTitle']
     ) ||
     !isNonNegativeInteger(value['current']) ||
     !isNonNegativeInteger(value['total']) ||
@@ -183,6 +183,9 @@ function parseProgress(value: unknown): PagePackageProgressV1 | null {
     value['errors'].length > MAX_JOB_TABS ||
     !value['errors'].every((entry) => isBoundedText(entry, true)) ||
     !isBoundedText(value['message'], true) ||
+    !(
+      value['collectingPageTitle'] === undefined || isBoundedTabTitle(value['collectingPageTitle'])
+    ) ||
     !PROGRESS_PHASES.includes(value['phase'] as PagePackageProgressPhaseV1) ||
     !(
       value['activeStepKey'] === undefined ||
@@ -318,8 +321,8 @@ export function clonePagePackageJobStatus(status: PagePackageJobStatusV1): PageP
 }
 
 export type PagePackageJobStatusPatch = Partial<
-  Omit<PagePackageJobStatusV1, 'intent' | 'jobId' | 'revision'>
->;
+  Omit<PagePackageJobStatusV1, 'intent' | 'jobId' | 'revision' | 'progress'>
+> & { progress?: Partial<PagePackageProgressV1> };
 
 export function createEffectiveComponentPlan(
   intent: PagePackageJobIntent,

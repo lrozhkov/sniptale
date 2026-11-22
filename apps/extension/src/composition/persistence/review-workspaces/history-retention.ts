@@ -8,7 +8,7 @@ import {
 } from '../../../features/video/review/document';
 import type { VideoWorkspace } from './contracts';
 
-const encoder = new TextEncoder();
+import { reviewOperationEncodedBytes } from '../../../features/video/review/validation';
 
 /** Structural equality of admitted workspace history and baseline values. */
 export function sameReviewWorkspaceValue(left: unknown, right: unknown): boolean {
@@ -46,7 +46,7 @@ export function compactVideoWorkspaceHistory(workspace: VideoWorkspace) {
   const window = selectHistoryRetentionWindow(
     workspace.history.map((operation) => ({
       actions: 1,
-      bytes: encoder.encode(JSON.stringify(operation)).byteLength + 1,
+      bytes: reviewOperationEncodedBytes(operation) + 1,
     })),
     workspace.cursor,
     { ...EDITOR_HISTORY_LIMITS, maxBytes: EDITOR_HISTORY_LIMITS.maxBytes - 1 }

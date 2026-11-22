@@ -1,4 +1,12 @@
 import { resolveCapturedProjectAssetSource } from './project-snapshot';
+import { isSha256Digest } from '@sniptale/platform/security/digest';
+import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
+import {
+  VIDEO_PROJECT_HISTORY_OWNER_KIND,
+  videoProjectHistoryAssetBindings,
+  videoProjectHistoryChangeRefs,
+  videoProjectHistoryInlineBytes,
+} from '../projects/history-contracts';
 import {
   freezeImageInTransaction,
   readImageReplicaPredecessorInTransaction,
@@ -105,7 +113,9 @@ function frozenNativeRow<T>(value: unknown, admit: (value: unknown) => value is 
 export function digestCapturedMediaRows(rows: CapturedMediaRows): string {
   const normalized = parseCapturedMediaRows(rows);
   requireSupported(normalized !== null);
-  const digest = sha256(new TextEncoder().encode(JSON.stringify(normalized)));
+  // Visibility is published under the same causal head, separate from native source evidence.
+  const { savedIndependently: _claim, ...original } = normalized;
+  const digest = sha256(new TextEncoder().encode(JSON.stringify(original)));
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
@@ -281,7 +291,12 @@ export async function freezeMediaInTransaction(
     thumbnails: 'recording' in rows ? new Set([...reviews, mediaId]) : reviews,
     presentation: null,
   });
-  return structuredClone(rows);
+  return structuredClone({
+    ...rows,
+    ...(media.savedIndependently === undefined
+      ? {}
+      : { savedIndependently: media.savedIndependently }),
+  });
 }
 
 async function requireSourceOwner(
@@ -345,6 +360,7 @@ class NativeProjectSnapshot {
   }
 
   async freeze(): Promise<CapturedVideoProjectRows> {
+    await this.retainHistory();
     await this.retainProjectSources();
     await this.retainPublishedExports();
     // Growing sets resolve origins and borrowed sources; maps bound cycles and deduplicate rows.
@@ -378,7 +394,11 @@ class NativeProjectSnapshot {
     let ref = this.refs.get(assetId);
     if (!ref) {
       ref = frozenNativeRow(await this.tx.objectStore(ASSET_REFS_STORE).get(assetId), admitRef);
-      requireSupported(ref.assetId === assetId && this.refs.size < MAX_CAPTURE_ROWS);
+      requireSupported(
+        ref.assetId === assetId &&
+          this.refs.size <
+            MAX_CAPTURE_ROWS + videoProjectHistoryAssetBindings(this.project.history).length
+      );
       this.refs.set(assetId, ref);
     }
     requireSupported(ref.size === size && ref.mimeType === mimeType);
@@ -498,6 +518,55 @@ class NativeProjectSnapshot {
         await this.retainScenarioAsset(asset.source.scenarioAssetId);
     }
     for (const id of assetIds) await this.retainAsset(id);
+    for (const source of this.project.history?.sources ?? []) {
+      switch (source.kind) {
+        case 'recording':
+          this.mediaToRead.add(`recording:${source.id}`);
+          break;
+        case 'library-asset':
+          this.mediaToRead.add(source.id);
+          break;
+        case 'project-asset':
+          await this.retainAsset(source.id);
+          break;
+        case 'scenario-asset':
+          await this.retainScenarioAsset(source.id);
+          break;
+        case 'scenario-project':
+          break;
+      }
+    }
+  }
+
+  private async retainHistory(): Promise<void> {
+    const history = this.project.history;
+    if (!history) return;
+    for (const { assetId, role } of videoProjectHistoryAssetBindings(history)) {
+      await requireSourceOwner(
+        this.tx,
+        VIDEO_PROJECT_HISTORY_OWNER_KIND,
+        this.project.id,
+        role,
+        assetId
+      );
+      const ref = frozenNativeRow(
+        await this.tx.objectStore(ASSET_REFS_STORE).get(assetId),
+        admitRef
+      );
+      requireSupported(
+        ref.assetId === assetId &&
+          ref.mimeType === 'application/json' &&
+          ref.sha256 !== null &&
+          isSha256Digest(`sha256:${ref.sha256}`)
+      );
+      this.refs.set(assetId, ref);
+    }
+    let bytes = videoProjectHistoryInlineBytes(history);
+    requireSupported(bytes <= EDITOR_HISTORY_LIMITS.maxBytes);
+    for (const { assetId } of videoProjectHistoryChangeRefs(history)) {
+      bytes += this.refs.get(assetId)!.size;
+      requireSupported(bytes <= EDITOR_HISTORY_LIMITS.maxBytes);
+    }
   }
 
   private async retainScenarioAsset(childId: string): Promise<void> {

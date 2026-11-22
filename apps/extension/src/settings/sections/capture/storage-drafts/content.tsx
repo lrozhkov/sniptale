@@ -18,14 +18,23 @@ import type { TrashPolicyFeedback } from './use-storage-policy-state';
 const destinationOptions = [
   {
     value: 'temporary' as const,
-    label: translate('settings.storageDrafts.destinationTemporary'),
+    get label() {
+      return translate('settings.storageDrafts.destinationTemporary');
+    },
   },
-  { value: 'library' as const, label: translate('settings.storageDrafts.destinationLibrary') },
+  {
+    value: 'library' as const,
+    get label() {
+      return translate('settings.storageDrafts.destinationLibrary');
+    },
+  },
 ];
 
 const retentionOptions = LOCAL_STORAGE_RETENTION_DAY_OPTIONS.map((days) => ({
   value: String(days),
-  label: `${days} ${translate('settings.storageDrafts.daySuffix')}`,
+  get label() {
+    return `${days} ${translate('settings.storageDrafts.daySuffix')}`;
+  },
 }));
 
 const sectionClassName = 'space-y-1';
@@ -111,8 +120,6 @@ function RetentionSection(
       <SectionLabel>{translate('settings.storageDrafts.cleanupTitle')}</SectionLabel>
       <SettingsControlRow
         label={translate('settings.storageDrafts.cleanupEnabled')}
-        keepInline
-        valueMinimum={32}
         valueClassName="flex justify-end"
       >
         <SettingsSwitch
@@ -160,8 +167,6 @@ function TrashRetentionSection(
       <SectionLabel>{translate('settings.storageDrafts.trashTitle')}</SectionLabel>
       <SettingsControlRow
         label={translate('settings.storageDrafts.trashCleanupEnabled')}
-        keepInline
-        valueMinimum={32}
         valueClassName="flex justify-end"
       >
         <SettingsSwitch

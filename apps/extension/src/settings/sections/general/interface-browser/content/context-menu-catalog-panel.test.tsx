@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadSettingsCatalogFixture,
+  prepareSettingsTranslations,
+} from '../../../../catalog-fixture.test-support';
 import type { ContextMenuTree } from '../../../../../contracts/settings/context-menu-layout';
 import { ContextMenuCatalogPanel } from './context-menu-catalog-panel';
 
@@ -122,3 +126,10 @@ it('restores a disabled ancestor section through its unused action', async () =>
     children: [{ command: 'sniptale.gallery', enabled: true }],
   });
 });
+
+vi.mock('../../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadSettingsCatalogFixture>[0]) =>
+    loadSettingsCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareSettingsTranslations('en'));

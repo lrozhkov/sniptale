@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { test, openProvider, saveProof } from './webdav-fixtures';
 import { expect } from '@playwright/test';
 import { applyHarnessBootstrap } from '../extension-critical.helpers';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 for (const sourceKind of ['project-asset', 'recording'] as const) {
   for (const viewport of [

@@ -1,9 +1,30 @@
-import { expect, it } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
+import { GL_TRANSITIONS } from '../features/video/project/transition/gl-catalog';
+import {
+  getCatalogFixture,
+  translateCatalogFixture,
+} from '../platform/i18n/catalog-fixture.test-support';
+import { glTransitionParameterLabel } from './gl-transition-labels';
+const state = vi.hoisted(() => ({ locale: 'en' as 'en' | 'ru' }));
+vi.mock('../platform/i18n', async (original) => {
+  const fixture = await import('../platform/i18n/catalog-fixture.test-support');
+  return {
+    ...(await original<typeof import('../platform/i18n')>()),
+    translate: (
+      key: Parameters<typeof fixture.translateCatalogFixture>[0],
+      locale = state.locale
+    ) => fixture.translateCatalogFixture(key, locale),
+  };
+});
+beforeEach(() => {
+  state.locale = 'en';
+});
 import { createGlTransitionSelection } from '../features/video/project/transition/gl-catalog';
 import {
   glTransitionChoices,
   glTransitionChoiceValue,
   resolveGlTransitionChoice,
+  sceneJoinTransitionChoices,
   type GlTransitionChoiceCatalog,
 } from './gl-transition-choices';
 const original = createGlTransitionSelection('CrossZoom');
@@ -51,7 +72,7 @@ it('keeps a disabled applied selection visible without granting a new apply oper
   expect(glTransitionChoiceValue(catalog, original)).toBe('CrossZoom');
   expect(glTransitionChoices(catalog, original)).toContainEqual({
     value: 'CrossZoom',
-    label: 'CrossZoom',
+    label: 'Zoom blur',
     disabled: true,
   });
   expect(original).toEqual(snapshot);
@@ -66,7 +87,7 @@ it.each([
   expect(resolveGlTransitionChoice(unavailable, 'CrossZoom')).toBeNull();
   expect(resolveGlTransitionChoice(unavailable, 'gl.custom')).toBeNull();
   expect(glTransitionChoices(unavailable, original)).toEqual([
-    { value: 'CrossZoom', label: 'CrossZoom', disabled: true },
+    { value: 'CrossZoom', label: 'Zoom blur', disabled: true },
   ]);
 });
 it('matches parameter values independently of object key order, but requires the exact pinned implementation', () => {
@@ -82,4 +103,93 @@ it('matches parameter values independently of object key order, but requires the
 it('retains standalone pure-field builtin choices when no catalogue dependency is supplied', () => {
   expect(glTransitionChoices()).toHaveLength(214);
   expect(resolveGlTransitionChoice(undefined, 'CrossZoom')).toEqual(original);
+});
+
+it.each(['en', 'ru'] as const)(
+  'distinguishes a GL preset from a simple join with the same label in %s',
+  (locale) => {
+    state.locale = locale;
+    const label = translateCatalogFixture('gallery.videoReview.cutFadeColor', locale);
+    const choices = sceneJoinTransitionChoices({
+      ...catalog,
+      items: catalog.items.map((item) =>
+        item.id === 'gl.custom' ? { ...item, name: label } : item
+      ),
+    });
+    expect(choices.filter((option) => option.label === label)).toEqual([
+      { value: 'fade-black', label },
+    ]);
+    expect(choices).toContainEqual({ value: 'gl.custom', label: `${label} (GL)` });
+  }
+);
+
+it.each(['en', 'ru'] as const)(
+  'covers every pinned built-in name and parameter in %s',
+  (locale) => {
+    const labels = getCatalogFixture(locale).videoEditor.glTransitions;
+    expect(Object.keys(labels.names).sort()).toEqual(
+      GL_TRANSITIONS.map((item) => item.name).sort()
+    );
+    expect(Object.keys(labels.parameters).sort()).toEqual(
+      [...new Set(GL_TRANSITIONS.flatMap((item) => Object.keys(item.params)))].sort()
+    );
+    expect(Object.values(labels.names).every((label) => label.trim().length > 0)).toBe(true);
+    expect(Object.values(labels.parameters).every((label) => label.trim().length > 0)).toBe(true);
+  }
+);
+it.each([
+  ['en', 'Fast vertical pan', 'Pan downward', 'Color separation'],
+  ['ru', 'Резкая вертикальная панорама', 'Панорама вниз', 'Разделение цветов'],
+] as const)(
+  'shows authored effect and parameter labels in %s while preserving IDs',
+  (locale, name, down, chroma) => {
+    state.locale = locale;
+    expect(glTransitionChoices()).toContainEqual({ value: 'WhipTilt', label: name });
+    expect(glTransitionParameterLabel('down', locale)).toBe(down);
+    expect(glTransitionParameterLabel('chroma', locale)).toBe(chroma);
+    expect(glTransitionParameterLabel('grid.x', locale)).toBe(
+      locale === 'en' ? 'Grid size · X' : 'Размер сетки · X'
+    );
+  }
+);
+it('preserves imported literal names even when they match a built-in identifier', () => {
+  state.locale = 'ru';
+  const imported: GlTransitionChoiceCatalog = {
+    loading: false,
+    error: false,
+    items: [
+      {
+        id: 'gl.custom',
+        name: 'WhipTilt',
+        builtin: false,
+        enabled: true,
+        status: 'ready',
+        selection: original,
+      },
+    ],
+  };
+  expect(glTransitionChoices(imported)).toEqual([{ value: 'gl.custom', label: 'WhipTilt' }]);
+  expect(resolveGlTransitionChoice(imported, 'gl.custom')).toEqual(original);
+});
+it('uses canonical built-in metadata only when the catalog identity and implementation match', () => {
+  const selection = createGlTransitionSelection('WhipTilt')!;
+  const item = {
+    id: 'builtin:WhipTilt',
+    name: 'WhipTilt',
+    builtin: true,
+    enabled: true,
+    status: 'ready' as const,
+    selection,
+  };
+  const source = { loading: false, error: false, items: [item] };
+  expect(glTransitionChoices(source)).toEqual([{ value: 'WhipTilt', label: 'Fast vertical pan' }]);
+  expect(glTransitionChoices({ ...source, items: [{ ...item, id: 'custom:WhipTilt' }] })).toEqual([
+    { value: 'WhipTilt', label: 'WhipTilt' },
+  ]);
+  expect(
+    glTransitionChoices({
+      ...source,
+      items: [{ ...item, selection: { ...selection, wgslSha256: '0'.repeat(64) } }],
+    })
+  ).toEqual([{ value: 'WhipTilt', label: 'WhipTilt' }]);
 });

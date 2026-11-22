@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadSettingsCatalogFixture,
+  prepareSettingsTranslations,
+} from '../../../../catalog-fixture.test-support';
 import type { useAudioPresets } from '../../../../../composition/audio-preset-resources/use-audio-presets';
 import { listBuiltInAudioPresets } from '../../../../../features/video/audio/effects/presets';
 import { parseAudioPresetCatalog } from '../../../../../composition/persistence/audio-presets/catalog';
@@ -115,3 +119,10 @@ it('submits an opened rename through its original catalogue basis after an exter
   expect(original).toHaveBeenCalledWith('user-a', 'Custom');
   expect(replacement).not.toHaveBeenCalled();
 });
+
+vi.mock('../../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadSettingsCatalogFixture>[0]) =>
+    loadSettingsCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareSettingsTranslations('ru'));

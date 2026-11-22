@@ -195,6 +195,21 @@ export const EFFECT_V1_OWNER_MAPPINGS = [
   },
   {
     exclusive: true,
+    allowCrossOwner: true,
+    owner: 'effect-v1-standalone-frame-driver',
+    productionFile:
+      'apps/extension/src/features/video/composition/effect-runtime/runtime/driver.ts',
+    reason: 'The standalone frame driver owns output admission, disposal and diagnostic codes.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/effect-runtime/runtime/driver.test.ts',
+      'apps/extension/src/features/video/composition/effect-runtime/runtime/resource-limits.test.ts',
+      'apps/extension/src/effect-runtime-sandbox/broker/session.test.ts',
+      'apps/extension/src/workflows/video-review/render-preview.test.ts',
+      'apps/extension/src/workflows/video-review/export-diagnostics.test.ts',
+    ],
+  },
+  {
+    exclusive: true,
     owner: 'effect-v1-project-runtime',
     productionPrefix: 'apps/extension/src/features/video/composition/effect-runtime/',
     reason: 'EffectV1 frame, audio, media, and resource plans are covered by owner-local suites.',
@@ -408,6 +423,15 @@ export const EFFECT_V1_OWNER_MAPPINGS = [
     reason:
       'Pure catalogue projection preserves pinned selections and refuses unavailable new choices.',
     testFiles: ['apps/extension/src/ui/gl-transition-choices.test.ts'],
+  },
+  {
+    owner: 'gl-transition-labels',
+    productionFile: 'apps/extension/src/ui/gl-transition-labels.ts',
+    reason: 'Localized built-in labels and literal imported names have direct catalog proof.',
+    testFiles: [
+      'apps/extension/src/ui/gl-transition-choices.test.ts',
+      'apps/extension/src/ui/gl-transition-fields.test.tsx',
+    ],
   },
   ...EFFECT_V1_INTEGRATION_OWNER_MAPPINGS,
 ];

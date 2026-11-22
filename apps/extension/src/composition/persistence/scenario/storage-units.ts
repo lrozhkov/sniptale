@@ -1,3 +1,4 @@
+import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
 import { sameHistoryArray, sameHistoryRecord } from '@sniptale/foundation/history/equal';
 import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { TOUR_LIMITS } from '@sniptale/runtime-contracts/scenario/types/tour';
@@ -5,6 +6,11 @@ import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { ScenarioProjectEntry } from './contracts';
 import { SCENARIO_HISTORY_LIMIT } from './history-model';
 import { materializeScenarioStorage } from './storage-format';
+
+interface UnitReference {
+  unitId: string;
+  revision: number;
+}
 
 interface UnitRow {
   projectId: string;
@@ -65,22 +71,40 @@ export function materializeScenarioUnitStorage(
   rows: unknown[],
   units: unknown[]
 ): unknown {
-  if (!isRecord(head) || head['historyFormatVersion'] !== 2)
+  if (!isRecord(head) || (head['historyFormatVersion'] !== 2 && head['historyFormatVersion'] !== 3))
     return units.length ? unavailable(head, rows, units) : materializeScenarioStorage(head, rows);
   const projectId = head['id'];
+  const editing = head['editingHistory'];
+  const hasEditingHistory = head['historyFormatVersion'] === 3;
+  if (
+    hasEditingHistory
+      ? !isRecord(editing) ||
+        Object.keys(editing).length !== 3 ||
+        editing['version'] !== 1 ||
+        !Array.isArray(editing['past']) ||
+        !Array.isArray(editing['future']) ||
+        editing['past'].length + editing['future'].length > EDITOR_HISTORY_LIMITS.maxActions
+      : editing !== undefined
+  )
+    return unavailable(head, rows, units);
   if (
     typeof projectId !== 'string' ||
     rows.length > SCENARIO_HISTORY_LIMIT ||
-    units.length > (GUIDE_LIMITS.maxItems + TOUR_LIMITS.maxSlides) * (SCENARIO_HISTORY_LIMIT + 1)
+    units.length >
+      (GUIDE_LIMITS.maxItems + TOUR_LIMITS.maxSlides) *
+        (SCENARIO_HISTORY_LIMIT + 1 + (hasEditingHistory ? EDITOR_HISTORY_LIMITS.maxActions : 0))
   )
     return unavailable(head, rows, units);
   const parsedUnits = indexScenarioUnits(units, projectId);
   if (!parsedUnits) return unavailable(head, rows, units);
   const indexed = parsedUnits;
   const used = new Set<string>();
+  const lists = { guide: new WeakMap<object, unknown[]>(), tour: new WeakMap<object, unknown[]>() };
   function body(values: unknown, kind: 'guide' | 'tour'): unknown[] | null {
     const limit = kind === 'guide' ? GUIDE_LIMITS.maxItems : TOUR_LIMITS.maxSlides;
     if (!Array.isArray(values) || values.length > limit) return null;
+    const previous = lists[kind].get(values);
+    if (previous) return previous;
     const result: unknown[] = [];
     const ids = new Set<string>();
     for (const ref of values) {
@@ -102,6 +126,7 @@ export function materializeScenarioUnitStorage(
       used.add(key);
       result.push(value);
     }
+    lists[kind].set(values, result);
     return result;
   }
   function project(value: unknown): unknown | null {
@@ -123,9 +148,27 @@ export function materializeScenarioUnitStorage(
     if (!content) return unavailable(head, rows, units);
     history.push({ ...row, project: content });
   }
+  let editingHistory;
+  if (
+    hasEditingHistory &&
+    isRecord(editing) &&
+    Array.isArray(editing['past']) &&
+    Array.isArray(editing['future'])
+  ) {
+    const past = editing['past'].map(project);
+    const future = editing['future'].map(project);
+    if (past.some((value) => value === null) || future.some((value) => value === null))
+      return unavailable(head, rows, units);
+    editingHistory = { version: 1, past, future };
+  }
   if (used.size !== indexed.size) return unavailable(head, rows, units);
   return materializeScenarioStorage(
-    { ...head, project: current, historyFormatVersion: 1 },
+    {
+      ...head,
+      project: current,
+      historyFormatVersion: 1,
+      ...(editingHistory ? { editingHistory } : {}),
+    },
     history
   );
 }
@@ -134,6 +177,7 @@ export function materializeScenarioUnitStorage(
  * One caller transaction determines row identities; none is a project revision or writer.
  * Canonical input stays stable during this synchronous call. Shared unit objects resolve once
  * per kind; no resolution or content-equality evidence is retained for a later encoding call.
+ * Equal ordered reference lists share their native clone representation. All indexes are local.
  */
 export function encodeScenarioUnitStorage(entry: ScenarioProjectEntry, existingUnits: unknown[]) {
   const candidates = new Map<string, UnitRow[]>();
@@ -152,13 +196,13 @@ export function encodeScenarioUnitStorage(entry: ScenarioProjectEntry, existingU
   }
   const used = new Map<string, UnitRow>();
   const known = {
-    guide: new WeakMap<object, UnitRow>(),
-    tour: new WeakMap<object, UnitRow>(),
+    guide: new WeakMap<object, UnitReference>(),
+    tour: new WeakMap<object, UnitReference>(),
   };
   function reference(value: { id: string }, kind: 'guide' | 'tour') {
     const unitId = `${kind}:${value.id}`;
     const previous = known[kind].get(value);
-    if (previous) return { unitId, revision: previous.revision };
+    if (previous) return previous;
     const own = candidates.get(unitId) ?? [];
     let row = own.find((candidate) => sameScenarioStoredValue(candidate.value, value));
     if (!row) {
@@ -170,20 +214,39 @@ export function encodeScenarioUnitStorage(entry: ScenarioProjectEntry, existingU
       candidates.set(unitId, own);
     }
     used.set(unitKey(unitId, row.revision), row);
-    known[kind].set(value, row);
-    return { unitId, revision: row.revision };
+    const ref = { unitId, revision: row.revision };
+    known[kind].set(value, ref);
+    return ref;
+  }
+  const lists = {
+    guide: new WeakMap<readonly object[], UnitReference[]>(),
+    tour: new WeakMap<readonly object[], UnitReference[]>(),
+  };
+  const sequences = {
+    guide: new Map<string, UnitReference[]>(),
+    tour: new Map<string, UnitReference[]>(),
+  };
+  function references(values: readonly { id: string }[], kind: 'guide' | 'tour') {
+    const previous = lists[kind].get(values);
+    if (previous) return previous;
+    const refs = values.map((value) => reference(value, kind));
+    const key = JSON.stringify(refs);
+    const shared = sequences[kind].get(key) ?? refs;
+    sequences[kind].set(key, shared);
+    lists[kind].set(values, shared);
+    return shared;
   }
   function project(value: GuideProject) {
     const { items, tour, ...root } = value;
-    const current = { ...root, items: items.map((item) => reference(item, 'guide')) };
+    const current = { ...root, items: references(items, 'guide') };
     if (!tour) return current;
     const { slides, ...settings } = tour;
     return {
       ...current,
-      tour: { ...settings, slides: slides.map((slide) => reference(slide, 'tour')) },
+      tour: { ...settings, slides: references(slides, 'tour') },
     };
   }
-  const { history, ...current } = entry;
+  const { history, editingHistory, ...current } = entry;
   const rows = (history ?? []).map((version) => ({
     ...version,
     projectId: entry.id,
@@ -192,7 +255,16 @@ export function encodeScenarioUnitStorage(entry: ScenarioProjectEntry, existingU
   const head = {
     ...current,
     project: project(entry.project),
-    historyFormatVersion: 2,
+    historyFormatVersion: editingHistory === undefined ? 2 : 3,
+    ...(editingHistory === undefined
+      ? {}
+      : {
+          editingHistory: {
+            version: 1,
+            past: editingHistory.past.map(project),
+            future: editingHistory.future.map(project),
+          },
+        }),
     savedVersionRevisions: rows.map((row) => row.revision),
   };
   return { head, rows, units: [...used.values()] };

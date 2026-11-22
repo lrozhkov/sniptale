@@ -7,6 +7,11 @@ import {
   triggerExtensionAction,
 } from '../support/recording-action';
 import type { ScreenshotCaptureConfig } from '@sniptale/runtime-contracts/capture/action';
+import {
+  grantAllSitesAccessFromSettings,
+  openRealExtensionPage,
+  SETTINGS_PATH,
+} from '../security/support';
 
 type CaptureMode = 'visible' | 'selection' | 'full';
 type CaptureEntry = 'home' | 'quick-action';
@@ -724,4 +729,187 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       }
     });
   }
+}
+
+async function readCapturedImageWorkspace(page: Page, id: string) {
+  return page.evaluate(async (id) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('sniptale-db');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      const tx = db.transaction(['image_workspaces', 'image_workspace_identities']);
+      const head = tx.objectStore('image_workspaces').get(id);
+      const identity = tx.objectStore('image_workspace_identities').get(id);
+      await new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onabort = () => reject(tx.error);
+      });
+      const raw: unknown = head.result;
+      const lifetime: unknown = identity.result;
+      const generation =
+        lifetime &&
+        typeof lifetime === 'object' &&
+        'generation' in lifetime &&
+        typeof lifetime.generation === 'string'
+          ? lifetime.generation
+          : null;
+      if (
+        !raw ||
+        typeof raw !== 'object' ||
+        !('revision' in raw) ||
+        typeof raw.revision !== 'number' ||
+        !('document' in raw) ||
+        !raw.document ||
+        typeof raw.document !== 'object' ||
+        !('canvasJson' in raw.document) ||
+        typeof raw.document.canvasJson !== 'string'
+      )
+        return { revision: 0, pathIds: [], generation };
+      const canvas: unknown = JSON.parse(raw.document.canvasJson);
+      const objects =
+        canvas && typeof canvas === 'object' && 'objects' in canvas && Array.isArray(canvas.objects)
+          ? canvas.objects
+          : [];
+      const pathIds: string[] = [];
+      for (const value of objects) {
+        const item: unknown = value;
+        if (
+          item &&
+          typeof item === 'object' &&
+          'type' in item &&
+          typeof item.type === 'string' &&
+          item.type.toLowerCase() === 'path' &&
+          'sniptaleId' in item &&
+          typeof item.sniptaleId === 'string'
+        )
+          pathIds.push(item.sniptaleId);
+      }
+      return { revision: raw.revision, pathIds, generation };
+    } finally {
+      db.close();
+    }
+  }, id);
+}
+
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`fresh native capture accepts edits and switches without stale hydration at ${viewport.name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(120_000);
+    const settings = await openRealExtensionPage(
+      context,
+      extensionId,
+      `${SETTINGS_PATH}?section=access-data`
+    );
+    await grantAllSitesAccessFromSettings(settings);
+    await settings.close();
+    const { page, popup, tabId } = await openCapturePage(
+      context,
+      extensionId,
+      hostOrigin,
+      viewport.size
+    );
+    await popup.evaluate(async () =>
+      chrome.storage.local.set({ 'sniptale-locale-preference': 'en' })
+    );
+    const editorOpened = context.waitForEvent('page');
+    expect(await triggerCapture(popup, tabId, 'home', 'visible', 0, 'edit')).toMatchObject({
+      success: true,
+    });
+    const editor = await editorOpened;
+    const errors: string[] = [];
+    editor.on('console', (message) => {
+      if (
+        message.type() === 'error' &&
+        /Failed to persist draft|Opening editor document failed/.test(message.text())
+      )
+        errors.push(message.text());
+    });
+    let other: Page | undefined;
+    try {
+      await editor.setViewportSize(viewport.size);
+      await editor.waitForURL(/editor/);
+      const id = new URL(editor.url()).searchParams.get('assetId');
+      if (!id) throw new Error('Native capture identity missing');
+      await expect(editor.locator('[data-ui="editor.floating.tool-rail"]')).toBeVisible();
+      await expect(editor.locator('[data-ui="editor.page.open-loading"]')).toHaveCount(0);
+      await editor.locator('[data-ui="editor.floating.tool-rail.pencil"]').click();
+      const canvas = await editor
+        .locator('[data-ui="editor.canvas.layer"] canvas.upper-canvas')
+        .boundingBox();
+      if (!canvas) throw new Error('Capture canvas missing');
+      await editor.mouse.move(canvas.x + canvas.width * 0.35, canvas.y + canvas.height * 0.4);
+      await editor.mouse.down();
+      await editor.mouse.move(canvas.x + canvas.width * 0.45, canvas.y + canvas.height * 0.5, {
+        steps: 5,
+      });
+      await editor.mouse.up();
+      await expect
+        .poll(async () => (await readCapturedImageWorkspace(editor, id)).pathIds.length)
+        .toBeGreaterThan(0);
+      const saved = await readCapturedImageWorkspace(editor, id);
+      expect(saved.generation).toBeTruthy();
+      expect(saved.revision).toBeGreaterThan(0);
+      expect(new URL(editor.url()).searchParams.has('bootstrap')).toBe(false);
+      const pathId = saved.pathIds[0]!;
+      await page.bringToFront();
+      await popup.evaluate(async (id) => {
+        const target = await chrome.tabs.update(id, { active: true });
+        await chrome.windows.update(target.windowId, { focused: true });
+      }, tabId);
+      const nextOpened = context.waitForEvent('page', { timeout: 30_000 });
+      expect(await triggerCapture(popup, tabId, 'home', 'visible', 0, 'edit')).toMatchObject({
+        success: true,
+      });
+      other = await nextOpened;
+      await other.setViewportSize(viewport.size);
+      await other.waitForURL(/editor/);
+      const secondId = new URL(other.url()).searchParams.get('assetId');
+      if (!secondId || secondId === id) throw new Error('Second native capture identity missing');
+      await expect(other.locator('[data-ui="editor.floating.tool-rail"]')).toBeVisible();
+      await other.close();
+      other = undefined;
+      await editor.bringToFront();
+      const timeOrigin = await editor.evaluate(() => performance.timeOrigin);
+      const trigger = editor.locator('[data-ui="editor.recent-images.trigger"]');
+      const recent = editor.locator('[data-ui="editor.recent-images.panel"]');
+      await trigger.click();
+      await recent.locator(`[data-asset-id="${secondId}"]`).click();
+      await expect(editor).toHaveURL((url) => url.searchParams.get('assetId') === secondId);
+      await expect(editor.locator('[data-ui="editor.page.switch-loading"]')).toHaveCount(0);
+      await trigger.click();
+      await recent.locator(`[data-asset-id="${id}"]`).click();
+      await expect(editor).toHaveURL((url) => url.searchParams.get('assetId') === id);
+      expect(await editor.evaluate(() => performance.timeOrigin)).toBe(timeOrigin);
+      await editor.locator('[data-ui="editor.floating.layers.mode.layers"]').click();
+      await expect(editor.locator(`[data-editor-layer-id="${pathId}"]`)).toBeVisible();
+      await editor.reload();
+      await expect(editor.locator(`[data-editor-layer-id="${pathId}"]`)).toBeVisible();
+      expect(errors).toEqual([]);
+      await editor.screenshot({
+        path: info.outputPath('fresh-capture-reopened.png'),
+        fullPage: false,
+      });
+      await info.attach('native-capture-result', {
+        body: JSON.stringify({ saved, errors }),
+        contentType: 'application/json',
+      });
+    } catch (error) {
+      await editor
+        .screenshot({ path: info.outputPath('fresh-capture-failure.png'), fullPage: false })
+        .catch(() => undefined);
+      await info.attach('native-capture-failure', {
+        body: JSON.stringify({ url: editor.url(), errors }),
+        contentType: 'application/json',
+      });
+      throw error;
+    } finally {
+      await other?.close();
+      await editor.close();
+    }
+  });
 }

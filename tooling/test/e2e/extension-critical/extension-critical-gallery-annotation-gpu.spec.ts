@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { enableGpuPreviewProof, observeEffectGpuPlans } from '../support/gpu-preview-proof';
 
 enableGpuPreviewProof();
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 import { addReviewFocus, seedReviewVideo } from '../support/quick-editor-media-fixture';

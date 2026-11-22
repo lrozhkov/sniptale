@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { translate, type TranslationKey } from './index';
+import { translateCatalogFixture } from './catalog-fixture.test-support';
+import type { TranslationKey } from './types';
 
 describe('editor toolbar layer messages', () => {
   it('keeps short layer-effect labels localized for the expanded layer row', () => {
@@ -19,5 +20,5 @@ describe('editor toolbar layer messages', () => {
 });
 
 function localized(key: TranslationKey) {
-  return { en: translate(key, 'en'), ru: translate(key, 'ru') };
+  return { en: translateCatalogFixture(key, 'en'), ru: translateCatalogFixture(key, 'ru') };
 }

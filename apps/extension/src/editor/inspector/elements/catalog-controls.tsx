@@ -100,7 +100,7 @@ export function EditorElementsControls({
           <SlidersHorizontal size={16} />
         </EditorIconButton>
         <form
-          className="min-w-0 flex-1 [&>label]:!h-8 [&>label]:!rounded-[4px] [&>label]:!px-2"
+          className="min-w-0 flex-1"
           onKeyDown={(event) => event.stopPropagation()}
           onKeyUp={(event) => event.stopPropagation()}
           onSubmit={(event) => {

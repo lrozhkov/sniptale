@@ -19,6 +19,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -32,6 +33,27 @@ const region = (): QuickEditZoomRegion => ({
   exit: { type: 'ease-in-out', duration: 0.3 },
 });
 const frame = { image: document.createElement('canvas'), width: 640, height: 360 };
+function paintClock() {
+  vi.useFakeTimers();
+  const requests = new Map<number, FrameRequestCallback>();
+  let sequence = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    requests.set(++sequence, callback);
+    return sequence;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => requests.delete(id));
+  return {
+    requests,
+    async admit() {
+      act(() => {
+        const callbacks = [...requests.values()];
+        requests.clear();
+        callbacks.forEach((callback) => callback(0));
+      });
+      await act(async () => vi.runOnlyPendingTimersAsync());
+    },
+  };
+}
 const pointer = (canvas: HTMLCanvasElement, kind: string, x: number, y = 0) =>
   act(async () => {
     canvas.dispatchEvent(
@@ -53,13 +75,8 @@ it('paints live transport, then restores the target and cancels animation on sto
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
     context as unknown as CanvasRenderingContext2D
   );
-  const requests = new Map<number, FrameRequestCallback>();
-  let sequence = 0;
-  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
-    requests.set(++sequence, callback);
-    return sequence;
-  });
-  vi.stubGlobal('cancelAnimationFrame', (id: number) => requests.delete(id));
+  const clock = paintClock();
+  const requests = clock.requests;
   const onChange = vi.fn();
   const onInteract = vi.fn();
   const video = document.createElement('video');
@@ -87,6 +104,7 @@ it('paints live transport, then restores the target and cancels animation on sto
       )
     );
   await render(1);
+  await clock.admit();
   expect(drawImage).toHaveBeenLastCalledWith(normalized, 0, 0, 480, 270);
   const area = () => host.querySelector<HTMLElement>('[data-focus-frame]')!;
   expect(Number.parseFloat(area().style.width)).toBeCloseTo(100);
@@ -120,6 +138,7 @@ it('paints live transport, then restores the target and cancels animation on sto
 });
 
 it('keeps auxiliary fallback pixels paired with the accepted live camera snapshot', async () => {
+  const clock = paintClock();
   const image = document.createElement('canvas');
   image.width = 640;
   image.height = 360;
@@ -149,6 +168,7 @@ it('keeps auxiliary fallback pixels paired with the accepted live camera snapsho
       )
     );
   await show(0.5, 2, 2);
+  await clock.admit();
   const queued = paint.mock.lastCall![0];
   await act(async () => {
     queued.onPresented?.({ ...queued, frame: { image, width: 640, height: 360 } });

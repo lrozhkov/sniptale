@@ -1,6 +1,13 @@
-import { projectSourceInteractionActions } from './source-interaction-documents';
+import {
+  isResultSourceInteractionAction,
+  projectSourceInteractionActions,
+} from './source-interaction-documents';
 import { recordingEventProjectActions } from './recording-events/project-facts';
-import { areVideoClipSourceClocksContinuous } from './timeline/rate';
+import {
+  areVideoClipInteractionClocksContinuous,
+  getVideoClipInteractionTimelineTime,
+  areVideoClipSourceClocksContinuous,
+} from './timeline/rate';
 import { recordingIdForProjectAsset } from './source-interactions';
 import type { VideoProject, VideoProjectActionEvent, VideoProjectVideoClip } from './types';
 
@@ -8,6 +15,7 @@ import type { VideoProject, VideoProjectActionEvent, VideoProjectVideoClip } fro
 export interface VideoProjectActionOccurrence {
   event: VideoProjectActionEvent;
   eventId: string;
+  timeDomain?: 'result';
   clipId: string | null;
   /** Captured down time projected through the owning run, including before a retained tail. */
   time: number;
@@ -17,23 +25,29 @@ export interface VideoProjectActionOccurrence {
 
 const CONTINUITY_EPSILON = 0.000_001;
 
-function touches(left: VideoProjectVideoClip, right: VideoProjectVideoClip): boolean {
+function touches(
+  left: VideoProjectVideoClip,
+  right: VideoProjectVideoClip,
+  resultClock = false
+): boolean {
   return (
     left.id !== right.id &&
     left.trackId === right.trackId &&
     left.assetId === right.assetId &&
     Math.abs(left.startTime + left.duration - right.startTime) <= CONTINUITY_EPSILON &&
-    areVideoClipSourceClocksContinuous(left, right)
+    (resultClock
+      ? areVideoClipInteractionClocksContinuous(left, right)
+      : areVideoClipSourceClocksContinuous(left, right))
   );
 }
 
-function resolveRuns(clips: readonly VideoProjectVideoClip[]) {
+function resolveRuns(clips: readonly VideoProjectVideoClip[], resultClock = false) {
   const runs = new Map<string, NonNullable<VideoProjectActionOccurrence['playbackRun']>>();
   const successors = new Map(
-    clips.map((left) => [left.id, clips.filter((right) => touches(left, right))])
+    clips.map((left) => [left.id, clips.filter((right) => touches(left, right, resultClock))])
   );
   const predecessors = new Map(
-    clips.map((right) => [right.id, clips.filter((left) => touches(left, right))])
+    clips.map((right) => [right.id, clips.filter((left) => touches(left, right, resultClock))])
   );
   const linkedNext = (clip: VideoProjectVideoClip) => {
     const next = successors.get(clip.id);
@@ -90,6 +104,7 @@ export function resolveVideoProjectActionOccurrences(
     }
   }
   const runs = new Map([...instances].map(([key, clips]) => [key, resolveRuns(clips)]));
+  const resultRuns = new Map([...instances].map(([key, clips]) => [key, resolveRuns(clips, true)]));
   const preparedActions = recordingEventProjectActions(project);
   const sourceActions = projectSourceInteractionActions(project, [
     ...preparedActions.filter(
@@ -127,6 +142,39 @@ export function resolveVideoProjectActionOccurrences(
       anchor.sourceInstanceId,
     ]);
     const clips = instances.get(key) ?? [];
+    if (isResultSourceInteractionAction(project, event)) {
+      const clipRuns = resultRuns.get(key);
+      return clips.flatMap((clip) => {
+        const time = getVideoClipInteractionTimelineTime(clip, anchor.sourceTime);
+        const end = getVideoClipInteractionTimelineTime(
+          clip,
+          anchor.sourceTime + (event.capturedDuration ?? 0)
+        );
+        const downInside =
+          time >= clip.startTime - CONTINUITY_EPSILON &&
+          time < clip.startTime + clip.duration - CONTINUITY_EPSILON;
+        const run = clipRuns?.get(clip.id);
+        const earlier = clips.some(
+          (other) =>
+            other.id !== clip.id &&
+            run?.clipIds.includes(other.id) &&
+            time >= other.startTime - CONTINUITY_EPSILON &&
+            time < other.startTime + other.duration - CONTINUITY_EPSILON
+        );
+        if (!downInside && (earlier || time >= clip.startTime || end <= clip.startTime)) return [];
+        return [
+          {
+            event,
+            eventId: event.id,
+            timeDomain: 'result' as const,
+            clipId: clip.id,
+            time,
+            sourceInstanceId: anchor.sourceInstanceId,
+            playbackRun: run ?? null,
+          },
+        ];
+      });
+    }
     const pointTime = (clip: VideoProjectVideoClip) =>
       clip.startTime +
       (anchor.sourceTime - clip.sourceStart) / (clip.playbackRate ?? 1) -

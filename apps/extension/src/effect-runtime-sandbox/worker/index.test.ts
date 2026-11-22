@@ -2,12 +2,16 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import {
   EFFECT_RUNTIME_PROTOCOL_VERSION,
+  EFFECT_RUNTIME_WORKER_READY,
   EFFECT_RUNTIME_WORKER_REQUEST,
+  EFFECT_RUNTIME_WORKER_RESPONSE,
   type EffectRuntimeWorkerMessage,
 } from '../../contracts/effect-runtime/types';
 import { parseRuntimeAnimationDocument } from '../../contracts/effect-runtime/animation';
 
-const initialization = vi.hoisted(() => ({ preload: vi.fn(async () => undefined) }));
+const initialization = vi.hoisted(() => ({
+  preload: vi.fn<() => Promise<void>>(async () => undefined),
+}));
 vi.mock('./lottie', async (original) => ({
   ...(await original<typeof import('./lottie')>()),
   initializeLottieRuntime: () => initialization.preload(),
@@ -18,6 +22,15 @@ vi.mock('./lottie', async (original) => ({
   }),
 }));
 beforeEach(() => initialization.preload.mockReset());
+
+function workerScope(postFrame: (message: unknown, transfer: unknown) => void) {
+  return {
+    onmessage: null as ((event: MessageEvent<unknown>) => void) | null,
+    postMessage(message: { type: string }, transfer: unknown) {
+      if (message.type === EFFECT_RUNTIME_WORKER_RESPONSE) postFrame(message, transfer);
+    },
+  };
+}
 
 class FakeBitmap implements ImageBitmap {
   readonly close = vi.fn();
@@ -34,10 +47,7 @@ afterEach(() => {
 it('installs the worker boundary and returns a typed malformed response', async () => {
   vi.resetModules();
   const postMessage = vi.fn();
-  const scope: {
-    onmessage: ((event: MessageEvent<unknown>) => void) | null;
-    postMessage: typeof postMessage;
-  } = { onmessage: null, postMessage };
+  const scope = workerScope(postMessage);
   vi.stubGlobal('self', scope);
 
   await import('./index');
@@ -53,10 +63,7 @@ it('installs the worker boundary and returns a typed malformed response', async 
 it('transfers a successful frame from the installed worker boundary', async () => {
   vi.resetModules();
   const postMessage = vi.fn();
-  const scope: {
-    onmessage: ((event: MessageEvent<unknown>) => void) | null;
-    postMessage: typeof postMessage;
-  } = { onmessage: null, postMessage };
+  const scope = workerScope(postMessage);
   vi.stubGlobal('self', scope);
   vi.stubGlobal('ImageBitmap', FakeBitmap);
   await import('./index');
@@ -86,10 +93,7 @@ it('disposes a successful frame when the final worker transfer fails', async () 
     }
     throw new Error('transfer failed');
   });
-  const scope: {
-    onmessage: ((event: MessageEvent<unknown>) => void) | null;
-    postMessage: typeof postMessage;
-  } = { onmessage: null, postMessage };
+  const scope = workerScope(postMessage);
   vi.stubGlobal('self', scope);
   vi.stubGlobal('ImageBitmap', FakeBitmap);
   await import('./index');
@@ -103,10 +107,7 @@ it('disposes a successful frame when the final worker transfer fails', async () 
 it('rejects unexpected message ports and disposes request-owned resources', async () => {
   vi.resetModules();
   const postMessage = vi.fn();
-  const scope: {
-    onmessage: ((event: MessageEvent<unknown>) => void) | null;
-    postMessage: typeof postMessage;
-  } = { onmessage: null, postMessage };
+  const scope = workerScope(postMessage);
   const bitmap = new FakeBitmap(10, 10);
   const channel = new MessageChannel();
   const close = vi.spyOn(channel.port2, 'close');
@@ -133,10 +134,7 @@ it('rejects unexpected message ports and disposes request-owned resources', asyn
 it('rejects messages carrying a window origin', async () => {
   vi.resetModules();
   const postMessage = vi.fn();
-  const scope: {
-    onmessage: ((event: MessageEvent<unknown>) => void) | null;
-    postMessage: typeof postMessage;
-  } = { onmessage: null, postMessage };
+  const scope = workerScope(postMessage);
   vi.stubGlobal('self', scope);
   vi.stubGlobal('ImageBitmap', FakeBitmap);
   await import('./index');
@@ -195,10 +193,7 @@ it('installs guards after failed preload and returns a classified failure withou
   vi.resetModules();
   initialization.preload.mockRejectedValueOnce(new Error('WASM unavailable'));
   const postMessage = vi.fn();
-  const scope: {
-    onmessage: ((event: MessageEvent<unknown>) => void) | null;
-    postMessage: typeof postMessage;
-  } = { onmessage: null, postMessage };
+  const scope = workerScope(postMessage);
   vi.stubGlobal('self', scope);
   await import('./index');
   await Promise.resolve();
@@ -210,4 +205,26 @@ it('installs guards after failed preload and returns a classified failure withou
     expect.objectContaining({ result: expect.objectContaining({ code: 'crashed' }) }),
     { transfer: [] }
   );
+});
+
+it('announces readiness only after Lottie initialization and sandbox guards', async () => {
+  vi.resetModules();
+  let finish!: () => void;
+  initialization.preload.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      finish = resolve;
+    })
+  );
+  const scope = { ...workerScope(vi.fn()), postMessage: vi.fn() };
+  vi.stubGlobal('self', scope);
+  await import('./index');
+  expect(scope.postMessage).not.toHaveBeenCalled();
+  finish();
+  await vi.waitFor(() =>
+    expect(scope.postMessage).toHaveBeenCalledWith(
+      { type: EFFECT_RUNTIME_WORKER_READY, initialized: true },
+      { transfer: [] }
+    )
+  );
+  expect(() => Reflect.get(scope, 'fetch')).toThrow('SNIPTALE_EFFECT_RUNTIME_API_DENIED');
 });

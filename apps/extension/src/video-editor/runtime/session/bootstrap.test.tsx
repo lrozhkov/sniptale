@@ -1,8 +1,23 @@
 // @vitest-environment jsdom
 
+import {
+  videoeditorFixtureMessages,
+  prepareVideoEditorTranslations,
+} from '../../testing/translations.test-support';
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: Parameters<typeof videoeditorFixtureMessages>[0]) =>
+    videoeditorFixtureMessages(locale)
+  ),
+}));
+
+beforeAll(async () => {
+  await prepareVideoEditorTranslations('en');
+});
+
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import type { ApplyLoadedProject } from './types';
 
@@ -113,7 +128,7 @@ async function verifyReadyBeforeLibraryRefreshes() {
   });
   await flushEffects();
 
-  expect(applyLoadedProject).toHaveBeenCalledWith(project, 'recording-1');
+  expect(applyLoadedProject).toHaveBeenCalledWith(project, 'recording-1', undefined);
   expect(setReady).toHaveBeenCalledWith(true);
 
   refreshRecordings.resolve();
@@ -146,7 +161,7 @@ async function verifyRefreshFailuresKeepProjectReady() {
   });
   await flushEffects();
 
-  expect(applyLoadedProject).toHaveBeenCalledWith(project, 'recording-2');
+  expect(applyLoadedProject).toHaveBeenCalledWith(project, 'recording-2', undefined);
   expect(setError).not.toHaveBeenCalled();
   expect(setReady).toHaveBeenCalledWith(true);
 }

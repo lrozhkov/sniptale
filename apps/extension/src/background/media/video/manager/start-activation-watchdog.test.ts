@@ -13,7 +13,6 @@ function createDeps() {
     getRecordingId: vi.fn(() => 'recording-1'),
     isPreparing: vi.fn(() => true),
     failStart: vi.fn(async () => undefined),
-    translate: vi.fn((key: string) => `t:${key}`),
   };
 }
 
@@ -33,10 +32,7 @@ it('delegates an expired preparing start to the completion owner exactly once', 
   await vi.advanceTimersByTimeAsync(RECORDING_START_ACTIVATION_TIMEOUT_MS - 1);
   expect(deps.failStart).not.toHaveBeenCalled();
   await vi.advanceTimersByTimeAsync(1);
-  expect(deps.failStart).toHaveBeenCalledExactlyOnceWith(
-    'recording-1',
-    't:background.runtime.recordingStartTimeout'
-  );
+  expect(deps.failStart).toHaveBeenCalledExactlyOnceWith('recording-1', 'start-activation-timeout');
   await vi.advanceTimersByTimeAsync(RECORDING_START_ACTIVATION_TIMEOUT_MS);
   expect(deps.failStart).toHaveBeenCalledOnce();
 });
@@ -66,8 +62,5 @@ it('replaces the old timer and ignores clearing a different identity', async () 
   scheduleRecordingStartActivationWatchdog('recording-1', deps);
   clearRecordingStartActivationWatchdog('old');
   await vi.advanceTimersByTimeAsync(RECORDING_START_ACTIVATION_TIMEOUT_MS);
-  expect(deps.failStart).toHaveBeenCalledExactlyOnceWith(
-    'recording-1',
-    't:background.runtime.recordingStartTimeout'
-  );
+  expect(deps.failStart).toHaveBeenCalledExactlyOnceWith('recording-1', 'start-activation-timeout');
 });

@@ -102,7 +102,11 @@ function projectCameraFrameAtTime(
   const sample = rendered ? renderedSample : resolveObservedCursorPosition(project, time, clipId);
   const authoredSource = resolveProjectSourceInteractionDocument(project, time, clipId);
   const authoredCursor = authoredSource?.document.cursorEnabled
-    ? evaluateCursorMotion(authoredSource.document.cursorMotions, authoredSource.sourceTime)
+    ? evaluateCursorMotion(
+        authoredSource.document.cursorMotions,
+        authoredSource.sourceTime,
+        authoredSource.resultTime
+      )
     : null;
   const actual = authoredCursor
     ? { x: authoredCursor.x, y: authoredCursor.y }
@@ -182,7 +186,11 @@ function retainClosingProjectFrames(
       const authored = resolveProjectSourceInteractionDocument(project, previous.time, clip.id);
       if (
         authored?.document.cursorEnabled &&
-        evaluateCursorMotion(authored.document.cursorMotions, authored.sourceTime)
+        evaluateCursorMotion(
+          authored.document.cursorMotions,
+          authored.sourceTime,
+          authored.resultTime
+        )
       )
         continue;
       const separate = project.cursorTrack?.captureMode === VideoCursorCaptureMode.SEPARATE;

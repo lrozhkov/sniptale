@@ -1,7 +1,19 @@
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, afterEach, expect, it, vi } from 'vitest';
+import en from '../../../../platform/i18n/catalogs/en.json';
+import ru from '../../../../platform/i18n/catalogs/ru.json';
+import { prepareTranslations, type AppLocale } from '../../../../platform/i18n';
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: AppLocale) =>
+    flatCatalogFixture(locale === 'ru' ? ru : en)
+  ),
+}));
+
+beforeAll(async () => {
+  await prepareTranslations('settings', 'en');
+});
 import type { EffectBundleCatalogListItem } from '../../../../features/video/project/effect-bundle/catalog';
 const { list, toggle, remove, importFiles, get, exportCatalog } = vi.hoisted(() => ({
   get: vi.fn(),
@@ -103,7 +115,7 @@ it('accepts multiple files and shows partial success without hiding the catalog'
   expect(importFiles).toHaveBeenCalledWith(files);
   expect(
     container.querySelector('[data-ui="effect-catalog.import-result"]')?.textContent
-  ).toContain('1 из 2');
+  ).toContain('1 of 2');
   expect(container.textContent).toContain('bad.json');
   expect(input.value).toBe('');
 });
@@ -162,7 +174,7 @@ it('manages saved packs with download and confirms removal', async () => {
   const dialog = document.querySelector('[role=alertdialog]')!;
   expect(dialog).not.toBeNull();
   const confirm = Array.from(dialog.querySelectorAll('button')).find(
-    (b) => b.textContent === 'Удалить'
+    (b) => b.textContent === 'Delete'
   )!;
   await act(async () => confirm.click());
   expect(remove).toHaveBeenCalledWith('pack-0');
@@ -357,3 +369,15 @@ it('serializes preparation and copy saves, preserves the source and retries the 
   expect(container.innerHTML).toBe('');
   expect(catalog).toEqual(before);
 });
+
+function flatCatalogFixture(value: unknown, prefix = ''): Record<string, string> {
+  if (typeof value === 'string') return { [prefix]: value };
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Invalid authored catalog fixture');
+  }
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, child]) =>
+      Object.entries(flatCatalogFixture(child, prefix ? `${prefix}.${key}` : key))
+    )
+  );
+}

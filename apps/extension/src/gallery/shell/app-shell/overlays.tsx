@@ -120,8 +120,10 @@ type GalleryPreviewOverlayProps = Pick<
   | 'onPreviewDownload'
   | 'onPreviewDownloadOriginal'
   | 'onPreviewEdit'
+  | 'onImageProjectPickerRequested'
   | 'onPreviewOpenSnapshotScreenshot'
   | 'onPreviewPromote'
+  | 'onPreviewRemoveFromOriginals'
   | 'onPreviewResetChanges'
   | 'onPreviewRestoreTrash'
   | 'onPreviewRestoreOriginal'
@@ -213,12 +215,17 @@ function renderPreviewOverlayPanel(
       onDownloadOriginal={async () => props.onPreviewDownloadOriginal()}
       onCopy={async () => props.onPreviewCopy()}
       onEdit={() => props.onPreviewEdit(previewItem)}
+      imageProjectPickerRequest={props.state.preview.session.imageProjectPickerRequest}
+      onImageProjectPickerRequested={props.onImageProjectPickerRequested}
       onOpenSnapshotScreenshot={async () => props.onPreviewOpenSnapshotScreenshot()}
       onDelete={async (opening) => props.onPreviewDelete(previewItem, opening)}
       onRestoreOriginal={props.onPreviewRestoreOriginal}
       onSaveCopy={async () => props.onPreviewSaveCopy()}
       {...(props.onPreviewPromote
         ? { onPromote: async () => props.onPreviewPromote?.(previewItem) }
+        : {})}
+      {...(props.onPreviewRemoveFromOriginals
+        ? { onRemoveFromOriginals: async () => props.onPreviewRemoveFromOriginals?.(previewItem) }
         : {})}
     />
   );

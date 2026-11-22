@@ -43,9 +43,12 @@ export interface PreviewPanelProps {
   onDownloadOriginal?: () => Promise<boolean | void>;
   onCopy: () => Promise<boolean | void>;
   onEdit: () => void;
+  imageProjectPickerRequest?: string | undefined;
+  onImageProjectPickerRequested?: ((request: string) => void) | undefined;
   onOpenSnapshotScreenshot?: () => Promise<void>;
   onDelete: (opening?: GalleryDeletionOpening) => Promise<void>;
   onPromote?: () => Promise<void>;
+  onRemoveFromOriginals?: () => Promise<void>;
   onRestoreOriginal?: () => void;
   onSaveCopy?: () => Promise<boolean | void>;
 }

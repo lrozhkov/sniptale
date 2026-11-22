@@ -1,3 +1,4 @@
+import { createImageWorkspaceIdentity } from '../image-workspaces/identity';
 import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
 import {
   captureVideoProjectInTransaction,
@@ -32,6 +33,7 @@ import {
   SYNC_CAPTURE_STORE,
   RECORDING_TELEMETRY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   IMAGE_WORKSPACES_STORE,
   THUMBNAILS_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
@@ -116,6 +118,7 @@ async function publishProjectMediaAsset(args: {
   filename?: string;
   expectedAssetId?: string | null;
   publishToLibrary?: boolean;
+  projectRetained?: true;
   requiredReviewAnnotationEffect?: ProjectAssetPublicationOptions['requiredReviewAnnotationEffect'];
   expectedLibrarySource?: ProjectAssetPublicationPayload['expectedLibrarySource'];
   journal: AssetReadyJournal;
@@ -136,6 +139,7 @@ async function publishProjectMediaAsset(args: {
         SYNC_CAPTURE_STORE,
         RECORDING_TELEMETRY_STORE,
         VIDEO_WORKSPACE_DRAFTS_STORE,
+        IMAGE_WORKSPACE_IDENTITIES_STORE,
         IMAGE_WORKSPACES_STORE,
         THUMBNAILS_STORE,
         AGGREGATE_PRESENTATIONS_STORE,
@@ -239,12 +243,18 @@ async function publishProjectMediaAsset(args: {
                 lifecycle: createLibraryLifecycle('library', args.entry.createdAt),
                 filename: args.filename ?? args.entry.id,
                 originalFilename: args.filename ?? args.entry.id,
+                ...(args.projectRetained ? { savedIndependently: false } : {}),
               }
             : buildProjectExportMediaEntry(args.entry as StoredProjectExportEntry);
-        const currentMedia = parseMediaLibraryEntry(await mediaStore.get(mediaEntry.id));
+        const existingMedia: unknown = await mediaStore.get(mediaEntry.id);
+        if (args.projectRetained && existingMedia !== undefined)
+          throw new SupersededAssetPublicationError();
+        const currentMedia = parseMediaLibraryEntry(existingMedia);
         if (currentMedia?.lifecycle) mediaEntry.lifecycle = currentMedia.lifecycle;
+        if (!currentMedia && (mediaEntry.kind === 'image' || mediaEntry.kind === 'screenshot'))
+          await createImageWorkspaceIdentity(tx, mediaEntry.id);
         await tx.objectStore(MEDIA_LIBRARY_STORE).put(mediaEntry);
-        await captureMediaInTransaction(tx, mediaEntry.id, publication);
+        if (!args.projectRetained) await captureMediaInTransaction(tx, mediaEntry.id, publication);
       }
       if (physicalDelete.assetIds.length > 0) {
         await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
@@ -304,6 +314,7 @@ export async function publishProjectAssetJournal(
     ...(payload.publishToLibrary === undefined
       ? {}
       : { publishToLibrary: payload.publishToLibrary }),
+    ...(payload.projectRetained ? { projectRetained: true } : {}),
     journal,
     ...(payload.expectedLibrarySource
       ? { expectedLibrarySource: payload.expectedLibrarySource }

@@ -21,6 +21,8 @@ export function AnnotationNumeric(props: {
   step?: number | undefined;
   unit?: CompactInspectorUnit | undefined;
   revealScrub?: boolean | undefined;
+  rangePresentation?: 'field' | undefined;
+  stepperPlacement?: 'sides' | undefined;
   scrub?: Scrub | undefined;
 }) {
   const active = useRef(false);
@@ -31,7 +33,7 @@ export function AnnotationNumeric(props: {
     const patch = props.patch(value);
     if (!patch) return false;
     if (!active.current) {
-      if (!props.editor.beginGesture(props.id)) return false;
+      if (!props.editor.beginGesture(props.id, 'field')) return false;
       active.current = true;
       frozen.current = props.scrub;
     }
@@ -66,7 +68,6 @@ export function AnnotationNumeric(props: {
       <NumericRow
         appearance="plain"
         focusAppearance="accent-box"
-        className="min-h-8! w-full grid-cols-[minmax(0,1fr)_auto]! py-0!"
         label={props.label}
         value={props.value}
         disabled={props.disabled}
@@ -76,8 +77,11 @@ export function AnnotationNumeric(props: {
         precision={2}
         unit={props.unit}
         revealScrub={props.revealScrub ?? false}
+        rangePresentation={props.rangePresentation}
+        stepperPlacement={props.stepperPlacement}
         scrub={active.current ? frozen.current : props.scrub}
         onPreviewValue={preview}
+        onCancelValue={cancel}
         onCommitValue={(value) => {
           if (!preview(value)) return;
           active.current = false;
@@ -108,21 +112,4 @@ export function annotationNumericScrub(
   const low = practical ? Math.max(min, Math.min(value, practical.min)) : min;
   const high = practical ? Math.min(max, Math.max(value, practical.max)) : max;
   return low <= high ? { min: low, max: high, step } : undefined;
-}
-
-/** Placement tracks use practical percentages; timing and rotation retain their input bounds. */
-export function annotationPlacementScrub(
-  key: string,
-  value: number,
-  min: number | undefined,
-  max: number | undefined,
-  step: number
-) {
-  const practical =
-    key === 'x' || key === 'y'
-      ? { min: -100, max: 200 }
-      : key === 'width' || key === 'height'
-        ? { min: 0.01, max: 200 }
-        : undefined;
-  return annotationNumericScrub(value, min, max, step, practical);
 }

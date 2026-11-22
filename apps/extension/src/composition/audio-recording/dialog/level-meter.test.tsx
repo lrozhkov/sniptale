@@ -1,7 +1,16 @@
 // @vitest-environment jsdom
+import {
+  loadCompositionCatalogFixture,
+  prepareCompositionTranslations,
+} from '../../catalog-fixture.test-support';
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadCompositionCatalogFixture>[0]) =>
+    loadCompositionCatalogFixture(locale),
+}));
+
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { expect, it, vi } from 'vitest';
+import { expect, it, vi, beforeEach } from 'vitest';
 import { RecordingLevelMeter } from './level-meter';
 
 import { setLocalePreference } from '../../../platform/i18n';
@@ -43,4 +52,8 @@ it('reports voice, silence, pause and unavailable input without animating inacti
   act(() => root.unmount());
   host.remove();
   vi.unstubAllGlobals();
+});
+
+beforeEach(async () => {
+  await prepareCompositionTranslations('video-editor', 'en');
 });

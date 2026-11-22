@@ -1,11 +1,16 @@
 import { readReviewFreezeFrame } from '../../workflows/video-review/freeze-frame';
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useRef, useState, type SetStateAction } from 'react';
 import type { ReviewAnchor, ReviewEdit, ReviewSelection } from '../../features/video/review/types';
 import type { useReviewAdvanced } from './use-advanced';
 import { commitReviewEdit, useReviewEdits } from './use-edits';
 import type { useReviewExport } from './use-export';
 import { useReviewZoomEditor } from './zoom-editor';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import {
+  reviewCommandSourceTime,
+  type ReviewCommandContext,
+  type ReviewCommandPort,
+} from './command-context';
 
 type Session = ReturnType<
   typeof import('../../workflows/video-review/session').createVideoReviewSession
@@ -13,12 +18,13 @@ type Session = ReturnType<
 
 /** Owns edit and zoom tool selection while persistence remains in their domain hooks. */
 export function useReviewEditingTools(args: {
+  commands: ReviewCommandPort;
   advancedState: ReturnType<typeof useReviewAdvanced>;
   zoom: ReturnType<typeof useReviewAdvanced>['advanced']['zoom'];
   timelineDuration: number;
   timelineSelection: ReviewAnchor;
   activeSelection: ReviewSelection;
-  setActiveSelection: Dispatch<SetStateAction<ReviewSelection>>;
+  setActiveSelection(next: SetStateAction<ReviewSelection>, context?: ReviewCommandContext): void;
   sourceDuration: number;
   sourceTime: number;
   file: Blob;
@@ -40,8 +46,8 @@ export function useReviewEditingTools(args: {
     timelineDuration: args.timelineDuration,
     timeMap: buildReviewTimeMap(args.sourceDuration, args.edits),
     selection: args.activeSelection.kind === 'zoom' ? args.activeSelection.id : null,
-    onSelectionChange: (id) =>
-      args.setActiveSelection(id ? { kind: 'zoom', id } : { kind: 'none' }),
+    onSelectionChange: (id, context) =>
+      args.setActiveSelection(id ? { kind: 'zoom', id } : { kind: 'none' }, context),
     linkSelection: args.activeSelection.kind === 'zoom-link' ? args.activeSelection.id : null,
     onLinkSelectionChange: (id) =>
       args.setActiveSelection(id ? { kind: 'zoom-link', id } : { kind: 'none' }),
@@ -68,14 +74,15 @@ export function useReviewEditingTools(args: {
     setSelection: args.setTimelineSelection,
     selectedEditId: args.activeSelection.kind === 'edit' ? args.activeSelection.id : null,
     selectedObject: args.activeSelection.kind !== 'none',
-    onSelectedEditIdChange: (id) =>
-      args.setActiveSelection(id ? { kind: 'edit', id } : { kind: 'none' }),
-    commit: (before, after) =>
+    onSelectedEditIdChange: (id, context) =>
+      args.setActiveSelection(id ? { kind: 'edit', id } : { kind: 'none' }, context),
+    commit: (before, after, context) =>
       commitReviewEdit({
         session: args.session,
         run: (action) =>
           args.run(async () => {
             await args.advancedState.flush();
+            if (context && !args.commands.isCurrent(context, 'temporal')) return;
             return action();
           }),
         busy: args.busy,
@@ -85,50 +92,70 @@ export function useReviewEditingTools(args: {
         after,
       }),
   });
-  const addFreeze = async () => {
+  const activate = <T>(
+    action: (context: ReviewCommandContext) => Promise<T>,
+    supplied?: ReviewCommandContext
+  ) => {
+    if (supplied)
+      return args.commands.isCurrent(supplied, 'source')
+        ? action(supplied)
+        : Promise.resolve(undefined);
+    const context = args.commands.capture();
+    if (!context) return Promise.resolve(undefined);
+    let pending: Promise<T> | undefined;
+    args.commands.admit(context, () => {
+      pending = action(context);
+    });
+    return pending ?? Promise.resolve(undefined);
+  };
+  const performFreeze = async (context: ReviewCommandContext) => {
     if (request.current || args.busy || !args.canStart()) return;
+    const sourceTime = reviewCommandSourceTime(context);
+    if (sourceTime === null) return;
     if (
-      args.edits.some(
-        (edit) => edit.kind === 'cut' && edit.start <= args.sourceTime && args.sourceTime < edit.end
+      context.document.edits.some(
+        (edit) => edit.kind === 'cut' && edit.start <= sourceTime && sourceTime < edit.end
       )
     ) {
       args.onInvalid();
       return;
     }
-    args.pause();
     const controller = new AbortController();
     request.current = controller;
     setFreezing(true);
     try {
       await args.advancedState.flush();
       controller.signal.throwIfAborted();
-      const revision = args.session.getSnapshot().snapshot.workspace.revision;
+      if (!args.commands.isCurrent(context, 'temporal')) return;
       const frame = await readReviewFreezeFrame(
         args.file,
-        args.sourceTime,
-        args.sourceDuration,
+        sourceTime,
+        context.scope.sourceDuration,
         controller.signal
       );
       controller.signal.throwIfAborted();
       if (
         latest.current.file !== args.file ||
         latest.current.session !== args.session ||
-        args.session.getSnapshot().snapshot.workspace.revision !== revision
+        !args.commands.isCurrent(context, 'temporal')
       )
         return;
       const after: ReviewEdit = {
         id: crypto.randomUUID(),
         kind: 'freeze',
-        start: args.sourceTime,
-        end: args.sourceTime,
-        requestedStart: args.sourceTime,
-        requestedEnd: args.sourceTime,
+        start: sourceTime,
+        end: sourceTime,
+        requestedStart: sourceTime,
+        requestedEnd: sourceTime,
         duration: 2,
         ...frame,
       };
       const committed = await commitReviewEdit({
         session: args.session,
-        run: args.run,
+        run: (action) =>
+          args.run(async () => {
+            if (args.commands.isCurrent(context, 'temporal')) return action();
+          }),
         busy: latest.current.busy,
         exporterPhase: latest.current.exporter.phase,
         canStart: latest.current.canStart,
@@ -136,7 +163,7 @@ export function useReviewEditingTools(args: {
         after,
       });
       if (committed) {
-        cuts.select(after);
+        cuts.select(after, context);
         const segment = buildReviewTimeMap(
           args.sourceDuration,
           args.session.getSnapshot().document.edits
@@ -150,5 +177,22 @@ export function useReviewEditingTools(args: {
       setFreezing(false);
     }
   };
-  return { zoom, cuts: { ...cuts, addFreeze, freezing } };
+  return {
+    zoom,
+    cuts: {
+      ...cuts,
+      toggle: (kind: 'cut' | 'speed' = 'cut', context?: ReviewCommandContext) =>
+        activate((captured) => cuts.toggle(kind, captured), context),
+      commitRange: (...values: Parameters<typeof cuts.commitRange>) =>
+        activate(
+          (captured) => cuts.commitRange(values[0], values[1], values[2], captured),
+          values[3]
+        ).then((result) => result ?? false),
+      addFreeze: () =>
+        request.current || args.busy || !args.canStart()
+          ? Promise.resolve(undefined)
+          : activate(performFreeze),
+      freezing,
+    },
+  };
 }

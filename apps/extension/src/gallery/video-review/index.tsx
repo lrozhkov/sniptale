@@ -1,10 +1,16 @@
+import { openGalleryPage } from '../../platform/navigation/extension-pages';
+import { ReviewInspectorActions } from './edit-actions';
 import { ReviewPlaybackPresentationClockContext } from './playback-presentation-clock';
 import { useReviewLiveSeek } from './use-live-seek';
-import { Magnet, ScanLine } from 'lucide-react';
+import { Magnet } from 'lucide-react';
+import { ReviewLiveSeekIcon } from './live-seek-icon';
 import { ReviewButton, reviewIconButtonClassName } from './controls';
 import { resolveReviewTimelineSelection } from './timeline-batch-selection';
 import { ReviewInspectorToolbarNavigation } from './review-toolbar';
 import { ReviewSelectionActionsSurface } from './selection-actions';
+import { reviewTimelineSelectionInterval } from './use-review-selection';
+import { ReviewTimelineFragment } from './selection-fragment';
+import type { ReviewPlaybackRange } from './playback-range';
 import { setGalleryQuickEditUrl, clearGalleryQuickEditUrl } from '../platform/browser-driver';
 import { useReviewWorkspaceColor } from './workspace-color';
 import {
@@ -18,6 +24,7 @@ import {
   reviewInspectorContext,
   backupReview,
   flushReviewTextVoiceBuffers,
+  leaveReviewInspector,
 } from './inspector-binding';
 import { useReviewProjectCommands } from './project-controls';
 import { ReviewKeyboardHelp } from './keyboard-help';
@@ -25,20 +32,27 @@ import { usePresentationPreview } from './use-presentation-preview';
 import { ReviewEditorPresentationDialog } from './presentation-preview-dialog';
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
 import { resolveOverlayComments } from '../../features/video/review/comments';
+import type { ReviewPreviewRendererStatus } from './preview-presentation-state';
 import { useReviewPreviewInspector } from './preview-inspector';
 import {
   ReviewPreviewRendererContext,
-  type useReviewPreviewPreferences,
+  useReviewPreviewPreferences,
 } from './use-preview-preferences';
 import { useReviewMusicImport } from './music-import';
 import { AudioLibraryPicker } from '../../composition/audio-library/picker';
 import { ReviewPanelResizeHandle, useReviewPanelLayout } from './panel-layout';
-import { ReviewPreviewBinding } from './preview-binding';
+import { ReviewPreviewBinding, type ReviewPreviewInputs } from './preview-binding';
+import type { ReviewStageBinding } from './stage-binding';
+import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
+import { resolveReviewCursorFocusPath } from '../../features/video/review/advanced/cursor-focus-path';
+import { resolveReviewOutputProfile } from '../../workflows/video-review/render-settings';
+import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
 import { ReviewLoadStatus, reviewErrorMessage } from './feedback';
 import { ReviewDialog } from './review-dialog';
 import { ReviewHistoryControls } from './timeline-chrome';
-import { reviewSelectionLabel } from './selected-properties';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ReviewEditHistory } from './edit-history';
+import { reviewSelectionLabel, createReviewInspectorEditCommands } from './selected-properties';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { translate, useAppLocale, usePageLocaleMetadata } from '../../platform/i18n';
 import { useReviewWaveforms } from './audio-waveform';
 import { ReviewTimelineBinding } from './timeline-binding';
@@ -65,7 +79,7 @@ function ReviewHistoryControlBinding({
         error: snapshot.error,
         errorMessage: snapshot.error ? reviewErrorMessage(snapshot.error) : null,
         dirty: snapshot.dirty,
-        saving: snapshot.pending > 0,
+        saving: snapshot.pending > 0 || snapshot.saving === true,
         busy,
         onChange: (enabled) => state.beforeAction(() => state.session.setAutosaveEnabled(enabled)),
         onReload: () =>
@@ -84,7 +98,7 @@ type ReviewEditorProps = {
   resource: LoadedReview;
   onBack(): void;
   onClose(): void;
-  onProjectCreated(aggregateId: string): void;
+  onProjectCreated(aggregateId: string, sourceMediaId: string): void;
 };
 
 /** One immutable editor projection drives the disposable seam preview workflow. */
@@ -123,7 +137,7 @@ function useEditorPresentationPreview(
       state.keyCues,
     ]
   );
-  return usePresentationPreview(previewInput, preferences, () => state.video.current?.pause());
+  return usePresentationPreview(previewInput, preferences, state.pause);
 }
 
 /** Keep text visibility on the same caption writer as the scene inspector. */
@@ -143,7 +157,29 @@ function ReviewEditor({
   onJoinPreview,
   onProjectCreated,
 }: ReviewEditorProps) {
-  const state = useReviewEditorState(resource);
+  const previewPreferences = useReviewPreviewPreferences();
+  const [previewRendererStatus, setPreviewRendererStatus] =
+    useState<ReviewPreviewRendererStatus | null>(null);
+  const state = useReviewEditorState(
+    resource,
+    previewPreferences.preferences.renderer === 'gpu' &&
+      previewRendererStatus?.decodedSourceIdentity === resource.url
+  );
+  const interruptParameterPlayback = (target: EventTarget | null) => {
+    if (
+      !(target instanceof Element) ||
+      !target.closest('[data-ui="gallery.videoReview.inspector"]') ||
+      !target.closest(
+        'input,textarea,select,[role="slider"],[role="spinbutton"],[role="combobox"],[contenteditable="true"]'
+      )
+    )
+      return;
+    const mode = state.transport.getStatusSnapshot().mode;
+    if (mode !== 'playing' && mode !== 'preparing' && mode !== 'recovering') return;
+    const context = state.commands.capture();
+    if (context) state.commands.admit(context, () => {});
+  };
+  const previewInputs = useReviewPreviewInputs(resource, state);
   usePageLocaleMetadata(
     'videoEditor.app.documentTitle',
     state.snapshot.snapshot.workspace.project?.name ?? resource.filename
@@ -159,34 +195,99 @@ function ReviewEditor({
     editorReady
   );
   const previewSettings = useReviewPreviewInspector({
+    preferences: previewPreferences,
+    rendererStatus: previewRendererStatus,
     workspaceColor,
     projectFailed: state.advancedFailed,
     retryProject: state.retryAdvanced,
   });
-  const previewPreferences = previewSettings.preferences;
-  const [annotationMagnetEnabled, setAnnotationMagnetEnabled] = useState(true);
+  const annotationMagnetEnabled = state.advanced.ui.annotationMagnetEnabled !== false;
   const liveSeek = useReviewLiveSeek(
     resource,
-    state,
+    {
+      advanced: state.advanced,
+      source: state.source,
+      resultTime: state.transport.getStatusSnapshot().position.resultTime,
+      snapshot: state.snapshot,
+      exporter: state.exporter,
+      keyCues: state.keyCues,
+      clickCues: state.clickCues,
+    },
     previewPreferences.preferences,
     previewSettings.raster,
-    state.playing || state.busy || state.editing.exporter.phase !== 'idle' || !editorReady
+    state.playing || state.busy || state.editing.exporter.phase !== 'idle' || !editorReady,
+    {
+      enabled: state.advanced.ui.liveSeekEnabled !== false,
+      onChange: (liveSeekEnabled) => state.setTimelinePreferences({ liveSeekEnabled }),
+    }
   );
-  const reportPresentedTime = state.onPresentedTime;
   const reportHoverPresentedTime = liveSeek.onPresentedTime;
   const onLiveSeekPresented = useCallback(
     (identity: string, time: number) => {
-      reportPresentedTime(identity, time);
       if (identity === resource.url) reportHoverPresentedTime(time);
     },
-    [reportPresentedTime, resource.url, reportHoverPresentedTime]
+    [resource.url, reportHoverPresentedTime]
   );
-  const { onImportAudioFile, voiceover } = useReviewAudioWiring(state);
+  const { onImportAudioFile, onPrepareImportAudioFile, voiceover } = useReviewAudioWiring(state);
   const navigationState = useReviewEditorNavigation(state, voiceover.recording);
   const { navigation, requestExport, historyCommands, trackNavigation } = navigationState;
   const music = useReviewMusicImport(state);
   const { audio, canvasComments, editing, snapshot, composer, advanced, features, zoom, busy } =
     state;
+  const inspectorCurrent = useRef(state);
+  inspectorCurrent.current = state;
+  const inspectorEditCommands = useMemo(
+    () => createReviewInspectorEditCommands(() => inspectorCurrent.current.editing),
+    []
+  );
+  const inspectorMedia = useMemo(
+    () => ({
+      pause: () => inspectorCurrent.current.pause(),
+      seek: (time: number, playing?: boolean) => inspectorCurrent.current.seek(time, playing),
+      seekResult: (time: number) => inspectorCurrent.current.seekResult(time),
+      play: () => inspectorCurrent.current.transport.play(),
+      readPosition: () => {
+        const current = inspectorCurrent.current;
+        const position = current.commands.capture()?.position;
+        return {
+          sourceTime: position?.source?.sourceTime ?? position?.media?.time ?? current.time,
+          resultTime: position?.resultTime ?? current.timeline.sceneOutputTime,
+          seekRevision: current.seekRevision,
+        };
+      },
+      readVideo: () => inspectorCurrent.current.video.current,
+      toSourceTime: (time: number) =>
+        inspectorCurrent.current.timeline.timeMap.timelineToSource(time),
+    }),
+    []
+  );
+  const inspectorFragment = state.playbackRange
+    ? { kind: 'range' as const, ...state.playbackRange }
+    : state.selection.kind === 'range'
+      ? state.selection
+      : null;
+  const exitOwner = useRef({ active: true, resource, session: state.session });
+  exitOwner.current.resource = resource;
+  exitOwner.current.session = state.session;
+  useEffect(() => {
+    const owner = exitOwner.current;
+    owner.active = true;
+    return () => {
+      owner.active = false;
+    };
+  }, []);
+  const leaveEditor = () => {
+    state.pause();
+    leaveReviewInspector(
+      state,
+      canvasComments,
+      onBack,
+      () =>
+        exitOwner.current.active &&
+        exitOwner.current.resource === resource &&
+        exitOwner.current.session === state.session
+    );
+  };
   const joinPreview = useEditorPresentationPreview(resource, state, previewPreferences.preferences);
   const projectCommands = useReviewProjectCommands(
     state,
@@ -201,6 +302,15 @@ function ReviewEditor({
     features.mode === 'advanced' || !!editing.exporter.index?.audioCodec,
     editing.exporter.index === null || !!editing.exporter.index.audioCodec
   );
+  const applyInterval = (range: ReviewPlaybackRange) => {
+    state.pause();
+    if (range.result) state.setPlaybackRange(range);
+    else {
+      state.setPlaybackRange(null);
+      state.seek(range.start, false);
+    }
+    state.setSelection({ kind: 'range', start: range.start, end: range.end });
+  };
   const timelineRow = panels.timelineHeight === null ? 'auto' : `${panels.timelineHeight}px`;
   if (!editorReady) {
     return (
@@ -210,6 +320,32 @@ function ReviewEditor({
   return (
     <ReviewSelectionActionsSurface
       selection={state.activeSelection}
+      onSelectInterval={(keys) =>
+        state.beforeAction(() => {
+          const range = reviewTimelineSelectionInterval(
+            keys,
+            state.activeSelection,
+            {
+              document: state.snapshot.document,
+              advanced: state.advanced,
+              duration: state.source.duration,
+              markers: state.projected.markers,
+              segments: state.timeline.timeMap.getSegments(),
+            },
+            state.cursorFocusKeys
+          );
+          if (!range) return;
+          applyInterval(range);
+        })
+      }
+      fragmentAction={(keys) => (
+        <ReviewTimelineFragment
+          state={state}
+          keys={keys}
+          onSelectInterval={applyInterval}
+          onOpenExport={() => requestExport((current) => current + 1)}
+        />
+      )}
       onSelectKey={(key) => {
         if (!key) {
           state.setActiveSelection({ kind: 'none' });
@@ -232,12 +368,29 @@ function ReviewEditor({
           <div
             ref={panels.container}
             data-ui="gallery.videoReview.workspace"
+            onPointerDownCapture={(event) => {
+              const field =
+                event.target instanceof Element
+                  ? event.target.closest(
+                      [
+                        'textarea,input:not([type])',
+                        'input:is([type="text"],[type="number"],[type="search"])',
+                        '[contenteditable]:not([contenteditable="false"])',
+                      ].join(',')
+                    )
+                  : null;
+              const continuingFieldEdit =
+                field !== null && field === event.currentTarget.ownerDocument.activeElement;
+              if (event.button === 0 && !continuingFieldEdit) state.advancedState.endTyping();
+              interruptParameterPlayback(event.target);
+            }}
+            onFocusCapture={(event) => interruptParameterPlayback(event.target)}
             style={{
               ...workspaceColor.style,
               gridTemplateColumns: `minmax(0,1fr) ${panels.inspectorWidth}px`,
               gridTemplateRows: `minmax(0,1fr) ${timelineRow}`,
             }}
-            className="grid h-full min-h-0 min-w-[1254px]"
+            className="grid h-full min-h-0 min-w-0"
           >
             <div className="contents" inert={voiceover.recording}>
               <ReviewPreviewBinding
@@ -254,15 +407,15 @@ function ReviewEditor({
                 onOpenPreviewSettings={navigation.openPreview}
                 previewPreferences={previewPreferences.preferences}
                 onPreviewRaster={previewSettings.setRaster}
-                onPreviewRendererStatus={previewSettings.setRendererStatus}
-                resource={resource}
-                state={{ ...state, onPresentedTime: onLiveSeekPresented }}
+                onPreviewRendererStatus={setPreviewRendererStatus}
+                {...previewInputs}
+                onPresentedTime={onLiveSeekPresented}
                 sceneActive={
                   features.mode === 'advanced' &&
                   navigation.shown === 'track' &&
-                  trackNavigation.track === 'source' &&
-                  trackNavigation.tab === 'settings'
+                  trackNavigation.track === 'source'
                 }
+                watermarkEditingAvailability={trackNavigation.view.sourceSettings}
               />
             </div>
             <ReviewInspectorBinding
@@ -272,14 +425,26 @@ function ReviewEditor({
               }}
               backLabel={trackNavigation.backLabel}
               inspectorTrack={trackNavigation.track}
-              trackTab={trackNavigation.tab}
-              onTrackTab={trackNavigation.setTab}
+              trackView={trackNavigation.view}
               onRenameProject={projectCommands.rename}
               recording={
                 voiceover.recording ? <ReviewVoiceoverLayer voiceover={voiceover} /> : undefined
               }
               onJoinPreview={onJoinPreview ?? joinPreview.open}
               preview={previewSettings.inspector}
+              editHistory={
+                navigation.shown === 'editHistory' ? (
+                  <ReviewEditHistory
+                    operations={snapshot.snapshot.workspace.history}
+                    cursor={snapshot.snapshot.workspace.cursor}
+                    busy={busy || !!state.composer.before || editing.exporter.phase !== 'idle'}
+                    autosaveEnabled={snapshot.autosaveEnabled}
+                    onSeek={state.moveHistory}
+                    onStart={() => state.moveHistory('start')}
+                    onReset={() => state.moveHistory('reset')}
+                  />
+                ) : null
+              }
               navigation={navigation}
               resizeHandle={
                 panelsEnabled ? <ReviewPanelResizeHandle resize={panels.inspector} /> : null
@@ -287,9 +452,131 @@ function ReviewEditor({
               fullHeight={fullHeight || voiceover.recording}
               onToggleHeight={() => setFullHeight((value) => !value)}
               resource={resource}
-              state={state}
+              model={{
+                document: snapshot.document,
+                workspace: {
+                  project: snapshot.snapshot.workspace.project,
+                  aggregateId: snapshot.snapshot.workspace.aggregateId,
+                  sourceAssetId: snapshot.snapshot.workspace.sourceAssetId,
+                  effectSnapshots: snapshot.snapshot.workspace.effectSnapshots,
+                },
+                save: {
+                  pending: snapshot.pending,
+                  error: snapshot.error,
+                  saving: snapshot.saving || (snapshot.autosaveEnabled && snapshot.dirty),
+                  advancedPending: state.advancedPending,
+                  advancedFailed: state.advancedFailed,
+                },
+                advanced: state.advanced,
+                scene: {
+                  zoomRegions: features.zoomRegions,
+                  canvas: features.canvas,
+                  background: features.background,
+                  windowHeader: features.windowHeader,
+                },
+                activeSelection: state.activeSelection,
+                selection: state.selection,
+                playbackRange: state.playbackRange,
+                selected: state.selected,
+                busy: state.busy,
+                playing: state.playing,
+                cursorFocusPath: state.cursorFocusPath,
+                cursorFocusKeys: state.cursorFocusKeys,
+                projected: {
+                  markers: state.projected.markers,
+                  captureCapabilities: state.projected.captureCapabilities,
+                },
+                segments: state.timeline.timeMap.getSegments(),
+                resultDuration: state.timeline.resultDuration,
+              }}
+              editors={{
+                annotationEffects: state.annotationEffects,
+                cursorMotion: state.cursorMotion,
+                text: state.text,
+                zoom: state.zoom,
+                webcam: state.webcam,
+                watermark: state.watermark,
+                presentation: state.presentation,
+                backgroundImport: state.backgroundImport,
+                interactionEditor: state.interactionEditor,
+                composer: state.composer,
+                editing: { selected: editing.selected, commands: inspectorEditCommands },
+              }}
+              commands={{
+                activation: state.commands,
+                setCursorFocusPath: state.setCursorFocusPath,
+                setTrackVisibility: state.setTrackVisibility,
+                setKeyAnimations: state.setKeyAnimations,
+                setActionAudio: state.setActionAudio,
+                setClickAnimations: state.setClickAnimations,
+                setBackground: state.setBackground,
+                previewBackground: state.previewBackground,
+                setCanvas: state.setCanvas,
+                setCaptions: state.setCaptions,
+                setWindowHeader: state.setWindowHeader,
+                setSourceFilters: state.setSourceFilters,
+                setCameraFollowDefaults: state.setCameraFollowDefaults,
+                beforeAction: state.beforeAction,
+                run: state.run,
+                runComposer: state.runComposer,
+                canStart: state.canStart,
+                performAction: state.performAction,
+                setActiveSelection: state.setActiveSelection,
+                selectCursorFocusKey: state.selectCursorFocusKey,
+                setMode: state.setMode,
+                setHovered: state.setHovered,
+                setBusy: state.setBusy,
+                setMessage: state.setMessage,
+                selectComment: state.selectComment,
+                add: state.add,
+                leaveNewNote: state.leaveNewNote,
+                retryAdvanced: state.retryAdvanced,
+                flushAdvanced: state.flushAdvanced,
+                registerSpeechFlush: state.registerSpeechFlush,
+                setVoiceoverSilent: state.setVoiceoverSilent,
+                actionSoundPreview: state.actionSoundPreview,
+              }}
+              media={inspectorMedia}
+              output={{
+                index: editing.exporter.index,
+                phase: editing.exporter.phase,
+                result: editing.exporter.result
+                  ? { receipt: editing.exporter.result.receipt }
+                  : null,
+                presentationDuration: editing.exporter.presentationDuration,
+                hasBookends: editing.exporter.hasBookends,
+              }}
+              exportActions={
+                <ReviewInspectorActions
+                  exporter={editing.exporter}
+                  fragment={
+                    inspectorFragment
+                      ? { selection: inspectorFragment, edits: snapshot.document.edits }
+                      : undefined
+                  }
+                  toolKey={`${editing.mode}:${zoom.drawing}:${zoom.insertionType}:${audio.originalTool}`}
+                  onOpenResult={(mediaId) => {
+                    void state.run(() => openGalleryPage({ mediaId }));
+                  }}
+                  advanced={advanced.ui.mode === 'advanced'}
+                  hasEdits={snapshot.document.edits.length > 0}
+                  busy={busy}
+                  composerBusy={!!composer.before}
+                  onExport={() => state.beforeAction(() => void editing.exporter.start())}
+                />
+              }
               canvasComments={canvasComments}
-              audio={audio}
+              audio={{
+                assets: audio.assets,
+                selected: audio.selected,
+                selectedOriginal: audio.selectedOriginal,
+                patchClip: audio.patchClip,
+                removeClip: audio.removeClip,
+                patchOriginal: audio.patchOriginal,
+                removeOriginal: audio.removeOriginal,
+                setOriginal: audio.setOriginal,
+                setLaneVolume: audio.setLaneVolume,
+              }}
               onBack={onBack}
               onClose={onClose}
             />
@@ -305,10 +592,14 @@ function ReviewEditor({
             >
               {panelsEnabled ? <ReviewPanelResizeHandle resize={panels.timelineResize} /> : null}
               <ReviewTimelineBinding
+                commands={state.commands}
                 onHoverTime={liveSeek.hover}
                 onHoverIntent={(starting) => {
                   if (starting) liveSeek.hold();
-                  else liveSeek.finishIntent(() => state.video.current?.currentTime);
+                  else
+                    liveSeek.finishIntent(
+                      () => state.transport.getStatusSnapshot().position.resultTime ?? undefined
+                    );
                 }}
                 interactionEditor={state.interactionEditor}
                 onInteractionAdded={() => navigation.setSection('selected')}
@@ -338,7 +629,6 @@ function ReviewEditor({
                 onPlaybackRange={state.setPlaybackRange}
                 zoomAnchor={state.zoomAnchor}
                 beforeAction={state.beforeAction}
-                onAddNote={() => state.add()}
                 historyControls={<ReviewHistoryControlBinding state={state} />}
                 inspectorControls={
                   <ReviewInspectorToolbarNavigation
@@ -347,7 +637,7 @@ function ReviewEditor({
                     busy={busy || editing.exporter.phase !== 'idle'}
                   />
                 }
-                utilityControls={
+                navigationControls={
                   <>
                     {features.mode === 'advanced' && (
                       <ReviewButton
@@ -356,7 +646,11 @@ function ReviewEditor({
                         className={reviewIconButtonClassName}
                         aria-pressed={annotationMagnetEnabled}
                         data-ui="gallery.videoReview.annotationMagnetToggle"
-                        onClick={() => setAnnotationMagnetEnabled(!annotationMagnetEnabled)}
+                        onClick={() =>
+                          state.setTimelinePreferences({
+                            annotationMagnetEnabled: !annotationMagnetEnabled,
+                          })
+                        }
                       >
                         <Magnet size={16} aria-hidden="true" />
                       </ReviewButton>
@@ -369,17 +663,26 @@ function ReviewEditor({
                       data-ui="gallery.videoReview.liveSeekToggle"
                       onClick={() => liveSeek.setEnabled(!liveSeek.enabled)}
                     >
-                      <ScanLine size={16} aria-hidden="true" />
+                      <ReviewLiveSeekIcon />
                     </ReviewButton>
-                    <ReviewKeyboardHelp
-                      onBasicMode={
-                        features.mode === 'advanced' ? () => state.setMode('basic') : undefined
-                      }
-                      busy={busy || editing.exporter.phase !== 'idle'}
-                      onNewProject={projectCommands.newProject}
-                      onBackup={() => void state.run(() => backupReview(state, canvasComments))}
-                    />
                   </>
+                }
+                utilityControls={
+                  <ReviewKeyboardHelp
+                    onOpenEditHistory={() => navigation.setSection('editHistory')}
+                    onBasicMode={
+                      features.mode === 'advanced' ? () => state.setMode('basic') : undefined
+                    }
+                    busy={busy || editing.exporter.phase !== 'idle'}
+                    onClose={panelsEnabled ? leaveEditor : undefined}
+                    onNewProject={projectCommands.newProject}
+                    onBackup={
+                      resource.original &&
+                      snapshot.snapshot.workspace.revision === resource.snapshot.workspace.revision
+                        ? undefined
+                        : () => void state.run(() => backupReview(state, canvasComments))
+                    }
+                  />
                 }
                 editing={editing}
                 edits={snapshot.document.edits}
@@ -408,6 +711,8 @@ function ReviewEditor({
                 setMode={state.setMode}
                 telemetryAvailable={state.projected.markers.length > 0}
                 time={state.time}
+                onPause={state.pause}
+                insertionPoint={state.insertionPoint}
                 playing={state.playing}
                 navigationRevision={state.navigationRevision}
                 markers={state.projected.markers}
@@ -416,9 +721,8 @@ function ReviewEditor({
                 audio={audio}
                 audioState={advanced.audio}
                 waveforms={waveforms}
-                onImportAudioFile={(...args) =>
-                  state.beforeAction(() => onImportAudioFile(...args))
-                }
+                onImportAudioFile={onImportAudioFile}
+                onPrepareImportAudioFile={onPrepareImportAudioFile}
                 onRecordVoiceover={() => state.beforeAction(voiceover.open)}
                 onOpenMusic={music.open}
                 onClearSelection={() => state.setActiveSelection({ kind: 'none' })}
@@ -428,11 +732,13 @@ function ReviewEditor({
                 onComment={state.selectComment}
                 onSeekResult={(time) => {
                   state.seekResult(time);
-                  liveSeek.commit(state.video.current?.currentTime ?? state.time);
+                  const accepted = state.transport.getStatusSnapshot().position.resultTime;
+                  if (accepted !== null) liveSeek.commit(accepted);
                 }}
                 onSeek={(time, snap) => {
                   state.seek(time, snap);
-                  liveSeek.commit(state.video.current?.currentTime ?? time);
+                  const accepted = state.transport.getStatusSnapshot().position.resultTime;
+                  if (accepted !== null) liveSeek.commit(accepted);
                 }}
                 onPlay={() => state.beforeAction(state.play)}
               />
@@ -448,32 +754,54 @@ function ReviewEditor({
 /** Native modal owns focus/inert; Escape cancels drawing, header navigation exits after recovery flush. */
 export function VideoReview({
   aggregateId,
+  sourceMediaId,
   onBack,
   onClose = onBack,
   onJoinPreview,
 }: {
   onJoinPreview?: ((slot: 'intro' | 'outro', target?: 'fade' | 'join') => void) | undefined;
   aggregateId: string;
+  sourceMediaId?: string;
   onBack(): void;
   onClose?(): void;
 }) {
   useAppLocale();
-  const [activeId, setActiveId] = useState(aggregateId);
-  useEffect(() => setActiveId(aggregateId), [aggregateId]);
-  const { resource, failed, retry } = useLoadedReview(activeId);
+  const [active, setActive] = useState({ aggregateId, sourceMediaId });
+  useEffect(() => setActive({ aggregateId, sourceMediaId }), [aggregateId, sourceMediaId]);
+  const { resource, failed, retry } = useLoadedReview(active.aggregateId, active.sourceMediaId);
   useEffect(() => {
-    setGalleryQuickEditUrl(activeId);
-    return () => clearGalleryQuickEditUrl(activeId);
-  }, [activeId]);
+    let routeId: string | undefined;
+    const loaded =
+      resource &&
+      (resource.snapshot.workspace.aggregateId === active.aggregateId ||
+        (!active.sourceMediaId && resource.original?.mediaId === active.aggregateId));
+    const publishRoute = () => {
+      let proposed = active.sourceMediaId ?? active.aggregateId;
+      if (loaded) {
+        const workspace = resource.session.getSnapshot().snapshot.workspace;
+        if (!resource.original || workspace.revision > resource.snapshot.workspace.revision)
+          proposed = workspace.aggregateId;
+      }
+      if (proposed === routeId) return;
+      routeId = proposed;
+      setGalleryQuickEditUrl(routeId);
+    };
+    publishRoute();
+    const unsubscribe =
+      loaded && resource.original ? resource.session.subscribe(publishRoute) : null;
+    return () => {
+      unsubscribe?.();
+      if (routeId !== undefined) clearGalleryQuickEditUrl(routeId);
+    };
+  }, [active, resource]);
   return (
     <ReviewDialog>
       {resource ? (
         <ReviewEditor
           key={`${resource.snapshot.workspace.aggregateId}:${resource.snapshot.workspace.createdAt}`}
           resource={resource}
-          onProjectCreated={(id) => {
-            setActiveId(id);
-            retry();
+          onProjectCreated={(id, originalId) => {
+            setActive({ aggregateId: id, sourceMediaId: originalId });
           }}
           onBack={onBack}
           onClose={onClose}
@@ -527,7 +855,6 @@ function useReviewEditorNavigation(
     },
     onMarker: (marker: Parameters<Parameters<typeof ReviewTimelineBinding>[0]['onMarker']>[0]) => {
       if (!state.canStart()) return;
-      state.seek(marker.start, false);
       state.setActiveSelection({ kind: 'telemetry', ref: marker.ref });
       navigation.setSection('selected');
     },
@@ -544,4 +871,414 @@ function useReviewEditorNavigation(
     select: state.setActiveSelection,
   });
   return { navigation, requestExport, historyCommands, trackNavigation };
+}
+
+type EditorState = ReturnType<typeof useReviewEditorState>;
+type StageProps = Parameters<typeof ReviewStageBinding>[0];
+type PreviewEditorInput = Pick<
+  EditorState,
+  | 'busy'
+  | 'playing'
+  | 'voiceoverSilent'
+  | 'time'
+  | 'playheadClock'
+  | 'seekRevision'
+  | 'message'
+  | 'setMessage'
+  | 'beforeAction'
+  | 'play'
+  | 'setActiveSelection'
+  | 'seek'
+  | 'keyCues'
+  | 'clickCues'
+  | 'source'
+  | 'video'
+  | 'displayRegion'
+  | 'onTime'
+  | 'setSelection'
+  | 'onMediaPlayback'
+  | 'onEnded'
+  | 'onMediaError'
+  | 'recovering'
+> & {
+  transport?: EditorState['transport'];
+  onMediaReady?: EditorState['onMediaReady'];
+  preparingPlayback?: EditorState['preparingPlayback'];
+  cursorMotion?: EditorState['cursorMotion'];
+  history?: EditorState['history'];
+  setCursorFocusPath?: EditorState['setCursorFocusPath'];
+  selectCursorFocusKey?: EditorState['selectCursorFocusKey'];
+  cursorFocusPath?: EditorState['cursorFocusPath'];
+  cursorFocusKeys?: EditorState['cursorFocusKeys'];
+  annotationEffects?: EditorState['annotationEffects'];
+  activeSelection?: EditorState['activeSelection'];
+  text: Pick<EditorState['text'], 'jump'>;
+  features: Pick<
+    EditorState['features'],
+    | 'cursorMotions'
+    | 'webcam'
+    | 'canvas'
+    | 'sourceFilters'
+    | 'windowHeader'
+    | 'zoomRegions'
+    | 'background'
+    | 'zoomApplied'
+    | 'zoomTrackVisible'
+    | 'overlaysVisible'
+    | 'annotationEffects'
+  >;
+  composer: Pick<EditorState['composer'], 'annotation' | 'change'>;
+  snapshot: {
+    document: Pick<EditorState['snapshot']['document'], 'edits' | 'canvasComments' | 'annotations'>;
+  };
+  canvasComments: StageProps['canvasComments'];
+  audio: Pick<EditorState['audio'], 'originalFeedback' | 'dismissOriginalFeedback'>;
+  webcam: Pick<EditorState['webcam'], 'failed' | 'pending' | 'retry'> &
+    NonNullable<StageProps['webcam']>['editor'];
+  seekResult?: EditorState['seekResult'];
+  timeline: Pick<EditorState['timeline'], 'sceneOutputTime' | 'resultDuration' | 'timeMap'> &
+    Partial<Pick<EditorState['timeline'], 'readOutputTime' | 'outputTime'>>;
+  editing: { exporter: Pick<EditorState['editing']['exporter'], 'phase'> };
+  advanced: EditorState['advanced'];
+  backgroundPreview?: EditorState['backgroundPreview'];
+  presentation: Pick<EditorState['presentation'], 'settings'>;
+  watermark: Pick<
+    EditorState['watermark'],
+    'settings' | 'pending' | 'preview' | 'change' | 'onResourceError' | 'resourceRetryGeneration'
+  >;
+  exporter: Pick<EditorState['exporter'], 'retryAssetAvailability' | 'index' | 'renderSettings'>;
+  backgroundImport: Pick<EditorState['backgroundImport'], 'pending'>;
+  zoom: Pick<
+    EditorState['zoom'],
+    'selected' | 'previewRegion' | 'preview' | 'previewChanges' | 'change' | 'setSelection'
+  >;
+} & Pick<EditorState, 'readPosition'>;
+
+/** Root composition adapts editor owners once; preview consumers receive only their own ports. */
+export function useReviewPreviewInputs(
+  resource: Pick<LoadedReview, 'file' | 'url' | 'session'> &
+    Partial<Pick<LoadedReview, 'telemetry'>>,
+  state: PreviewEditorInput
+): ReviewPreviewInputs {
+  const latest = useRef(state);
+  latest.current = state;
+  const segments = state.timeline.timeMap.getSegments();
+  const advanced = state.advanced.ui.mode === 'advanced';
+  const captionEnabled = resolveQuickEditEffectiveFeatures(state.advanced).captionsApplied;
+  const captions = useMemo(
+    () =>
+      captionEnabled && state.advanced.captions
+        ? {
+            document: state.advanced.text,
+            settings: state.advanced.captions,
+            segments,
+          }
+        : undefined,
+    [captionEnabled, state.advanced.text, state.advanced.captions, segments]
+  );
+  const effectSnapshots = resource.session.getSnapshot().snapshot.workspace.effectSnapshots;
+  const annotationLane = state.annotationEffects?.previewLane ?? state.features.annotationEffects;
+  const annotations = useMemo(
+    () =>
+      state.features.annotationEffects
+        ? {
+            lane: annotationLane!,
+            snapshots: effectSnapshots ?? [],
+            segments,
+          }
+        : undefined,
+    [state.features.annotationEffects, annotationLane, effectSnapshots, segments]
+  );
+  const profile = useMemo(() => {
+    if (!state.exporter.index) return null;
+    try {
+      return resolveReviewOutputProfile(
+        state.exporter.index,
+        state.advanced,
+        state.exporter.renderSettings
+      );
+    } catch {
+      return null;
+    }
+  }, [state.exporter.index, state.advanced, state.exporter.renderSettings]);
+  const dimensionsSupported = profile?.dimensionsSupported;
+  const numerator = profile?.rate.numerator;
+  const denominator = profile?.rate.denominator;
+  const outerFadePlan = useMemo(() => {
+    if (!advanced || !dimensionsSupported || numerator === undefined || denominator === undefined)
+      return undefined;
+    const result = planReviewPresentationSequence({
+      settings: state.presentation.settings,
+      mainDuration: state.timeline.resultDuration,
+      fragmentOffset: 0,
+      includeBookends: true,
+      rate: { numerator, denominator },
+    });
+    return result.ok ? result.plan : undefined;
+  }, [
+    advanced,
+    dimensionsSupported,
+    numerator,
+    denominator,
+    state.presentation.settings,
+    state.timeline.resultDuration,
+  ]);
+  const background = advanced
+    ? (state.backgroundPreview ?? state.features.background)
+    : state.features.background;
+  const scene = useMemo<ReviewPreviewInputs['scene']>(
+    () => ({
+      source: state.source,
+      canvas: state.features.canvas,
+      sourceFilters: state.features.sourceFilters,
+      windowHeader: state.features.windowHeader,
+      background,
+      zoomRegions: state.features.zoomRegions,
+      zoomApplied: state.features.zoomApplied,
+      zoomTrackVisible: state.features.zoomTrackVisible,
+      cursorMotions: state.features.cursorMotions,
+      comments: state.snapshot.document.canvasComments,
+      annotations: state.snapshot.document.annotations,
+      edits: state.snapshot.document.edits,
+      overlaysVisible: state.features.overlaysVisible,
+      annotationEffects: annotations,
+      captions,
+      keyCues: state.keyCues,
+      clickCues: state.clickCues,
+      watermark: advanced ? state.watermark.settings : undefined,
+      webcam: state.features.webcam,
+      outerFadePlan,
+    }),
+    [
+      state.source,
+      state.features.canvas,
+      state.features.sourceFilters,
+      state.features.windowHeader,
+      background,
+      state.features.zoomRegions,
+      state.features.zoomApplied,
+      state.features.zoomTrackVisible,
+      state.features.cursorMotions,
+      state.snapshot.document.canvasComments,
+      state.snapshot.document.annotations,
+      state.snapshot.document.edits,
+      state.features.overlaysVisible,
+      annotations,
+      captions,
+      state.keyCues,
+      state.clickCues,
+      advanced,
+      state.watermark.settings,
+      state.features.webcam,
+      outerFadePlan,
+    ]
+  );
+  const seekResultAvailable = state.seekResult !== undefined;
+  const cursorPathAvailable = state.setCursorFocusPath !== undefined;
+  const cursorKeyAvailable = state.selectCursorFocusKey !== undefined;
+  const commands = useMemo<ReviewPreviewInputs['commands']>(
+    () => ({
+      beforeAction: (action) => latest.current.beforeAction(action),
+      play: () => latest.current.play(),
+      seek: (time, snap) => latest.current.seek(time, snap),
+      seekResult: seekResultAvailable ? (time) => latest.current.seekResult?.(time) : undefined,
+      select: (value) => latest.current.setActiveSelection(value),
+      dismissFeedback: () => {
+        latest.current.setMessage(null);
+        latest.current.audio.dismissOriginalFeedback();
+      },
+      readAsset: async (reference, signal) => {
+        signal.throwIfAborted();
+        const local = await resource.session.readAnnotationResource(reference, signal);
+        signal.throwIfAborted();
+        const bytes = local ?? (await resolveReviewAssetBytes(reference));
+        signal.throwIfAborted();
+        return bytes;
+      },
+      onCaptionSelect: (id) => {
+        const current = latest.current;
+        const fragment = current.advanced.text?.fragments.find((item) => item.id === id);
+        if (fragment) current.text.jump(fragment, true);
+      },
+      onRegion: (region) => {
+        const current = latest.current;
+        if (current.composer.annotation && !current.busy)
+          current.composer.change({ ...current.composer.annotation, region });
+      },
+      onReady: () => {
+        const current = latest.current;
+        if (current.recovering) return;
+        const anchor = current.composer.annotation?.anchor;
+        if (anchor) current.seek(anchor.kind === 'point' ? anchor.time : anchor.start);
+      },
+      onTime: () => {
+        const current = latest.current;
+        const next = current.onTime();
+        if (!current.playing)
+          current.setSelection((selection) =>
+            selection.kind === 'point' && selection.time !== next
+              ? { kind: 'point', time: next }
+              : selection
+          );
+      },
+      onPlaying: (playing) => {
+        const current = latest.current;
+        if (playing && !current.voiceoverSilent)
+          current.setActiveSelection((selection) =>
+            selection.kind === 'none' ? selection : { kind: 'none' }
+          );
+        current.onMediaPlayback(playing);
+      },
+      onMediaReady: (event) => latest.current.onMediaReady?.(event),
+      onEnded: () => latest.current.onEnded(),
+      onError: () => latest.current.onMediaError(),
+      onAssetsReady: () => latest.current.exporter.retryAssetAvailability(),
+      setCursorPath: cursorPathAvailable
+        ? (path) => latest.current.setCursorFocusPath?.(path)
+        : undefined,
+      selectCursorKey: cursorKeyAvailable
+        ? (id, time) => latest.current.selectCursorFocusKey?.(id, time)
+        : undefined,
+    }),
+    [resource.session, seekResultAvailable, cursorPathAvailable, cursorKeyAvailable]
+  );
+  const request = useMemo<ReviewPreviewInputs['request']>(
+    () => ({
+      file: resource.file,
+      sourceIdentity: resource.url,
+      video: state.video,
+      clock: state.playheadClock,
+      readPosition: state.readPosition,
+      readTimeMap: state.transport?.getTimeMapSnapshot,
+      timeMap: state.timeline.timeMap,
+      resultDuration: state.timeline.resultDuration,
+      seekRevision: state.seekRevision,
+      sourceFrameRate: state.exporter.index?.frameRate,
+      sourceToResult: (time) => {
+        const timeline = latest.current.timeline;
+        return timeline.readOutputTime
+          ? timeline.readOutputTime(time)
+          : timeline.timeMap.sourceToTimeline(time);
+      },
+    }),
+    [
+      resource.file,
+      resource.url,
+      state.video,
+      state.playheadClock,
+      state.readPosition,
+      state.transport,
+      state.timeline.timeMap,
+      state.timeline.resultDuration,
+      state.seekRevision,
+      state.exporter.index?.frameRate,
+    ]
+  );
+  const cursorEditable =
+    cursorPathAvailable &&
+    state.activeSelection?.kind === 'cursor-focus' &&
+    advanced &&
+    state.features.overlaysVisible &&
+    !state.busy &&
+    !state.playing &&
+    state.editing.exporter.phase === 'idle' &&
+    !state.composer.annotation;
+  const cursorPath = useMemo(
+    () =>
+      state.cursorFocusPath ??
+      (cursorEditable
+        ? resolveReviewCursorFocusPath(
+            state.history?.telemetry ?? resource.telemetry ?? null,
+            state.source,
+            state.advanced.cursorFocusPath
+          )
+        : undefined),
+    [
+      state.cursorFocusPath,
+      cursorEditable,
+      state.history?.telemetry,
+      resource.telemetry,
+      state.source,
+      state.advanced.cursorFocusPath,
+    ]
+  );
+  return {
+    scene,
+    request,
+    commands,
+    overlays: {
+      advanced,
+      selection: state.activeSelection,
+      region: state.displayRegion,
+      annotation: state.composer.annotation ?? undefined,
+      zoom: {
+        selected: state.zoom.selected,
+        previewRegion: state.zoom.previewRegion,
+        preview: state.zoom.preview,
+        previewChanges: state.zoom.previewChanges,
+        change: state.zoom.change,
+        setSelection: state.zoom.setSelection,
+      },
+      authoredZoom: state.advanced.zoom,
+      cursorPath,
+      cursorFocusKeys: state.cursorFocusKeys,
+      cursorMotion: state.cursorMotion ? { overlay: state.cursorMotion.overlay } : undefined,
+      cursorFollow: state.advanced.cursorFocusPath?.mode === 'follow',
+      cursorMotionEnabled:
+        state.advanced.ui.tracks.cursorMotion !== false &&
+        state.advanced.cursorMotionEnabled !== false,
+      annotationEditingEnabled: advanced && state.advanced.ui.tracks.annotationEffects !== false,
+      annotationEditor: state.annotationEffects,
+      annotationSnapshots: effectSnapshots ?? [],
+      canvasComments: {
+        selectedId: state.canvasComments.selectedId,
+        setGeometry: state.canvasComments.setGeometry,
+        onSelect: state.canvasComments.onSelect,
+        onPatch: state.canvasComments.onPatch,
+      },
+      webcamEditor: {
+        crop: state.webcam.crop,
+        place: state.webcam.place,
+        placement: state.webcam.placement,
+        resourceAttempt: state.webcam.resourceAttempt,
+        retry: state.webcam.retry,
+        selectVisible: state.webcam.selectVisible,
+        selection: state.webcam.selection,
+        time: state.webcam.time,
+        sourceTime: state.webcam.sourceTime,
+      },
+      watermark: {
+        pending: state.watermark.pending,
+        onPreview: state.watermark.preview,
+        onChange: state.watermark.change,
+        onError: state.watermark.onResourceError,
+        retryGeneration: state.watermark.resourceRetryGeneration,
+        onReady: commands.onAssetsReady,
+      },
+    },
+    status: {
+      busy: state.busy,
+      playing: state.playing,
+      recovering: state.recovering,
+      preparingPlayback: !!state.preparingPlayback,
+      exporting: state.editing.exporter.phase !== 'idle',
+      message: state.message,
+      originalFeedback: state.audio.originalFeedback,
+      history: state.history
+        ? {
+            failed: state.history.failed,
+            pending: state.history.pending,
+            initialLoading: state.history.initialLoading,
+            incomplete: state.history.incomplete,
+            retry: state.history.retry,
+          }
+        : undefined,
+      webcam: {
+        failed: state.webcam.failed,
+        pending: state.webcam.pending,
+        retry: state.webcam.retry,
+      },
+      backgroundPending: state.backgroundImport.pending,
+    },
+  };
 }

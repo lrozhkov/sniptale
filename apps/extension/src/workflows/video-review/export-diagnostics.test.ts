@@ -5,6 +5,31 @@ import {
   cleanupReviewExportFailure,
 } from './export-diagnostics';
 import { QuickEditExportUnavailable } from './export-unavailable';
+import { EffectRuntimeFrameError } from '../../features/video/composition/effect-runtime/runtime/frame-error';
+
+it.each(['preview', 'download'] as const)(
+  'reports the first checked effect code for %s without retaining the nested error',
+  async (destination) => {
+    const sink = vi.fn();
+    const attempt = createReviewExportDiagnostics({ destination, route: 'render' }, sink);
+    const failure = await attempt
+      .phase('compose', () => {
+        throw new Error('private project content', {
+          cause: new EffectRuntimeFrameError('timeout'),
+        });
+      })
+      .catch((error: unknown) => error);
+    attempt.reportFailure(failure);
+    attempt.reportFailure(new EffectRuntimeFrameError('circuitOpen'), 'compose');
+    expect(sink).toHaveBeenCalledExactlyOnceWith(
+      [
+        destination === 'preview' ? 'preview' : 'export',
+        `outcome=failed route=render destination=${destination}`,
+        'stage=compose code=compose-failed effectCode=timeout',
+      ].join(' ')
+    );
+  }
+);
 
 it('keeps concurrent phases and nested causes bound to their own operations', async () => {
   const sink = vi.fn();

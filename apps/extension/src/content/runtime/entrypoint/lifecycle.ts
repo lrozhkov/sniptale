@@ -5,9 +5,11 @@ import { CONTENT_RUNTIME_CLEANUP_KEY } from './markers';
 // policyStateIds: [] - body readiness is disposable DOM lifecycle coordination, not authority.
 const logger = createLogger({ namespace: 'ContentEntrypointBootstrap' });
 let pendingBodyReadyInitialization = false;
+const CONTENT_RUNTIME_PREPARATION_KEY = '__sniptaleContentRuntimePreparation';
 
 type ContentRuntimeGlobal = typeof globalThis & {
   [CONTENT_RUNTIME_CLEANUP_KEY]?: ContentRuntimeCleanup;
+  [CONTENT_RUNTIME_PREPARATION_KEY]?: () => void;
 };
 
 function getContentRuntimeGlobal(): ContentRuntimeGlobal {
@@ -29,8 +31,27 @@ export function hasRegisteredContentRuntimeCleanup(): boolean {
   return typeof getContentRuntimeGlobal()[CONTENT_RUNTIME_CLEANUP_KEY] === 'function';
 }
 
+/** Replace only pending preparation. Keep the last valid runtime until its replacement is ready. */
+export function registerContentRuntimePreparation(cancel: () => void): () => boolean {
+  const runtime = getContentRuntimeGlobal();
+  runtime[CONTENT_RUNTIME_PREPARATION_KEY]?.();
+  const token = () => {
+    if (runtime[CONTENT_RUNTIME_PREPARATION_KEY] === token) {
+      delete runtime[CONTENT_RUNTIME_PREPARATION_KEY];
+    }
+    cancel();
+  };
+  runtime[CONTENT_RUNTIME_PREPARATION_KEY] = token;
+  return () => {
+    if (runtime[CONTENT_RUNTIME_PREPARATION_KEY] !== token) return false;
+    delete runtime[CONTENT_RUNTIME_PREPARATION_KEY];
+    return true;
+  };
+}
+
 export function disposeExistingContentRuntime(): void {
   const runtimeGlobal = getContentRuntimeGlobal();
+  runtimeGlobal[CONTENT_RUNTIME_PREPARATION_KEY]?.();
   const cleanup = runtimeGlobal[CONTENT_RUNTIME_CLEANUP_KEY];
   delete runtimeGlobal[CONTENT_RUNTIME_CLEANUP_KEY];
 
@@ -41,17 +62,19 @@ export function disposeExistingContentRuntime(): void {
   }
 }
 
-export function runWhenContentBodyReady(initialize: () => void): void {
+export function runWhenContentBodyReady(initialize: () => void): () => void {
   if (pendingBodyReadyInitialization) {
-    return;
+    return () => undefined;
   }
 
   pendingBodyReadyInitialization = true;
   let observer: MutationObserver | null = null;
   let domContentLoadedInstalled = false;
+  let active = true;
+  let timer: number | undefined;
   let cleanup = () => undefined;
   const initializeWhenReady = () => {
-    if (!document.body) {
+    if (!active || !document.body) {
       return;
     }
 
@@ -60,6 +83,10 @@ export function runWhenContentBodyReady(initialize: () => void): void {
     initialize();
   };
   cleanup = () => {
+    if (!active) return;
+    active = false;
+    pendingBodyReadyInitialization = false;
+    window.clearTimeout(timer);
     observer?.disconnect();
     if (domContentLoadedInstalled) {
       document.removeEventListener('DOMContentLoaded', initializeWhenReady);
@@ -76,5 +103,6 @@ export function runWhenContentBodyReady(initialize: () => void): void {
     observer.observe(document.documentElement, { childList: true });
   }
 
-  window.setTimeout(initializeWhenReady, 0);
+  timer = window.setTimeout(initializeWhenReady, 0);
+  return cleanup;
 }

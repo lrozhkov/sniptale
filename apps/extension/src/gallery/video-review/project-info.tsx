@@ -44,7 +44,7 @@ export function ReviewProjectInfo(props: {
     return () => controller.abort();
   }, [assetId, props.active, props.cameraPending, props.cameraAttempt]);
   return (
-    <section className="space-y-4" data-ui="gallery.videoReview.projectInfo">
+    <section className="review-project-info" data-ui="gallery.videoReview.projectInfo">
       <div className="space-y-1">
         <h3 className="text-xs text-[var(--sniptale-color-text-muted)]">
           {translate('videoEditor.app.projectNameLabel')}
@@ -57,7 +57,7 @@ export function ReviewProjectInfo(props: {
       </div>
       <div className="space-y-2">
         <h3 className="text-sm font-medium">{translate('gallery.preview.source')}</h3>
-        <dl className="space-y-1 text-[13px] leading-[18px]">
+        <dl className="sniptale-parameter-stack text-[13px] leading-[18px]">
           <ProjectProperty
             label={translate('gallery.preview.filename')}
             value={props.resource.file.name}
@@ -81,7 +81,7 @@ export function ReviewProjectInfo(props: {
         <div className="space-y-2" data-ui="gallery.videoReview.projectCameraInfo">
           <h3 className="text-sm font-medium">{translate('gallery.videoReview.webcam')}</h3>
           {cameraSource ? (
-            <dl className="space-y-1 text-[13px] leading-[18px]">
+            <dl className="sniptale-parameter-stack text-[13px] leading-[18px]">
               {cameraFilename ? (
                 <ProjectProperty
                   label={translate('gallery.preview.filename')}

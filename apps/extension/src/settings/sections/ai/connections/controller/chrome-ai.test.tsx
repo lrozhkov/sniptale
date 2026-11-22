@@ -2,7 +2,11 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadSettingsCatalogFixture,
+  prepareSettingsTranslations,
+} from '../../../../catalog-fixture.test-support';
 
 import { useAiProvidersChromeAiState } from './chrome-ai';
 import { ChromeAiRuntimeError } from '@sniptale/platform/browser/chrome-ai';
@@ -238,3 +242,10 @@ it('tests the enabled Chrome AI runtime and exposes an inline result', async () 
   expect(latestState?.testStatus).toBe('success');
   expect(chromeAiControllerMocks.toastSuccessMock).not.toHaveBeenCalled();
 });
+
+vi.mock('../../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadSettingsCatalogFixture>[0]) =>
+    loadSettingsCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareSettingsTranslations('ru'));

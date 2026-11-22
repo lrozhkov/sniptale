@@ -1,5 +1,9 @@
 // @vitest-environment jsdom
 import {
+  loadScenarioCatalogFixture,
+  prepareScenarioTranslations,
+} from '../test-support/translations.test-support';
+import {
   getTourHotspots,
   getTourAnnotations,
   TOUR_HIGHLIGHT_ANIMATION_DEFAULTS,
@@ -7,7 +11,14 @@ import {
 import { hideAllToasts } from '@sniptale/ui/product-feedback/toast-service';
 import { act, useState, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, beforeEach, expect, it, vi } from 'vitest';
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadScenarioCatalogFixture>[0]) =>
+    loadScenarioCatalogFixture(locale),
+}));
+
+beforeAll(prepareScenarioTranslations);
+
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import {
   createGuideProject,

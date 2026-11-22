@@ -6,6 +6,7 @@ export {
   getMediaLibraryEntry,
   getMediaThumbnail,
   listMediaLibrary,
+  setMediaLibraryOriginalClaim,
   syncLegacyMediaLibrary,
   updateMediaLibraryEntry,
 } from './index.library.ts';

@@ -24,8 +24,10 @@ afterEach(() => {
 function Parameter({
   controls,
   onChange,
+  scrub,
 }: {
   controls: Record<string, number>;
+  scrub: boolean;
   onChange(value: number): void;
 }) {
   const editing = useEffectPresetEditing('effect', controls);
@@ -35,13 +37,14 @@ function Parameter({
       value={controls['intensity']!}
       min={0}
       max={100}
+      scrub={scrub}
       onChange={onChange}
       onPreview={editing.begin}
       onCommit={editing.finish}
     />
   );
 }
-function Surface({ show = true }: { show?: boolean }) {
+function Surface({ show = true, scrub }: { show?: boolean; scrub: boolean }) {
   const [controls, setControls] = useState({ intensity: 20 });
   const matching = useEffectPresetMatchingControls('effect', controls);
   const other = useEffectPresetMatchingControls('other', { intensity: 90 });
@@ -51,16 +54,20 @@ function Surface({ show = true }: { show?: boolean }) {
       <output data-live>{controls['intensity']}</output>
       <output data-other>{other['intensity']}</output>
       {show && (
-        <Parameter controls={controls} onChange={(intensity) => setControls({ intensity })} />
+        <Parameter
+          controls={controls}
+          scrub={scrub}
+          onChange={(intensity) => setControls({ intensity })}
+        />
       )}
     </>
   );
 }
-const render = (show = true, selection = 'first') =>
+const render = (show = true, selection = 'first', scrub = true) =>
   act(() =>
     root.render(
       <EffectPresetEditingProvider key={selection}>
-        <Surface show={show} />
+        <Surface show={show} scrub={scrub} />
       </EffectPresetEditingProvider>
     )
   );
@@ -126,13 +133,13 @@ it.each(['button', 'svg'])(
   (target) => {
     vi.useFakeTimers();
     try {
-      render();
+      render(true, 'first', false);
       const increase = host.querySelector<HTMLButtonElement>(
         'button[aria-label="Intensity increase"]'
       )!;
       act(() =>
         (target === 'svg' ? increase.querySelector('svg')! : increase).dispatchEvent(
-          new Event('pointerdown', { bubbles: true, cancelable: true })
+          new MouseEvent('pointerdown', { button: 0, bubbles: true, cancelable: true })
         )
       );
       expect(read('live')).toBe('21');
@@ -149,7 +156,7 @@ it.each(['button', 'svg'])(
 );
 
 it('keeps matching frozen through repeated keyboard activation of a stepper', () => {
-  render();
+  render(true, 'first', false);
   const increase = host.querySelector<HTMLButtonElement>(
     'button[aria-label="Intensity increase"]'
   )!;

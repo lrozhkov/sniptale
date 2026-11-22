@@ -98,8 +98,9 @@ it('offers every bundled GL choice and preserves authored timing when explicitly
   const labels = new Set(
     [...document.querySelectorAll('[role="option"]')].map((option) => option.textContent)
   );
-  for (const entry of GL_TRANSITIONS) expect(labels.has(entry.name), entry.name).toBe(true);
-  await select('CrossZoom');
+  for (const entry of GL_TRANSITIONS)
+    expect(labels.has(`videoEditor.glTransitions.names.${entry.name}`), entry.name).toBe(true);
+  await select('videoEditor.glTransitions.names.CrossZoom');
   expect(callbacks.onChange).toHaveBeenLastCalledWith({
     type: 'gl',
     before: 0,
@@ -130,7 +131,7 @@ it('keeps the pinned GL selection and easing when editing loaded join timing', (
     after: 0.2,
   };
   const callbacks = render(settings);
-  expect(host.textContent).toContain('BowTie');
+  expect(host.textContent).toContain('videoEditor.glTransitions.names.BowTie');
   accept('gallery.videoReview.presentationDuration', '0.8');
   expect(callbacks.onChange).toHaveBeenCalledExactlyOnceWith({
     ...settings,

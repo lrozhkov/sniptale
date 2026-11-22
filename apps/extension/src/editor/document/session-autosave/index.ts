@@ -1,4 +1,5 @@
 import type { AssetRef } from '../../../composition/persistence/assets';
+import type { ImageAggregateCopyResult } from '../../../composition/persistence/image-aggregates';
 import type { ImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces';
 import type { EditorDocument } from '../../../features/editor/document/types';
 import {
@@ -19,6 +20,7 @@ import {
   schedulePendingAutosaveWrite,
   saveEditorSessionSnapshot,
   setEditorSaveState,
+  captureEditorSaveSnapshot,
 } from './persistence';
 import { scheduleImagePresentation } from './presentation';
 import {
@@ -32,6 +34,8 @@ import {
   type ActiveEditorSessionContext,
   type EditorCheckpointExit,
   type EditorSessionAutosaveState,
+  type EditorHistoryCaptureSource,
+  type EditorSaveSnapshot,
 } from './state';
 
 export interface EditorSessionAutosaveService {
@@ -41,7 +45,11 @@ export interface EditorSessionAutosaveService {
     finish: (ready: boolean) => void;
     saveNow: (getDocument: () => EditorDocument) => Promise<void>;
   };
-  rebindAggregate: (context: ActiveEditorSessionContext) => void;
+  rebindAggregate: (
+    context: ActiveEditorSessionContext,
+    publication?: ImageAggregateCopyResult
+  ) => void;
+  captureSnapshot: (getDocument: () => EditorDocument) => EditorSaveSnapshot;
   updateContext: (patch: Partial<Omit<ActiveEditorSessionContext, 'aggregateId'>>) => void;
   /** Adopt prepared resources only after a successful load under the hydration gate. */
   adoptPreparedDocument: (entry: PreparedEditorSessionDocument) => void;
@@ -66,6 +74,7 @@ export interface EditorSessionAutosaveService {
   setEnabled: (enabled: boolean, getDocument?: () => EditorDocument) => void;
   discardDraft: (aggregateId?: string | null) => Promise<void>;
   getDurableRevision: () => number | null;
+  getSourceGeneration: () => string | null;
   getLastWriteError: () => unknown | null;
   schedulePresentation: () => void;
   dispose: () => void;
@@ -124,7 +133,8 @@ function createEditorSessionAutosaveActions(
         },
       };
     },
-    rebindAggregate: (context) => rebindAutosaveAggregate(state, context),
+    rebindAggregate: (context, publication) => rebindAutosaveAggregate(state, context, publication),
+    captureSnapshot: (getDocument) => captureEditorSaveSnapshot(state, getDocument),
     updateContext: (patch) => updateAutosaveContext(state, patch),
     adoptPreparedDocument: (entry) => adoptPreparedAutosaveDocument(state, entry),
     adoptVectorAssets: (refs) => {
@@ -159,6 +169,7 @@ function createEditorSessionAutosaveActions(
       state.enabled = enabled;
       cancelPendingAutosaveRequest(state);
       state.pendingDocument = null;
+      state.pendingHistoryCapture = undefined;
       if (enabled && state.activeContext && !state.hydration && getDocument) {
         queuePendingAutosave(state, getDocument());
       } else if (!enabled) {
@@ -168,6 +179,7 @@ function createEditorSessionAutosaveActions(
     },
     discardDraft: (aggregateId) => discardAutosaveDraft(state, aggregateId),
     getDurableRevision: () => state.activeContext?.durableRevision ?? null,
+    getSourceGeneration: () => state.activeContext?.sourceGeneration ?? null,
     getLastWriteError: () => state.lastWriteError,
     schedulePresentation: () => {
       const context = state.activeContext;
@@ -185,6 +197,8 @@ function createEditorSessionAutosaveActions(
 /**
  * Creates a page-owned autosave service with isolated session state and timer lifecycle.
  */
-export function createEditorSessionAutosaveService(): EditorSessionAutosaveService {
-  return createEditorSessionAutosaveActions(createAutosaveState());
+export function createEditorSessionAutosaveService(
+  options: { prepareHistory?: EditorHistoryCaptureSource } = {}
+): EditorSessionAutosaveService {
+  return createEditorSessionAutosaveActions(createAutosaveState(options));
 }

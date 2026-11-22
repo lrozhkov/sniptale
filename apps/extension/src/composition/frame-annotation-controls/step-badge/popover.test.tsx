@@ -1,10 +1,18 @@
 // @vitest-environment jsdom
+import {
+  loadCompositionCatalogFixture,
+  prepareCompositionTranslations,
+} from '../../catalog-fixture.test-support';
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadCompositionCatalogFixture>[0]) =>
+    loadCompositionCatalogFixture(locale),
+}));
 
 import { InspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi, beforeEach } from 'vitest';
 import type { StepBadgePreset } from '@sniptale/runtime-contracts/highlighter/step-badge';
 import { createDefaultFrameStepBadge } from '../../../features/highlighter/frame-annotation/defaults';
 import { createSystemStepBadgePresetCatalog } from '../../../features/highlighter/step-badge-presets/catalog';
@@ -208,3 +216,7 @@ it.each([false, true])(
     act(() => root.unmount());
   }
 );
+
+beforeEach(async () => {
+  await prepareCompositionTranslations('content', 'ru');
+});

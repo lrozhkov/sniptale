@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -21,6 +22,19 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
 vi.mock('../../../platform/i18n/format-bytes', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n/format-bytes')>()),
   formatBytes: formatBytesMock,
+}));
+
+vi.mock('@sniptale/platform/browser/tabs', async (original) => {
+  const actual = await original<typeof import('@sniptale/platform/browser/tabs')>();
+  return { ...actual, browserTabs: { ...actual.browserTabs, create: vi.fn() } };
+});
+vi.mock('../../../platform/navigation/extension-pages/editor', () => ({
+  buildEditorUrl: vi.fn(() => 'https://example.test/editor'),
+}));
+
+vi.mock('../../../composition/persistence/image-workspaces/read', async (original) => ({
+  ...(await original()),
+  listImageProjectsForEditing: async () => [],
 }));
 
 vi.mock('../../video-review', () => ({
@@ -496,7 +510,7 @@ it('hides destructive and reset actions for scenario exports without pending cha
   expect(exportMarkup).not.toContain('gallery.preview.download');
 });
 
-it('wires interactive preview actions and tag editing handlers', () => {
+it('wires interactive preview actions and tag editing handlers', async () => {
   const onAddTag = vi.fn();
   const onRemoveTag = vi.fn();
   const onTagDraftChange = vi.fn();
@@ -540,7 +554,7 @@ it('wires interactive preview actions and tag editing handlers', () => {
   if (!(updatedInput instanceof HTMLInputElement)) {
     throw new Error('Expected updated preview tag input');
   }
-  act(() => {
+  await act(async () => {
     updatedInput.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
     updatedButtons.forEach((button) => button.click());
   });
@@ -548,7 +562,9 @@ it('wires interactive preview actions and tag editing handlers', () => {
   expect(onTagDraftChange).toHaveBeenCalledWith('updated');
   expect(onRemoveTag).toHaveBeenCalledWith('alpha');
   expect(onAddTag).toHaveBeenCalledTimes(1);
-  expect(onEdit).toHaveBeenCalledTimes(1);
+  expect(browserTabs.create).toHaveBeenCalledExactlyOnceWith({
+    url: 'https://example.test/editor',
+  });
   expect(onResetChanges).toHaveBeenCalledTimes(1);
   expect(onDownload).toHaveBeenCalledTimes(1);
   expect(onCopy).toHaveBeenCalledTimes(1);

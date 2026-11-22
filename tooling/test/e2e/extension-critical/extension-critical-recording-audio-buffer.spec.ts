@@ -12,10 +12,11 @@ for (const {
   packets = nativeEncoder ? 128 : 130,
 } of [
   { packetFrames: 128, channels: 1, overload: false },
-  { packetFrames: 480, channels: 1, overload: true },
+  { packetFrames: 480, channels: 1, overload: true, packets: 229 },
   { packetFrames: 256, channels: 32, overload: true },
   { packetFrames: 480, channels: 1, overload: false, nativeEncoder: true },
   { packetFrames: 480, channels: 1, overload: false, packets: 129 },
+  { packetFrames: 480, channels: 1, overload: false, packets: 228 },
 ])
   test(
     `native audio burst preserves bounded PCM frames=${packetFrames} channels=${channels} ` +

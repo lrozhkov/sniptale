@@ -136,7 +136,8 @@ function resolveEvent(
       const projected = projectVideoProjectFeedbackInterval(
         clip,
         animationStart,
-        animationStart + duration
+        animationStart + duration,
+        occurrence.timeDomain
       );
       return projected ? [projected] : [];
     }
@@ -196,7 +197,7 @@ function resolveSourceClick(
     anchor = event.anchor;
   const run =
     anchor.kind !== 'project'
-      ? getVideoProjectFeedbackRuns(project, anchor).find((item) =>
+      ? getVideoProjectFeedbackRuns(project, anchor, occurrence.timeDomain).find((item) =>
           item.clips.some((clip) => clip.id === occurrence.clipId)
         )
       : undefined;
@@ -220,7 +221,12 @@ function resolveSourceClick(
   const animationStart = (window?.anchor ?? occurrence.time + style.offset) - style.before;
   const renderIntervals = window
     ? clips.flatMap((clip) => {
-        const interval = projectVideoProjectFeedbackInterval(clip, window.start, window.end);
+        const interval = projectVideoProjectFeedbackInterval(
+          clip,
+          window.start,
+          window.end,
+          occurrence.timeDomain
+        );
         return interval ? [interval] : [];
       })
     : [];
@@ -319,7 +325,7 @@ function resolveSourceKey(
   const anchor = event.anchor;
   const run =
     anchor.kind !== 'project'
-      ? getVideoProjectFeedbackRuns(project, anchor).find((item) =>
+      ? getVideoProjectFeedbackRuns(project, anchor, occurrence.timeDomain).find((item) =>
           item.clips.some((clip) => clip.id === occurrence.clipId)
         )
       : undefined;
@@ -335,7 +341,12 @@ function resolveSourceKey(
       : null;
   const renderIntervals = window
     ? (run?.clips ?? []).flatMap((clip) => {
-        const interval = projectVideoProjectFeedbackInterval(clip, window.start, window.end);
+        const interval = projectVideoProjectFeedbackInterval(
+          clip,
+          window.start,
+          window.end,
+          occurrence.timeDomain
+        );
         return interval ? [interval] : [];
       })
     : [];

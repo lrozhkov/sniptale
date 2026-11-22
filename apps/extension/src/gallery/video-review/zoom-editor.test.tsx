@@ -774,3 +774,39 @@ it('keeps a camera copy inactive through reset and activates it after moving cle
   expect(state.regions.find((r) => r.id === id)).toMatchObject({ start: 4, end: 6 });
   expect(projectReviewFocus(state.regions).map((r) => r.id)).toEqual(['original', id]);
 });
+
+it('keeps hidden focus placement through Reset and permits insertion on different footage', () => {
+  const focus: QuickEditZoomRegion = {
+    ...region('hidden', 2, 5),
+    timeDomain: 'result',
+    visualAnchor: [{ start: 2, end: 5, offset: 0, rate: 1 }],
+    transform: { scale: 3, centerX: 0.2, centerY: 0.2 },
+  };
+  const map = buildReviewTimeMap(14, [
+    { id: 'cut', kind: 'cut', start: 0, end: 6, requestedStart: 0, requestedEnd: 6 },
+  ]);
+  let editor!: ReturnType<typeof useReviewZoomEditor>;
+  let state!: QuickEditZoomState;
+  function Harness() {
+    const [zoom, setZoom] = useState({ enabled: true, regions: [focus] });
+    state = zoom;
+    editor = useReviewZoomEditor({ zoom, setZoom, timelineDuration: 8, timeMap: map });
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  act(() => editor.resetPosition(focus.id));
+  expect(state.regions[0]).toMatchObject({
+    id: focus.id,
+    start: 2,
+    end: 5,
+    timeDomain: 'result',
+    visualAnchor: focus.visualAnchor,
+  });
+  expect(state.regions[0]?.transform.scale).not.toBe(3);
+  act(() => editor.add(3, 8));
+  expect(state.regions).toHaveLength(2);
+  expect(state.regions.find((item) => item.id === editor.selection)?.sourceAnchor).toEqual({
+    start: 9,
+    end: 11,
+  });
+});

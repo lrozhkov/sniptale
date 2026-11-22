@@ -9,7 +9,7 @@ export type SegmentedSwitchOption<TId extends string> = {
 
 type SegmentedSwitchProps<TId extends string> = {
   activeId: TId;
-  appearance?: 'default' | 'neutral';
+  appearance?: 'default' | 'neutral' | 'property';
   ariaLabel: string;
   dataAttribute?: Record<string, string>;
   density?: 'compact' | 'default';
@@ -23,6 +23,8 @@ export function SegmentedSwitch<TId extends string>(props: SegmentedSwitchProps<
     return null;
   }
 
+  if (props.appearance === 'property') return <PropertySegments {...props} />;
+
   const activeIndex = Math.max(
     0,
     props.options.findIndex((option) => option.id === props.activeId)
@@ -33,6 +35,42 @@ export function SegmentedSwitch<TId extends string>(props: SegmentedSwitchProps<
   }
 
   return <InlineSegmentedSwitch {...props} activeIndex={activeIndex} />;
+}
+
+function PropertySegments<TId extends string>(props: SegmentedSwitchProps<TId>) {
+  return (
+    <div
+      {...props.dataAttribute}
+      aria-label={props.ariaLabel}
+      className={props.wrap ? 'flex min-w-0 flex-wrap' : 'grid min-w-0'}
+      data-property-segments=""
+      role="group"
+      style={
+        props.wrap
+          ? undefined
+          : { gridTemplateColumns: `repeat(${props.options.length}, minmax(0, 1fr))` }
+      }
+    >
+      {props.options.map((option) => (
+        <button
+          key={option.id}
+          type="button"
+          aria-pressed={option.id === props.activeId}
+          data-segment-face=""
+          disabled={option.disabled}
+          title={option.label}
+          onClick={() => props.onChange(option.id)}
+          className={[
+            'min-w-0 px-2 text-[13px] font-normal leading-[18px]',
+            'enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-45',
+            props.density === 'compact' ? 'min-h-8' : 'min-h-10',
+          ].join(' ')}
+        >
+          <span className="block truncate">{option.label}</span>
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function WrappedSegmentedSwitch<TId extends string>(props: SegmentedSwitchProps<TId>) {

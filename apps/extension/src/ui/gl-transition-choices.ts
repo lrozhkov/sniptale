@@ -3,6 +3,8 @@ import {
   createGlTransitionSelection,
   type GlTransitionSelection,
 } from '../features/video/project/transition/gl-catalog';
+import { glTransitionLabel } from './gl-transition-labels';
+import { translate } from '../platform/i18n';
 
 /** Checked catalogue data is supplied by composition; this projection has no storage authority. */
 export type GlTransitionChoiceCatalog = {
@@ -45,15 +47,45 @@ export function glTransitionChoices(
   current?: GlTransitionSelection
 ) {
   const options: { value: string; label: string; disabled?: boolean }[] = catalog
-    ? available(catalog).map((item) => ({ value: choiceId(item), label: item.name }))
-    : GL_TRANSITIONS.map((item) => ({ value: item.name, label: item.name }));
+    ? available(catalog).map((item) => ({
+        value: choiceId(item),
+        label:
+          item.builtin && item.status === 'ready' && item.id === `builtin:${item.selection.name}`
+            ? glTransitionLabel(item.selection)
+            : item.name,
+      }))
+    : GL_TRANSITIONS.map((item) => {
+        const selection = createGlTransitionSelection(item.name);
+        return { value: item.name, label: selection ? glTransitionLabel(selection) : item.name };
+      });
   if (current) {
     const value = glTransitionChoiceValue(catalog, current);
     if (!options.some((option) => option.value === value))
-      options.push({ value, label: current.name, disabled: true });
+      options.push({ value, label: glTransitionLabel(current), disabled: true });
   }
   return options;
 }
+
+/** Keep simple joins and GL choices distinct when their localized labels match. */
+export function sceneJoinTransitionChoices(
+  catalog?: GlTransitionChoiceCatalog,
+  current?: GlTransitionSelection
+) {
+  const simple = [
+    { value: 'none', label: translate('gallery.videoReview.transitionNone') },
+    { value: 'dissolve', label: translate('gallery.videoReview.cutDissolve') },
+    { value: 'fade-black', label: translate('gallery.videoReview.cutFadeColor') },
+  ];
+  return [
+    ...simple,
+    ...glTransitionChoices(catalog, current).map((option) =>
+      simple.some(({ label }) => label === option.label)
+        ? { ...option, label: `${option.label} (GL)` }
+        : option
+    ),
+  ];
+}
+
 export function resolveGlTransitionChoice(
   catalog: GlTransitionChoiceCatalog | undefined,
   value: string

@@ -1,3 +1,4 @@
+import { ProductInput } from '@sniptale/ui/product-form-controls';
 import {
   useEffect,
   useLayoutEffect,
@@ -171,18 +172,13 @@ function TemplateCatalogTools(props: {
         'max-[680px]:grid-cols-[minmax(0,1fr)_auto]',
       ].join(' ')}
     >
-      <input
+      <ProductInput
         ref={props.search}
         type="search"
         aria-label={translate('highlighter.paintPicker.searchTemplates')}
         placeholder={translate('highlighter.paintPicker.searchTemplates')}
         value={props.query}
         onChange={(event) => props.onQuery(event.target.value)}
-        className={[
-          'h-7 min-w-0 rounded-[4px] border border-[var(--sniptale-color-border-soft)]',
-          'bg-[var(--sniptale-color-surface-input)] px-2 text-xs outline-none focus-visible:outline',
-          'focus-visible:outline-1 focus-visible:outline-[var(--sniptale-color-text-secondary)]',
-        ].join(' ')}
       />
       <div className="min-w-0 max-[680px]:col-span-2 max-[680px]:row-start-2">
         <CompactSelect<'all' | GradientType>

@@ -32,7 +32,7 @@ import { rebaseTemporaryLifecycle } from '../restore-lifecycle';
 import type { StagedArchiveObject } from '../staging';
 import { decodePortableEditorDocument } from '../root-codecs/editor-document';
 import {
-  decodePortableScenarioHistory,
+  decodePortableScenarioHistoryBody,
   MAX_PORTABLE_SCENARIO_HISTORY_BYTES,
   type PortableScenarioProjectMetadata,
 } from '../root-codecs/projects';
@@ -147,7 +147,10 @@ function remapGuideBlock(
   return { ...rest, assetId, editDocumentId, galleryAssetId };
 }
 
-async function readSavedHistory(object: StagedArchiveObject, projectId: string) {
+async function readSavedHistory(
+  object: StagedArchiveObject,
+  entry: PortableScenarioProjectMetadata['entry']
+) {
   if (object.ref.size > MAX_PORTABLE_SCENARIO_HISTORY_BYTES) {
     throw new Error('Portable guide history exceeds the metadata limit.');
   }
@@ -156,7 +159,7 @@ async function readSavedHistory(object: StagedArchiveObject, projectId: string) 
     throw new Error('Portable guide history exceeds the metadata limit.');
   }
   const value: unknown = JSON.parse(await file.text());
-  return decodePortableScenarioHistory(value, projectId);
+  return decodePortableScenarioHistoryBody(value, entry.id, entry.project);
 }
 
 async function prepareScenarioEntry(args: {
@@ -170,9 +173,9 @@ async function prepareScenarioEntry(args: {
   const portableHistory = args.metadata.historyObjectId
     ? await readSavedHistory(
         required(args.objects, args.metadata.historyObjectId),
-        args.metadata.entry.id
+        args.metadata.entry
       )
-    : [];
+    : { history: [] };
   const decode = (project: unknown) =>
     decodeGuideProject({
       assetIds: args.assetIds,
@@ -185,12 +188,21 @@ async function prepareScenarioEntry(args: {
     ...rebaseTemporaryLifecycle(args.metadata.entry),
     id: args.targetProjectId,
     project: decode(args.metadata.entry.project),
-    ...(portableHistory.length
+    ...(portableHistory.history.length
       ? {
-          history: portableHistory.map((version) => ({
+          history: portableHistory.history.map((version) => ({
             ...version,
             project: decode(version.project),
           })),
+        }
+      : {}),
+    ...(portableHistory.editingHistory
+      ? {
+          editingHistory: {
+            version: 1,
+            past: portableHistory.editingHistory.past.map(decode),
+            future: portableHistory.editingHistory.future.map(decode),
+          },
         }
       : {}),
   });

@@ -492,9 +492,12 @@ it('releases failed texture admission and retained resources on teardown', async
 it('does not publish a validation-error frame', async () => {
   const { device, transfer } = graphics();
   const renderer = await owner();
-  device.popErrorScope.mockResolvedValueOnce({ message: 'invalid texture binding' });
+  const validation = { message: 'invalid texture binding' };
+  device.popErrorScope.mockResolvedValueOnce(validation);
   const pending = renderer.render(request());
   await expect(pending).rejects.toThrow('invalid texture binding');
+  await expect(pending).rejects.toHaveProperty('name', 'GpuPreviewValidationError');
+  await expect(pending).rejects.toHaveProperty('cause', validation);
   await expect(pending).rejects.not.toBeInstanceOf(GpuPreviewDeviceError);
   expect(transfer).not.toHaveBeenCalled();
   expect(device.popErrorScope).toHaveBeenCalledOnce();

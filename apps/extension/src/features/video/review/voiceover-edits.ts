@@ -53,7 +53,7 @@ export function anchorReviewVoiceover(
   clip: QuickEditAudioClip,
   map: readonly ReviewTimeSegment[]
 ): QuickEditAudioClip {
-  if (clip.sourceAnchor || clip.dormant) return clip;
+  if (clip.timeDomain === 'result' || clip.sourceAnchor || clip.dormant) return clip;
   const tempo = clip.tempo ?? 1;
   const anchors: QuickEditVoiceoverAnchor[] = [];
   for (const segment of map) {
@@ -143,7 +143,8 @@ export function isReviewVoiceoverCut(
 /** Visible recording slices retain sample offsets and fade phase; stored recordings remain whole. */
 export function projectReviewVoiceover(
   clips: readonly QuickEditAudioClip[],
-  map?: readonly ReviewTimeSegment[]
+  map?: readonly ReviewTimeSegment[],
+  holdPolicy: 'continue' | 'source' | 'fill' = 'continue'
 ): QuickEditAudioClip[] {
   return clips.flatMap((clip) => {
     if (!clip.sourceAnchor || !map) {
@@ -160,35 +161,88 @@ export function projectReviewVoiceover(
           ];
     }
     const anchors = retimeReviewVoiceover(clip, map).sourceAnchor ?? clip.sourceAnchor;
-    return projectReviewVoiceoverAnchors(clip, anchors, map);
+    return projectReviewVoiceoverAnchors(clip, anchors, map, holdPolicy);
   });
 }
 
-/** Projects normalized native anchors without choosing an editor's source clock. */
+/** Adjacent retimed spans can divide one intact take at an inserted-video boundary. */
+function crossesContinuousAudio(
+  anchors: readonly QuickEditVoiceoverAnchor[],
+  time: number
+): boolean {
+  if (anchors.some((span) => span.start < time && time < span.end)) return true;
+  return anchors.some(
+    (left) =>
+      left.start < time &&
+      Math.abs(left.end - time) < 1e-7 &&
+      anchors.some(
+        (right) =>
+          Math.abs(right.start - time) < 1e-7 &&
+          right.end > time &&
+          Math.abs(left.offset + left.duration - right.offset) < 1e-7
+      )
+  );
+}
+
+/** Music fills inserted video with subsequent asset samples; recorded takes keep their native length. */
 export function projectReviewVoiceoverAnchors(
   clip: QuickEditAudioClip,
   anchors: readonly QuickEditVoiceoverAnchor[],
-  map: readonly ReviewTimeSegment[]
+  map: readonly ReviewTimeSegment[],
+  holdPolicy: 'continue' | 'source' | 'fill' = 'continue'
 ): QuickEditAudioClip[] {
   const { sourceAnchor: _anchor, ...recording } = clip;
+  const crossingHolds = map.filter(
+    (part) => part.kind === 'freeze' && crossesContinuousAudio(anchors, part.sourceStart)
+  );
+  const tempo = clip.tempo ?? 1;
+  const filledSamples =
+    holdPolicy === 'fill'
+      ? crossingHolds.reduce((sum, part) => sum + (part.resultEnd - part.resultStart) * tempo, 0)
+      : 0;
   const slices = anchors.flatMap((anchor, anchorIndex) =>
     map.flatMap((part) => {
-      if (part.kind === 'cut' || part.kind === 'freeze') return [];
+      if (part.kind === 'cut') return [];
+      const filling = part.kind === 'freeze';
+      if (
+        filling &&
+        (holdPolicy !== 'fill' ||
+          !crossingHolds.includes(part) ||
+          anchor.start > part.sourceStart ||
+          anchor.end <= part.sourceStart)
+      )
+        return [];
       const start = Math.max(anchor.start, part.sourceStart);
       const end = Math.min(anchor.end, part.sourceEnd);
-      if (end <= start) return [];
+      if (!filling && end <= start) return [];
       const assetPerSource = anchor.duration / (anchor.end - anchor.start);
       const assetOffset = anchor.offset + (start - anchor.start) * assetPerSource;
-      const duration = (end - start) / part.rate;
+      const duration = filling ? part.resultEnd - part.resultStart : (end - start) / part.rate;
+      const placedStart = filling
+        ? part.resultStart
+        : part.resultStart + (start - part.sourceStart) / part.rate;
+      const insertedDelay =
+        holdPolicy !== 'source'
+          ? crossingHolds.reduce(
+              (delay, hold) =>
+                delay +
+                (hold.resultEnd <= placedStart + 1e-7 ? hold.resultEnd - hold.resultStart : 0),
+              0
+            )
+          : 0;
       return [
         {
           ...recording,
           id: `${clip.id}:slice:${anchorIndex}:${part.sourceStart}`,
-          timelineStart: part.resultStart + (start - part.sourceStart) / part.rate,
-          sourceOffset: clip.sourceOffset + assetOffset,
+          timelineStart: placedStart - (holdPolicy === 'continue' ? insertedDelay : 0),
+          sourceOffset:
+            clip.sourceOffset + assetOffset + (holdPolicy === 'fill' ? insertedDelay * tempo : 0),
           duration,
-          playbackRate: clip.tempo ?? 1,
-          fadePhase: { offset: assetOffset, duration: clip.duration },
+          playbackRate: tempo,
+          fadePhase: {
+            offset: assetOffset + (holdPolicy === 'fill' ? insertedDelay * tempo : 0),
+            duration: clip.duration + filledSamples,
+          },
         },
       ];
     })
@@ -207,10 +261,11 @@ export function projectReviewVoiceoverAnchors(
 export function reviewVoiceoverNativeIntervals(
   clip: QuickEditAudioClip,
   interval: { start: number; end: number },
-  map?: readonly ReviewTimeSegment[]
+  map?: readonly ReviewTimeSegment[],
+  holdPolicy: 'continue' | 'source' = 'continue'
 ): Array<{ start: number; end: number }> {
   if (clip.dormant || interval.end <= interval.start) return [];
-  return projectReviewVoiceover([clip], map).flatMap((slice) => {
+  return projectReviewVoiceover([clip], map, holdPolicy).flatMap((slice) => {
     const rate = slice.playbackRate ?? 1;
     const start = Math.max(interval.start, slice.sourceOffset);
     const end = Math.min(interval.end, slice.sourceOffset + slice.duration * rate);

@@ -1,12 +1,5 @@
-import {
-  hasExactKeys,
-  isNumber,
-  isPlainRecord,
-} from '@sniptale/runtime-contracts/validation/primitives';
-import {
-  isCursorTrajectoryClock,
-  isTrajectoryInteger,
-} from '../../features/video/project/cursor-trajectory/records';
+import { isFinalObservationBatch } from './observation-batches';
+import { isRecordingObservationHeader } from './observation-header';
 import { isRecordingEventRecord } from '../../features/video/project/recording-events/records';
 import type { RecordingEventRecord } from '../../features/video/project/recording-events/types';
 import type { CursorTrajectorySegment } from '../../features/video/project/cursor-trajectory/types';
@@ -24,57 +17,22 @@ export interface RecordingEventObservationPacket {
   version: 1;
   recordingId: string;
   batchSequence: number;
+  /** Stable producer instance. Legacy packets omit this field. */
+  sourceInstanceId?: string;
+  /** Observation phase identity, which can change on Resume. */
   sourceClockId: string;
   clockRevision: number;
   clock: CursorTrajectorySegment['clock'];
   viewport: RecordingViewportGeometry;
   records: RecordingEventRecord[];
 }
-const identifier = (value: unknown) =>
-  typeof value === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(value);
-
 /** Closed packet admission precedes any sender binding or durable source processing. */
 export function isRecordingEventObservationPacket(
   value: unknown
 ): value is RecordingEventObservationPacket {
-  if (
-    !isPlainRecord(value) ||
-    !hasExactKeys(value, [
-      'version',
-      'recordingId',
-      'batchSequence',
-      'sourceClockId',
-      'clockRevision',
-      'clock',
-      'viewport',
-      'records',
-    ])
-  )
-    return false;
-  const viewport = value['viewport'];
+  if (!isRecordingObservationHeader(value)) return false;
   const records = value['records'];
   if (
-    value['version'] !== 1 ||
-    !identifier(value['recordingId']) ||
-    !identifier(value['sourceClockId']) ||
-    !isTrajectoryInteger(value['batchSequence']) ||
-    !isTrajectoryInteger(value['clockRevision']) ||
-    !isCursorTrajectoryClock(value['clock']) ||
-    value['clock'].source !== 'dom-event-time' ||
-    !isPlainRecord(viewport) ||
-    !hasExactKeys(viewport, [
-      'width',
-      'height',
-      'devicePixelRatio',
-      'visualViewportScale',
-      'visualViewportOffsetX',
-      'visualViewportOffsetY',
-    ]) ||
-    !['width', 'height', 'devicePixelRatio', 'visualViewportScale'].every(
-      (key) => isNumber(viewport[key]) && viewport[key] > 0
-    ) ||
-    !isNumber(viewport['visualViewportOffsetX']) ||
-    !isNumber(viewport['visualViewportOffsetY']) ||
     !Array.isArray(records) ||
     records.length < 1 ||
     records.length > RECORDING_EVENTS_PACKET_MAX_RECORDS ||
@@ -97,4 +55,25 @@ export function isRecordingEventObservationPacket(
   return (
     new TextEncoder().encode(JSON.stringify(value)).byteLength <= RECORDING_EVENTS_PACKET_MAX_BYTES
   );
+}
+
+/** Validates a bounded final packet batch from one producer incarnation. */
+export function isFinalRecordingEventPackets(
+  value: unknown
+): value is RecordingEventObservationPacket[] {
+  if (
+    !isFinalObservationBatch(
+      value,
+      isRecordingEventObservationPacket,
+      RECORDING_EVENTS_INPUT_QUEUE_CAPACITY + RECORDING_EVENTS_PACKET_MAX_RECORDS + 2
+    )
+  )
+    return false;
+  let previous: number | null = null;
+  for (const packet of value)
+    for (const record of packet.records) {
+      if (previous !== null && record.recordSeq !== previous + 1) return false;
+      previous = record.recordSeq;
+    }
+  return true;
 }

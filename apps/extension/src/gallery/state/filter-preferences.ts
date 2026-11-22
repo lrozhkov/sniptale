@@ -2,19 +2,11 @@
 // preserves advisory Gallery navigation state.
 import { runWithPersistenceMutationPermit } from '../../composition/persistence/infrastructure/mutation-barrier';
 import type { FolderFilter, GalleryFacetFilters, GalleryScope } from './types';
+import { SIDEBAR_FOLDERS } from '../library/constants';
 
 const GALLERY_FILTERS_STORAGE_KEY = 'sniptale.gallery.filters';
 
-const FOLDERS = new Set<string>([
-  'all',
-  'screenshot',
-  'recording',
-  'audio',
-  'export',
-  'web-snapshot',
-  'scenario',
-  'video-project',
-]);
+const FOLDERS = new Set<string>(SIDEBAR_FOLDERS);
 const SCOPES = new Set<string>(['all', 'library', 'temporary']);
 const FACET_IDS = [
   'created',

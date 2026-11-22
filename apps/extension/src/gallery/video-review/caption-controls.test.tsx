@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createReviewCommandFixture } from './editor-fixture.test-support';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -11,6 +12,7 @@ import {
 } from '../../features/video/review/text-document';
 import type { ReviewTextFragment } from '../../features/video/review/text-types';
 import { useReviewText } from './use-review-text';
+import { translate } from '../../platform/i18n';
 
 let root: Root, host: HTMLDivElement;
 beforeEach(() => {
@@ -49,9 +51,13 @@ it('starts globally disabled and preserves the configured appearance across disa
   await act(async () => root.render(<Scene />));
   const toggle = host.querySelector<HTMLButtonElement>('[role="switch"]')!;
   expect(toggle.getAttribute('aria-checked')).toBe('false');
+  expect(toggle.closest('.sniptale-switch-with-status')).not.toBeNull();
   expect(host.querySelector('fieldset')).toBeNull();
   act(() => toggle.click());
   expect(host.querySelector('fieldset')).not.toBeNull();
+  const size = host.querySelector<HTMLInputElement>('.opacity-field input[type="range"]');
+  expect(size?.min).toBe('1.5');
+  expect(size?.max).toBe('15');
   const top = host.querySelectorAll<HTMLButtonElement>('fieldset button[aria-pressed]')[1]!;
   act(() => top.click());
   expect(JSON.parse(host.querySelector('output')!.textContent!).style.position).toBe('top');
@@ -98,6 +104,7 @@ it('shows inherited/local style compactly and never stales retained voice by app
             captions: scene,
             playhead: () => 0,
             split: vi.fn(),
+            splitAtPlayhead: vi.fn(),
             merge: vi.fn(),
             remove: vi.fn(),
             change: (id, patch) => {
@@ -123,14 +130,16 @@ it('shows inherited/local style compactly and never stales retained voice by app
   act(() => switches()[1]!.click());
   let fragment = JSON.parse(host.querySelector('output')!.textContent!) as ReviewTextFragment;
   expect(fragment.style?.position).toBe('top');
-  const sizeInput = host.querySelector<HTMLInputElement>('fieldset input[type="range"]')!;
-  expect(sizeInput).not.toBeNull();
-  act(() => sizeInput.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  const size = host.querySelector('fieldset .opacity-field')!;
+  expect(size.querySelector<HTMLInputElement>('input[type="range"]')?.value).toBe('4');
+  act(() => size.querySelector<HTMLButtonElement>('button')!.click());
+  const sizeInput = size.querySelector<HTMLInputElement>('input[role="spinbutton"]')!;
+  expect(document.activeElement).toBe(sizeInput);
   act(() => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(sizeInput, '8');
     sizeInput.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  act(() => sizeInput.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+  act(() => sizeInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
   fragment = JSON.parse(host.querySelector('output')!.textContent!) as ReviewTextFragment;
   expect(fragment.style?.fontSize).toBe(0.08);
   expect(reviewVoiceTextStatus(fragment, snapshot)).toBe('current');
@@ -155,6 +164,12 @@ it('guards caption navigation and preserves ordinary timeline navigation', async
     setText = vi.fn();
   function Hook() {
     controller = useReviewText({
+      commands: createReviewCommandFixture(() => ({ duration: 10, time: 0 }), {
+        pause,
+        beforeAction: (action) => {
+          if (allow) action();
+        },
+      }),
       document: { version: 1, fragments: [phrase] },
       sourceDuration: 10,
       edits: [],
@@ -174,7 +189,15 @@ it('guards caption navigation and preserves ordinary timeline navigation', async
   expect(select).not.toHaveBeenCalled();
   expect(seek).toHaveBeenCalledExactlyOnceWith(0, false);
   act(() => controller.jump(phrase, true));
-  expect(select).toHaveBeenCalledExactlyOnceWith({ kind: 'text', id: phrase.id });
+  expect(select).toHaveBeenCalledExactlyOnceWith(
+    { kind: 'text', id: phrase.id },
+    expect.objectContaining({
+      position: expect.objectContaining({
+        resultTime: 0,
+        source: expect.objectContaining({ sourceTime: 0 }),
+      }),
+    })
+  );
   allow = false;
   select.mockClear();
   seek.mockClear();
@@ -184,4 +207,46 @@ it('guards caption navigation and preserves ordinary timeline navigation', async
   expect(seek).not.toHaveBeenCalled();
   expect(pause).not.toHaveBeenCalled();
   expect(setText).not.toHaveBeenCalled();
+});
+
+it('uses Text then Appearance without interval or nested style disclosure', async () => {
+  const change = vi.fn(() => true);
+  const editor = {
+    endTyping: vi.fn(),
+    captions: createReviewCaptionSettings(),
+    playhead: () => 0,
+    split: vi.fn(),
+    splitAtPlayhead: vi.fn(),
+    merge: vi.fn(),
+    remove: vi.fn(),
+    change,
+  };
+  await act(async () =>
+    root.render(
+      <ReviewTextPhrase
+        fragment={phrase}
+        inspector
+        expanded
+        busy={false}
+        limit={10}
+        onJump={vi.fn()}
+        editor={editor}
+      />
+    )
+  );
+  const tabs = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+  expect(tabs.map((tab) => tab.getAttribute('aria-label') ?? tab.textContent)).toEqual([
+    translate('videoEditor.effectsLibrary.objectText'),
+    translate('videoEditor.effectsLibrary.objectAppearance'),
+  ]);
+  expect(host.querySelector('textarea')).not.toBeNull();
+  expect(
+    host.querySelector(`[aria-label="${translate('gallery.videoReview.speechJump')}"]`)
+  ).toBeNull();
+  act(() => tabs[1]!.click());
+  expect(host.querySelector('details')).toBeNull();
+  const switches = host.querySelectorAll<HTMLButtonElement>('[role="switch"]');
+  expect(switches).toHaveLength(2);
+  act(() => switches[1]!.click());
+  expect(change).toHaveBeenCalledWith(phrase.id, { style: createReviewCaptionSettings().style });
 });

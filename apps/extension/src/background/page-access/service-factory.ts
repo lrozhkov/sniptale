@@ -22,7 +22,11 @@ import type { TemporaryTabActivationStore } from './tab-activation';
 
 export type PageAccessService = {
   clearPageAccessTabActivation(tabId: number): Promise<void>;
-  ensureActivePageAccessRuntime(tabId: number, failureMessage?: string): Promise<void>;
+  ensureActivePageAccessRuntime(
+    tabId: number,
+    failureMessage?: string,
+    options?: { injectImmediately?: boolean }
+  ): Promise<void>;
   ensureNativeVisibleCaptureAuthority(tabId: number, failureMessage?: string): Promise<void>;
   handlePageAccessMessage(message: PageAccessMessage): Promise<PageAccessResponse>;
   hasActivePageAccess(tabId: number): Promise<boolean>;
@@ -32,7 +36,10 @@ export type PageAccessService = {
     isCurrent: () => boolean;
     tabId: number;
   }): Promise<'registered' | 'superseded'>;
-  refreshActivePageAccessRuntime(tabId: number): Promise<boolean>;
+  refreshActivePageAccessRuntime(
+    tabId: number,
+    options?: { injectImmediately?: boolean }
+  ): Promise<boolean>;
   reconcilePageAccessTabNavigation(tabId: number, url: string): Promise<void>;
   unregisterRemovedPageAccessOrigins(origins: string[]): Promise<void>;
 };
@@ -95,7 +102,8 @@ async function hasActivePageAccessWithContext(
 
 async function refreshActivePageAccessRuntimeWithContext(
   tabId: number,
-  serviceContext: PageAccessServiceContext
+  serviceContext: PageAccessServiceContext,
+  options: { injectImmediately?: boolean } = {}
 ): Promise<boolean> {
   const context = await resolveStatusContext(tabId);
   if (context.kind !== 'supported') {
@@ -107,7 +115,10 @@ async function refreshActivePageAccessRuntimeWithContext(
     return false;
   }
 
-  await injectContentRuntimeAndAwaitReady(context.target, { allFrames: status.siteGranted });
+  await injectContentRuntimeAndAwaitReady(context.target, {
+    allFrames: status.siteGranted,
+    ...options,
+  });
   return true;
 }
 
@@ -138,8 +149,12 @@ export function createPageAccessService({
     async clearPageAccessTabActivation(tabId) {
       await temporaryTabActivationStore.clear(tabId);
     },
-    async ensureActivePageAccessRuntime(tabId, failureMessage = 'Page access is required.') {
-      if (!(await service.refreshActivePageAccessRuntime(tabId))) {
+    async ensureActivePageAccessRuntime(
+      tabId,
+      failureMessage = 'Page access is required.',
+      options
+    ) {
+      if (!(await service.refreshActivePageAccessRuntime(tabId, options))) {
         throw new Error(failureMessage);
       }
     },
@@ -165,8 +180,8 @@ export function createPageAccessService({
         resolveContext: () => resolveStatusContext(args.tabId),
       });
     },
-    async refreshActivePageAccessRuntime(tabId) {
-      return refreshActivePageAccessRuntimeWithContext(tabId, serviceContext);
+    async refreshActivePageAccessRuntime(tabId, options) {
+      return refreshActivePageAccessRuntimeWithContext(tabId, serviceContext, options);
     },
     async reconcilePageAccessTabNavigation(tabId, url) {
       await temporaryTabActivationStore.reconcileNavigation({ tabId, url: new URL(url) });

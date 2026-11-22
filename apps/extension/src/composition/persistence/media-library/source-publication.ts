@@ -21,12 +21,27 @@ interface MediaSourcePublicationStores {
   projectExports: PublicationStore<StoredProjectExportEntry>;
 }
 
+/** Retain local visibility for legacy replicas and fence every explicit independent save. */
+export function replicaOriginalClaim(
+  previous: MediaLibraryEntry | null,
+  savedIndependently: boolean | undefined
+): Pick<MediaLibraryEntry, 'savedIndependently' | 'originalSaveId'> {
+  const claim = savedIndependently ?? previous?.savedIndependently;
+  return {
+    ...(claim === undefined ? {} : { savedIndependently: claim }),
+    ...(savedIndependently === true || previous?.originalSaveId === undefined
+      ? {}
+      : { originalSaveId: previous.originalSaveId }),
+  };
+}
+
 /** Publish accepted Library source rows inside the caller's transaction. */
 export async function publishPreparedMediaSourceInTransaction(
   prepared: PreparedMediaSourcePublication,
   stores: MediaSourcePublicationStores
 ): Promise<void> {
-  await stores.media.put(prepared.media);
+  const media = prepared.media;
+  await stores.media.put({ ...media, originalSaveId: media.originalSaveId ?? crypto.randomUUID() });
   if (prepared.media.source.kind !== 'stored-asset') return;
   await stores.refs.put(prepared.original.ref);
   await stores.owners.put({

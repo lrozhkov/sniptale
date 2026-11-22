@@ -26,6 +26,7 @@ import { normalizeBrowserFrameState } from '../../../../apps/extension/src/featu
 import { type BrowserFrameState } from '../../../../apps/extension/src/features/editor/document/types';
 import { useEditorStore } from '../../../../apps/extension/src/editor/state/useEditorStore';
 import { createExactBrowserFrameHarnessPayload } from './scenarios/browser-frame-exact';
+import { prepareTranslations } from '../../../../apps/extension/src/platform/i18n';
 
 declare global {
   interface Window {
@@ -215,7 +216,8 @@ function HarnessEditorDebugBridge() {
   return null;
 }
 
-void harnessReady.then(() => {
+void harnessReady.then(async () => {
+  await prepareTranslations('editor');
   initializeAppTheme();
   const bootstrapPayload =
     window.__sniptaleHarnessBootstrap?.editorBootstrapPayload ??

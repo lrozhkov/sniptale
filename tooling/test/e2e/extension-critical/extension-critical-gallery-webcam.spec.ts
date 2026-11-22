@@ -1,5 +1,6 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { expect, test, type Page, type TestInfo, type Locator } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { startHostServer } from '../support/host-server';
 import { seedReviewWebcamBundle } from '../support/quick-editor-media-fixture';
 import { readWebcamWorkspace } from '../support/quick-editor-webcam-proof';
@@ -443,11 +444,10 @@ for (const variant of [
         await expect.poll(async () => (await cameraPixel(false))[3]).toBe(255);
         expect((await cameraPixel(true))[3]).toBe(0);
         const centerBeforeShadow = await cameraPixel(false);
-        const shadow = inspector.getByRole('textbox', {
-          name: label('gallery.videoReview.webcamShadow'),
-          exact: true,
-        });
-        await shadow.fill('60');
+        const shadow = numericControl(inspector, label('gallery.videoReview.webcamShadow'));
+        await (
+          await openNumericControl(inspector, label('gallery.videoReview.webcamShadow'))
+        ).fill('60');
         await shadow.press('Enter');
         await button('gallery.videoReview.webcamShadowColor').click();
         const color = page.getByRole('textbox', {
@@ -485,10 +485,7 @@ for (const variant of [
           })
         ).toHaveValue('30');
         await expect(
-          inspector.getByRole('textbox', {
-            name: label('gallery.videoReview.webcamShadow'),
-            exact: true,
-          })
+          numericControl(inspector, label('gallery.videoReview.webcamShadow'))
         ).toHaveValue('60');
       } finally {
         await new Promise<void>((resolve, reject) =>
@@ -581,11 +578,10 @@ test('webcam inspector preserves controls across adaptive columns and panel heig
       await inspector
         .getByRole('button', { name: label('gallery.videoReview.webcamLayout'), exact: true })
         .click();
-      const zoom = inspector.getByRole('textbox', {
-        name: label('videoEditor.sidebar.cameraCropZoom'),
-        exact: true,
-      });
-      await zoom.fill('1.5');
+      const zoom = numericControl(inspector, label('videoEditor.sidebar.cameraCropZoom'));
+      await (
+        await openNumericControl(inspector, label('videoEditor.sidebar.cameraCropZoom'))
+      ).fill('1.5');
       await zoom.press('Enter');
       const pan = inspector.getByRole('textbox', {
         name: label('gallery.videoReview.webcamCropX'),
@@ -672,11 +668,10 @@ async function refineCameraPoint(page: Page, locale: 'en' | 'ru', info: TestInfo
   await expect(dialog.locator('[data-ui="gallery.videoReview.hoverTime"]')).toHaveCount(0);
   await marker.click();
   const inspector = dialog.locator('[data-ui="gallery.videoReview.webcamInspector"]');
-  const zoom = inspector.getByRole('textbox', {
-    name: label('videoEditor.sidebar.cameraCropZoom'),
-    exact: true,
-  });
-  await zoom.fill('2');
+  const zoom = numericControl(inspector, label('videoEditor.sidebar.cameraCropZoom'));
+  await (
+    await openNumericControl(inspector, label('videoEditor.sidebar.cameraCropZoom'))
+  ).fill('2');
   await zoom.press('Enter');
   const crop = inspector.locator('[data-ui="gallery.videoReview.webcamCrop"] button').first();
   await expect(crop).toBeEnabled();

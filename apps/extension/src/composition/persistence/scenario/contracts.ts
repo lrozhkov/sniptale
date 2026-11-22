@@ -5,6 +5,13 @@ import type { LibraryLifecycle } from '../library-lifecycle/contracts';
 import type { AssetRef } from '../assets/contracts';
 import type { PersistedEditorDocument } from '../document-assets/contracts';
 
+/** Exact navigation branches; saved revisions have a separate retention and chronology. */
+export interface ScenarioEditingHistory {
+  version: 1;
+  readonly past: readonly GuideProject[];
+  readonly future: readonly GuideProject[];
+}
+
 export interface ScenarioSavedVersion {
   revision: number;
   savedAt: number;
@@ -15,6 +22,7 @@ export interface ScenarioSavedVersion {
 export interface ScenarioProjectSnapshot {
   readonly project: GuideProject;
   readonly workspaceRevision: number;
+  readonly editingHistory?: ScenarioEditingHistory;
   /** Transient receipt for pending work minted by this save, issued only after commit. */
   readonly checkpointReceipt?: SyncCheckpointReceipt;
 }
@@ -28,6 +36,7 @@ export interface ScenarioProjectEntry {
   /** Owner-issued revision of the committed aggregate. */
   workspaceRevision: number;
   history?: ScenarioSavedVersion[];
+  editingHistory?: ScenarioEditingHistory;
   /** Last accepted page action; only an exact revision CAS can continue this saved-version group. */
   lastAcceptedActionId?: string;
 }

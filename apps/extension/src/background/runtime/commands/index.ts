@@ -20,7 +20,7 @@ import {
 import { startContextMenuExport, showContextMenuToast } from '../context-menu/action-helpers';
 import { enableScreenshotMode } from '../tab-mode-router-screenshot';
 import type { BackgroundModeState } from '../routing/runtime-wiring/shared';
-import { translate } from '../../../platform/i18n';
+import { prepareTranslations, translate } from '../../../platform/i18n';
 
 export const extensionCommandIds = [
   'tools-open',
@@ -86,6 +86,7 @@ function parseExtensionCommand(command: string): ExtensionCommandId | null {
 }
 
 async function requireCommandTab(tab?: chrome.tabs.Tab): Promise<chrome.tabs.Tab & { id: number }> {
+  await prepareTranslations('background');
   const candidate =
     typeof tab?.id === 'number'
       ? tab
@@ -195,6 +196,12 @@ async function reportCommandFailure(
 ): Promise<void> {
   logger.error('Extension command failed', { command, error });
   if (typeof tab?.id !== 'number') return;
+  try {
+    await prepareTranslations('background');
+  } catch {
+    logger.warn('Command failure feedback could not prepare translations');
+    return;
+  }
   await showContextMenuToast(tab.id, {
     message: translate('background.runtime.commandFailed'),
     title: translate('common.states.error'),

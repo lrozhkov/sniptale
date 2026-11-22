@@ -1,5 +1,6 @@
+import { ProductTextarea } from '@sniptale/ui/product-form-controls';
 import { translate } from '../../../../platform/i18n';
-import { editorResizeHandleClassName, editorTextareaClassName } from '../../constants';
+import { editorResizeHandleClassName } from '../../constants';
 import type { EditorState } from '../types';
 
 export function EditorCustomCssField({ state }: { state: EditorState }) {
@@ -17,7 +18,7 @@ export function EditorCustomCssField({ state }: { state: EditorState }) {
         </span>
       </div>
       <div className="relative">
-        <textarea
+        <ProductTextarea
           value={state.customCss}
           onChange={(event) => {
             const nextValue = event.target.value;
@@ -26,7 +27,7 @@ export function EditorCustomCssField({ state }: { state: EditorState }) {
           }}
           placeholder={translate('highlighter.editor.customCssPlaceholder')}
           style={{ height: `${state.textareaHeight}px` }}
-          className={editorTextareaClassName}
+          className="min-h-0! resize-none! font-mono!"
         />
         <div
           onMouseDown={state.handleResizeStart}

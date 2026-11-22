@@ -3,7 +3,7 @@
 import { act } from 'react';
 import { createRoot as createReactRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createSolidPaint } from '@sniptale/foundation/paint';
+import { createGradientPaint, createSolidPaint } from '@sniptale/foundation/paint';
 import { CompactPaintSelector } from '.';
 
 const mountedRoots = new Set<ReturnType<typeof createReactRoot>>();
@@ -127,6 +127,38 @@ it.each(['default', 'swatch'] as const)(
     host.remove();
   }
 );
+
+it('uses a single gradient summary button with no palette icon and restores it after Cancel', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const onChange = vi.fn();
+  let stop = 0;
+  act(() =>
+    root.render(
+      <CompactPaintSelector
+        triggerVariant="swatch"
+        label="Fill"
+        title="Fill"
+        value={createGradientPaint('#fff', () => String(++stop))}
+        onChange={onChange}
+      />
+    )
+  );
+  const selector = '[data-ui="shared.ui.paint-selector.trigger"]';
+  const trigger = host.querySelector<HTMLButtonElement>(selector)!;
+  expect(trigger.querySelector('svg')).toBeNull();
+  expect(trigger.textContent).toContain('highlighter.paintPicker.linear');
+  act(() => trigger.click());
+  const popup = document.querySelector('[data-ui="shared.ui.paint-selector.popup"]')!;
+  act(() => selectPaintMode(popup, 'radial'));
+  expect(host.querySelector(selector)).toBe(trigger);
+  expect(trigger.textContent).toContain('highlighter.paintPicker.radial');
+  act(() => trigger.click());
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  expect(trigger.textContent).toContain('highlighter.paintPicker.linear');
+  expect(onChange).not.toHaveBeenCalled();
+});
 
 it.each(['default', 'swatch'] as const)(
   '%s uses one popup owner, switches modes, applies, and never nests a color popup',

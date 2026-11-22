@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import { Search } from 'lucide-react';
 import type { AppLocale } from '../../../platform/i18n';
 import { translate } from '../../../platform/i18n';
+import { SearchField } from '../../../ui/compact-inspector-controls/row-controls';
 import {
   DESIGN_SYSTEM_KIND_FILTERS,
   DESIGN_SYSTEM_SCOPE_FILTERS,
@@ -17,43 +17,12 @@ const FILTERS_SECTION_CLASS =
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_90%,var(--sniptale-color-surface-canvas)_10%)] ' +
   'px-4 py-4 shadow-sm backdrop-blur-sm';
 
-const SEARCH_LABEL_CLASS =
-  'relative block w-full rounded-[14px] border border-[var(--sniptale-color-border-soft)] ' +
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_88%,transparent)]';
-
-const SEARCH_INPUT_CLASS =
-  'w-full rounded-[14px] bg-transparent py-3 pl-10 pr-3 text-sm text-[var(--sniptale-color-text-primary)] ' +
-  'outline-none transition focus:border-[var(--sniptale-color-border-accent-strong)]';
-
-const SEARCH_ICON_CLASS =
-  'pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ' +
-  'text-[var(--sniptale-color-text-muted)]';
-
 const FILTER_PANEL_CLASS =
   'mt-4 rounded-[16px] border border-[var(--sniptale-color-border-soft)] ' +
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_94%,transparent)] p-4';
 
 const PANEL_LABEL_CLASS =
   'text-xs font-semibold uppercase tracking-[0.14em] text-[var(--sniptale-color-text-muted-strong)]';
-
-function DesignSystemSearchField(props: {
-  onChange: (value: string) => void;
-  placeholder: string;
-  value: string;
-}) {
-  return (
-    <label className={SEARCH_LABEL_CLASS}>
-      <Search className={SEARCH_ICON_CLASS} />
-      <input
-        type="search"
-        value={props.value}
-        onChange={(event) => props.onChange(event.target.value)}
-        placeholder={props.placeholder}
-        className={SEARCH_INPUT_CLASS}
-      />
-    </label>
-  );
-}
 
 export function DesignSystemFiltersSection(props: {
   locale: AppLocale;
@@ -85,12 +54,15 @@ function DesignSystemWorkspaceRow(props: {
   setPreviewTheme: (theme: AppTheme) => void;
   state: DesignSystemPageState;
 }) {
+  const searchLabel = translate('designSystem.page.searchPlaceholder', props.locale);
   return (
     <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_auto_auto] xl:items-center">
-      <DesignSystemSearchField
+      <SearchField
+        label={searchLabel}
+        placeholder={searchLabel}
         value={props.state.searchQuery}
         onChange={props.state.setSearchQuery}
-        placeholder={translate('designSystem.page.searchPlaceholder')}
+        disableTextAssistance
       />
 
       <div className="flex flex-wrap items-center gap-3">
@@ -206,15 +178,18 @@ function DesignSystemFilterGroup(props: { children: ReactNode; label: string }) 
 }
 
 function DesignSystemUsageFilterList(props: { locale: AppLocale; state: DesignSystemPageState }) {
+  const searchLabel = translate('designSystem.page.usageSearchPlaceholder', props.locale);
   return (
     <section className="space-y-3">
       <div className={PANEL_LABEL_CLASS}>
         {translate('designSystem.page.filterUsageAny', props.locale)}
       </div>
-      <DesignSystemSearchField
+      <SearchField
+        label={searchLabel}
+        placeholder={searchLabel}
         value={props.state.usageSearchQuery}
         onChange={props.state.setUsageSearchQuery}
-        placeholder={translate('designSystem.page.usageSearchPlaceholder', props.locale)}
+        disableTextAssistance
       />
 
       {props.state.filteredUsageOptions.length > 0 ? (

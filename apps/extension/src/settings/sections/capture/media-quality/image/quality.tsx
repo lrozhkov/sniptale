@@ -14,8 +14,6 @@ export function ImageSettingsSectionQuality({
     <SettingsControlRow
       label={translate('imageSettings.section.qualityLabel')}
       className="!max-w-[480px]"
-      keepInline
-      valueMinimum={100}
     >
       <NumericRow
         appearance="plain"

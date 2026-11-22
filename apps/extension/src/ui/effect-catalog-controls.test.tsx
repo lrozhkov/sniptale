@@ -1,5 +1,11 @@
+// @vitest-environment jsdom
+
 import { renderToStaticMarkup } from 'react-dom/server';
-import { expect, it, vi } from 'vitest';
+import { expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadUiCatalogFixture,
+  prepareUiTranslations,
+} from './test-support/translations.test-support';
 import { EffectCatalogControls, EffectImportSummary } from './effect-catalog-controls';
 it('escapes untrusted filenames and exposes partial import failures as a status', () => {
   const html = renderToStaticMarkup(
@@ -34,3 +40,10 @@ it('exposes an explicit selected All category instead of leaving every category 
   expect(html).toContain('data-category="all"');
   expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
 });
+
+vi.mock('../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadUiCatalogFixture>[0]) =>
+    loadUiCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareUiTranslations('video-editor', 'ru'));

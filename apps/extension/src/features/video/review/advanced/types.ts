@@ -1,3 +1,4 @@
+import type { ReviewVisualPlacement } from '../visual-anchor';
 import type { CursorCompositionSettings } from '../../project/motion/spatial';
 import type { SourceAudioGainRange } from '../../audio/source-envelope';
 import type { VideoSceneBackgroundMotion } from '../../project/types/layout';
@@ -20,7 +21,7 @@ export type { QuickEditVoiceoverAnchor } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 34;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 35;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -57,6 +58,9 @@ export interface QuickEditTrackVisibility {
 export interface QuickEditUiState {
   /** Project workspace appearance, independent of authored scene and history. */
   workspaceColors?: Partial<Record<'light' | 'dark', string>>;
+  /** Project-scoped timeline interaction preferences; missing legacy fields mean enabled. */
+  liveSeekEnabled?: boolean;
+  annotationMagnetEnabled?: boolean;
   mode: 'basic' | 'advanced';
   modeSelectionPending?: boolean;
   /** First entry reveals editing lanes; later mode switches preserve their settings. */
@@ -102,7 +106,8 @@ export interface QuickEditCameraTransform {
  * Zoom interval on the quick-editor timeline. `start`/`end` are timeline seconds,
  * matching the shared ReviewTimeMap coordinate domain.
  */
-export interface QuickEditZoomRegion {
+export interface QuickEditZoomRegion extends ReviewVisualPlacement {
+  timeDomain?: 'result';
   /** Independent spatial effect; it never occupies or moves the zoom camera. */
   effect?: '3d';
   /** Derived source clock for a cut/rate slice; storage admission drops this field. */
@@ -211,6 +216,7 @@ export type QuickEditBackgroundSettings = {
 /** One voiceover or music clip; timeline coordinates are seconds like the video domain. */
 
 export interface QuickEditAudioClip {
+  timeDomain?: 'result';
   audioProcessing?: import('@sniptale/runtime-contracts/audio-effects').AudioProcessing;
   /** Immutable text association; deleting or editing text does not delete this audio. */
   textSnapshot?: import('../text-types').ReviewVoiceTextSnapshot;
@@ -293,7 +299,7 @@ export interface QuickEditAdvancedContent {
   /** Source color processing is independent of presentation mode and overlay visibility. */
   sourceFilters?: import('../../../image-filters/contract').SourceImageFilterStack;
   cursorMotionEnabled?: boolean;
-  cursorMotions?: import('../../project/cursor-motion').CursorMotion[];
+  cursorMotions?: QuickEditCursorMotion[];
   cameraFollowDefaults?: import('../../project/camera/cursor-policy').CameraFollowSettings;
   cursorFocusPath?: import('../../project/cursor-focus-path/types').CursorFocusPath;
   text?: import('../text-types').ReviewTextDocument;
@@ -316,3 +322,6 @@ export interface QuickEditAdvancedContent {
   presentation?: import('./presentation').QuickEditPresentationSettings;
   audio: QuickEditAudioState;
 }
+
+export type QuickEditCursorMotion = import('../../project/cursor-motion').CursorMotion &
+  ReviewVisualPlacement;

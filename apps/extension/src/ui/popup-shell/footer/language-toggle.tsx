@@ -3,16 +3,18 @@ import {
   setLocalePreference,
   translate,
   useAppLocale,
+  SUPPORTED_LOCALES,
   type AppLocale,
 } from '../../../platform/i18n/popup';
 
 const logger = createLogger({ namespace: 'shared:ui:popup-footer-language' });
 function getNextLocale(locale: AppLocale): AppLocale {
-  return locale === 'ru' ? 'en' : 'ru';
+  const index = SUPPORTED_LOCALES.indexOf(locale);
+  return SUPPORTED_LOCALES[(index + 1) % SUPPORTED_LOCALES.length] ?? locale;
 }
 
 function getLocaleName(locale: AppLocale): string {
-  return translate(locale === 'ru' ? 'common.languages.ru' : 'common.languages.en');
+  return translate(`common.languages.${locale}`);
 }
 
 export function PopupFooterLanguageToggle() {

@@ -1,6 +1,6 @@
 import './command-parity.css';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
-import { ArrowLeft, Download, ExternalLink, File, ZoomIn, ZoomOut } from 'lucide-react';
+import { ArrowLeft, Download, ExternalLink, File } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -9,6 +9,7 @@ import type { LoadedWebSnapshotAsset } from '../../viewer/asset-objects';
 import type { ViewerPackageFile } from '../../viewer/package-files';
 import { createViewablePackageFileBlob, isPreviewableAssetImage } from './asset-opening';
 import { getCatalogFileName } from './file-presentation';
+import { SnapshotZoomSteps } from './viewport-zoom';
 
 export type PreviewSelection =
   | { kind: 'resource'; asset: LoadedWebSnapshotAsset }
@@ -37,35 +38,15 @@ function PreviewZoomControls(props: {
   zoom: number;
 }) {
   return (
-    <div
-      aria-label={translate('webSnapshotViewer.app.previewZoom', props.locale)}
-      className="flex items-center gap-1"
-      role="group"
-    >
-      <ContentToolbarButton
-        tone="utility"
-        aria-label={translate('webSnapshotViewer.app.zoomOut', props.locale)}
-        className="h-8 w-8 cursor-pointer !p-0"
-        disabled={props.zoom <= 1}
-        onClick={() => props.onZoomChange(Math.max(1, props.zoom - 0.25))}
-        type="button"
-      >
-        <ZoomOut aria-hidden="true" size={16} />
-      </ContentToolbarButton>
-      <span className="min-w-9 text-center text-[13px] leading-[18px] font-normal tabular-nums">
-        {Math.round(props.zoom * 100)}%
-      </span>
-      <ContentToolbarButton
-        tone="utility"
-        aria-label={translate('webSnapshotViewer.app.zoomIn', props.locale)}
-        className="h-8 w-8 cursor-pointer !p-0"
-        disabled={props.zoom >= 1.5}
-        onClick={() => props.onZoomChange(Math.min(1.5, props.zoom + 0.25))}
-        type="button"
-      >
-        <ZoomIn aria-hidden="true" size={16} />
-      </ContentToolbarButton>
-    </div>
+    <SnapshotZoomSteps
+      label={translate('webSnapshotViewer.app.previewZoom', props.locale)}
+      locale={props.locale}
+      zoom={props.zoom}
+      minimum={1}
+      maximum={1.5}
+      onZoomOut={() => props.onZoomChange(Math.max(1, props.zoom - 0.25))}
+      onZoomIn={() => props.onZoomChange(Math.min(1.5, props.zoom + 0.25))}
+    />
   );
 }
 

@@ -1,3 +1,4 @@
+import { Plus, Trash2 } from 'lucide-react';
 import {
   CameraFollowMovementChoice,
   CameraFollowZoneChoice,
@@ -22,7 +23,7 @@ import {
   compareCursorFocusKeys,
 } from '../../features/video/project/cursor-focus-path/authoring';
 import { evaluateReviewCursorFocus } from '../../features/video/review/advanced/cursor-focus-path';
-import { Clock3, MousePointer2, SlidersHorizontal } from 'lucide-react';
+import { MousePointer2, SlidersHorizontal } from 'lucide-react';
 import { SegmentedRow, SelectField, ToggleField } from '../../ui/compact-inspector-controls';
 import { DraftNumericRow as ReviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
 import { ReviewInspectorSections, reviewInspectorActions } from './inspector-sections';
@@ -115,7 +116,6 @@ type CursorEditorState = ReturnType<typeof cursorEditorState>;
 
 export function ReviewCursorPathEditor(props: CursorPathEditorProps) {
   const state = cursorEditorState(props);
-  const { selected, segment, field, editable, change } = state;
   return (
     <fieldset
       disabled={props.disabled}
@@ -130,22 +130,6 @@ export function ReviewCursorPathEditor(props: CursorPathEditorProps) {
             icon: MousePointer2,
             content: <CursorPositionFields state={state} />,
           },
-          ...(selected
-            ? [
-                {
-                  id: 'timing',
-                  label: translate('gallery.videoReview.interval'),
-                  icon: Clock3,
-                  content: field(
-                    translate('videoEditor.sidebar.actionTimePrefix'),
-                    selected.time,
-                    (time) => change({ time }),
-                    !editable,
-                    { min: segment?.start, max: segment?.end }
-                  ),
-                },
-              ]
-            : []),
           reviewInspectorActions(<CursorKeyActions state={state} props={props} />),
         ]}
       />
@@ -195,13 +179,18 @@ function CursorKeyActions({
           props.onChange(addReviewCursorFocusKey(props.path, props.time, duration, id));
           select(id, props.time);
         }}
-      />
+      >
+        <Plus size={16} aria-hidden="true" />
+      </ReviewButton>
       <ReviewButton
         className={reviewTextButtonClassName}
+        selectionAction="delete"
         label={translate('common.actions.delete')}
         disabled={props.disabled || selected?.anchor !== 'manual'}
         onClick={() => selected && props.onChange(deleteCursorFocusKey(props.path, selected.id))}
-      />
+      >
+        <Trash2 size={16} aria-hidden="true" />
+      </ReviewButton>
     </>
   );
 }
@@ -338,6 +327,8 @@ export function ReviewCursorPathSettings(props: {
       >
         <ReviewNumberRow
           label={translate('videoEditor.sidebar.cursorFocusSmoothing')}
+          rangePresentation="field"
+          unit=""
           value={props.path.smoothing}
           min={0}
           max={1}

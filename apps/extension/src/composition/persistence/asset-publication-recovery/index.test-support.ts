@@ -8,6 +8,7 @@ import type {
   ArchiveRestoreSession,
   PhysicalDeleteAssetOperation,
 } from '../assets/contracts';
+import { projectRowReferenceKeys } from '../assets/retention-index-projection';
 
 export function createDbHarness(
   operations: Array<AssetOperation | ArchiveRestoreSession | PhysicalDeleteAssetOperation>
@@ -34,6 +35,12 @@ export function createDbHarness(
   };
   const objectStore = (storeName: string) => ({
     getAll: async () => [...(stores.get(storeName)?.values() ?? [])],
+    index: () => ({
+      getAll: async (query: string, count?: number) =>
+        [...(stores.get(storeName)?.values() ?? [])]
+          .filter((row) => projectRowReferenceKeys(storeName, row).includes(query))
+          .slice(0, count),
+    }),
     delete: async (entryKey: unknown) => stores.get(storeName)?.delete(key(entryKey)),
     get: async (entryKey: unknown) => stores.get(storeName)?.get(key(entryKey)),
     put: async (value: Record<string, unknown>) =>

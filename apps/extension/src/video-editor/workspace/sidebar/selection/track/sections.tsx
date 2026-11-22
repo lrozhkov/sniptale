@@ -98,7 +98,7 @@ export function TrackLayoutFields({
       className="sniptale-parameter-stack space-y-2"
       data-ui="video-editor.inspector.track-layout"
     >
-      <InspectorParameterRow label={translate('videoEditor.app.trackOrder')} valueMinimum={68}>
+      <InspectorParameterRow label={translate('videoEditor.app.trackOrder')}>
         <div className="flex min-w-0 flex-wrap justify-end gap-1">
           <InspectorActionButton
             compact
@@ -165,6 +165,7 @@ export function TrackAudioFields(props: {
       <NumericRow
         appearance="plain"
         label={translate('videoEditor.sidebar.trackVolumeLabel')}
+        rangePresentation="field"
         scrub={{ min: 0, max: 200, step: 1 }}
         value={getProjectTrackAudioVolume(props.project, props.selectedTrack.id) * 100}
         min={0}

@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { createVideoProjectEntry } from '../projects/index.test-support';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
 import { reviewAdvancedContentBaseline } from '../../../features/video/review/document';
@@ -8,6 +9,39 @@ import {
   usageReferenceKey,
   USAGE_INDEX_MARKER,
 } from './usage-index-keys';
+
+it('indexes Montage sources retained only by Undo or Redo without trusting imported keys', () => {
+  const entry = createVideoProjectEntry();
+  const result = withVideoProjectUsage({
+    ...entry,
+    history: {
+      version: 1,
+      epoch: 'epoch',
+      past: [{ assetId: 'past' }],
+      future: [{ assetId: 'future' }],
+      sources: [
+        { kind: 'recording', id: 'removed-recording' },
+        { kind: 'project-asset', id: 'removed-private' },
+        { kind: 'library-asset', id: 'removed-library' },
+        { kind: 'scenario-asset', id: 'removed-child' },
+        { kind: 'scenario-project', id: 'scenario' },
+      ],
+    },
+    usageReferenceKeys: ['forged'],
+  });
+  expect(new Set(result.usageReferenceKeys)).toEqual(
+    new Set([
+      USAGE_INDEX_MARKER,
+      ...[
+        ['recording', 'removed-recording'],
+        ['project-asset', 'removed-private'],
+        ['library-asset', 'removed-library'],
+        ['scenario-asset', 'removed-child'],
+        ['scenario-project', 'scenario'],
+      ].map(([kind, id]) => usageReferenceKey(kind!, id!)),
+    ])
+  );
+});
 
 it('indexes current, undo, redo and recovery review references, including disabled resources', () => {
   const webcam = (id: string) => ({

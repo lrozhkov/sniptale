@@ -1,4 +1,5 @@
 import type React from 'react';
+import { NumberInput } from '@sniptale/ui/number-input';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { translate } from '../../../../platform/i18n';
@@ -174,7 +175,8 @@ function useNumberFieldState(props: {
 function NumberFieldInput(props: { field: ReturnType<typeof useNumberFieldState>; label: string }) {
   const { field } = props;
   return (
-    <input
+    <NumberInput
+      onNumericStep={field.applyStep}
       aria-label={props.label}
       inputMode="decimal"
       type="text"

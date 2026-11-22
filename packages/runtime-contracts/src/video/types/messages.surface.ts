@@ -1,4 +1,5 @@
 import type { ContentPrivilegedActionCapability } from '../../protocol/content-privileged-action';
+import { isAppLocale, type AppLocale } from '../../i18n';
 import { isContentPrivilegedActionCapability } from '../../protocol/content-privileged-action';
 import { VideoMessageType } from '../messages';
 import { MICROPHONE_GAIN_MIN, MICROPHONE_GAIN_MAX } from './microphone-processing';
@@ -181,7 +182,7 @@ export interface RecordingMediaPermissionBootstrap {
       requestPermission: false;
     };
   };
-  locale: 'ru' | 'en';
+  locale: AppLocale;
   theme: 'light' | 'dark';
 }
 
@@ -196,7 +197,7 @@ export function isRecordingMediaPermissionBootstrap(
     isRecord(value) &&
     hasExactKeys(value, ['type', 'request', 'locale', 'theme']) &&
     value['type'] === 'recording-media-permission' &&
-    (value['locale'] === 'ru' || value['locale'] === 'en') &&
+    isAppLocale(value['locale']) &&
     (value['theme'] === 'light' || value['theme'] === 'dark') &&
     isVideoRecordingSurfaceCommandMessage(value['request']) &&
     value['request'].surfaceToken.length > 0 &&

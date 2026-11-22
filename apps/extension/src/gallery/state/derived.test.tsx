@@ -242,6 +242,19 @@ it('partitions trash before normal facets, counts, selection and search; trash i
   );
 });
 
+it('hides project-retained originals from library cards and filters', () => {
+  const props = createProbeProps('healthy');
+  props.library.items = [
+    item,
+    { ...item, id: 'project-retained-original', savedIndependently: false },
+  ];
+  act(() => root?.render(<HookProbe {...props} />));
+  expect(latestValue?.allItems).toEqual([item]);
+  expect(selectorMocks.getFilteredGalleryItems).toHaveBeenLastCalledWith(
+    expect.objectContaining({ items: [item] })
+  );
+});
+
 it('counts every item in the current mode independently of storage scope', () => {
   const props = createProbeProps('healthy');
   const temporary = {

@@ -20,7 +20,10 @@ export function useReviewExportSettings(
     key: string;
     codecs: NonNullable<ReviewMediaIndex['outputCodecs']>;
   } | null>(null);
-  const profile = source ? resolveReviewOutputProfile(source, advanced, renderSettings) : null;
+  const profile = useMemo(
+    () => (source ? resolveReviewOutputProfile(source, advanced, renderSettings) : null),
+    [source, advanced, renderSettings]
+  );
   const enabled = !!source && advanced.ui.mode === 'advanced';
   const width = profile?.width ?? 0;
   const height = profile?.height ?? 0;

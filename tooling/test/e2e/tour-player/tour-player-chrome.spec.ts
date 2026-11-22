@@ -1,5 +1,6 @@
 import type { TourDocument } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import type { TourPlayerLabels } from '../../../../apps/extension/src/features/scenario/tour-player/document';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { buildPlayerHtml, labels, slide, tour } from './tour-player-artifact.fixture';
@@ -118,6 +119,81 @@ async function expectFloatingChrome(page: Page) {
 }
 
 test.describe('standalone tour player chrome', () => {
+  test('master volume matches the seek range and retains compact keyboard controls', async ({
+    page,
+  }, info) => {
+    const audio = await readFile(
+      new URL('../../../../apps/extension/public/action-sounds/v1/mouse-click.wav', import.meta.url)
+    );
+    const documentTour: TourDocument = {
+      ...tour,
+      backgroundMusic: {
+        assetId: 'sample',
+        duration: 1,
+        volume: 0.3,
+        loop: true,
+        ducking: { enabled: false, level: 0.25 },
+      },
+    };
+    await page.setViewportSize(PRIMARY_BROWSER_VIEWPORTS[0].size);
+    await page.setContent(
+      await buildPlayerHtml(documentTour, labels, [
+        { id: 'sample', mime: 'audio/wav', base64: audio.toString('base64') },
+      ])
+    );
+    const volume = page.getByRole('slider', { name: 'Volume', exact: true });
+    const seek = page.getByRole('slider', { name: labels.seek, exact: true });
+    const mute = page.getByRole('button', { name: 'Mute', exact: true });
+    await expect(volume).toHaveAttribute('aria-valuetext', '100%');
+    await page.screenshot({ path: info.outputPath('tour-volume-at-rest.png'), fullPage: false });
+    await expect(volume).toHaveCSS('appearance', 'none');
+    await expect(seek).toHaveCSS('appearance', 'none');
+    await volume.press('ArrowLeft');
+    await expect(volume).toHaveAttribute('aria-valuetext', '99%');
+    await volume.press('Home');
+    await expect(volume).toHaveAttribute('aria-valuetext', '0%');
+    await volume.press('ArrowRight');
+    await expect(volume).toHaveAttribute('aria-valuetext', '1%');
+    expect(
+      await volume.evaluate((node) =>
+        getComputedStyle(node).getPropertyValue('--tour-scrub-fill').trim()
+      )
+    ).toBe('1%');
+    await mute.press('Space');
+    const unmute = page.getByRole('button', { name: 'Unmute', exact: true });
+    await expect(unmute).toHaveAttribute('aria-pressed', 'true');
+    await volume.press('End');
+    await expect(volume).toHaveAttribute('aria-valuetext', '100%');
+    await unmute.press('Space');
+    await expect(mute).toHaveAttribute('aria-pressed', 'false');
+
+    const compactSizes = [375, 479, 480, 481].map((width) => ({ width, height: 640 }));
+    for (const size of [...PRIMARY_BROWSER_VIEWPORTS.map(({ size }) => size), ...compactSizes]) {
+      await page.setViewportSize(size);
+      await expectFloatingChrome(page);
+      const toolbar = await geometry(page);
+      const bounds = (await volume.boundingBox())!;
+      expect(bounds.x).toBeGreaterThanOrEqual(toolbar.toolbar.x);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(
+        toolbar.toolbar.x + toolbar.toolbar.width
+      );
+      await expect(volume).toHaveCSS('width', size.width <= 480 ? '48px' : '64px');
+      if (size.width === 375 || size.width >= 1280) {
+        await volume.press('ArrowLeft');
+        await expect(volume).toBeFocused();
+        await page.screenshot({
+          path: info.outputPath(`tour-volume-${size.width}.png`),
+          fullPage: false,
+        });
+      }
+    }
+    const contents = page.getByRole('button', { name: labels.contents, exact: true });
+    await contents.click();
+    await expect(page.locator('[data-tour-navigation]')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-tour-navigation]')).toBeHidden();
+  });
+
   for (const [name, size] of [
     ['desktop', { width: 1280, height: 560 }],
     ['minimum', { width: 480, height: 640 }],

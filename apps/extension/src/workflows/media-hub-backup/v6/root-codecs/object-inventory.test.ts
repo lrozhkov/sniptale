@@ -15,6 +15,10 @@ import { openArchiveReader } from '../../../../composition/archive-transfer';
 import { buildMediaHubBackupExportPlanV6, exportMediaHubBackupV6 } from '../export';
 import { inspectMediaHubBackupV6 } from '../inspect';
 import { parseManifestV6 } from '../codec';
+import { createGuideProject } from '../../../../features/scenario/project/factories';
+import { encodePortableScenarioProjectEntry } from './projects';
+import { EDITOR_HISTORY_LIMITS } from '../../../../features/editor-history/policy';
+import { parsePortableMediaMetadata } from './media';
 
 const reader: ArchiveReader = { close: vi.fn(), entries: () => [], entry: () => null };
 const object = {
@@ -48,6 +52,23 @@ const media = (mimeType = 'image/png') =>
     entry: { id: 'root', tags: [], source: { kind: 'screenshot' }, mimeType, size: 3 },
     originalObjectId: 'body',
   });
+
+it('rejects native Original claims and linked workspace fields in legacy media archives', () => {
+  const entry = { id: 'root', tags: [], source: { kind: 'screenshot' } };
+  const metadata = { entry, originalObjectId: 'body' };
+  expect(() =>
+    parsePortableMediaMetadata({
+      ...metadata,
+      entry: { ...entry, savedIndependently: false },
+    })
+  ).toThrow('Portable media root metadata is invalid');
+  expect(() =>
+    parsePortableMediaMetadata({
+      ...metadata,
+      workspace: { sourceMediaId: 'unrelated-original' },
+    })
+  ).toThrow('Portable image workspace is invalid');
+});
 const scenario = (mimeType = 'image/png') =>
   envelope('scenario-project', {
     entry: { id: 'root', project: {} },
@@ -71,6 +92,49 @@ const video = (mimeType = 'image/png') =>
     ],
     projectExports: [],
   });
+
+it.each(['mime', 'missing', 'logical-budget'] as const)(
+  'refuses invalid Montage history object roles before staging: %s',
+  async (failure) => {
+    const metadata = {
+      entry: { id: 'root', project: { assets: [] } },
+      projectAssets: [],
+      projectExports: [],
+      history: {
+        version: 1,
+        past: [{ objectId: 'body' }, { objectId: 'body' }],
+        future: [],
+        sources: [],
+      },
+    };
+    const root = envelope('video-project', metadata);
+    root.objects =
+      failure === 'missing'
+        ? []
+        : [
+            {
+              ...object,
+              mimeType: failure === 'mime' ? 'image/png' : 'application/json',
+              size: failure === 'logical-budget' ? EDITOR_HISTORY_LIMITS.maxBytes / 2 + 1 : 3,
+            },
+          ];
+    await expect(assertArchiveRootObjectInventory(root, null, [])).rejects.toThrow();
+  }
+);
+
+it('requires the history role instead of silently treating its bodies as unused', async () => {
+  const entry = { id: 'root', project: { assets: [] } };
+  const root = envelope('video-project', {
+    entry,
+    projectAssets: [],
+    projectExports: [],
+    history: { version: 1, past: [{ objectId: 'body' }], future: [], sources: [] },
+  });
+  root.objects = [{ ...object, mimeType: 'application/json' }];
+  await assertArchiveRootObjectInventory(root, null, []);
+  root.metadata = { entry, projectAssets: [], projectExports: [] };
+  await expect(assertArchiveRootObjectInventory(root, null, [])).rejects.toThrow('unused');
+});
 
 it.each([false, true])(
   'refuses unsupported Scenario MIME before staging (shared=%s)',
@@ -355,6 +419,72 @@ it('checks saved history JSON before staging and refuses an absent sidecar', asy
       []
     )
   ).rejects.toThrow('history');
+});
+
+it('admits a compact editing sidecar before staging and refuses a mismatched current or future format', async () => {
+  const project = createGuideProject('Current', 'root', 1);
+  const {
+    editingHistory,
+    history: _legacy,
+    ...entry
+  } = encodePortableScenarioProjectEntry({
+    id: project.id,
+    project,
+    createdAt: 1,
+    updatedAt: 1,
+    workspaceRevision: 1,
+    editingHistory: { version: 1, past: [], future: [{ ...project, name: 'Future' }] },
+  });
+  if (!editingHistory) throw new Error('Missing compact history');
+  const metadata = {
+    entry,
+    assets: [],
+    exports: [],
+    exportThumbnails: [],
+    stepDocuments: [],
+    historyObjectId: 'body',
+  };
+  assertMetadataJson(metadata);
+  const root = envelope('scenario-project', metadata);
+  const json = JSON.stringify(editingHistory);
+  root.objects = [
+    { ...object, mimeType: 'application/json', size: new TextEncoder().encode(json).byteLength },
+  ];
+  root.descriptor.totalBytes = root.objects[0]!.size;
+  const jsonReader = (text: string): ArchiveReader => ({
+    ...reader,
+    entry: () => ({
+      ...root.objects[0]!,
+      compressedSize: text.length,
+      crc32: 0,
+      directory: false,
+      pipeTo: vi.fn(),
+      text: async () => text,
+    }),
+  });
+  await expect(
+    assertArchiveRootObjectInventory(root, jsonReader(json), [])
+  ).resolves.toBeUndefined();
+  await expect(
+    assertArchiveRootObjectInventory(
+      root,
+      jsonReader(JSON.stringify({ ...editingHistory, version: 2 })),
+      []
+    )
+  ).rejects.toThrow();
+  const mismatched = {
+    entry: { ...entry, project: { ...project, name: 'Different current' } },
+    assets: [],
+    exports: [],
+    exportThumbnails: [],
+    stepDocuments: [],
+    historyObjectId: 'body',
+  };
+  assertMetadataJson(mismatched);
+  root.metadata = mismatched;
+  await expect(assertArchiveRootObjectInventory(root, jsonReader(json), [])).rejects.toThrow(
+    'differs from metadata'
+  );
 });
 
 it('admits exact Scenario history roles without bytes only for metadata discovery', async () => {

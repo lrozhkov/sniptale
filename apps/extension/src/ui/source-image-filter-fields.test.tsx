@@ -30,10 +30,20 @@ function button(label: string, scope: ParentNode = host) {
   if (!item) throw new Error('Missing button ' + label);
   return item;
 }
+const addTrigger = () => button('videoEditor.sidebar.sourceFiltersAdd');
+async function addFilter(kind: string) {
+  act(() => addTrigger().click());
+  const option = button('videoEditor.sidebar.sourceFiltersAdd' + kind, document.body);
+  expect(option.getAttribute('role')).toBe('option');
+  await act(async () => {
+    option.click();
+  });
+}
+
 it(
   'authors a controlled ordered stack with intensity parameters ' +
     'toggles and deletion without mutating the input',
-  () => {
+  async () => {
     const initial: SourceImageFilterStack = {
         version: 1,
         filters: [createSourceImageFilter('blur', 'existing')],
@@ -46,8 +56,9 @@ it(
       return <SourceImageFilterFields value={value} onChange={setValue} />;
     }
     act(() => root.render(<Harness />));
-    act(() => button('videoEditor.sidebar.sourceFiltersAddColor').click());
+    await addFilter('Color');
     expect(current?.filters.map((item) => item.kind)).toEqual(['blur', 'color']);
+    expect(addTrigger().textContent).toBe('videoEditor.sidebar.sourceFiltersAdd');
     const color = host.querySelector<HTMLElement>('[data-source-filter-id]:last-child');
     if (!color) throw new Error('Missing color');
     const input = color.querySelector<HTMLInputElement>(
@@ -98,7 +109,7 @@ it('keeps every command disabled when locked and refuses to exceed the stack bou
     },
     onChange = vi.fn();
   act(() => root.render(<SourceImageFilterFields value={value} onChange={onChange} />));
-  expect(button('videoEditor.sidebar.sourceFiltersAddColor').disabled).toBe(true);
+  expect(addTrigger().disabled).toBe(true);
   act(() => root.render(<SourceImageFilterFields value={value} disabled onChange={onChange} />));
   expect(
     [...host.querySelectorAll('button,input')].every((item) => item.matches(':disabled'))
@@ -109,7 +120,7 @@ it('keeps every command disabled when locked and refuses to exceed the stack bou
 
 it.each(['Monochrome', 'Sepia', 'Sharpen', 'Pixelate', 'Vignette', 'Grain'] as const)(
   'adds the validated %s operation through the controlled inspector',
-  (name) => {
+  async (name) => {
     let current: SourceImageFilterStack | undefined;
     function Harness() {
       const [value, setValue] = useState<SourceImageFilterStack>();
@@ -117,7 +128,7 @@ it.each(['Monochrome', 'Sepia', 'Sharpen', 'Pixelate', 'Vignette', 'Grain'] as c
       return <SourceImageFilterFields value={value} onChange={setValue} />;
     }
     act(() => root.render(<Harness />));
-    act(() => button('videoEditor.sidebar.sourceFiltersAdd' + name).click());
+    await addFilter(name);
     expect(current?.filters).toHaveLength(1);
     expect(current?.filters[0]?.kind).toBe(name.toLowerCase());
     if (name === 'Grain')

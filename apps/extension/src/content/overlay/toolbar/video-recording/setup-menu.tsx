@@ -298,7 +298,7 @@ function RecordingCaptureTarget(props: {
       </ProductToolbarMenuGroupLabel>
       <SegmentedSwitch
         activeId={mode}
-        appearance="neutral"
+        appearance="property"
         density="compact"
         ariaLabel={translate('content.toolbar.videoRecordingTarget')}
         dataAttribute={{ 'data-ui': 'content.toolbar.video-recording.capture-target' }}

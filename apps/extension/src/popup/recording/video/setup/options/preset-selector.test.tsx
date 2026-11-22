@@ -1,22 +1,33 @@
 // @vitest-environment jsdom
 
+import en from '../../../../../platform/i18n/catalogs/en.json';
+import ru from '../../../../../platform/i18n/catalogs/ru.json';
+import {
+  prepareTranslations,
+  setLocalePreference,
+  type AppLocale,
+} from '../../../../../platform/i18n';
+
+vi.mock('../../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: AppLocale) =>
+    flatCatalogFixture(locale === 'ru' ? ru : en)
+  ),
+}));
+
+beforeAll(async () => {
+  await prepareTranslations('popup', 'ru');
+  await setLocalePreference('ru');
+});
+
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 
 const runtimeMocks = vi.hoisted(() => ({
   openSettingsPage: vi.fn().mockResolvedValue(undefined),
   sendRuntimeMessage: vi.fn(),
 }));
 
-vi.mock('../../../../../platform/i18n/popup', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../platform/i18n/popup')>()),
-  translate: (key: string) => `t:${key}`,
-}));
-vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
-  translate: (key: string) => `t:${key}`,
-}));
 vi.mock('../../../../runtime-services', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../runtime-services')>()),
   getPopupRuntimeServices: () => ({
@@ -80,7 +91,7 @@ afterEach(() => {
 
 it('describes loading, available, and unavailable window availability states', () => {
   expect(getVideoPresetAvailabilityDescription(undefined)).toBe(
-    't:viewportPresets.availability.checking'
+    ru.viewportPresets.availability.checking
   );
   expect(
     getVideoPresetAvailabilityDescription({
@@ -89,7 +100,7 @@ it('describes loading, available, and unavailable window availability states', (
       target: 'window',
       required: { width: 1280, height: 720 },
     })
-  ).toBe('t:viewportPresets.hints.window');
+  ).toBe(ru.viewportPresets.hints.window);
   expect(
     getVideoPresetAvailabilityDescription({
       status: 'unavailable',
@@ -97,7 +108,7 @@ it('describes loading, available, and unavailable window availability states', (
       target: 'window',
       reason: 'window-too-large',
     })
-  ).toBe('t:viewportPresets.availability.windowTooLarge');
+  ).toBe(ru.viewportPresets.availability.windowTooLarge);
 });
 
 it('shows native size and window presets in an inline curtain', async () => {
@@ -126,8 +137,8 @@ it('shows native size and window presets in an inline curtain', async () => {
 
   const buttons = () => Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
 
-  expect(container?.textContent).toContain('t:popup.video.presetRowLabel');
-  expect(container?.textContent).toContain('t:viewportPresets.section.nativeOption');
+  expect(container?.textContent).toContain(ru.popup.video.presetRowLabel);
+  expect(container?.textContent).toContain(ru.viewportPresets.section.nativeOption);
 
   await act(async () => {
     buttons()[0]?.click();
@@ -135,8 +146,8 @@ it('shows native size and window presets in an inline curtain', async () => {
   });
   expect(container?.textContent).toContain('Preset');
   expect(container?.textContent).toContain('1\u00a0280 × 720');
-  expect(container?.textContent).not.toContain('t:popup.video.presetNativeDescription');
-  expect(container?.textContent?.split('t:viewportPresets.availability.pendingVideo').length).toBe(
+  expect(container?.textContent).not.toContain(ru.popup.video.presetNativeDescription);
+  expect(container?.textContent?.split(ru.viewportPresets.availability.pendingVideo).length).toBe(
     1
   );
   expect(runtimeMocks.sendRuntimeMessage).toHaveBeenCalledWith({
@@ -168,10 +179,10 @@ it('opens the size-preset settings section from the selector management action',
   });
   const manageButton = Array.from(
     container?.querySelectorAll<HTMLButtonElement>('button') ?? []
-  ).find((button) => button.textContent === 't:popup.video.manageSizePresets');
+  ).find((button) => button.textContent === ru.popup.video.manageSizePresets);
   const nativeOption = Array.from(
     container?.querySelectorAll<HTMLButtonElement>('button') ?? []
-  ).find((button) => button.textContent === 't:viewportPresets.section.nativeOption');
+  ).find((button) => button.textContent === ru.viewportPresets.section.nativeOption);
   expect(manageButton).toBeTruthy();
   expect(container?.querySelectorAll('[aria-controls]')).toHaveLength(1);
   expect(manageButton?.closest('[id]')).not.toBeNull();
@@ -219,7 +230,7 @@ it('selects native size when the native curtain option is clicked', async () => 
   });
   act(() => {
     Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])
-      .find((button) => button.textContent === 't:viewportPresets.section.nativeOption')
+      .find((button) => button.textContent === ru.viewportPresets.section.nativeOption)
       ?.click();
   });
 
@@ -260,7 +271,7 @@ it('keeps a preset disabled when runtime availability fails', async () => {
     ?.querySelector<HTMLElement>('[data-popup-hint="Preset"]')
     ?.closest<HTMLButtonElement>('button');
   await vi.waitFor(() =>
-    expect(container?.textContent).toContain('t:viewportPresets.availability.platformRejected')
+    expect(container?.textContent).toContain(ru.viewportPresets.availability.platformRejected)
   );
   expect(presetButton?.disabled).toBe(false);
   expect(presetButton?.getAttribute('aria-disabled')).toBe('true');
@@ -314,12 +325,12 @@ it('shows availability progress only when the batch request takes at least 400ms
     await Promise.resolve();
   });
 
-  expect(container?.textContent).not.toContain('t:viewportPresets.availability.checking');
+  expect(container?.textContent).not.toContain(ru.viewportPresets.availability.checking);
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 410));
   });
-  expect(container?.textContent).toContain('t:viewportPresets.availability.checking');
-  expect(container?.textContent?.split('t:viewportPresets.availability.checking')).toHaveLength(2);
+  expect(container?.textContent).toContain(ru.viewportPresets.availability.checking);
+  expect(container?.textContent?.split(ru.viewportPresets.availability.checking)).toHaveLength(2);
 
   await act(async () => {
     resolveAvailability({
@@ -335,7 +346,7 @@ it('shows availability progress only when the batch request takes at least 400ms
     });
     await Promise.resolve();
   });
-  expect(container?.textContent).not.toContain('t:viewportPresets.availability.checking');
+  expect(container?.textContent).not.toContain(ru.viewportPresets.availability.checking);
 });
 
 it('queries browser window sizes for desktop capture', async () => {
@@ -373,9 +384,9 @@ it('queries browser window sizes for desktop capture', async () => {
     container?.querySelector<HTMLButtonElement>('button')?.click();
   });
 
-  expect(container?.textContent).not.toContain('t:viewportPresets.availability.screenUnsupported');
+  expect(container?.textContent).not.toContain(ru.viewportPresets.availability.screenUnsupported);
   expect(runtimeMocks.sendRuntimeMessage).toHaveBeenCalled();
-  expect(container?.textContent).not.toContain('t:viewportPresets.availability.pendingVideo');
+  expect(container?.textContent).not.toContain(ru.viewportPresets.availability.pendingVideo);
 });
 
 it('disables viewport presets but keeps window presets selectable for crop recording', async () => {
@@ -437,8 +448,8 @@ it('disables viewport presets but keeps window presets selectable for crop recor
   const windowButton = buttons.find((button) => button.textContent?.includes('Window'));
   expect(viewportButton?.getAttribute('aria-disabled')).not.toBe('true');
   expect(windowButton?.getAttribute('aria-disabled')).not.toBe('true');
-  expect(container?.textContent).toContain('t:viewportPresets.groups.window');
-  expect(container?.textContent).not.toContain('t:viewportPresets.groups.viewport');
+  expect(container?.textContent).toContain(ru.viewportPresets.groups.window);
+  expect(container?.textContent).not.toContain('viewportPresets.groups.viewport');
 
   act(() => viewportButton?.click());
   expect(onPresetChange).toHaveBeenCalledWith('viewport-1');
@@ -474,3 +485,15 @@ it('can hide the preset selector when switching from tab capture to camera', asy
   ).not.toThrow();
   expect(container?.textContent).toBe('');
 });
+
+function flatCatalogFixture(value: unknown, prefix = ''): Record<string, string> {
+  if (typeof value === 'string') return { [prefix]: value };
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Invalid authored catalog fixture');
+  }
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, child]) =>
+      Object.entries(flatCatalogFixture(child, prefix ? `${prefix}.${key}` : key))
+    )
+  );
+}

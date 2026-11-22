@@ -186,7 +186,6 @@ export function CalloutTextSettings(props: ManualContentProps) {
         label={translate('content.callout.fontSizeLabelPrefix')}
         max={72}
         min={10}
-        scrubMax={36}
         value={typography.fontSize}
         onChange={(fontSize) => changeTypography({ fontSize })}
       />
@@ -440,7 +439,6 @@ export function CalloutTitleSettings(props: ManualContentProps) {
             label={translate('content.callout.titleFontSizeLabel')}
             max={144}
             min={10}
-            scrubMax={72}
             value={title.fontSize}
             onChange={(fontSize) => changeTitle({ fontSize })}
           />

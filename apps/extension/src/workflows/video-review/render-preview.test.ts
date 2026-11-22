@@ -25,6 +25,8 @@ import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { createCanvasComment } from '../../features/video/review/comments';
 import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
 import { reviewPresentedGeometry } from './gpu-preview-geometry';
+import { createReviewExportDiagnostics } from './export-diagnostics';
+import { EffectRuntimeFrameError } from '../../features/video/composition/effect-runtime/runtime/frame-error';
 
 const io = vi.hoisted(() => ({
   order: [] as string[],
@@ -125,12 +127,15 @@ function setup() {
         rect: vi.fn(),
         clip: vi.fn(),
         scale: vi.fn(),
+        rotate: vi.fn(),
+        translate: vi.fn(),
         drawImage: vi.fn(),
         fillRect: vi.fn(() => io.order.push('outer-fade')),
         measureText: vi.fn((text: string) => ({ width: text.length * 8 })),
         beginPath: vi.fn(),
         roundRect: vi.fn(),
         fill: vi.fn(),
+        strokeText: vi.fn(),
         fillText: vi.fn(() => io.order.push('captions')),
       } as unknown as CanvasRenderingContext2D;
       const release = vi.fn();
@@ -1963,6 +1968,70 @@ it('does not enter the annotation producer when all instances are disabled durin
   }
 });
 
+it('queues two captured camera-scene requests with one exclusive GPU execution', async () => {
+  const { resources } = setup();
+  const { createQuickEditWebcam } = await import('../../features/video/review/advanced/webcam');
+  const input = scene();
+  const sceneWithCamera = {
+    ...input,
+    webcam: createQuickEditWebcam('camera', input.source, input.source),
+  };
+  const entered = Promise.withResolvers<void>();
+  const fence = Promise.withResolvers<void>();
+  const output = {
+    canvas: { ...dimensions.backing } as HTMLCanvasElement,
+    release: vi.fn(),
+    outputKind: 'gpu-surface' as const,
+    retainedProviderBytes: () => 0,
+    isRetiredProvider: () => false,
+  };
+  const gpu = {
+    allocatedBytes: 0,
+    render: vi.fn(),
+    renderPresentation: vi.fn(async () => {
+      entered.resolve();
+      await fence.promise;
+      return output;
+    }),
+    releaseScene: vi.fn(),
+    dispose: vi.fn(),
+  };
+  io.gpu.mockReturnValue(gpu);
+  vi.stubGlobal('navigator', { gpu: {} });
+  const renderer = createReviewPreviewRenderer({
+    resources,
+    maximumInFlight: 2,
+    allowCameraCaptureOverlap: true,
+  });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(sceneWithCamera, dimensions, signal);
+  expect(renderer.maximumInFlight(sceneWithCamera)).toBe(2);
+  const source = { ...frame().source, videoFrame: () => ({}) as VideoFrame };
+  const request = { ...frame(), source };
+  const first = renderer.renderPresentation(prepared, request, signal, vi.fn());
+  await entered.promise;
+  const next = renderer.renderPresentation(
+    prepared,
+    { ...request, sourceTime: 2, resultTime: 3 },
+    signal,
+    vi.fn()
+  );
+  try {
+    await expect(renderer.renderPresentation(prepared, request, signal, vi.fn())).rejects.toThrow(
+      'already admitted'
+    );
+    expect(gpu.renderPresentation).toHaveBeenCalledOnce();
+  } finally {
+    fence.resolve();
+    const results = await Promise.allSettled([first, next]);
+    for (const result of results) if (result.status === 'fulfilled') result.value.release();
+    renderer.dispose();
+  }
+  expect((await first).sourceTime).toBe(request.sourceTime);
+  expect((await next).sourceTime).toBe(2);
+  expect(gpu.renderPresentation).toHaveBeenCalledTimes(2);
+});
+
 it('publishes a completed GPU surface without acquiring a Canvas2D publication lease', async () => {
   const { resources } = setup();
   const output = {
@@ -2424,6 +2493,57 @@ it.each(['normal-to-transition', 'transition-to-normal'] as const)(
     }
   }
 );
+
+it('queues the next foreground frame while an upcoming transition warms', async () => {
+  const f = await cutExecutionFixture();
+  const warming = Promise.withResolvers<void>();
+  const ready = Promise.withResolvers<void>();
+  const output = () => ({
+    canvas: { ...dimensions.backing } as HTMLCanvasElement,
+    outputKind: 'gpu-surface' as const,
+    retainedProviderBytes: () => 0,
+    isRetiredProvider: () => false,
+    release: vi.fn(),
+  });
+  let activeWarmup = false;
+  const renderPresentation = vi.fn(async () => {
+    if (activeWarmup) throw new Error('GPU preview overlap is unavailable.');
+    return output();
+  });
+  const prepareBoundaryPipelines = vi.fn(async () => {
+    activeWarmup = true;
+    warming.resolve();
+    await ready.promise;
+    activeWarmup = false;
+    return true;
+  });
+  Object.assign(f.gpu, { renderPresentation, prepareBoundaryPipelines });
+  const signal = new AbortController().signal;
+  const first = f.renderer.renderPresentation(
+    f.prepared,
+    { ...f.input(), boundary: { resultTime: 2, transition: f.transition().transition } },
+    signal,
+    vi.fn()
+  );
+  await warming.promise;
+  const next = f.renderer.renderPresentation(
+    f.prepared,
+    { ...f.input(), sourceTime: 3, resultTime: 3 },
+    signal,
+    vi.fn()
+  );
+  const completed = Promise.allSettled([first, next]);
+  try {
+    await flushCutExecution();
+    expect(renderPresentation).toHaveBeenCalledOnce();
+  } finally {
+    ready.resolve();
+    for (const result of await completed) if (result.status === 'fulfilled') result.value.release();
+    await f.close();
+  }
+  expect((await completed).map((result) => result.status)).toEqual(['fulfilled', 'fulfilled']);
+  expect(renderPresentation).toHaveBeenCalledTimes(2);
+});
 
 it('resumes two independent normal GPU frames after the exclusive transition drains', async () => {
   const f = await cutExecutionFixture();
@@ -2925,4 +3045,196 @@ it('releases a refused GL context allocation and retries without leaking its res
   await vi.waitFor(() => expect(lose).toHaveBeenCalledOnce());
   expect(reservations[1]).toHaveBeenCalledOnce();
   output.release();
+});
+
+it('uses the ordered Canvas path before allocating GPU text rasters for a dense mixed viewport stack', async () => {
+  const { createReviewAnnotationTextClip } =
+    await import('../../features/video/review/annotation-effects/text-animation');
+  const fixture = await annotationsFixture();
+  const lane = fixture.input.annotationEffects!.lane;
+  const template = lane.instances[1]!;
+  lane.instances = Array.from({ length: 32 }, (_, index) => ({
+    ...template,
+    id: `package-${index}`,
+    order: index * 2 + 1,
+    transform: { ...template.transform, width: 0.025, height: 0.025 },
+  }));
+  lane.textClips = Array.from({ length: 33 }, (_, index) =>
+    createReviewAnnotationTextClip(`text-${index}`, 'A', 0, 4, index * 2)
+  );
+  const { resources } = setup();
+  const gpu = { allocatedBytes: 0, render: vi.fn(), releaseScene: vi.fn(), dispose: vi.fn() };
+  io.gpu.mockReturnValue(gpu);
+  vi.stubGlobal('navigator', { gpu: {} });
+  const renderer = createReviewPreviewRenderer({
+    resources,
+    annotationExecutor: () => fixture.executor,
+  });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(fixture.input, dimensions, signal);
+  const source = { ...frame().source, videoFrame: () => ({}) as VideoFrame };
+  const result = await renderer.render(prepared, { ...frame(), source }, signal);
+  try {
+    expect(result.renderer.backend).toBe('legacy');
+    expect(gpu.render).not.toHaveBeenCalled();
+    expect(fixture.executor.renderFrame).toHaveBeenCalledTimes(32);
+    const imageCalls = vi.mocked(result.context.drawImage).mock;
+    const textCalls = vi.mocked(result.context.fillText).mock.invocationCallOrder;
+    expect(textCalls).toHaveLength(33);
+    for (const [index, bitmap] of fixture.bitmaps.entries()) {
+      const imageIndex = imageCalls.calls.findIndex(([image]) => Object.is(image, bitmap));
+      expect(imageIndex).toBeGreaterThanOrEqual(0);
+      const packageCall = imageCalls.invocationCallOrder[imageIndex]!;
+      expect(packageCall).toBeGreaterThan(textCalls[index]!);
+      expect(packageCall).toBeLessThan(textCalls[index + 1]!);
+      expect(bitmap.close).toHaveBeenCalledOnce();
+    }
+  } finally {
+    result.release();
+    renderer.dispose();
+  }
+});
+
+it('retains one cumulative raster budget across streamed viewport packages', async () => {
+  const { createReviewAnnotationTextClip } =
+    await import('../../features/video/review/annotation-effects/text-animation');
+  const fixture = await annotationsFixture();
+  const lane = fixture.input.annotationEffects!.lane;
+  const template = lane.instances[1]!;
+  lane.instances = Array.from({ length: 18 }, (_, index) => ({
+    ...template,
+    id: `package-${index}`,
+    order: index,
+    transform: { ...template.transform, width: 1, height: 1 },
+  }));
+  lane.textClips = [createReviewAnnotationTextClip('text', 'Title', 5, 6, 18)];
+  const { resources, leases } = setup();
+  const renderer = createReviewPreviewRenderer({
+    resources,
+    annotationExecutor: () => fixture.executor,
+  });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(
+    fixture.input,
+    { canonical: size, backing: size },
+    signal
+  );
+  try {
+    const sink = vi.fn();
+    const diagnostics = createReviewExportDiagnostics(
+      { destination: 'preview', route: 'render' },
+      sink
+    );
+    const rendering = diagnostics.phase('compose', () =>
+      renderer.render(prepared, frame(), signal)
+    );
+    await expect(
+      rendering.catch((error: unknown) => {
+        diagnostics.reportFailure(error);
+        throw error;
+      })
+    ).rejects.toThrow();
+    diagnostics.reportFailure(new EffectRuntimeFrameError('circuitOpen'), 'compose');
+    expect(sink).toHaveBeenCalledExactlyOnceWith(
+      expect.stringContaining('effectCode=resourceLimit')
+    );
+    expect(fixture.executor.renderFrame.mock.calls.length).toBeLessThan(lane.instances.length);
+    expect(fixture.bitmaps.length).toBeGreaterThan(0);
+    for (const bitmap of fixture.bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
+    expect(leases[0]?.release).toHaveBeenCalledOnce();
+  } finally {
+    prepared.release();
+    renderer.dispose();
+  }
+});
+
+it('admits Canvas after a text edit with retained GPU artwork and front leases', async () => {
+  const { createReviewAnnotationTextClip } =
+    await import('../../features/video/review/annotation-effects/text-animation');
+  const { createPreviewRenderResources } = await import('./preview-render-resources');
+  const fixture = await annotationsFixture();
+  const lane = fixture.input.annotationEffects!.lane;
+  lane.textClips = [createReviewAnnotationTextClip('first', 'First', 0, 4, 0)];
+  lane.instances[0]!.order = 1;
+  lane.instances[1]!.order = 2;
+  const backing = { width: 3840, height: 2160 };
+  const context = setup().resources.canvas('context', { width: 1, height: 1 }).context;
+  const resources = createPreviewRenderResources({
+    maximumManagedBytes: 1,
+    maximumCanvases: 1,
+    createCanvas: () =>
+      ({ width: 0, height: 0, getContext: () => context }) as unknown as HTMLCanvasElement,
+  });
+  const graph = allocationInput();
+  graph.publication.backing = backing;
+  const retained: { release(): void }[] = [];
+  const gpu = {
+    allocatedBytes: 0,
+    renderPresentation: vi.fn(async () => {
+      for (const role of [
+        'preview-gpu-background',
+        'preview-gpu-decoration',
+        'preview-gpu-captions',
+      ])
+        retained.push(resources.canvas(role, { width: 640, height: 360 }));
+      const front = resources.canvas('preview-publication', backing);
+      return {
+        canvas: front.canvas,
+        release: front.release,
+        outputKind: 'gpu-surface' as const,
+        retainedProviderBytes: () => 0,
+        isRetiredProvider: () => false,
+      };
+    }),
+    releaseScene: vi.fn(),
+    dispose: vi.fn(),
+  };
+  io.gpu.mockReturnValue(gpu);
+  vi.stubGlobal('navigator', { gpu: {} });
+  const renderer = createReviewPreviewRenderer({
+    resources,
+    annotationExecutor: () => fixture.executor,
+    allocation: { describe: () => graph, replaceLimits: resources.replaceLimits.bind(resources) },
+  });
+  const signal = new AbortController().signal;
+  const dims = { canonical: size, backing };
+  const source = { ...frame().source, videoFrame: () => ({}) as VideoFrame };
+  const first = await renderer.prepare(fixture.input, dims, signal);
+  const acquireOutput = vi.fn();
+  const front = await renderer.renderPresentation(
+    first,
+    { ...frame(), source },
+    signal,
+    acquireOutput
+  );
+  try {
+    expect(front.renderer.backend).toBe('gpu');
+    graph.publication.previousFront = backing;
+    graph.publication.previousFrontKind = 'gpu-surface';
+    const second = createReviewAnnotationTextClip('second', 'Second', 0, 4, 3);
+    const changed = {
+      ...fixture.input,
+      annotationEffects: {
+        ...fixture.input.annotationEffects!,
+        lane: { ...lane, textClips: [...lane.textClips, second] },
+      },
+    };
+    const dense = await renderer.prepare(changed, dims, signal);
+    const result = await renderer.renderPresentation(
+      dense,
+      { ...frame(), source },
+      signal,
+      acquireOutput
+    );
+    expect(result.renderer.backend).toBe('legacy');
+    expect(gpu.renderPresentation).toHaveBeenCalledOnce();
+    result.release();
+    dense.release();
+  } finally {
+    front.release();
+    first.release();
+    for (const lease of retained) lease.release();
+    renderer.dispose();
+    resources.dispose();
+  }
 });

@@ -25,34 +25,20 @@ import {
 } from '../../../apps/extension/src/composition/persistence/gradient-presets/mutations';
 import { getGradientPresetDisplayName } from '../../../apps/extension/src/features/highlighter/gradient-presets/display-name';
 import { getShowcaseGradientPaint } from '../../../apps/extension/src/features/highlighter/showcase-resources';
-import { setLocalePreference, type AppLocale } from '../../../apps/extension/src/platform/i18n';
+import {
+  prepareTranslations,
+  setLocalePreference,
+  type AppLocale,
+} from '../../../apps/extension/src/platform/i18n';
+import { InspectorFields } from './inspector-fields';
+import { LensChoices, SegmentFitChoices } from './lens-choices';
+import { SwitchStatus } from './switch-status';
+import { usePickerPreferences } from './reference-picker-preferences';
 import './reference.css';
+import './inspector-fields.css';
 
 const palette = [...DEFAULT_DRAWING_COLORS];
 const createId = () => crypto.randomUUID();
-const densityKey = 'sniptale.design-reference.picker-compact';
-
-function useReferencePreference(key = densityKey) {
-  const [compact, setCompact] = useState(() => {
-    try {
-      return localStorage.getItem(key) === 'true';
-    } catch {
-      return false;
-    }
-  });
-  return [
-    compact,
-    (value: boolean) => {
-      setCompact(value);
-      try {
-        localStorage.setItem(key, String(value));
-      } catch {
-        /* The current session remains editable. */
-      }
-    },
-  ] as const;
-}
-
 /** Reference-only resources never read or write the extension's user catalog. */
 function useReferenceTemplates(locale: AppLocale): GradientTemplateResources {
   const [catalog, setCatalog] = useState(createDefaultGradientPresetCatalog);
@@ -109,12 +95,9 @@ function useReferenceTemplates(locale: AppLocale): GradientTemplateResources {
 function ColorReference() {
   const [accepted, setAccepted] = useState('#FA7116A6');
   const [draft, setDraft] = useState(accepted);
-  const [recent, setRecent] = useState<string[]>([]);
   const [session, setSession] = useState(0);
-  const [compact, setCompact] = useReferencePreference();
-  const [catalogMode, setCatalogMode] = useReferencePreference(
-    'sniptale.design-reference.picker-catalog'
-  );
+  const { compact, setCompact, catalogMode, setCatalogMode, recentColors, rememberColor } =
+    usePickerPreferences();
   const format = useFormatMode();
   const eyedropper = useEyedropper(setDraft, () => undefined);
   return (
@@ -131,13 +114,13 @@ function ColorReference() {
         formatMode={format.formatMode}
         onCycleFormatMode={format.cycleFormatMode}
         palette={palette}
-        recentColors={recent}
+        recentColors={recentColors}
         title=""
         onColorChange={setDraft}
         onSelectTransparent={() => setDraft('#00000000')}
         onApply={() => {
           setAccepted(draft);
-          setRecent((items) => [draft, ...items.filter((item) => item !== draft)].slice(0, 10));
+          rememberColor(draft);
           setSession((value) => value + 1);
         }}
         onCancel={() => {
@@ -154,12 +137,9 @@ function PaintReference({ locale }: { locale: AppLocale }) {
   const [profile, setProfile] = useState<Profile>('combined');
   const [accepted, setAccepted] = useState(() => getShowcaseGradientPaint('system-ocean'));
   const [session, setSession] = useState(0);
-  const [recent, setRecent] = useState<string[]>([]);
   const resources = useReferenceTemplates(locale);
-  const [compact, setCompact] = useReferencePreference();
-  const [catalogMode, setCatalogMode] = useReferencePreference(
-    'sniptale.design-reference.picker-catalog'
-  );
+  const { compact, setCompact, catalogMode, setCatalogMode, recentColors, rememberColor } =
+    usePickerPreferences();
   const [name, setName] = useState('');
   return (
     <div className="sniptale-reference-paint">
@@ -201,13 +181,10 @@ function PaintReference({ locale }: { locale: AppLocale }) {
         name={name}
         onNameChange={setName}
         locale={locale}
-        recent={recent}
+        recent={recentColors}
         onApply={(paint) => {
           setAccepted(paint);
-          if (paint.kind === 'solid')
-            setRecent((items) =>
-              [paint.color, ...items.filter((item) => item !== paint.color)].slice(0, 10)
-            );
+          if (paint.kind === 'solid') rememberColor(paint.color);
           setSession((value) => value + 1);
         }}
         onCancel={() => setSession((value) => value + 1)}
@@ -316,14 +293,19 @@ function PaintReferenceSession(props: {
 /** Mount the product panels inside the canonical reference's existing theme surfaces. */
 export async function mountPickerReferences(
   host: HTMLElement,
-  options: { theme: 'light' | 'dark'; locale: AppLocale; kind: 'color' | 'paint' }
+  options: { theme: 'light' | 'dark'; locale: AppLocale } & (
+    | { kind: 'color' | 'paint' | 'lens' | 'segment-fit' | 'switch-status' }
+    | { kind: 'inspector'; controls: readonly HTMLElement[] }
+  )
 ) {
   await setLocalePreference(options.locale);
+  await prepareTranslations('design-system', options.locale);
   const frame = document.createElement('div');
   frame.className = 'sniptale-picker-reference';
   frame.dataset['theme'] = options.theme;
   frame.dataset['pickerReference'] = options.kind;
   const shell = document.createElement('div');
+  if (options.kind === 'inspector') shell.append(...options.controls);
   host.append(shell);
   const shadow = shell.attachShadow({ mode: 'open' });
   const stylesheet = document.createElement('link');
@@ -336,8 +318,20 @@ export async function mountPickerReferences(
   });
   shadow.append(frame);
   const root = createRoot(frame);
-  root.render(
-    options.kind === 'color' ? <ColorReference /> : <PaintReference locale={options.locale} />
-  );
+  if (options.kind === 'inspector') {
+    root.render(
+      <InspectorFields locale={options.locale === 'ru' ? 'ru' : 'en'} palette={palette} />
+    );
+  } else if (options.kind === 'lens') {
+    root.render(<LensChoices locale={options.locale === 'ru' ? 'ru' : 'en'} />);
+  } else if (options.kind === 'switch-status') {
+    root.render(<SwitchStatus locale={options.locale} />);
+  } else if (options.kind === 'segment-fit') {
+    root.render(<SegmentFitChoices locale={options.locale === 'ru' ? 'ru' : 'en'} />);
+  } else {
+    root.render(
+      options.kind === 'color' ? <ColorReference /> : <PaintReference locale={options.locale} />
+    );
+  }
   return () => root.unmount();
 }

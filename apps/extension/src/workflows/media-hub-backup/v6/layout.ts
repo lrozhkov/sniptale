@@ -9,12 +9,16 @@ export const MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT = 'library-folders-v2';
 export const MEDIA_HUB_BACKUP_SHARED_LAYOUT = 'library-folders-v3';
 const MEDIA_HUB_BACKUP_PROJECT_LAYOUT = 'library-folders-v4';
 export const MEDIA_HUB_BACKUP_CURSOR_LAYOUT = 'library-folders-v5';
+export const MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT = 'library-folders-v6';
+export const MEDIA_HUB_BACKUP_LINKED_LIBRARY_LAYOUT = 'library-folders-v7';
 export type MediaHubBackupLayout =
   | typeof MEDIA_HUB_BACKUP_LAYOUT
   | typeof MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT
   | typeof MEDIA_HUB_BACKUP_SHARED_LAYOUT
   | typeof MEDIA_HUB_BACKUP_PROJECT_LAYOUT
-  | typeof MEDIA_HUB_BACKUP_CURSOR_LAYOUT;
+  | typeof MEDIA_HUB_BACKUP_CURSOR_LAYOUT
+  | typeof MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT
+  | typeof MEDIA_HUB_BACKUP_LINKED_LIBRARY_LAYOUT;
 
 /** Admitted shared layouts use the same byte and alias resource profile. */
 export function isSharedBackupLayout(
@@ -22,11 +26,15 @@ export function isSharedBackupLayout(
 ): value is
   | typeof MEDIA_HUB_BACKUP_SHARED_LAYOUT
   | typeof MEDIA_HUB_BACKUP_PROJECT_LAYOUT
-  | typeof MEDIA_HUB_BACKUP_CURSOR_LAYOUT {
+  | typeof MEDIA_HUB_BACKUP_CURSOR_LAYOUT
+  | typeof MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT
+  | typeof MEDIA_HUB_BACKUP_LINKED_LIBRARY_LAYOUT {
   return (
     value === MEDIA_HUB_BACKUP_SHARED_LAYOUT ||
     value === MEDIA_HUB_BACKUP_PROJECT_LAYOUT ||
-    value === MEDIA_HUB_BACKUP_CURSOR_LAYOUT
+    value === MEDIA_HUB_BACKUP_CURSOR_LAYOUT ||
+    value === MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT ||
+    value === MEDIA_HUB_BACKUP_LINKED_LIBRARY_LAYOUT
   );
 }
 
@@ -45,6 +53,8 @@ export function assertReviewProjectLayout(value: unknown, layout: MediaHubBackup
   if (
     layout !== MEDIA_HUB_BACKUP_PROJECT_LAYOUT &&
     layout !== MEDIA_HUB_BACKUP_CURSOR_LAYOUT &&
+    layout !== MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT &&
+    layout !== MEDIA_HUB_BACKUP_LINKED_LIBRARY_LAYOUT &&
     hasReviewProjectMetadata(value)
   )
     throw new Error('Review project metadata requires library-folders-v4.');
@@ -63,8 +73,43 @@ export function hasCursorAttachmentMetadata(value: unknown): boolean {
 
 /** An older layout cannot silently discard root-owned capture history. */
 export function assertCursorAttachmentLayout(value: unknown, layout: MediaHubBackupLayout): void {
-  if (layout !== MEDIA_HUB_BACKUP_CURSOR_LAYOUT && hasCursorAttachmentMetadata(value))
+  if (
+    layout !== MEDIA_HUB_BACKUP_CURSOR_LAYOUT &&
+    layout !== MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT &&
+    layout !== MEDIA_HUB_BACKUP_LINKED_LIBRARY_LAYOUT &&
+    hasCursorAttachmentMetadata(value)
+  )
     throw new Error('Recording history attachments require library-folders-v5.');
+}
+
+/** Only the Image root workspace owns this capability marker. */
+export function hasImageHistoryMetadata(value: unknown): boolean {
+  return (
+    isRecord(value) && isRecord(value['workspace']) && Object.hasOwn(value['workspace'], 'history')
+  );
+}
+
+/** Older readers must refuse before they can silently discard the retained cursor and states. */
+export function assertImageHistoryLayout(value: unknown, layout: MediaHubBackupLayout): void {
+  if (
+    layout !== MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT &&
+    layout !== MEDIA_HUB_BACKUP_LINKED_LIBRARY_LAYOUT &&
+    hasImageHistoryMetadata(value)
+  )
+    throw new Error('Image history requires library-folders-v6.');
+}
+
+function hasLinkedLibraryMetadata(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    (Object.hasOwn(value, 'linkedSourceMediaId') || Object.hasOwn(value, 'savedIndependently'))
+  );
+}
+
+/** Older archive layouts cannot publish a linked project or an explicit original claim. */
+export function assertLinkedLibraryLayout(value: unknown, layout: MediaHubBackupLayout): void {
+  if (layout !== MEDIA_HUB_BACKUP_LINKED_LIBRARY_LAYOUT && hasLinkedLibraryMetadata(value))
+    throw new Error('Linked Library roots require library-folders-v7.');
 }
 
 /** Selects the required writer layout without downgrading an already selected newer contract. */
@@ -72,6 +117,10 @@ export function resolveMediaHubBackupMetadataLayout(
   layout: MediaHubBackupLayout,
   value: unknown
 ): MediaHubBackupLayout {
+  if (layout === MEDIA_HUB_BACKUP_LINKED_LIBRARY_LAYOUT || hasLinkedLibraryMetadata(value))
+    return MEDIA_HUB_BACKUP_LINKED_LIBRARY_LAYOUT;
+  if (layout === MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT || hasImageHistoryMetadata(value))
+    return MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT;
   if (layout === MEDIA_HUB_BACKUP_CURSOR_LAYOUT || hasCursorAttachmentMetadata(value))
     return MEDIA_HUB_BACKUP_CURSOR_LAYOUT;
   return hasReviewProjectMetadata(value) ? MEDIA_HUB_BACKUP_PROJECT_LAYOUT : layout;

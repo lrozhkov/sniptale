@@ -3,6 +3,11 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewTimeline } from './timeline';
+import { layoutReviewActionLanes } from '../../features/video/review/action-lanes';
+vi.mock('../../features/video/review/action-lanes', async (load) => {
+  const original = await load<typeof import('../../features/video/review/action-lanes')>();
+  return { ...original, layoutReviewActionLanes: vi.fn(original.layoutReviewActionLanes) };
+});
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
   translate: (key: string) => key,
@@ -129,4 +134,40 @@ it('highlights only the explicitly selected action, independently of playback', 
   expect(scrolled?.getAttribute('aria-pressed')).toBe('false');
   expect(scrolled?.className).not.toContain('accent');
   expect(scrolled?.className).not.toContain('ring-');
+});
+
+it('retains event geometry across playback samples with a freeze and updates it after edits', () => {
+  const marker = {
+    ref: { kind: 'action' as const, id: 'click' },
+    eventType: 'CLICK',
+    start: 2,
+    end: 2,
+  };
+  const freeze = {
+    id: 'hold',
+    kind: 'freeze' as const,
+    start: 1,
+    end: 1,
+    requestedStart: 1,
+    requestedEnd: 1,
+    frameTime: 0.98,
+    frameDuration: 0.04,
+    duration: 2,
+  };
+  const { props, host } = renderTimeline({ markers: [marker], edits: [freeze], playing: true });
+  const before = vi.mocked(layoutReviewActionLanes).mock.calls.length;
+  for (const time of [2.1, 2.2, 2.3])
+    act(() => environment.root!.render(<ReviewTimeline {...props} time={time} />));
+  expect(layoutReviewActionLanes).toHaveBeenCalledTimes(before);
+  const button = host.querySelector<HTMLButtonElement>(
+    '[title^="gallery.videoReview.eventClick"]'
+  )!;
+  const position = button.style.left;
+  act(() => button.click());
+  expect(props.onMarker).toHaveBeenCalledWith(marker);
+  act(() =>
+    environment.root!.render(<ReviewTimeline {...props} edits={[{ ...freeze, duration: 4 }]} />)
+  );
+  expect(vi.mocked(layoutReviewActionLanes).mock.calls.length).toBeGreaterThan(before);
+  expect(button.style.left).not.toBe(position);
 });

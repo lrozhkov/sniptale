@@ -143,6 +143,8 @@ it('requires confirmation before replacing a missing document with its original'
   expect(container?.querySelector('[data-ui="editor.page.recover-dialog"]')).toBeNull();
 
   await act(async () => recoveryButton?.click());
+  const replacementRecovery = vi.fn(async () => undefined);
+  await renderLayout(false, 'missing', replacementRecovery);
   await act(async () => {
     container
       ?.querySelector<HTMLButtonElement>(
@@ -151,6 +153,7 @@ it('requires confirmation before replacing a missing document with its original'
       ?.click();
   });
   expect(recover).toHaveBeenCalledTimes(1);
+  expect(replacementRecovery).not.toHaveBeenCalled();
 });
 
 it('shows a specific missing-original message without blocking the empty canvas intake', async () => {

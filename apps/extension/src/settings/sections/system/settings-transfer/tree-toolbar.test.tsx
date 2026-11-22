@@ -59,6 +59,10 @@ it('edits and clears the controlled query without replacing the search field', a
     )
   );
   const input = host.querySelector('input')!;
+  const clearLabel = translate('shared.ui.clearField').replace(
+    '{field}',
+    translate('settings.settingsTransfer.searchLabel')
+  );
   input.focus();
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'query');
@@ -66,13 +70,12 @@ it('edits and clears the controlled query without replacing the search field', a
   });
   expect(changed).toHaveBeenLastCalledWith('query');
   expect(document.activeElement).toBe(input);
-  await act(async () => button(translate('settings.settingsTransfer.clearSearch')).click());
+  await act(async () => button(clearLabel).click());
   expect(changed).toHaveBeenLastCalledWith('');
   expect(host.querySelector('input')).toBe(input);
   expect(input.value).toBe('');
-  expect(
-    host.querySelector('[aria-label="' + translate('settings.settingsTransfer.clearSearch') + '"]')
-  ).toBeNull();
+  expect(document.activeElement).toBe(input);
+  expect(host.querySelector('[aria-label="' + clearLabel + '"]')).toBeNull();
 });
 
 it.each([

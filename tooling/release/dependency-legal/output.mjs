@@ -39,7 +39,7 @@ function validateInterfaceFont(interfaceFont) {
   };
 }
 
-function formatInterfaceFontSection(interfaceFont, family = 'Golos UI') {
+function formatInterfaceFontSection(interfaceFont, family = 'Golos UI', provenance = '') {
   const artifactRows = interfaceFont.artifacts
     .map(
       (artifact) => `| \`${artifact.path}\` | \`${artifact.sourcePath}\` | \`${artifact.sha256}\` |`
@@ -51,7 +51,7 @@ function formatInterfaceFontSection(interfaceFont, family = 'Golos UI') {
 - Source package: \`${interfaceFont.sourcePackage}\`
 - Font version: \`${interfaceFont.version}\`
 - License: \`${interfaceFont.license}\`
-- Copyright: ${interfaceFont.copyright}
+- Copyright: ${interfaceFont.copyright}${provenance}
 - License text: [\`${releaseLegalArchivePath(interfaceFont.licensePath)}\`](` +
     `${releaseLegalArchivePath(interfaceFont.licensePath)})
 
@@ -183,11 +183,25 @@ function formatDependencySection(entry) {
 }
 
 /** Formats the deterministic notices document for the complete production dependency closure. */
-export function formatThirdPartyNotices({ entries, interfaceFont, documentFont, bundledAssets }) {
+export function formatThirdPartyNotices({
+  entries,
+  interfaceFont,
+  documentFont,
+  galleryFonts = [],
+  bundledAssets,
+}) {
   const normalizedInterfaceFont = validateInterfaceFont(interfaceFont);
   const documentSection = documentFont
     ? `\n\n${formatInterfaceFontSection(validateInterfaceFont(documentFont), 'Golos Text')}`
     : '';
+  const gallerySections = galleryFonts
+    .map((font) => {
+      const archive = requireText(font.sourceArchive, 'Gallery font source archive');
+      const digest = requireSha256(font.sourceArchiveSha256, 'Gallery font archive SHA-256');
+      const provenance = `\n- Source archive: ${archive}\n- Source archive SHA-256: \`${digest}\``;
+      return `\n\n${formatInterfaceFontSection(validateInterfaceFont(font), font.family, provenance)}`;
+    })
+    .join('');
   const assetSections = normalizeBundledAssetNotices(bundledAssets)
     .map(formatBundledAssetSection)
     .map((section) => `\n\n${section}`)
@@ -204,7 +218,7 @@ export function formatThirdPartyNotices({ entries, interfaceFont, documentFont, 
 
 This file is generated from the installed production dependency closure, package-lock, and reviewed pinned sources.
 
-${formatInterfaceFontSection(normalizedInterfaceFont)}${documentSection}${assetSections}
+${formatInterfaceFontSection(normalizedInterfaceFont)}${documentSection}${gallerySections}${assetSections}
 
 ## Production dependency licenses
 
@@ -316,6 +330,7 @@ export async function writeDependencyLegalClosure({
   manifestPath = 'THIRD_PARTY_DEPENDENCIES.json',
   interfaceFont,
   documentFont,
+  galleryFonts,
   bundledAssets,
   noticesPath = 'THIRD_PARTY_NOTICES.md',
   outputRoot,
@@ -325,6 +340,7 @@ export async function writeDependencyLegalClosure({
     entries: normalized.entries,
     interfaceFont,
     documentFont,
+    galleryFonts,
     bundledAssets,
   });
   await assertCanonicalLicenseFiles(outputRoot, normalized.canonicalEntries);

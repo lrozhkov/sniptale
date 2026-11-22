@@ -368,7 +368,21 @@ export async function handleOffscreenRuntimeMessage(
         message.discard ?? false
       );
     case VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS:
-      if (message.eventPacket)
+      if (message.eventPackets)
+        await appendRecordingEventObservations(
+          resolveRecordingSourceBinding(message),
+          message.eventPackets,
+          message.nativeDocumentId,
+          'final'
+        );
+      else if (message.cursorPackets)
+        await appendRecordingCursorObservations(
+          resolveRecordingSourceBinding(message),
+          message.cursorPackets,
+          message.nativeDocumentId,
+          'final'
+        );
+      else if (message.eventPacket)
         await appendRecordingEventObservations(
           resolveRecordingSourceBinding(message),
           message.eventPacket,

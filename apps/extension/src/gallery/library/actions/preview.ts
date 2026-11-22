@@ -1,9 +1,10 @@
+import { readGalleryImagePreview } from '../items/image-preview-source';
 import {
   runWithNativePublicationResources,
   ensureScenarioHtmlArtifactAvailable,
 } from '../../../workflows/sync-transfer/editing-admission';
 import { renameQuickEditProject } from '../../../workflows/media-hub/trash';
-import { canOpenGalleryProject } from '../items/types';
+import { canOpenGalleryProject, usesGalleryImagePresentation } from '../items/types';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { getMediaAssetBlob } from '../../../composition/persistence/media-library/index.library.ts';
 import type { MediaLibraryEntry } from '../../../composition/persistence/media-library/contracts';
@@ -32,11 +33,12 @@ import {
   type GalleryBusyAction,
 } from './shared';
 import { updateMediaLibraryEntrySafely } from '../../../workflows/media-hub/store';
-import { getAggregatePreviewBlob } from '../../../composition/persistence/aggregate-presentations';
 import {
   copyImageAggregate,
   restoreImageAggregateOriginal,
+  StaleImageWorkspaceError,
 } from '../../../composition/persistence/image-aggregates';
+import { readImageOriginalSource } from '../../../composition/persistence/image-workspaces';
 import { createSecureRandomUuid } from '@sniptale/platform/security/secure-random-id';
 import { translate } from '../../../platform/i18n';
 import { openGalleryConfirmDialog } from './shared';
@@ -66,6 +68,11 @@ export function getPreviewMetadataValues(
 
 export function openInEditor(item: GalleryItem) {
   if (isGalleryRemoteItem(item)) return;
+  if (item.type === 'image-project') {
+    if (canOpenGalleryProject(item))
+      void browserTabs.create({ url: buildEditorUrl({ assetId: item.entityId }) });
+    return;
+  }
   if (item.type === 'quick-edit-project') {
     if (canOpenGalleryProject(item))
       void openGalleryPage({ mediaId: item.entityId, quickEdit: true });
@@ -135,10 +142,9 @@ async function withPreviewItemBlob(
       return;
     }
     const assetId = previewItem.entityId ?? previewItem.id;
-    const blob =
-      previewItem.source.kind === 'screenshot'
-        ? await getAggregatePreviewBlob({ id: assetId, kind: 'image' })
-        : await getMediaAssetBlob(assetId);
+    const blob = usesGalleryImagePresentation(previewItem)
+      ? await readGalleryImagePreview(previewItem)
+      : await getMediaAssetBlob(assetId);
     if (!blob) {
       throw createMissingBlobError(previewItem.filename);
     }
@@ -166,12 +172,7 @@ export function downloadPreviewItem(
 
 function getPreviewImageAggregate(controller: GalleryPreviewController) {
   const item = controller.state.preview.session.item;
-  return item &&
-    isGalleryMediaItem(item) &&
-    isImageKind(item.kind) &&
-    item.source.kind === 'screenshot'
-    ? item
-    : null;
+  return item && isGalleryMediaItem(item) && usesGalleryImagePresentation(item) ? item : null;
 }
 
 function getEditedPreviewImageAggregate(controller: GalleryPreviewController) {
@@ -199,35 +200,44 @@ export function createRestoreOriginalAction(
   controller: GalleryPreviewController,
   withBusy: GalleryBusyAction
 ) {
-  return () => {
+  return async () => {
     const item = getEditedPreviewImageAggregate(controller);
     if (!item) return;
-    openGalleryConfirmDialog(controller, {
-      title: translate('gallery.preview.restoreOriginalTitle'),
-      message: translate('gallery.preview.restoreOriginalMessage'),
-      confirmText: translate('gallery.preview.restoreOriginalConfirm'),
-      onConfirm: async () => {
-        await withBusy(async () => {
-          const result = await restoreImageAggregateOriginal(
-            item.entityId ?? item.id,
-            item.workspaceRevision ?? 0
-          );
-          controller.actions.preview.setPreview((current) => ({
-            ...current,
-            item: current.item
-              ? {
-                  ...current.item,
-                  imageContentState: 'original',
-                  presentationRevision: result.revision,
-                  updatedAt: result.updatedAt,
-                  workspaceRevision: result.revision,
-                }
-              : null,
-            url: null,
-          }));
-          await controller.actions.storage.refresh();
-        });
-      },
+    await withBusy(async () => {
+      const aggregateId = item.entityId ?? item.id;
+      const expectedRevision = item.workspaceRevision ?? 0;
+      const observed = await readImageOriginalSource(aggregateId, { includeBlob: false });
+      if (!observed.asset || (observed.asset.workspaceRevision ?? 0) !== expectedRevision)
+        throw new StaleImageWorkspaceError(aggregateId);
+      const expectedGeneration = observed.sourceGeneration;
+      openGalleryConfirmDialog(controller, {
+        title: translate('gallery.preview.restoreOriginalTitle'),
+        message: translate('gallery.preview.restoreOriginalMessage'),
+        confirmText: translate('gallery.preview.restoreOriginalConfirm'),
+        onConfirm: async () => {
+          await withBusy(async () => {
+            const result = await restoreImageAggregateOriginal(
+              aggregateId,
+              expectedRevision,
+              expectedGeneration
+            );
+            controller.actions.preview.setPreview((current) => ({
+              ...current,
+              item: current.item
+                ? {
+                    ...current.item,
+                    imageContentState: 'original',
+                    presentationRevision: result.revision,
+                    updatedAt: result.updatedAt,
+                    workspaceRevision: result.revision,
+                  }
+                : null,
+              url: null,
+            }));
+            await controller.actions.storage.refresh();
+          });
+        },
+      });
     });
   };
 }

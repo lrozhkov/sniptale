@@ -53,6 +53,9 @@ export const FOLDER_LABELS: Record<FolderFilter, string> = {
   get 'video-project'() {
     return translate('gallery.preview.folderVideoProject');
   },
+  get 'image-project'() {
+    return translate('gallery.preview.folderImageProject');
+  },
 };
 
 export function getGalleryFolderIcon(folder: FolderFilter) {
@@ -72,16 +75,21 @@ export function getGalleryFolderIcon(folder: FolderFilter) {
     return Archive;
   }
 
+  if (folder === 'image-project') {
+    return ImageIcon;
+  }
+
   return getKindIcon(folder);
 }
 
 /** Resolves the item's category independently of the currently selected library filter. */
-export function getGalleryItemFolder(kind: GalleryItemKind): FolderFilter {
+export function getGalleryItemFolder(item: Pick<GalleryItem, 'kind' | 'type'>): FolderFilter {
+  if (item.type === 'image-project') return 'image-project';
   return (
     SIDEBAR_FOLDERS.find((folder) => {
-      if (folder === 'all') return false;
-      if (folder === 'scenario') return kind === 'scenario';
-      return FOLDER_FILTER_KIND_MAP[folder].includes(kind);
+      if (folder === 'all' || folder === 'image-project') return false;
+      if (folder === 'scenario') return item.kind === 'scenario';
+      return FOLDER_FILTER_KIND_MAP[folder].includes(item.kind);
     }) ?? 'all'
   );
 }

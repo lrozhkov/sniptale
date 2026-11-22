@@ -96,6 +96,7 @@ import type { SyncNativeEditingRoot } from '../../contracts/messaging/contracts/
 import { createSyncDownloadAllowance } from './native-residency';
 import { syncCatalogRootKey } from './catalog-graph';
 import {
+  IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   SCENARIO_PROJECTS_STORE,
   VIDEO_WORKSPACES_STORE,
@@ -313,6 +314,7 @@ it('does not claim a full retained set while a native root has an unreceived ser
 });
 
 it.each([
+  [IMAGE_WORKSPACES_STORE, 'saved-image-project'],
   [MEDIA_LIBRARY_STORE, 'trash-or-saved-media'],
   [VIDEO_PROJECTS_STORE, 'saved-project'],
   [VIDEO_WORKSPACES_STORE, 'archived-review'],
@@ -324,9 +326,10 @@ it.each([
     io.stores.clear();
     io.stores.set(store, new Set([id]));
     expect(await readRetainedNativePresence()).toBe(true);
-    expect(io.count).toHaveBeenCalledTimes(5);
+    expect(io.count).toHaveBeenCalledTimes(6);
     expect(io.transaction).toHaveBeenCalledExactlyOnceWith(
       [
+        IMAGE_WORKSPACES_STORE,
         MEDIA_LIBRARY_STORE,
         VIDEO_PROJECTS_STORE,
         VIDEO_WORKSPACES_STORE,
@@ -344,7 +347,7 @@ it.each([
 it('reports empty only when every retained root store count is valid and zero', async () => {
   io.stores.clear();
   expect(await readRetainedNativePresence()).toBe(false);
-  expect(io.count).toHaveBeenCalledTimes(5);
+  expect(io.count).toHaveBeenCalledTimes(6);
   expect(io.get).not.toHaveBeenCalled();
   expect(io.keys).not.toHaveBeenCalled();
 });
@@ -482,7 +485,7 @@ it('cancels only its own Library job and drains executor settlement before rejec
 function runtimeCatalog(
   entries: {
     id: string;
-    kind?: SyncNativeEditingRoot['rootKind'];
+    kind?: Exclude<SyncNativeEditingRoot['rootKind'], 'image-project'>;
     draft?: boolean;
     web?: boolean;
     trash?: boolean;

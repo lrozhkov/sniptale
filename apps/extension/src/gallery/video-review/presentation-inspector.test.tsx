@@ -1,4 +1,9 @@
 // @vitest-environment jsdom
+import { translate } from '../../platform/i18n';
+import en from '../../platform/i18n/catalogs/en.json';
+import ru from '../../platform/i18n/catalogs/ru.json';
+import { prepareTranslations } from '../../platform/i18n/locale/state';
+import type { AppLocale } from '@sniptale/platform/i18n/config';
 import { useGlTransitionCatalog } from '../../composition/gl-transition-presets/catalog';
 import {
   createGlCatalogFixture,
@@ -7,7 +12,33 @@ import {
 import { createGlTransitionSelection } from '../../features/video/project/transition/gl-catalog';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, beforeEach, expect, it, vi } from 'vitest';
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (language: AppLocale) => Promise.resolve(catalogFixtureMessages(language)),
+}));
+
+beforeAll(async () => {
+  await prepareTranslations('gallery', 'ru');
+});
+
+function catalogFixtureMessages(language: AppLocale): Record<string, string> {
+  const messages: Record<string, string> = {};
+  function visit(value: unknown, prefix: string) {
+    if (typeof value === 'string') {
+      messages[prefix] = value;
+      return;
+    }
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+      throw new Error('Invalid authored catalog fixture');
+    }
+    for (const [key, child] of Object.entries(value)) {
+      visit(child, prefix ? `${prefix}.${key}` : key);
+    }
+  }
+  visit({ en, ru }[language], '');
+  return messages;
+}
+
 import {
   ReviewPresentationInspector,
   type ReviewPresentationInspectorProps,
@@ -296,35 +327,44 @@ it.each([
   }
 );
 
-it('uses an independent 0.1–10 slider and previews before one keyboard commit', async () => {
+function startNumberStep(label: string) {
+  const stepper = host.querySelector<HTMLButtonElement>(`button[aria-label="${label} increase"]`)!;
+  act(() => stepper.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+}
+
+function endNumberStep() {
+  act(() => window.dispatchEvent(new MouseEvent('pointerup')));
+}
+
+function cancelNumberStep() {
+  act(() =>
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))
+  );
+  endNumberStep();
+}
+
+it('uses exact duration and previews a side step before one commit', async () => {
   retained();
   await render();
-  const range = field('Duration range');
-  expect(range.min).toBe('0.1');
-  expect(range.max).toBe('10');
-  act(() =>
-    range.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-  );
+  expect(field('Duration')?.closest('[data-stepper-placement="sides"]')).not.toBeNull();
+  expect(field('Duration range')).toBeNull();
+  startNumberStep('Duration');
   expect(props.onPreview).toHaveBeenLastCalledWith(
     expect.objectContaining({
       intro: expect.objectContaining({ image: expect.objectContaining({ duration: 3.1 }) }),
     })
   );
   expect(props.onChange).not.toHaveBeenCalled();
-  act(() => range.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true })));
+  endNumberStep();
   expect(props.onChange).toHaveBeenCalledOnce();
   expect(props.onPreview).toHaveBeenLastCalledWith(null);
 });
-it('cancels an active range preview before its key-up commit', async () => {
+it('cancels a held duration step before releasing it', async () => {
   retained();
   await render();
-  const range = field('Duration range');
-  act(() =>
-    range.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-  );
+  startNumberStep('Duration');
   expect(props.onPreview).toHaveBeenCalled();
-  act(() => range.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-  act(() => range.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true })));
+  cancelNumberStep();
   expect(props.onChange).not.toHaveBeenCalled();
   expect(props.onPreview).toHaveBeenLastCalledWith(null);
 });
@@ -332,11 +372,10 @@ it('rejects collapsed trim previews and cancels the validation feedback', async 
   retained('video');
   props.settings.intro.video!.trim = { start: 0, end: 0.001 };
   await render();
-  const range = field('Trim start range');
-  act(() => range.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true })));
+  startNumberStep('Trim start');
   expect(props.onPreview).toHaveBeenLastCalledWith(null);
   expect(host.textContent).toContain('Trim end must be after trim start.');
-  act(() => range.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  cancelNumberStep();
   expect(host.querySelector('[role="alert"]')).toBeNull();
   expect(props.onChange).not.toHaveBeenCalled();
 });
@@ -394,18 +433,15 @@ it('persists duration after the parent echoes each preview and survives inspecto
     );
   }
   await act(async () => root.render(<Controlled />));
-  const range = field('Duration range');
-  act(() =>
-    range.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-  );
-  expect(range.value).toBe('3.1');
+  startNumberStep('Duration');
+  expect(field('Duration').value).toBe('3.1');
   expect(props.settings.intro.image!.duration).toBe(3);
-  act(() => range.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true })));
+  endNumberStep();
   expect(props.onChange).toHaveBeenCalledOnce();
   expect(props.settings.intro.image!.duration).toBe(3.1);
   await act(async () => root.render(null));
   await render();
-  expect(field('Duration range').value).toBe('3.1');
+  expect(field('Duration').value).toBe('3.1');
 });
 
 it('configures and removes a join independently of the opposite edge and media', async () => {
@@ -458,29 +494,7 @@ it('configures and removes a join independently of the opposite edge and media',
   expect(last.intro).toEqual(props.settings.intro);
 });
 
-async function importPresetFile(
-  parent: ParentNode,
-  selection: ReturnType<typeof createGlTransitionSelection>,
-  name = 'Imported'
-) {
-  if (!selection) throw new Error('Missing preset selection');
-  const source = JSON.stringify({
-    format: 'sniptale-gl-preset',
-    version: 1,
-    name,
-    transition: selection,
-  });
-  const file = new File([source], 'imported.sniptale-gl-preset.json');
-  Object.defineProperty(file, 'arrayBuffer', {
-    value: async () => new TextEncoder().encode(source).buffer,
-  });
-  const input = parent.querySelector<HTMLInputElement>('input[type=file]');
-  if (!input) throw new Error('Missing preset file input');
-  Object.defineProperty(input, 'files', { value: [file], configurable: true });
-  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
-}
-
-it('imports a GL preset only into the selected presentation side and retains timing/easing', async () => {
+it('changes the selected presentation GL transition without preset file actions', async () => {
   retained();
   const initial = {
     type: 'gl' as const,
@@ -490,13 +504,27 @@ it('imports a GL preset only into the selected presentation side and retains tim
     after: 0.7,
   };
   props.settings.introTransition = initial;
+  props.settings.outroTransition = { type: 'dissolve', before: 0.1, after: 0.2 };
   const before = structuredClone(props.settings);
   await render();
-  expect(host.querySelector('[data-gl-preset-owner]')?.getAttribute('data-gl-preset-owner')).toBe(
-    'presentation:intro'
+  expect(host.querySelector('[data-ui="composition.gl-preset-actions"]')).toBeNull();
+  expect(host.querySelector('[data-gl-preset-owner]')).toBeNull();
+  expect(host.querySelector('input[type="file"]')).toBeNull();
+  expect(button('Import preset')).toBeUndefined();
+  expect(button('Download preset')).toBeUndefined();
+  const trigger = section().querySelector<HTMLButtonElement>(
+    'button[aria-label="Transition to video"]'
+  )!;
+  await act(async () => {
+    trigger.click();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  });
+  const option = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+    (node) => node.textContent === translate('videoEditor.glTransitions.names.CrossZoom')
   );
+  expect(option).toBeDefined();
+  await act(async () => option!.click());
   const selection = createGlTransitionSelection('CrossZoom')!;
-  await importPresetFile(host, selection);
   expect(props.onChange).toHaveBeenCalledExactlyOnceWith({
     ...before,
     introTransition: { ...initial, selection },

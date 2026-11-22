@@ -320,8 +320,70 @@ it.each<MediaLibraryEntry['source']>([
   expect(dbMocks.deleteCascadeMock).toHaveBeenCalledWith('linked', usage, expect.any(Object));
 });
 
+it('collects an unclaimed project original and retains a manual save or another project', async () => {
+  const original = createMediaEntry({
+    id: 'original',
+    kind: 'image',
+    source: { kind: 'screenshot' },
+  });
+  const retained = { ...original, savedIndependently: false };
+  dbMocks.getMock
+    .mockResolvedValueOnce({ ...retained, savedIndependently: true })
+    .mockResolvedValue(retained);
+  dbMocks.listMediaAssetProjectUsageMock.mockResolvedValueOnce([
+    { id: 'remaining-project', kind: 'image', name: 'Remaining project', primary: true },
+  ]);
+
+  await deleteMediaLibraryAsset(original.id, { projectRetainedOnly: true });
+  await deleteMediaLibraryAsset(original.id, { projectRetainedOnly: true });
+  expect(dbMocks.deleteCascadeMock).not.toHaveBeenCalled();
+
+  await deleteMediaLibraryAsset(original.id, { projectRetainedOnly: true });
+  expect(dbMocks.deleteCascadeMock).toHaveBeenCalledExactlyOnceWith(
+    original.id,
+    [],
+    expect.any(Object),
+    true
+  );
+});
+
+it('retains the last project original until its first publication journal clears', async () => {
+  const original = {
+    ...createMediaEntry({ id: 'local-original', kind: 'image', source: { kind: 'screenshot' } }),
+    savedIndependently: false,
+  };
+  const journal = {
+    domain: 'image-workspace',
+    payload: { aggregateId: 'local-project', newOriginal: { mediaId: original.id } },
+  };
+  dbMocks.getMock.mockResolvedValue(original);
+  dbMocks.readClaimsMock.mockResolvedValueOnce({
+    valid: true,
+    pending: false,
+    journals: [journal],
+  });
+  const options = { projectRetainedOnly: true };
+
+  await expect(deleteMediaLibraryAsset(original.id, options)).rejects.toMatchObject({
+    cause: expect.objectContaining({ reason: 'pending-publication' }),
+  });
+  expect(dbMocks.deleteCascadeMock).not.toHaveBeenCalled();
+  dbMocks.readClaimsMock.mockResolvedValueOnce({ valid: true, pending: false, journals: [] });
+  await deleteMediaLibraryAsset(original.id, options);
+  expect(dbMocks.deleteCascadeMock).toHaveBeenCalledExactlyOnceWith(
+    original.id,
+    [],
+    expect.any(Object),
+    true
+  );
+});
+
 it.each([
   { domain: 'image-workspace', payload: { aggregateId: 'missing' } },
+  {
+    domain: 'image-workspace',
+    payload: { aggregateId: 'local-project', newOriginal: { mediaId: 'missing' } },
+  },
   { domain: 'sync-replica', payload: { kind: 'image', input: { media: { id: 'missing' } } } },
 ])('checks selected pending $domain claims when the Library root is missing', async (journal) => {
   dbMocks.getMock.mockResolvedValueOnce(undefined);

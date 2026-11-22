@@ -104,6 +104,39 @@ async function click(name: string) {
   });
 }
 describe('vector styling toolbar', () => {
+  it('cancels the vector edit when a held numeric preview is undone', async () => {
+    await renderToolbar();
+    const field = host.querySelector<HTMLInputElement>(
+      'input[aria-label="editor.elements.opacity"]'
+    )!;
+    await act(async () => field.focus());
+    await act(async () =>
+      button('editor.elements.opacity decrease').dispatchEvent(
+        new MouseEvent('pointerdown', { bubbles: true })
+      )
+    );
+    expect(mocks.edit.preview).toHaveBeenCalledWith({ opacity: 0.99 });
+    await act(async () =>
+      field.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'z',
+          ctrlKey: true,
+          bubbles: true,
+          cancelable: true,
+        })
+      )
+    );
+    expect(mocks.edit.cancel).toHaveBeenCalled();
+    act(() => window.dispatchEvent(new MouseEvent('pointerup')));
+    expect(mocks.edit.commit).not.toHaveBeenCalled();
+    await act(async () =>
+      button('editor.elements.opacity decrease').dispatchEvent(
+        new MouseEvent('pointerdown', { bubbles: true })
+      )
+    );
+    await act(async () => window.dispatchEvent(new MouseEvent('pointerup')));
+    expect(mocks.edit.commit).toHaveBeenCalledOnce();
+  });
   it.each(['cancel', 'unmount', 'selection'])(
     'refuses a delayed preview after %s',
     async (reason) => {

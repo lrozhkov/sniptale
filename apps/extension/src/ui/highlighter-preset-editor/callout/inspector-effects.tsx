@@ -172,6 +172,7 @@ function LineConnectorSettings(props: ManualContentProps) {
         <>
           <NumericProperty
             label={translate('content.callout.curvatureLabel')}
+            scale
             max={1}
             min={0}
             step={0.05}

@@ -1,4 +1,13 @@
-import { expect, it, vi } from 'vitest';
+import {
+  loadFeatureCatalogFixture,
+  prepareFeatureTranslations,
+} from '../../../catalog-fixture.test-support';
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadFeatureCatalogFixture>[0]) =>
+    loadFeatureCatalogFixture(locale),
+}));
+
+import { expect, it, vi, beforeEach } from 'vitest';
 import { APPLE_GLASS_ANNOTATION_PACK } from '../annotation-engine';
 import {
   createAnnotationClip,
@@ -119,4 +128,8 @@ it('creates annotation overlays from declarative template inputs', () => {
       templateId: 'crawling-arrow-card',
     },
   });
+});
+
+beforeEach(async () => {
+  await prepareFeatureTranslations('video-editor', 'ru');
 });

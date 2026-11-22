@@ -15,6 +15,62 @@ it('keeps committed focused coverage owner maps valid', async () => {
   expect(module.collectFocusedCoverageOwnerMappingViolations()).toEqual([]);
 });
 
+it('selects Scenario archive publication and native identity proof despite a generic exclusive mapping', async () => {
+  const module = await importOwnerMap();
+  const tests = module.resolveMappedCoverageOwnerTests(
+    'apps/extension/src/workflows/media-hub-backup/v6/root-publication/scenario-project-publication.ts'
+  );
+  expect(tests).toEqual(
+    expect.arrayContaining([
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/scenario-project.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/scenario-project.security.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/scenario-project.frozen-roundtrip.test.ts',
+      'apps/extension/src/composition/persistence/scenario/backup-restore.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.identity.test.ts',
+    ])
+  );
+});
+
+it.each([
+  ['scenario/resource-references.ts', 'scenario/aggregate-mutations.identity.test.ts'],
+  ['scenario/resource-references.ts', 'assets/editing-resources.test.ts'],
+  ['scenario/projects/entry.ts', 'scenario/editing-history.test.ts'],
+  ['scenario/projects/entry.ts', 'scenario/aggregate-mutations.test.ts'],
+  ['scenario/projects/entry.ts', 'scenario/aggregate-mutations.identity.test.ts'],
+  ['scenario/projects/entry.ts', 'scenario/projects/project.capture-format.test.ts'],
+  ['assets/ready-media-claims.ts', 'media-library/delete-cascade.pending-publication.test.ts'],
+  ['sync-capture/project-snapshot.ts', 'sync-capture/capture.integration.test.ts'],
+  [
+    'infrastructure/indexed-db/database-migrations.ts',
+    'infrastructure/indexed-db/upgrade/branch-integration.test.ts',
+  ],
+  ['projects/mutation-stores.ts', 'sync-capture/checkpoint-schedule.test.ts'],
+  ['sync-capture/test-support/apply-video-project.ts', 'sync-capture/capture.integration.test.ts'],
+  ['sync-capture/test-support/freeze.ts', 'sync-capture/freeze.test.ts'],
+  ['sync-capture/apply-video-project.ts', 'sync-capture/apply-video-project.binary.test.ts'],
+  ['sync-capture/apply-video-project.ts', 'sync-capture/apply-video-project.scenario.test.ts'],
+])('selects the native consumer for %s', async (production, consumer) => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src/composition/persistence';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/${production}`)).toContain(
+    `${root}/${consumer}`
+  );
+});
+
+it('selects native history and actual archive publication for project replacement', async () => {
+  const module = await importOwnerMap();
+  expect(
+    module.resolveMappedCoverageOwnerTests(
+      'apps/extension/src/composition/persistence/projects/backup-restore.ts'
+    )
+  ).toEqual(
+    expect.arrayContaining([
+      'apps/extension/src/composition/persistence/projects/history-publication.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.test.ts',
+    ])
+  );
+});
+
 it.each(['action-kernel/owned-route-handlers.ts', 'authorization/owned.ts'])(
   'selects registered editor catalog and Simplify proof for %s',
   async (owner) => {
@@ -610,8 +666,11 @@ it.each(['en', 'ru'])('selects exact product proof for the %s catalog data', asy
   const files = module.resolveMappedCoverageOwnerTests(
     `apps/extension/src/platform/i18n/catalogs/${locale}.json`
   );
-  expect(files).toHaveLength(12);
+  expect(files).toHaveLength(14);
   expect(files).toContain('apps/extension/src/platform/i18n/catalog-reader.test.ts');
+  expect(files).toContain('apps/extension/src/platform/i18n/catalog-store.test.ts');
+  expect(files).toContain('apps/extension/src/platform/i18n/catalog-transport.test.ts');
+  expect(files).toContain('apps/extension/src/platform/i18n/locale/state.test.ts');
   expect(files).toContain('apps/extension/src/content/runtime/shim/launcher.test.ts');
   expect(files.every((file) => file.startsWith('apps/extension/src/'))).toBe(true);
   expect(
@@ -716,6 +775,100 @@ it('retains raster and vector resource publication proof for the document codec 
       `${root}/image-aggregates/mutations.reused-assets.test.ts`,
       `${root}/image-aggregates/mutations.root-lifecycle.test.ts`,
       `${root}/image-aggregates/mutations.vector-assets.test.ts`,
+    ])
+  );
+});
+
+it('selects native lifetime and delayed acknowledgement proof for Image source restore', async () => {
+  const module = await importOwnerMap();
+  expect(
+    module.resolveMappedCoverageOwnerTests(
+      'apps/extension/src/editor/document/page-session/index.ts'
+    )
+  ).toEqual(
+    expect.arrayContaining([
+      'apps/extension/src/editor/document/page-session/index.test.ts',
+      'apps/extension/src/editor/shell/page/runtime.bootstrap.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.history.integration.test.ts',
+      'apps/extension/src/editor/document/session-autosave/durable-history.test.ts',
+    ])
+  );
+});
+
+it('selects local acceptance, publication recovery and native purge proof for the review session', async () => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src/workflows/video-review';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/session.ts`)).toEqual(
+    expect.arrayContaining([
+      `${root}/session-buffer-autosave.test.ts`,
+      `${root}/session.project-purge.test.ts`,
+      `${root}/session.autosave.test.ts`,
+      `${root}/session.checkpoint-publication.test.ts`,
+      `${root}/session.checkpoint-receipt.test.ts`,
+    ])
+  );
+});
+
+it('selects immutable native snapshot acknowledgement proof for the review writer', async () => {
+  const module = await importOwnerMap();
+  expect(
+    module.resolveMappedCoverageOwnerTests(
+      'apps/extension/src/composition/persistence/review-workspaces/store.ts'
+    )
+  ).toContain(
+    'apps/extension/src/composition/persistence/review-workspaces/store-history-retention.test.ts'
+  );
+});
+
+it.each([
+  {
+    owner: 'native checkpoint',
+    production: 'apps/extension/src/composition/persistence/scenario/editing-history.ts',
+    expected: [
+      'apps/extension/src/composition/persistence/scenario/aggregate-checkpoint-write.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.identity.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.test.ts',
+    ],
+  },
+  {
+    owner: 'native unit storage',
+    production: 'apps/extension/src/composition/persistence/scenario/storage-units.ts',
+    expected: [
+      'apps/extension/src/composition/persistence/scenario/aggregate-checkpoint-write.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.identity.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.test.ts',
+      'apps/extension/src/composition/persistence/scenario/storage.test.ts',
+    ],
+  },
+  {
+    owner: 'page snapshot',
+    production: 'apps/extension/src/scenario-editor/page-shell/runtime/use-state.ts',
+    expected: [
+      'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.autosave.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.image-framing.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/reader.test.tsx',
+    ],
+  },
+])(
+  'selects Scenario $owner consumers for runtime checkpoint activation',
+  async ({ production, expected }) => {
+    const module = await importOwnerMap();
+    expect(module.resolveMappedCoverageOwnerTests(production)).toEqual(
+      expect.arrayContaining(expected)
+    );
+  }
+);
+
+it('selects all four native publishers when the common editor history budget changes', async () => {
+  const module = await importOwnerMap();
+  expect(
+    module.resolveMappedCoverageOwnerTests('apps/extension/src/features/editor-history/policy.ts')
+  ).toEqual(
+    expect.arrayContaining([
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.history.integration.test.ts',
+      'apps/extension/src/composition/persistence/projects/history-publication.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.identity.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store.test.ts',
     ])
   );
 });

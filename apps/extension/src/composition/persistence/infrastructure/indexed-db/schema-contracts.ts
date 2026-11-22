@@ -15,7 +15,9 @@ import {
   EDITOR_VECTOR_LIBRARY_STORE,
   FRAME_ANNOTATION_RASTER_JOBS_STORE,
   IMAGE_WORKSPACES_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_REVIEW_IDENTITIES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   MEDIA_LIBRARY_STORE,
@@ -33,6 +35,7 @@ import {
   SCENARIO_ASSETS_STORE,
   SCENARIO_EXPORTS_STORE,
   SCENARIO_PENDING_ASSETS_STORE,
+  SCENARIO_PROJECT_REVISIONS_STORE,
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
   SCENARIO_PROJECT_UNITS_STORE,
@@ -114,12 +117,14 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 39,
+    schemaVersion: 46,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
       { storeName: IMAGE_WORKSPACES_STORE, dataClass: 'durable-authority' },
+      { storeName: IMAGE_WORKSPACE_IDENTITIES_STORE, dataClass: 'durable-authority' },
       { storeName: VIDEO_WORKSPACES_STORE, dataClass: 'durable-authority' },
+      { storeName: VIDEO_REVIEW_IDENTITIES_STORE, dataClass: 'durable-authority' },
       { storeName: VIDEO_WORKSPACE_HISTORY_STORE, dataClass: 'durable-authority' },
       { storeName: VIDEO_WORKSPACE_DRAFTS_STORE, dataClass: 'durable-authority' },
       { storeName: AGGREGATE_PRESENTATIONS_STORE, dataClass: 'derived-rebuildable' },
@@ -127,7 +132,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'assetGraph',
-    schemaVersion: 6,
+    schemaVersion: 7,
     stores: [
       { storeName: ASSET_REFS_STORE, dataClass: 'durable-authority' },
       { storeName: ASSET_RESIDENCY_STORE, dataClass: 'durable-authority' },
@@ -137,7 +142,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'videoProjects',
-    schemaVersion: 13,
+    schemaVersion: 16,
     stores: [
       { storeName: VIDEO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: VIDEO_PROJECT_REVISIONS_STORE, dataClass: 'durable-authority' },
@@ -148,8 +153,9 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'scenarioProjects',
-    schemaVersion: 12,
+    schemaVersion: 15,
     stores: [
+      { storeName: SCENARIO_PROJECT_REVISIONS_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_PROJECT_HISTORY_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_PROJECT_UNITS_STORE, dataClass: 'durable-authority' },

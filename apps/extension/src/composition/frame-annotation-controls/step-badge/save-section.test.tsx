@@ -1,4 +1,12 @@
 // @vitest-environment jsdom
+import {
+  loadCompositionCatalogFixture,
+  prepareCompositionTranslations,
+} from '../../catalog-fixture.test-support';
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadCompositionCatalogFixture>[0]) =>
+    loadCompositionCatalogFixture(locale),
+}));
 
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -81,4 +89,8 @@ it('reports successful create and overwrite operations and keeps rejected operat
   expect(onCreated).toHaveBeenCalledTimes(1);
   await act(async () => overwrite.click());
   expect(onCreated).toHaveBeenLastCalledWith(preset.id);
+});
+
+beforeEach(async () => {
+  await prepareCompositionTranslations('content', 'ru');
 });

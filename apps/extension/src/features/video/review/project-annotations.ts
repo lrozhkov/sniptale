@@ -47,12 +47,30 @@ export function planReviewProjectAnnotations(args: {
     const sourceSegment = args.segments.find(
       (segment) => annotation.start >= segment.sourceStart && annotation.start < segment.sourceEnd
     );
-    const startTime =
+    const defaultStart =
       projection.slices[0]?.start ??
       sourceSegment?.resultStart ??
       args.segments.at(-1)?.resultEnd ??
       0;
-    const duration = dormant ? annotation.end - annotation.start : projection.duration;
+    const documentDuration = animationRuntimeDuration(document);
+    const placements = annotation.visualAnchor
+      ? projection.slices.map((slice) => ({
+          startTime: slice.start,
+          duration: slice.end - slice.start,
+          playbackRate: (documentDuration * (slice.rate ?? 1)) / projection.duration,
+          sourceStart: (documentDuration * slice.offset) / projection.duration,
+        }))
+      : [
+          {
+            startTime: defaultStart,
+            duration: dormant ? annotation.end - annotation.start : projection.duration,
+            playbackRate:
+              documentDuration /
+              (dormant ? annotation.end - annotation.start : projection.duration),
+            sourceStart: 0,
+          },
+        ];
+    if (!placements.length) continue;
     const plane = annotation.attachment === 'content' ? args.source : args.scene;
     const trackId = `${args.operationId}:annotation:${index}`;
     const name = document.label.en ?? document.id;
@@ -66,71 +84,75 @@ export function planReviewProjectAnnotations(args: {
     });
     if (!result.snapshots.some((entry) => entry.id === snapshot.id))
       result.snapshots.push(structuredClone(snapshot));
-    const id = `${trackId}:0`;
-    result.instances.push({
-      id,
-      kind: 'standalone',
-      target: { kind: 'scene' },
-      snapshotId: snapshot.id,
-      controls: structuredClone(annotation.controls),
-      enabled: annotation.enabled,
-      startTime,
-      duration,
-      playbackRate: animationRuntimeDuration(document) / duration,
-      sourceStart: 0,
-      ...(annotation.anchors
-        ? {
-            sceneAnchors: Object.fromEntries(
-              Object.entries(annotation.anchors).map(([key, point]) => [
-                key,
-                { x: point.x * plane.width, y: point.y * plane.height },
-              ])
-            ),
-          }
-        : {}),
-    });
-    result.clips.push({
-      id: `${id}:host`,
-      effectInstanceId: id,
-      trackId,
-      name,
-      type: 'EFFECT',
-      sourceRange: {
-        assetId: args.source.assetId,
-        sourceInstanceId: args.source.sourceInstanceId,
-        start: annotation.start,
-        end: annotation.end,
-        ...(dormant ? { dormant: true as const } : {}),
-      },
-      attachment:
-        annotation.attachment === 'content'
+    for (const [slice, placement] of placements.entries()) {
+      const id = `${trackId}:${slice}`;
+      const { startTime, duration } = placement;
+      result.instances.push({
+        id,
+        kind: 'standalone',
+        target: { kind: 'scene' },
+        snapshotId: snapshot.id,
+        controls: structuredClone(annotation.controls),
+        enabled: annotation.enabled,
+        ...placement,
+        ...(annotation.anchors
           ? {
-              kind: 'source',
-              assetId: args.source.assetId,
-              sourceInstanceId: args.source.sourceInstanceId,
+              sceneAnchors: Object.fromEntries(
+                Object.entries(annotation.anchors).map(([key, point]) => [
+                  key,
+                  { x: point.x * plane.width, y: point.y * plane.height },
+                ])
+              ),
             }
-          : { kind: 'viewport' },
-      groupId: null,
-      linkMode: 'DETACHED',
-      startTime,
-      duration,
-      muted: true,
-      volume: 1,
-      volumeEnvelopeStart: 1,
-      volumeEnvelopeEnd: 1,
-      fadeInMs: 0,
-      fadeOutMs: 0,
-      transitionIn: 'NONE',
-      transitionOut: 'NONE',
-      transform: {
-        x: annotation.transform.x * plane.width,
-        y: annotation.transform.y * plane.height,
-        width: annotation.transform.width * plane.width,
-        height: annotation.transform.height * plane.height,
-        rotation: (annotation.transform.rotation * 180) / Math.PI,
-        opacity: 1,
-      },
-    });
+          : {}),
+      });
+      result.clips.push({
+        id: `${id}:host`,
+        effectInstanceId: id,
+        trackId,
+        name,
+        type: 'EFFECT',
+        ...(annotation.timeDomain === 'result' || annotation.visualAnchor
+          ? {}
+          : {
+              sourceRange: {
+                assetId: args.source.assetId,
+                sourceInstanceId: args.source.sourceInstanceId,
+                start: annotation.start,
+                end: annotation.end,
+                ...(dormant ? { dormant: true as const } : {}),
+              },
+            }),
+        attachment:
+          annotation.attachment === 'content'
+            ? {
+                kind: 'source',
+                assetId: args.source.assetId,
+                sourceInstanceId: args.source.sourceInstanceId,
+              }
+            : { kind: 'viewport' },
+        groupId: null,
+        linkMode: 'DETACHED',
+        startTime,
+        duration,
+        muted: true,
+        volume: 1,
+        volumeEnvelopeStart: 1,
+        volumeEnvelopeEnd: 1,
+        fadeInMs: 0,
+        fadeOutMs: 0,
+        transitionIn: 'NONE',
+        transitionOut: 'NONE',
+        transform: {
+          x: annotation.transform.x * plane.width,
+          y: annotation.transform.y * plane.height,
+          width: annotation.transform.width * plane.width,
+          height: annotation.transform.height * plane.height,
+          rotation: (annotation.transform.rotation * 180) / Math.PI,
+          opacity: 1,
+        },
+      });
+    }
   }
   return result;
 }

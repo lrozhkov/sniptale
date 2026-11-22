@@ -4,6 +4,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createGuideProject } from '../../../features/scenario/project/factories';
 import { createMediaLibraryEntry, createVideoProjectEntry } from '../projects/index.test-support';
 import { createLibraryLifecycle } from './contracts';
+import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
+import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
 import {
   moveStoredItemsToTrash,
   restoreStoredItemsFromTrash,
@@ -43,6 +45,8 @@ beforeEach(() => {
   vi.stubGlobal('navigator', {});
   rows = new Map<string, Map<string, unknown>>([
     ['media_library', new Map([[media.id, media]])],
+    ['image_workspaces', new Map()],
+    ['image_workspace_identities', new Map()],
     ['video_projects', new Map([[video.id, video]])],
     ['scenario_projects', new Map([[scenario.id, scenario]])],
     ['scenario_project_history', new Map()],
@@ -90,6 +94,7 @@ beforeEach(() => {
           }),
           put: async (entry: {
             id?: string;
+            aggregateId?: string;
             projectId?: string;
             revision?: number;
             unitId?: string;
@@ -101,7 +106,7 @@ beforeEach(() => {
                   ? JSON.stringify([entry.projectId, entry.unitId, entry.revision])
                   : name === 'scenario_project_history'
                     ? JSON.stringify([entry.projectId, entry.revision])
-                    : entry.id!,
+                    : (entry.id ?? entry.aggregateId)!,
                 entry
               ),
         };
@@ -116,6 +121,56 @@ beforeEach(() => {
   );
 });
 afterEach(() => vi.unstubAllGlobals());
+
+it('trashes and restores an image project without changing its original or presentation', async () => {
+  const project = {
+    aggregateId: 'workspace',
+    sourceMediaId: media.id,
+    createdAt: 1,
+    updatedAt: 1,
+    sourceTitle: null,
+    sourceUrl: null,
+    document: createPersistedEditorDocumentFixture(createEditorDocumentFixture(), 'asset-1'),
+    revision: 1,
+    publicationId: 'first-save',
+    lifecycle: createLibraryLifecycle('library', 1),
+  };
+  rows.get('image_workspaces')!.set(project.aggregateId, project);
+  const preview = {
+    aggregateKind: 'image',
+    aggregateId: project.aggregateId,
+    presentationRevision: 1,
+  };
+  rows.set('aggregate_presentations', new Map([[project.aggregateId, preview]]));
+  const target = {
+    id: project.aggregateId,
+    kind: 'image-project' as const,
+    expectedRevision: 1,
+    expectedLifecycleUpdatedAt: 1,
+  };
+
+  await moveStoredItemsToTrash([target], 10);
+  await moveStoredItemsToTrash([target], 15);
+  expect(rows.get('image_workspaces')?.get(project.aggregateId)).toMatchObject({
+    lifecycle: { trashedAt: 10, updatedAt: 10 },
+    publicationId: 'first-save',
+  });
+  await restoreStoredItemsFromTrash([{ ...target, expectedLifecycleUpdatedAt: 10 }], 20);
+  await restoreStoredItemsFromTrash([{ ...target, expectedLifecycleUpdatedAt: 10 }], 30);
+  const { publicationId: _oldReceipt, ...restored } = project;
+  expect(rows.get('image_workspaces')?.get(project.aggregateId)).toEqual({
+    ...restored,
+    lifecycle: { ...project.lifecycle, updatedAt: 20 },
+  });
+  expect(rows.get('image_workspace_identities')?.get(project.aggregateId)).toMatchObject({
+    generation: expect.any(String),
+    retired: false,
+  });
+  await expect(moveStoredItemsToTrash([target], 40)).rejects.toBeInstanceOf(StaleTrashItemError);
+  expect(rows.get('media_library')?.get(media.id)).toEqual(media);
+  expect(rows.get('aggregate_presentations')?.get(project.aggregateId)).toEqual(preview);
+  expect(rows.get('asset_owners')?.get('retained')).toEqual({ assetId: 'unchanged' });
+});
 
 it('retains each aggregate graph and original destination through duplicate trash and restore', async () => {
   await moveStoredItemsToTrash(targets, 100);

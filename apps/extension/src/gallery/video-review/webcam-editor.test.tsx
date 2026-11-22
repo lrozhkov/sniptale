@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 import { act, useState } from 'react';
-import { committedEditorFixtureProjection } from './editor-fixture.test-support';
+import {
+  createReviewCommandFixture,
+  committedEditorFixtureProjection,
+} from './editor-fixture.test-support';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
@@ -40,7 +43,8 @@ function setup(
   pending = false,
   mount = true,
   priorCamera = false,
-  aggregateId = 'recording:main'
+  aggregateId = 'recording:main',
+  sourceMediaId?: string
 ) {
   const advanced = createQuickEditAdvancedState();
   advanced.ui.mode = automatic ? 'advanced' : 'basic';
@@ -59,15 +63,18 @@ function setup(
       ]
     : [];
   let cursor = 0;
+  let revision = history.length + 1;
   const events: string[] = [];
   let commitGate = Promise.resolve();
+  let loseAcknowledgement = false;
   const snapshot = (): VideoWorkspaceSnapshot => ({
     workspace: {
       aggregateId,
+      ...(sourceMediaId ? { sourceMediaId, generation: 'first-camera-project' } : {}),
       sourceAssetId: 'main',
       formatVersion: 1,
       source,
-      revision: history.length + 1,
+      revision,
       cursor,
       advanced,
       history: [...history],
@@ -83,33 +90,58 @@ function setup(
     if (!operation) throw new Error('Invalid operation');
     history.splice(cursor, history.length - cursor, operation);
     cursor += 1;
+    revision++;
     return snapshot();
   });
-  const saveAdvanced = vi.fn(async () => snapshot());
-  const session = createVideoReviewSession(snapshot(), {
-    commitVideoWorkspace: commit,
-    commitVideoWorkspaceWithProjection: async (args) =>
-      committedEditorFixtureProjection(await commit(args)),
-    saveVideoWorkspaceSnapshot: async (args) => {
-      const workspace = parseVideoWorkspace(args.workspace);
-      if (!workspace) throw new Error('Invalid workspace');
-      Object.assign(advanced, workspace.advanced);
-      history.splice(0, history.length, ...workspace.history);
-      return snapshot();
-    },
-    saveVideoWorkspaceDraft: async () => snapshot(),
-    readVideoWorkspace: async () => snapshot(),
-    moveVideoWorkspaceHistory: async ({ direction }) => {
-      cursor += direction === 'undo' ? -1 : 1;
-      return snapshot();
-    },
-    saveVideoWorkspaceAdvanced: saveAdvanced,
+  const saveAdvanced = vi.fn(async () => {
+    revision++;
+    return snapshot();
   });
+  const session = createVideoReviewSession(
+    snapshot(),
+    {
+      commitVideoWorkspace: commit,
+      commitVideoWorkspaceWithProjection: async (args) =>
+        committedEditorFixtureProjection(await commit(args)),
+      saveVideoWorkspaceSnapshot: async (args) => {
+        const workspace = parseVideoWorkspace(args.workspace);
+        if (!workspace) throw new Error('Invalid workspace');
+        Object.assign(advanced, workspace.advanced);
+        expect(args.expectedRevision).toBe(revision);
+        history.splice(0, history.length, ...workspace.history);
+        cursor = workspace.cursor;
+        revision++;
+        if (loseAcknowledgement) {
+          loseAcknowledgement = false;
+          throw new Error('Acknowledgement lost');
+        }
+        return snapshot();
+      },
+      saveVideoWorkspaceDraft: async () => snapshot(),
+      readVideoWorkspace: async () => (sourceMediaId && revision === 1 ? null : snapshot()),
+      moveVideoWorkspaceHistory: async ({ direction }) => {
+        cursor += direction === 'undo' ? -1 : 1;
+        revision++;
+        return snapshot();
+      },
+      saveVideoWorkspaceAdvanced: saveAdvanced,
+    },
+    sourceMediaId ? { mediaId: sourceMediaId, createdAt: 1, generation: null } : undefined
+  );
   function Harness({ activeSession = session }: { activeSession?: typeof session }) {
     const advanced = useReviewAdvanced(activeSession);
     const [selection, select] = useState<ReviewSelection>({ kind: 'annotation', id: 'note' });
     const [time, seek] = useState(3);
     editor = useReviewWebcamEditor({
+      commands: createReviewCommandFixture(() => ({
+        duration: 12,
+        time,
+        resultTime: time,
+        session: activeSession,
+        document: activeSession.getSnapshot().document,
+        advanced: advanced.readCurrent(),
+        selection,
+      })),
       session: activeSession,
       advanced: {
         ...advanced,
@@ -134,10 +166,16 @@ function setup(
     session,
     saveAdvanced,
     commit,
-    history,
+    get history() {
+      return session.getSnapshot().snapshot.workspace.history;
+    },
+    durableHistory: () => history,
     events,
     render: (activeSession = session) => root!.render(<Harness activeSession={activeSession} />),
     advanced,
+    loseNextAck: () => {
+      loseAcknowledgement = true;
+    },
     gate: (value: Promise<void>) => {
       commitGate = value;
     },
@@ -399,6 +437,53 @@ it.each([null, undefined])(
     expect(editor.camera?.positions[0]).toEqual(camera.positions[0]);
   }
 );
+
+it('discovers the grouped source and waits for explicit camera attachment in unpublished Advanced', async () => {
+  const aggregateId = 'recording:quick-project:pending';
+  const sourceMediaId = 'recording:main';
+  const fixture = setup(undefined, undefined, true, false, true, false, aggregateId, sourceMediaId);
+  await act(async () => {});
+  expect(io.find).toHaveBeenCalledWith(aggregateId, expect.any(AbortSignal), sourceMediaId);
+  expect(io.attach).not.toHaveBeenCalled();
+  expect(fixture.history).toEqual([]);
+
+  await act(async () => editor.toggle());
+  expect(io.attach).toHaveBeenCalledWith(
+    expect.objectContaining({ aggregateId, sourceMediaId, mediaId: 'recording:camera' })
+  );
+  expect(fixture.history).toHaveLength(1);
+  expect(editor.camera?.assetId).toBe('project-asset:camera');
+});
+
+it('retries the accepted first camera after a lost acknowledgement without acquiring it twice', async () => {
+  const fixture = setup(
+    undefined,
+    undefined,
+    true,
+    false,
+    true,
+    false,
+    'recording:quick-project:pending',
+    'recording:main'
+  );
+  fixture.loseNextAck();
+  await act(async () => {});
+  await act(async () => editor.toggle());
+  expect(editor.failed).toBe(true);
+  expect(editor.camera).toBeUndefined();
+  expect(fixture.durableHistory()).toHaveLength(1);
+
+  await act(async () => editor.retry());
+  expect(editor.failed).toBe(false);
+  expect(editor.selection).toEqual({ kind: 'webcam' });
+  expect(editor.camera?.assetId).toBe('project-asset:camera');
+  expect(io.attach).toHaveBeenCalledOnce();
+  expect(io.recover).toHaveBeenCalledExactlyOnceWith(
+    'project-asset:camera',
+    expect.any(AbortSignal)
+  );
+  expect(fixture.history).toHaveLength(1);
+});
 
 it('automatically admits a linked webcam in Advanced without changing object selection', async () => {
   const fixture = setup(undefined, undefined, true);

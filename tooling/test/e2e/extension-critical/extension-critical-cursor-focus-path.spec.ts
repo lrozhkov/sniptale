@@ -7,7 +7,7 @@ import {
 } from '../support/cursor-camera-policy-proof';
 import { expect, test, type Page, type Locator } from '@playwright/test';
 import { parseCursorFocusPath } from '../../../../apps/extension/src/features/video/project/cursor-focus-path/validation';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { createVideoProjectFromRecording } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { createVideoProjectCursorTrack } from '../../../../apps/extension/src/features/video/project/defaults';

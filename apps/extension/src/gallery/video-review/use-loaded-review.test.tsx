@@ -6,10 +6,32 @@ import { createQuickEditAdvancedState } from '../../features/video/review/advanc
 import { VideoReviewLoadError } from '../../workflows/video-review/source';
 import { useLoadedReview } from './use-session';
 
-const mocks = vi.hoisted(() => ({ load: vi.fn(), error: vi.fn(), warn: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  load: vi.fn(),
+  refresh: vi.fn(),
+  error: vi.fn(),
+  warn: vi.fn(),
+  listener: null as
+    | null
+    | ((event: {
+        type: 'library-changed';
+        reason: 'update';
+        assetIds: string[];
+        timestamp: number;
+      }) => void),
+}));
+vi.mock('../../features/media-hub/events', () => ({
+  subscribeToMediaHubEvents: (listener: typeof mocks.listener) => {
+    mocks.listener = listener;
+    return () => {
+      mocks.listener = null;
+    };
+  },
+}));
 vi.mock('../../workflows/video-review/source', async (original) => ({
   ...(await original<typeof import('../../workflows/video-review/source')>()),
   loadVideoReviewSource: mocks.load,
+  refreshVideoReviewRecordingHistory: mocks.refresh,
 }));
 vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => ({ error: mocks.error, warn: mocks.warn }),
@@ -50,6 +72,7 @@ beforeEach(() => {
   mocks.error.mockClear();
   mocks.warn.mockClear();
   mocks.load.mockReset();
+  mocks.refresh.mockReset();
   mocks.load.mockResolvedValue(loaded());
   vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:private'), revokeObjectURL: vi.fn() });
   host = document.createElement('div');
@@ -146,3 +169,125 @@ it('reports cleanup failure using a fixed content-free summary', async () => {
 vi.mock('../../workflows/sync-transfer/editing-admission', () => ({
   ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
 }));
+
+it('refreshes late history without replacing the session, media URL, or pending edits', async () => {
+  mocks.load.mockResolvedValueOnce({
+    ...loaded(),
+    recordingHistorySource: {
+      recordingId: 'r',
+      assetId: 'private-asset',
+      filename: 'private.webm',
+    },
+  });
+  await act(async () => root.render(<Harness />));
+  const initial = state.resource!;
+  const dispose = vi.spyOn(initial.session, 'dispose');
+  const capture = vi.fn(() => ({
+    change: { kind: 'draft' as const, annotation: null, before: null },
+    acknowledge: vi.fn(),
+    fail: vi.fn(),
+  }));
+  initial.session.stageAutosave('draft', capture, { delay: 60_000, maxWait: 60_000 });
+  const snapshot = initial.session.getSnapshot();
+  expect(snapshot.dirty).toBe(true);
+  const telemetry = { recordingId: 'r', actionEvents: [{ id: 'late-click' }] };
+  mocks.refresh.mockResolvedValue({ telemetry, historyProject: null });
+  await act(async () =>
+    mocks.listener?.({
+      type: 'library-changed',
+      reason: 'update',
+      assetIds: ['recording:other'],
+      timestamp: 1,
+    })
+  );
+  expect(mocks.refresh).not.toHaveBeenCalled();
+  await act(async () =>
+    mocks.listener?.({
+      type: 'library-changed',
+      reason: 'update',
+      assetIds: ['recording:r'],
+      timestamp: 2,
+    })
+  );
+  expect(state.resource?.telemetry).toEqual(telemetry);
+  expect(state.resource?.session).toBe(initial.session);
+  expect(state.resource?.session.getSnapshot()).toBe(snapshot);
+  expect(state.resource?.file).toBe(initial.file);
+  expect(URL.createObjectURL).toHaveBeenCalledOnce();
+  expect(dispose).not.toHaveBeenCalled();
+  mocks.refresh.mockRejectedValueOnce(new Error('PRIVATE'));
+  await act(async () =>
+    mocks.listener?.({
+      type: 'library-changed',
+      reason: 'update',
+      assetIds: ['recording:r'],
+      timestamp: 3,
+    })
+  );
+  expect(state.resource?.telemetry).toEqual(telemetry);
+  expect(mocks.warn).toHaveBeenCalledWith('video-review-history-refresh-failed');
+  expect(initial.session.getSnapshot().dirty).toBe(true);
+  expect(capture).not.toHaveBeenCalled();
+  initial.session.cancelAutosave('draft');
+});
+
+it('rejects a history refresh that finishes after the editor is disposed', async () => {
+  mocks.load.mockResolvedValueOnce({
+    ...loaded(),
+    recordingHistorySource: {
+      recordingId: 'r',
+      assetId: 'private-asset',
+      filename: 'private.webm',
+    },
+  });
+  await act(async () => root.render(<Harness />));
+  let resolve!: (value: unknown) => void;
+  mocks.refresh.mockReturnValueOnce(
+    new Promise((done) => {
+      resolve = done;
+    })
+  );
+  await act(async () =>
+    mocks.listener?.({
+      type: 'library-changed',
+      reason: 'update',
+      assetIds: ['recording:r'],
+      timestamp: 1,
+    })
+  );
+  const initial = state.resource;
+  await act(async () => root.render(null));
+  await act(async () => resolve({ telemetry: { recordingId: 'stale' }, historyProject: null }));
+  expect(state.resource).toBe(initial);
+});
+
+it('observes publication while the initial source read is still pending', async () => {
+  let resolve!: (value: unknown) => void;
+  mocks.load.mockReturnValueOnce(
+    new Promise((done) => {
+      resolve = done;
+    })
+  );
+  mocks.refresh.mockResolvedValue({ telemetry: { recordingId: 'r' }, historyProject: null });
+  await act(async () => root.render(<Harness />));
+  await act(async () =>
+    mocks.listener?.({
+      type: 'library-changed',
+      reason: 'update',
+      assetIds: ['recording:r'],
+      timestamp: 1,
+    })
+  );
+  expect(mocks.refresh).not.toHaveBeenCalled();
+  await act(async () =>
+    resolve({
+      ...loaded(),
+      recordingHistorySource: {
+        recordingId: 'r',
+        assetId: 'private-asset',
+        filename: 'private.webm',
+      },
+    })
+  );
+  expect(state.resource?.telemetry).toEqual({ recordingId: 'r' });
+});

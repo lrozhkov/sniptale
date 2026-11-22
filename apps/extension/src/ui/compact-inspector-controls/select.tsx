@@ -5,6 +5,7 @@ import { CompactSelectTrigger } from './select-trigger';
 import { useCompactSelectController } from '@sniptale/ui/compact-inspector-controls/select-controller';
 import { FLOATING_INTERACTION_OWNER_ID_ATTRIBUTE } from '@sniptale/ui/floating-interactions/ownership';
 import { cx } from './shared';
+import './inspector-select.css';
 import type { CompactSelectOption } from '@sniptale/ui/compact-inspector-controls/select-types';
 export type { CompactSelectOption } from '@sniptale/ui/compact-inspector-controls/select-types';
 
@@ -106,8 +107,7 @@ function CompactSelectTriggerView<T extends string>({
         }
       }}
       onKeyDown={select.keyboard.handleTriggerKeyDown}
-      className={props.className}
-      appearance={props.appearance}
+      className={cx('sniptale-inspector-select', props.className)}
       menuId={menuId}
       open={select.state.open}
       placeholder={props.placeholder}
@@ -143,7 +143,7 @@ function CompactSelectMenuView<T extends string>({
       portalTarget={select.placement.portalTarget}
       style={select.placement.menuStyle}
       theme={select.placement.portalTheme}
-      {...(props.menuClassName === undefined ? {} : { menuClassName: props.menuClassName })}
+      menuClassName={cx('sniptale-inspector-select-menu', props.menuClassName)}
     />
   );
 }

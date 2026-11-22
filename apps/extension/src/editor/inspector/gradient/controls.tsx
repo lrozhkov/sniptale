@@ -234,7 +234,9 @@ function GradientStopFields(props: {
         onPreviewReset={(color) => model.updateSelectedStop({ color }, model.previewStops)}
       />
       <NumericRow
+        appearance="plain"
         label={translate('editor.gradient.opacity')}
+        rangePresentation="field"
         min={0}
         max={100}
         step={1}

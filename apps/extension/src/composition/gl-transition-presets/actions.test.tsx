@@ -1,4 +1,13 @@
 // @vitest-environment jsdom
+import {
+  loadCompositionCatalogFixture,
+  prepareCompositionTranslations,
+} from '../catalog-fixture.test-support';
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadCompositionCatalogFixture>[0]) =>
+    loadCompositionCatalogFixture(locale),
+}));
+
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -192,4 +201,8 @@ it('downloads a named preset whose actual bytes reimport exactly and releases th
     ok: true,
     preset: { format: 'sniptale-gl-preset', version: 1, name: initial.name, transition: initial },
   });
+});
+
+beforeEach(async () => {
+  await prepareCompositionTranslations('video-editor', 'en');
 });

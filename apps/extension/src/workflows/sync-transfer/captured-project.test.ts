@@ -31,6 +31,14 @@ import { workspace as reviewWorkspace } from '../../composition/persistence/revi
 import { parseVideoWorkspace } from '../../composition/persistence/review-workspaces/parser';
 import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
 import { parseSyncOperationText } from './wire-record';
+import {
+  createVideoProjectHistoryChange,
+  applyVideoProjectHistoryChangeValues,
+} from '../../features/video/project/history-change';
+import { collectVideoProjectHistorySources } from '../../features/video/project/history-capture';
+import { hydratePreparedVideoProjectReplicaRoot } from '../../composition/persistence/sync-capture/prepared-project';
+import { hydratePersistedVideoProjectHistory } from '../../composition/persistence/projects/history-codec';
+import { createSha256BytesDigest } from '@sniptale/platform/security/digest';
 
 const io = vi.hoisted(() => ({ read: vi.fn(), files: new Map<string, File>() }));
 vi.mock('../../composition/persistence/assets', async (original) => ({
@@ -83,6 +91,132 @@ function projectRows(): CapturedVideoProjectRows {
     mediaDependencies: [],
   };
 }
+
+it.each([false, true])(
+  'transports both frozen history directions and recovery with historical-only sources: %s',
+  async (historicalOnly) => {
+    const rows = projectRows();
+    const original = rows.project.project;
+    const current = historicalOnly ? { ...original, assets: [], clips: [] } : original;
+    rows.project.project = current;
+    const anchor = { ...original, name: 'Anchor' };
+    const files = new Map<string, File>();
+    const inverse = (before: typeof current, after: typeof current, assetId: string) => {
+      const value = JSON.stringify(createVideoProjectHistoryChange(before, after));
+      const file = new File([value], 'history.json', { type: 'application/json' });
+      files.set(assetId, file);
+      rows.refs.push({
+        assetId,
+        createdAt: 1,
+        size: file.size,
+        mimeType: file.type,
+        location: { kind: 'opfs', objectKey: `objects/${assetId}` },
+        sha256: hashSyncText(value),
+      });
+      return { assetId };
+    };
+    rows.project.history = {
+      version: 1,
+      epoch: 'frozen-history',
+      past: [inverse({ ...anchor, name: 'Before' }, anchor, 'past-inverse')],
+      future: [inverse({ ...anchor, name: 'After' }, anchor, 'future-inverse')],
+      recovery: inverse(anchor, current, 'recovery-inverse'),
+      sources: collectVideoProjectHistorySources(anchor),
+    };
+    io.read.mockImplementation(
+      async (ref: AssetRef, filename: string) =>
+        files.get(ref.assetId) ??
+        new File([new Uint8Array(ref.size)], filename, { type: ref.mimeType })
+    );
+    expect(parseCapturedVideoProjectRows(rows)).not.toBeNull();
+    const encoded = await encodeCapturedProjectRoot(rows);
+    const metadata = parsePortableVideoProjectMetadata(encoded.envelope.metadata);
+    expect(metadata.entry).not.toHaveProperty('history');
+    expect(metadata.history).toMatchObject({
+      past: [expect.anything()],
+      future: [expect.anything()],
+      recovery: expect.anything(),
+    });
+    expect(encoded.bindings.map((binding) => binding.ref.assetId)).toEqual(
+      expect.arrayContaining([...files.keys()])
+    );
+    await expect(parsePortableSyncRoot(encoded.envelope)).resolves.toMatchObject({
+      kind: 'video-project',
+    });
+    const verifiedObjects = new Map<string, AssetRef>();
+    for (const object of encoded.objects) {
+      if (!object.blob) throw new Error('Expected captured bytes');
+      const assetId = `received-${object.ref.objectId}`;
+      files.set(assetId, new File([object.blob], assetId, { type: object.blob.type }));
+      verifiedObjects.set(object.ref.objectId, {
+        assetId,
+        createdAt: 1,
+        size: object.ref.size,
+        mimeType: object.blob.type,
+        location: { kind: 'opfs', objectKey: `objects/${assetId}` },
+        sha256: (
+          await createSha256BytesDigest(new Uint8Array(await object.blob.arrayBuffer()))
+        ).slice('sha256:'.length),
+      });
+    }
+    let stagedCount = 0;
+    for (const generation of [0, 1]) {
+      const payload = await preparePortableReplica({
+        envelope: encoded.envelope,
+        verifiedObjects,
+        senderDependencies: [],
+        admission: {
+          spaceId: 'space',
+          profileCreatedAt: 1,
+          connectionGeneration: 1,
+          operationId: 'history-roundtrip',
+          sourceDigest: 'a'.repeat(64),
+          expectedBasis: generation ? ['previous-head'] : [],
+          expectedLocalGeneration: generation,
+          expectedWorkspaceRevision: generation ? 4 : null,
+          dependencies: [],
+        },
+        stageNativeMetadata: async (blob) => {
+          const assetId = `native-history-${++stagedCount}`;
+          files.set(assetId, new File([blob], assetId, { type: blob.type }));
+          return {
+            assetId,
+            createdAt: 1,
+            size: blob.size,
+            mimeType: blob.type,
+            sha256: null,
+            location: { kind: 'opfs', objectKey: `objects/${assetId}` },
+          };
+        },
+      });
+      if (payload.kind !== 'video-project') throw new Error('Expected project replica');
+      expect(payload.input.root.entry).not.toHaveProperty('history');
+      const hydrated = await hydratePreparedVideoProjectReplicaRoot(payload.input.root);
+      const history = hydrated.entry.history;
+      if (!history) throw new Error('Expected admitted native history');
+      const restored = await hydratePersistedVideoProjectHistory({
+        current: hydrated.entry.project,
+        history,
+        refs: hydrated.historyRefs ?? [],
+      });
+      const recoveredAnchor = applyVideoProjectHistoryChangeValues(
+        hydrated.entry.project,
+        restored.recovery!.change
+      );
+      expect(recoveredAnchor.name).toBe('Anchor');
+      expect(
+        applyVideoProjectHistoryChangeValues(recoveredAnchor, restored.past[0]!.change).name
+      ).toBe('Before');
+      expect(
+        applyVideoProjectHistoryChangeValues(recoveredAnchor, restored.future[0]!.change).name
+      ).toBe('After');
+      const source = recoveredAnchor.assets[0]!.source;
+      if (source.kind !== 'project-asset') throw new Error('Expected private source');
+      expect(source.projectAssetId).toBe(payload.input.root.assets[0]!.entry.id);
+      expect(source.projectAssetId === rows.assets[0]!.id).toBe(generation === 0);
+    }
+  }
+);
 
 it('preserves Scenario source kinds through frozen backup and prepared exact native child mappings', async () => {
   const rows = projectRows();

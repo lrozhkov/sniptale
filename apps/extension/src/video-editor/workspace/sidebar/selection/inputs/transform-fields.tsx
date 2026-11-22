@@ -24,12 +24,12 @@ export function renderTransformFields(
         min={-360}
         max={360}
         step={1}
-        scrub
         unit="deg"
         onChange={(value) => onUpdateClipTransform(selectedClip.id, { rotation: value })}
       />
       <SliderField
         label={translate('videoEditor.sidebar.opacityLabel')}
+        rangePresentation="field"
         disabled={selectedTrackLocked}
         value={selectedClip.transform.opacity}
         min={0}
@@ -112,7 +112,6 @@ function TransformNumberField(props: {
       disabled={props.disabled}
       min={props.min}
       max={props.max}
-      scrub
       unit="px"
       value={props.clip.transform[props.field]}
       onChange={(value) => props.onUpdateClipTransform(props.clip.id, { [props.field]: value })}

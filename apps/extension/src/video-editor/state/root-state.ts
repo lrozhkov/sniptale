@@ -12,6 +12,8 @@ export function createVideoEditorTimelineState(set: VideoEditorStoreSet) {
   const recordingTelemetry: VideoEditorState['recordingTelemetry'] = [];
   return {
     project: null,
+    nativeWorkspace: null,
+    projectSessionId: Symbol('video-editor-project-session'),
     projectHistory: createEmptyVideoEditorProjectHistory(),
     recordingId: null,
     isReady: false,

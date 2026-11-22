@@ -63,6 +63,73 @@ function setInputValue(input: HTMLInputElement, value: string) {
 describe('editor-inspector-sidebar shared dimension input', () => {
   beforeEach(setupDimensionInputMocks);
 
+  it('steps a focused wheel through the dimension draft owner and preserves minimum', async () => {
+    const actual = await vi.importActual<typeof import('./dimension-input.helpers')>(
+      './dimension-input.helpers'
+    );
+    mocks.createDimensionDraftActionsMock.mockImplementation(actual.createDimensionDraftActions);
+    const onChange = vi.fn();
+    function Host() {
+      const [value, setValue] = React.useState(10);
+      return (
+        <>
+          <DimensionInput
+            label="Width"
+            value={value}
+            min={2}
+            step={3}
+            onChange={(next) => {
+              onChange(next);
+              setValue(next);
+            }}
+          />
+          <button type="button" data-external-dimension onClick={() => setValue(30)}>
+            External dimension
+          </button>
+        </>
+      );
+    }
+    renderDimensionInput(<Host />);
+    const input = getDimensionInput('Width');
+    act(() => input.focus());
+    act(() => setInputValue(input, '4'));
+    const down = new WheelEvent('wheel', {
+      altKey: true,
+      bubbles: true,
+      cancelable: true,
+      deltaY: 1,
+    });
+    act(() => input.dispatchEvent(down));
+    expect(input.value).toBe('2');
+    expect(onChange).toHaveBeenLastCalledWith(2);
+    expect(down.defaultPrevented).toBe(true);
+    act(() => {
+      input.dispatchEvent(
+        new WheelEvent('wheel', { altKey: true, bubbles: true, cancelable: true, deltaY: -1 })
+      );
+      input.dispatchEvent(
+        new WheelEvent('wheel', { altKey: true, bubbles: true, cancelable: true, deltaY: -1 })
+      );
+    });
+    expect(input.value).toBe('8');
+    expect(document.activeElement).toBe(input);
+    act(() => setInputValue(input, ''));
+    act(() =>
+      input.dispatchEvent(
+        new WheelEvent('wheel', { altKey: true, bubbles: true, cancelable: true, deltaY: -1 })
+      )
+    );
+    expect(input.value).toBe('11');
+    act(() => container?.querySelector<HTMLButtonElement>('[data-external-dimension]')?.click());
+    expect(input.value).toBe('30');
+    act(() =>
+      input.dispatchEvent(
+        new WheelEvent('wheel', { altKey: true, bubbles: true, cancelable: true, deltaY: 1 })
+      )
+    );
+    expect(input.value).toBe('27');
+  });
+
   it('filters draft input, commits changes, and supports keyboard resets', () => {
     renderDimensionInput(<DimensionInput label="Width" value={120} onChange={vi.fn()} />);
 

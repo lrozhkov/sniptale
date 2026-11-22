@@ -72,6 +72,21 @@ export interface ArchiveRestoreSession {
   currentRoot: string | null;
 }
 
+/** Durable ownership and custody evidence for a complete or indexed retention read. */
+export interface AssetRetentionSnapshot {
+  authorityValid: boolean;
+  archiveSessions: ArchiveRestoreSession[];
+  embeddedBinaryMetadata: string[];
+  expectedOwnerAssets: Map<string, string>;
+  expectedOwners: AssetOwner[];
+  owners: AssetOwner[];
+  operationIds: Set<string>;
+  protectedRollbackAssetIds: Set<string>;
+  protectedSyncCaptureAssetIds: Set<string>;
+  publishedProjectAssetIds: Set<string>;
+  refs: AssetRef[];
+}
+
 export interface PreparedAssetObject {
   ref: AssetRef;
 }

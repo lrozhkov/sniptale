@@ -262,14 +262,23 @@ async function verifyListMediaLibraryFlow() {
     updatedAt: 200,
     blob: new Blob(['raw']),
   });
+  const retained = {
+    ...createMediaEntry({ id: 'recording:retained', createdAt: 300, updatedAt: 300 }),
+    savedIndependently: false,
+  };
 
-  dbMocks.getAllMock.mockResolvedValueOnce([olderEntry, newerEntry]);
+  dbMocks.getAllMock.mockResolvedValue([olderEntry, newerEntry, retained]);
   dbMocks.getAllKeysMock.mockResolvedValue([createThumbnail('recording:newer').assetId]);
 
   const { listMediaLibrary } = await importMediaLibraryModule();
   await expect(listMediaLibrary()).resolves.toEqual([
     expect.objectContaining({ id: 'recording:newer', hasThumbnail: true }),
     expect.objectContaining({ id: 'recording:older', hasThumbnail: false }),
+  ]);
+  await expect(listMediaLibrary({ includeProjectRetained: true })).resolves.toEqual([
+    expect.objectContaining({ id: retained.id, savedIndependently: false }),
+    expect.objectContaining({ id: newerEntry.id }),
+    expect.objectContaining({ id: olderEntry.id }),
   ]);
   [
     dbMocks.listRecordingsMock,

@@ -339,19 +339,21 @@ it('edits every shared callout inspector section and connector mode', async () =
   expect(latestSettings.style.connector.kind).toBe('none');
 });
 
-it('keeps compact font sliders while accepting a larger manual title size', async () => {
-  const bodyRange = document.querySelector<HTMLInputElement>(
-    'input[aria-label="content.callout.fontSizeLabelPrefix range"]'
+it('uses precise font steppers and preserves larger accepted sizes', async () => {
+  const bodySize = document.querySelector<HTMLInputElement>(
+    'input[aria-label="content.callout.fontSizeLabelPrefix"]'
   );
-  expect(bodyRange?.max).toBe('36');
+  expect(bodySize?.closest('[data-stepper-placement="sides"]')).toBeTruthy();
+  expect(document.querySelector('input[type="range"]')).toBeNull();
   await enterNumber('content.callout.fontSizeLabelPrefix', 60);
 
   await openSection('content.callout.manualTitle');
-  const titleRange = document.querySelector<HTMLInputElement>(
-    'input[aria-label="content.callout.titleFontSizeLabel range"]'
+  const titleSize = document.querySelector<HTMLInputElement>(
+    'input[aria-label="content.callout.titleFontSizeLabel"]'
   );
 
-  expect(titleRange?.max).toBe('72');
+  expect(titleSize?.closest('[data-stepper-placement="sides"]')).toBeTruthy();
+  expect(document.querySelector('input[type="range"]')).toBeNull();
 
   await enterNumber('content.callout.titleFontSizeLabel', 120);
 
@@ -515,23 +517,19 @@ it('places accent edge immediately after the badge section', () => {
   expect(labels[badgeIndex + 1]).toBe('content.callout.manualAccent');
 });
 
-it('keeps the default-width slider bounded without capping manual input', async () => {
+it('uses a width stepper without capping exact input', async () => {
   await openSection('content.callout.manualSize');
-  const widthRange = document.querySelector<HTMLInputElement>(
-    'input[aria-label="content.callout.defaultWidthLabel range"]'
-  );
   const widthInput = document.querySelector<HTMLInputElement>(
     'input[aria-label="content.callout.defaultWidthLabel"]'
   );
 
-  expect(widthRange?.min).toBe('100');
-  expect(widthRange?.max).toBe('800');
+  expect(widthInput?.closest('[data-stepper-placement="sides"]')).toBeTruthy();
+  expect(document.querySelector('input[type="range"]')).toBeNull();
   expect(widthInput?.max).toBe('');
 
   await enterNumber('content.callout.defaultWidthLabel', 1400);
 
   expect(latestSettings.style.typography.maxWidth).toBe(1400);
-  expect(widthRange?.max).toBe('800');
 });
 
 it('shows an endpoint size only when that endpoint has a marker', () => {

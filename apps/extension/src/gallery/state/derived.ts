@@ -10,7 +10,7 @@ import {
 import type { GalleryAppState } from './types';
 import type { GalleryViewMode } from './types';
 import type { GalleryItem } from '../library/items';
-import { isGallerySelectableItem } from '../library/items';
+import { isGalleryMediaItem, isGallerySelectableItem } from '../library/items';
 import type { useGalleryFilterState } from './useGalleryFilterState';
 import type { useGalleryLibraryState } from './useGalleryLibraryState';
 import type { useGalleryViewportState } from './useGalleryViewportState';
@@ -175,10 +175,11 @@ export function useGalleryDerivedState(props: {
   const { filters, viewport, viewMode } = props;
   const modeItems = useMemo(
     () =>
-      props.library.items.filter(
-        (item) =>
-          Boolean(item.lifecycle?.trashedAt !== undefined) === Boolean(filters.state.trashMode)
-      ),
+      props.library.items.filter((item) => {
+        const trashed = item.lifecycle?.trashedAt !== undefined;
+        if (filters.state.trashMode) return trashed;
+        return !trashed && !(isGalleryMediaItem(item) && item.savedIndependently === false);
+      }),
     [props.library.items, filters.state.trashMode]
   );
   const library = { ...props.library, items: modeItems };

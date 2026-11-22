@@ -2,9 +2,10 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { ReviewPreviewInspector } from './preview-inspector';
+import { ReviewPreviewInspector, useReviewPreviewInspector } from './preview-inspector';
 import { DEFAULT_QUICK_PREVIEW_PREFERENCES } from '../../features/video/preview/quick-preferences';
-import { getDictionary } from '../../platform/i18n';
+import en from '../../platform/i18n/catalogs/en.json';
+import ru from '../../platform/i18n/catalogs/ru.json';
 
 vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
@@ -32,6 +33,7 @@ it('shows current defaults and actual raster, commits local settings and offers 
         <ReviewPreviewInspector
           preferences={{ ...DEFAULT_QUICK_PREVIEW_PREFERENCES }}
           status="session-only"
+          rendererStatus={{ backend: 'legacy', fallback: 'unavailable' }}
           actualRaster={{ width: 405, height: 720 }}
           disabled={disabled}
           onChange={onChange}
@@ -42,11 +44,15 @@ it('shows current defaults and actual raster, commits local settings and offers 
     );
   try {
     render();
+    expect(host.querySelector('[role="status"].review-inspector-notice')?.textContent).toBe(
+      'editor.scene.previewRendererUnavailable'
+    );
     expect(host.textContent).toContain('405 × 720');
     const actual = host.querySelector('[aria-label="gallery.videoReview.previewActualRaster"]')!;
-    expect(host.querySelector('.sniptale-parameter-row')).toBe(
-      actual.closest('.sniptale-parameter-row')
-    );
+    const resolution = host.querySelector('[aria-label="gallery.videoReview.previewResolution"]')!;
+    expect(
+      resolution.compareDocumentPosition(actual) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
     expect(actual.closest('.sniptale-parameter-row')?.textContent).toContain(
       'gallery.videoReview.previewActualRaster'
     );
@@ -108,9 +114,71 @@ it('shows current defaults and actual raster, commits local settings and offers 
   }
 });
 
+it('shows the raster as frames arrive and resets both preview preferences and workspace color', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const resetPreferences = vi.fn(async () => {});
+  const resetWorkspaceColor = vi.fn();
+  let publishRaster: ReturnType<typeof useReviewPreviewInspector>['setRaster'];
+
+  function Preview() {
+    const binding = useReviewPreviewInspector({
+      preferences: {
+        preferences: DEFAULT_QUICK_PREVIEW_PREFERENCES,
+        status: 'ready',
+        change: vi.fn(async () => {}),
+        reset: resetPreferences,
+        retry: vi.fn(async () => {}),
+      },
+      rendererStatus: null,
+      workspaceColor: {
+        theme: 'light',
+        value: '#F3F0EC',
+        style: {},
+        preview: vi.fn(),
+        cancel: vi.fn(),
+        change: vi.fn(),
+        reset: resetWorkspaceColor,
+      },
+      projectFailed: false,
+      retryProject: vi.fn(async () => {}),
+    });
+    publishRaster = binding.setRaster;
+    return binding.inspector;
+  }
+
+  try {
+    act(() => root.render(<Preview />));
+    const raster = host.querySelector(
+      'output[aria-label="gallery.videoReview.previewActualRaster"]'
+    );
+    expect(raster?.textContent).toBe('—');
+    act(() => publishRaster({ width: 640, height: 360 }));
+    expect(raster?.textContent).toBe('640 × 360');
+    act(() =>
+      host
+        .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.previewReset"]')!
+        .click()
+    );
+    expect(resetPreferences).toHaveBeenCalledOnce();
+    expect(resetWorkspaceColor).toHaveBeenCalledOnce();
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
 it('provides both shipped translations for each preview label', () => {
   for (const locale of ['en', 'ru'] as const) {
-    const messages = getDictionary(locale).gallery.videoReview;
+    const messages = { en, ru }[locale].gallery.videoReview;
     for (const [key, message] of Object.entries(messages)) {
       if (
         key.startsWith('preview') ||

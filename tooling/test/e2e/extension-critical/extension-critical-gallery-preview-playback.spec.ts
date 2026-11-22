@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { startHostServer } from '../support/host-server';
 import { seedReviewVideo, seedReviewWebcamBundle } from '../support/quick-editor-media-fixture';
 import {

@@ -46,8 +46,11 @@ selection and removal through the action list.',
     exclusive: true,
     reason:
       'Hook fixtures exercise edit admission, publication, narration, templates and refusal. Mounted \
-history proof verifies controls unlock after asynchronous copy recovery.',
+history, autosave, framing and reader proof verify the native snapshot contract and recovery controls.',
     testFiles: [
+      'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.autosave.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.image-framing.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/reader.test.tsx',
       'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.test.tsx',
       'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage-history.test.tsx',
       'apps/extension/src/scenario-editor/page-shell/runtime/use-state.test.tsx',

@@ -85,6 +85,15 @@ export async function checkInspectorLabels(panel: Locator) {
 
 /** Verifies bundled glyphs on the control's real text nodes, including native editor shadow DOM. */
 export async function checkInspectorPaintedFont(page: Page, target: Locator, kind: string) {
+  if (
+    await target.evaluate(
+      (node) => node.matches('input[type="range"]') && node.closest('.opacity-field') !== null
+    )
+  ) {
+    target = target
+      .locator('xpath=ancestor::*[contains(@class, "opacity-field")]')
+      .locator('.opacity-value');
+  }
   await target.scrollIntoViewIfNeeded();
   await target.evaluate(
     (node, value) => node.setAttribute('data-inspector-audit-font', value),

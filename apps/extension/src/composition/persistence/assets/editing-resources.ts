@@ -1,3 +1,12 @@
+import { isSha256Digest } from '@sniptale/platform/security/digest';
+import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
+import {
+  VIDEO_PROJECT_HISTORY_OWNER_KIND,
+  type PersistedVideoProjectHistory,
+  videoProjectHistoryAssetBindings,
+  videoProjectHistoryChangeRefs,
+} from '../projects/history-contracts';
+import { imageWorkspaceAssetBindings } from '../image-workspaces/assets';
 import type { IDBPTransaction } from 'idb';
 import type { AssetRef } from './contracts';
 import { parseAssetOwner, parseAssetRef } from './guards';
@@ -18,7 +27,7 @@ import {
 } from '../scenario/read-guards';
 import { parseScenarioStepEditorDocumentEntry } from '../scenario/editor-documents/index.guards';
 import { readScenarioStorage } from '../scenario/storage';
-import { getScenarioResourceReferences } from '../../../features/scenario/project/public';
+import { collectScenarioResourceReferences } from '../scenario/resource-references';
 import { freezeMediaInTransaction } from '../sync-capture/freeze';
 import { collectCapturedProjectRecordingIds } from '../sync-capture/project-snapshot';
 import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
@@ -57,7 +66,7 @@ interface NativeEditingResources {
   inlineMediaIds: string[];
 }
 export interface NativeEditingRoot {
-  rootKind: 'media' | 'video-review' | 'video-project' | 'scenario-project';
+  rootKind: 'media' | 'image-project' | 'video-review' | 'video-project' | 'scenario-project';
   rootId: string;
 }
 
@@ -65,28 +74,31 @@ function requireResource(condition: unknown): asserts condition {
   if (!condition) throw new Error('Native editing resources are unavailable.');
 }
 
-/** Project current native editing dependencies without reading original bytes or changing rows. */
+/** Project native dependencies for the requested operation without reading original bytes. */
 export async function collectNativeEditingResources(
   tx: ReadTransaction,
   root: NativeEditingRoot,
-  purpose: 'editing' | 'backup' = 'editing'
+  purpose: 'editing' | 'backup' | 'cache' = 'editing'
 ): Promise<NativeEditingResources> {
   const projection = new EditingResourceProjection(tx);
   switch (root.rootKind) {
     case 'media':
       await projection.media(root.rootId);
       break;
+    case 'image-project':
+      await projection.imageProject(root.rootId);
+      break;
     case 'video-review':
       await projection.review(root.rootId);
       break;
     case 'video-project':
-      await projection.project(root.rootId);
+      await projection.project(root.rootId, purpose === 'backup');
       break;
     case 'scenario-project':
       await projection.scenario(root.rootId);
       break;
   }
-  if (purpose === 'backup') await projection.backup(root);
+  if (purpose !== 'editing') await projection.archiveArtifacts(root);
   return projection.result();
 }
 
@@ -219,7 +231,17 @@ class EditingResourceProjection {
         workspace.aggregateId === media.id &&
         workspace.revision === media.workspaceRevision
     );
-    for (const asset of workspace.document.assets) await this.ref(asset.assetId);
+    for (const asset of imageWorkspaceAssetBindings(workspace)) await this.ref(asset.assetId);
+  }
+
+  async imageProject(id: string): Promise<void> {
+    const workspace = parseImageWorkspaceEntry(
+      await this.tx.objectStore(stores.IMAGE_WORKSPACES_STORE).get(id)
+    );
+    requireResource(workspace?.sourceMediaId && workspace.aggregateId === id);
+    const original = await this.media(workspace.sourceMediaId);
+    requireResource(original.kind === 'image' || original.kind === 'screenshot');
+    for (const asset of imageWorkspaceAssetBindings(workspace)) await this.ref(asset.assetId);
   }
 
   private async sourceAsset(id: string) {
@@ -323,7 +345,7 @@ class EditingResourceProjection {
     await this.optionalReview(id, ref, sourceId);
   }
 
-  async project(id: string) {
+  async project(id: string, includeHistory: boolean) {
     const entry = parseVideoProjectEntry(
       await this.tx.objectStore(stores.VIDEO_PROJECTS_STORE).get(id)
     );
@@ -354,9 +376,44 @@ class EditingResourceProjection {
             sameReviewVideoContainer(asset.metadata.mimeType, binding.mimeType))
       );
     }
+    if (includeHistory && entry.history) await this.projectHistory(id, entry.history);
   }
 
-  async backup(root: NativeEditingRoot): Promise<void> {
+  private async projectHistory(id: string, history: PersistedVideoProjectHistory) {
+    for (const { role, assetId } of videoProjectHistoryAssetBindings(history)) {
+      await this.owner(VIDEO_PROJECT_HISTORY_OWNER_KIND, id, role, assetId);
+      const ref = await this.ref(assetId);
+      requireResource(
+        ref.mimeType === 'application/json' && isSha256Digest(`sha256:${ref.sha256}`)
+      );
+    }
+    let bytes = 0;
+    for (const { assetId } of videoProjectHistoryChangeRefs(history)) {
+      bytes += this.refs.get(assetId)!.size;
+      requireResource(bytes <= EDITOR_HISTORY_LIMITS.maxBytes);
+    }
+    for (const source of history.sources) {
+      switch (source.kind) {
+        case 'recording':
+          await this.media(`recording:${source.id}`);
+          break;
+        case 'library-asset':
+          await this.media(source.id);
+          break;
+        case 'project-asset':
+          await this.asset(source.id);
+          break;
+        case 'scenario-asset':
+          await this.scenarioAsset(source.id);
+          break;
+        case 'scenario-project':
+          // This identifier links project metadata. Physical children have their own references.
+          break;
+      }
+    }
+  }
+
+  async archiveArtifacts(root: NativeEditingRoot): Promise<void> {
     if (root.rootKind === 'video-project') {
       for (const raw of await this.tx
         .objectStore(stores.PROJECT_EXPORTS_STORE)
@@ -428,16 +485,7 @@ class EditingResourceProjection {
   async scenario(id: string) {
     const entry = parseScenarioProjectEntry((await readScenarioStorage(this.tx, id)).logical);
     requireResource(entry && entry.id === id);
-    const assets = new Set<string>();
-    const documents = new Set<string>();
-    for (const project of [
-      entry.project,
-      ...(entry.history ?? []).map((version) => version.project),
-    ]) {
-      const references = getScenarioResourceReferences(project);
-      for (const asset of references.assets) assets.add(asset);
-      for (const document of references.documents) documents.add(document);
-    }
+    const { assets, documents } = collectScenarioResourceReferences(entry);
     for (const asset of assets) await this.scenarioAsset(asset, id);
     for (const stepId of documents) {
       const document = parseScenarioStepEditorDocumentEntry(

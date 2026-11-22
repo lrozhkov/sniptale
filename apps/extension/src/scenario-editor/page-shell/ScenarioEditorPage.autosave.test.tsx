@@ -1,8 +1,19 @@
 // @vitest-environment jsdom
+import {
+  loadScenarioCatalogFixture,
+  prepareScenarioTranslations,
+} from './test-support/translations.test-support';
 import { act, type ComponentProps } from 'react';
 import type { GuideLibraryBrowser } from './library-browser';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, beforeEach, expect, it, vi } from 'vitest';
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadScenarioCatalogFixture>[0]) =>
+    loadScenarioCatalogFixture(locale),
+}));
+
+beforeAll(prepareScenarioTranslations);
+
 import {
   createGuideParagraphs,
   createGuideProject,
@@ -71,10 +82,10 @@ vi.mock('./runtime/ai-request', () => ({
 vi.mock('./runtime/resource-session', () => ({ useGuideResourceSession: () => enterSession }));
 const enterSession = (projectId: string | null) => io.session(projectId);
 vi.mock('../../composition/persistence/scenario/history', () => ({
-  getScenarioSavedVersions: async () => {
+  getScenarioEditingSnapshot: async () => {
     const project = await io.load();
     return project
-      ? { currentRevision: 1, versions: [{ project, revision: 1, savedAt: 100 }] }
+      ? { project, workspaceRevision: 1, editingHistory: { version: 1, past: [], future: [] } }
       : null;
   },
 }));
@@ -222,6 +233,11 @@ it('keeps autosave paused across guide/tour switching and saves latest edits on 
   expect(io.save).toHaveBeenCalledWith(expect.objectContaining({ name: 'Paused tour title' }), {
     expectedRevision: 1,
     historyActionId: expect.any(String),
+    editingHistory: expect.objectContaining({
+      version: 1,
+      past: expect.any(Array),
+      future: expect.any(Array),
+    }),
   });
 });
 
@@ -270,6 +286,11 @@ it('opens AI during a pending autosave and sends the latest draft once using the
   expect(io.save).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Latest draft' }), {
     expectedRevision: 2,
     historyActionId: expect.any(String),
+    editingHistory: expect.objectContaining({
+      version: 1,
+      past: expect.any(Array),
+      future: expect.any(Array),
+    }),
   });
   expect(io.request).toHaveBeenCalledOnce();
   expect(io.request).toHaveBeenCalledWith(
@@ -290,6 +311,11 @@ it('flushes a field boundary immediately while keeping continuous input coalesce
   expect(io.save).toHaveBeenCalledWith(expect.objectContaining({ name: 'Completed field' }), {
     expectedRevision: 1,
     historyActionId: expect.any(String),
+    editingHistory: expect.objectContaining({
+      version: 1,
+      past: expect.any(Array),
+      future: expect.any(Array),
+    }),
   });
 });
 
@@ -321,7 +347,15 @@ it('keeps typing available during autosave and uses the acknowledged revision fo
   expect(io.save).toHaveBeenCalledTimes(2);
   expect(io.save).toHaveBeenLastCalledWith(
     expect.objectContaining({ items: [expect.objectContaining({ title: 'More recent draft' })] }),
-    { expectedRevision: 2, historyActionId: expect.any(String) }
+    {
+      expectedRevision: 2,
+      historyActionId: expect.any(String),
+      editingHistory: expect.objectContaining({
+        version: 1,
+        past: expect.any(Array),
+        future: expect.any(Array),
+      }),
+    }
   );
   await clickGuideControl('Undo', host);
   expect(host.querySelector('article .guide-step-title')).toHaveProperty('value', 'Step');

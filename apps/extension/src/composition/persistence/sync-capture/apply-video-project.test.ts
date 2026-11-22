@@ -13,6 +13,7 @@ import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-bar
 import {
   createVideoProjectEntryWithMediaClip,
   createProjectExportEntry,
+  createProjectAssetEntry,
 } from '../projects/index.test-support';
 import type { AssetRef } from '../assets';
 import { captureRootKey } from './contracts';
@@ -43,6 +44,91 @@ beforeEach(() => {
 
 const setup = (trashed = false) =>
   createVideoProjectReplicaFixture((db) => io.database.mockResolvedValue(db), trashed);
+
+it.each([false, true])(
+  'releases replaced history once and preserves shared owners: receipt failure=%s',
+  async (failReceipt) => {
+    const f = setup();
+    await applyPreparedVideoProjectRevision(f.input);
+    const current = {
+      ...f.input.root.entry,
+      workspaceRevision: 1,
+      history: {
+        version: 1 as const,
+        epoch: 'previous',
+        past: [{ assetId: 'old-inverse' }, { assetId: 'shared-inverse' }],
+        future: [],
+        sources: [{ kind: 'project-asset' as const, id: 'history-only-private' }],
+      },
+    };
+    f.table('video_projects').set(projectId, current);
+    for (const assetId of ['old-inverse', 'shared-inverse']) {
+      f.table('asset_refs').set(assetId, { ...f.ref, assetId, mimeType: 'application/json' });
+      f.table('asset_owners').set(
+        JSON.stringify(['video-project-history', projectId, `history:change:${assetId}`]),
+        {
+          assetId,
+          ownerKind: 'video-project-history',
+          ownerId: projectId,
+          role: `history:change:${assetId}`,
+        }
+      );
+    }
+    f.table('asset_owners').set(JSON.stringify(['external', 'other', 'body']), {
+      assetId: 'shared-inverse',
+      ownerKind: 'external',
+      ownerId: 'other',
+      role: 'body',
+    });
+    const privateAsset = createProjectAssetEntry({
+      id: 'history-only-private',
+      assetId: 'private-body',
+    });
+    f.table('project_assets').set(privateAsset.id, privateAsset);
+    f.table('asset_refs').set(privateAsset.assetId, { ...f.ref, assetId: privateAsset.assetId });
+    f.table('asset_owners').set(JSON.stringify(['project-asset', privateAsset.id, 'body']), {
+      assetId: privateAsset.assetId,
+      ownerKind: 'project-asset',
+      ownerId: privateAsset.id,
+      role: 'body',
+    });
+    const next = {
+      ...f.input,
+      operationId: 'replace-without-history',
+      expectedLocalGeneration: 1,
+      expectedWorkspaceRevision: 1,
+      expectedBasis: [f.input.operationId],
+    };
+    io.cleanup.mockClear();
+    if (failReceipt) {
+      const before = structuredClone(f.rows);
+      f.failReceipt();
+      await expect(applyPreparedVideoProjectRevision(next)).rejects.toThrow();
+      expect(f.rows).toEqual(before);
+      expect(io.cleanup).not.toHaveBeenCalled();
+      f.allowWrites();
+    }
+    await expect(applyPreparedVideoProjectRevision(next)).resolves.toMatchObject({
+      status: 'applied',
+    });
+    expect(f.table('asset_refs').has('old-inverse')).toBe(false);
+    expect(f.table('asset_refs').has('shared-inverse')).toBe(true);
+    expect(f.table('project_assets').has(privateAsset.id)).toBe(false);
+    expect(f.table('asset_refs').has(privateAsset.assetId)).toBe(false);
+    for (const assetId of ['old-inverse', 'shared-inverse'])
+      expect(
+        f
+          .table('asset_owners')
+          .has(JSON.stringify(['video-project-history', projectId, `history:change:${assetId}`]))
+      ).toBe(false);
+    expect(io.cleanup).toHaveBeenCalledTimes(1);
+    expect(io.cleanup.mock.calls[0]?.[0].assetIds).toEqual(['old-inverse', privateAsset.assetId]);
+    await expect(applyPreparedVideoProjectRevision(next)).resolves.toMatchObject({
+      status: 'duplicate',
+    });
+    expect(io.cleanup).toHaveBeenCalledTimes(1);
+  }
+);
 
 it.each([false, true])('preserves sources and exports: Trash=%s', async (trashed) => {
   const fixture = setup(trashed);

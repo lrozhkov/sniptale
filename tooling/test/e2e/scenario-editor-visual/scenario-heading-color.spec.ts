@@ -270,8 +270,13 @@ for (const theme of ['light', 'dark'] as const) {
 }
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`guide text selectors keep neutral selection in ${theme}`, async ({ page, hostOrigin }) => {
-    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1600, height: 1000 });
+  test(`guide text selectors keep neutral selection in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const viewport =
+      theme === 'light' ? { width: 1280, height: 560 } : { width: 1920, height: 900 };
+    await openVisualHarness(page, hostOrigin, theme, 'en', viewport);
     const details = page
       .locator('#guide-inspector-panel [data-ui="shared.information-disclosure"]')
       .filter({ hasText: 'Layouts change block widths' });
@@ -302,6 +307,7 @@ for (const theme of ['light', 'dark'] as const) {
     await check(dropdown).toHaveCSS('border-top-color', openBorder);
     await dropdown.hover();
     await check(dropdown).toHaveCSS('border-top-color', openBorder);
+    await page.screenshot({ path: info.outputPath('layout-menu-open.png'), fullPage: false });
     await page.keyboard.press('Escape');
     const save = page.getByRole('button', { name: 'Save as layout', exact: true });
     await expect(save).toHaveCSS('justify-content', 'flex-start');
@@ -332,7 +338,7 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(selected).toHaveCount(1);
       await expect(selected).toHaveAccessibleName(optionName);
       await selected.hover();
-      await check(selected).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+      await check(selected).toHaveCSS('border-top-width', '0px');
       await check(selected).toHaveCSS('box-shadow', 'none');
       await check(selected).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     };
@@ -348,7 +354,8 @@ for (const theme of ['light', 'dark'] as const) {
     );
     await categories.getByRole('button', { name: 'Text', exact: true }).click();
     await checkSelected('Text size', 'Normal');
-    await checkSelected('Alignment', 'Start');
+    await checkSelected('Text alignment', 'Start');
+    await page.screenshot({ path: info.outputPath('text-alignment.png'), fullPage: false });
     const resetText = blockInspector.getByRole('button', {
       name: 'Reset text appearance',
       exact: true,
@@ -443,10 +450,14 @@ for (const theme of ['light', 'dark'] as const) {
       await input.fill('invalid');
       await input.press('Enter');
       await expect(input).toHaveAttribute('aria-invalid', 'true');
-      await expect(field.getByRole('alert')).toBeVisible();
-      expect(await field.boundingBox()).toEqual(before);
+      const error = field.getByRole('alert');
+      await expect(error).toBeVisible();
+      const invalidBounds = (await field.boundingBox())!;
+      expect(invalidBounds).toEqual({ ...before, height: before!.height + 18 });
+      expect((await error.boundingBox())!.height).toBeLessThanOrEqual(18);
       await input.press('Escape');
       await expect(value).toHaveText('#ABCDEF');
+      expect(await field.boundingBox()).toEqual(before);
       await swatch.click();
       const picker = page.locator('[data-ui="shared.ui.color-selector.picker-layer"]');
       await expect(picker).toBeVisible();

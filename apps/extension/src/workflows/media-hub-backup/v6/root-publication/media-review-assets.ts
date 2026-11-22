@@ -1,3 +1,5 @@
+import { readVideoReviewRetiredRevision } from '../../../../composition/persistence/review-workspaces/identity';
+import { isUneditedLegacyQuickEdit } from '../../../../composition/persistence/media-library/legacy-projects';
 import type {
   StoredRecordingEntry,
   RecordingTelemetryEntry,
@@ -152,28 +154,46 @@ export async function prepareMediaReviewAssets(args: {
 
 export function prepareStandaloneMediaVideoReview(args: {
   mediaId: string;
+  projectId?: string;
   metadata: Pick<PortableMediaMetadata, 'entry' | 'videoReview'>;
   original: StagedArchiveObject;
   reviewAssets: readonly PreparedMediaReviewAsset[];
+  linkedSource?: { mediaId: string; assetId: string; recordingId?: string };
 }): ReturnType<typeof prepareVideoReviewRestore> | null {
   if (!args.metadata.videoReview) return null;
   if (args.metadata.videoReview.workspace.source.size !== args.original.ref.size) {
     throw new Error('Restored video review bytes are inconsistent.');
   }
-  return prepareVideoReviewRestore({
+  const targetRecordingId =
+    args.linkedSource?.recordingId ??
+    (args.mediaId.startsWith('recording:') ? args.mediaId.slice('recording:'.length) : undefined);
+  const review = prepareVideoReviewRestore({
     review: args.metadata.videoReview,
     sourceAggregateId: args.metadata.entry.id,
-    targetAggregateId: args.mediaId,
-    sourceAssetId: args.original.ref.assetId,
+    targetAggregateId: args.projectId ?? args.mediaId,
+    sourceAssetId: args.linkedSource?.assetId ?? args.original.ref.assetId,
     assetIdMap: new Map(args.reviewAssets.map((asset) => [asset.sourceId, asset.entry.id])),
-    ...(args.metadata.entry.source.kind === 'recording' && args.mediaId.startsWith('recording:')
+    ...(args.metadata.entry.source.kind === 'recording' && targetRecordingId
       ? {
-          recordingIdMap: new Map([
-            [args.metadata.entry.source.recordingId, args.mediaId.slice('recording:'.length)],
-          ]),
+          recordingIdMap: new Map([[args.metadata.entry.source.recordingId, targetRecordingId]]),
         }
       : {}),
   });
+  if (args.linkedSource || args.projectId)
+    review.workspace.sourceMediaId = args.linkedSource?.mediaId ?? args.mediaId;
+  if (args.projectId) {
+    if (
+      !review.draft &&
+      !args.reviewAssets.length &&
+      isUneditedLegacyQuickEdit(review.workspace, args.metadata.entry.filename)
+    )
+      return null;
+    review.workspace = materializeVideoWorkspaceProject(
+      review.workspace,
+      args.metadata.entry.filename
+    );
+  }
+  return review;
 }
 
 export async function hasMediaReviewAssetConflict(
@@ -275,11 +295,20 @@ export function isCaptureReview(prepared: PreparedMediaReviewRoot): boolean {
 /** Rebase the prepared review inside the existing media publication transaction. */
 export async function rebaseRestoredVideoReview(
   tx: Parameters<typeof allocateVideoReviewRevision>[0],
-  prepared: PreparedMediaReviewRoot
+  prepared: PreparedMediaReviewRoot,
+  preserveReplacementFence: boolean
 ): Promise<void> {
-  if (!isCaptureReview(prepared) || !prepared.videoReview || !(await readEnabledCaptureProfile(tx)))
+  if (!prepared.videoReview) return;
+  const id = prepared.videoReview.workspace.aggregateId;
+  const retired = prepared.videoReview.workspace.sourceMediaId
+    ? await readVideoReviewRetiredRevision(tx, id)
+    : 0;
+  if (
+    !preserveReplacementFence &&
+    !retired &&
+    (!isCaptureReview(prepared) || !(await readEnabledCaptureProfile(tx)))
+  )
     return;
-  const id = prepared.media.id;
   const stored = await readWorkspaceStorage(tx, id);
   const current = stored.logical === undefined ? null : parseVideoWorkspace(stored.logical);
   const rawDraft: unknown = await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).get(id);
@@ -295,7 +324,7 @@ export async function rebaseRestoredVideoReview(
   const revision = await allocateVideoReviewRevision(
     tx,
     id,
-    Math.max(prepared.videoReview.workspace.revision, current?.revision ?? 0) + 1
+    Math.max(prepared.videoReview.workspace.revision, current?.revision ?? 0, retired) + 1
   );
   const draftRevision =
     Math.max(prepared.videoReview.draft?.revision ?? 0, currentDraft?.revision ?? 0, revision) + 1;

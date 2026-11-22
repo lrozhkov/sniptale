@@ -24,10 +24,11 @@ const {
 
 vi.mock('../../project/operations/ops', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../project/operations/ops')>()),
-  copyProject: mockCopyProject,
-  createBlankProject: mockCreateBlankProject,
+  copyProject: async (...args: unknown[]) => opened(await mockCopyProject(...args)),
+  createBlankProject: async (...args: unknown[]) => opened(await mockCreateBlankProject(...args)),
   deletePersistedProject: mockDeletePersistedProject,
-  openPersistedProject: mockOpenPersistedProject,
+  openPersistedProject: async (...args: unknown[]) =>
+    opened(await mockOpenPersistedProject(...args)),
 }));
 
 vi.mock('../session/save-readiness', async (importOriginal) => ({
@@ -86,6 +87,15 @@ function createCurrentProject() {
     clips: [],
     cursorTrack: null,
     actionEvents: [],
+  };
+}
+
+function opened(project: ReturnType<typeof createCurrentProject>) {
+  return {
+    status: 'ready' as const,
+    project,
+    workspaceRevision: 23,
+    history: { status: 'absent' as const },
   };
 }
 
@@ -163,7 +173,11 @@ describe('deleteProjectWorkspace', () => {
 
     expect(mockWaitForVideoEditorSave).toHaveBeenCalledWith('current-project');
     expect(mockOpenPersistedProject).toHaveBeenCalledWith('other-project');
-    expect(params.applyLoadedProject).toHaveBeenCalledWith(nextProject, null);
+    expect(params.applyLoadedProject).toHaveBeenCalledWith(
+      nextProject,
+      null,
+      expect.objectContaining({ status: 'ready', workspaceRevision: 23 })
+    );
     expect(mockWaitForVideoEditorSave.mock.invocationCallOrder[0]).toBeLessThan(
       mockOpenPersistedProject.mock.invocationCallOrder[0] ?? 0
     );
@@ -208,7 +222,8 @@ describe('deleteProjectWorkspace', () => {
     expect(params.applyLoadedProject).toHaveBeenCalledTimes(1);
     expect(params.applyLoadedProject).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'latest-project' }),
-      null
+      null,
+      expect.objectContaining({ status: 'ready', workspaceRevision: 23 })
     );
     expect(params.libraries.refreshProjects).toHaveBeenCalledTimes(1);
   });
@@ -242,7 +257,11 @@ describe('createProjectWorkspace', () => {
     expect(port.applyLoadedProject).not.toHaveBeenCalled();
     created(next);
     await task;
-    expect(port.applyLoadedProject).toHaveBeenCalledWith(next, null);
+    expect(port.applyLoadedProject).toHaveBeenCalledWith(
+      next,
+      null,
+      expect.objectContaining({ status: 'ready', workspaceRevision: 23 })
+    );
   });
   it('copies the current document with the requested name', async () => {
     const port = createProjectHandlerParams();
@@ -250,7 +269,11 @@ describe('createProjectWorkspace', () => {
     mockCopyProject.mockResolvedValue(copy);
     await createProjectWorkspace(port, 'Copy', true);
     expect(mockCopyProject).toHaveBeenCalledWith(port.getCurrentProject(), 'Copy');
-    expect(port.applyLoadedProject).toHaveBeenCalledWith(copy, null);
+    expect(port.applyLoadedProject).toHaveBeenCalledWith(
+      copy,
+      null,
+      expect.objectContaining({ status: 'ready', workspaceRevision: 23 })
+    );
   });
   it.each(['save', 'create'])('keeps current project when %s fails', async (stage) => {
     const port = createProjectHandlerParams();
@@ -274,7 +297,11 @@ it('does not report creation failure after the project has been committed and op
   mockCreateBlankProject.mockResolvedValue(next);
   vi.mocked(port.libraries.refreshProjects).mockRejectedValue(new Error('list unavailable'));
   await expect(createProjectWorkspace(port, 'New')).resolves.toBeUndefined();
-  expect(port.applyLoadedProject).toHaveBeenCalledWith(next, null);
+  expect(port.applyLoadedProject).toHaveBeenCalledWith(
+    next,
+    null,
+    expect.objectContaining({ status: 'ready', workspaceRevision: 23 })
+  );
 });
 
 it.each(['open', 'create', 'delete'] as const)(
@@ -324,7 +351,8 @@ describe('checkpoint exit during project transitions', () => {
     await task;
     expect(port.applyLoadedProject).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'other-project' }),
-      null
+      null,
+      expect.objectContaining({ status: 'ready', workspaceRevision: 23 })
     );
   });
 
@@ -383,7 +411,8 @@ describe('checkpoint exit during project transitions', () => {
     expect(mockRequestCheckpointExit).toHaveBeenCalledWith(receipt);
     expect(port.applyLoadedProject).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'new-project' }),
-      null
+      null,
+      expect.objectContaining({ status: 'ready', workspaceRevision: 23 })
     );
   });
 

@@ -7,7 +7,7 @@ import {
   withRowReferenceMetadata,
 } from '../infrastructure/indexed-db/row-index-contract';
 import { collectReviewAssetReferences } from './asset-refs';
-import { parseVideoWorkspace } from './parser';
+import { inspectVideoWorkspace } from './parser';
 import { materializeWorkspaceStorage } from './storage-format';
 
 export const WORKSPACE_HEAD_STORE = 'video_workspaces';
@@ -37,7 +37,7 @@ export function projectWorkspaceReferenceKeys(head: unknown, rows: readonly unkn
     stripRowReferenceMetadata(head),
     rows.map(stripRowReferenceMetadata)
   );
-  const workspace = parseVideoWorkspace(logical);
+  const { workspace } = inspectVideoWorkspace(logical, 'transient');
   if (!workspace) return [UNKNOWN_HISTORY_REFERENCES];
   const keys = new Set([
     rowReferenceKey('media', workspace.aggregateId),

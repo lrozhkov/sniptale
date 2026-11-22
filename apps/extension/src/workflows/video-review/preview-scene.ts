@@ -193,6 +193,9 @@ export function activeReviewPreviewScene(source: PreviewScene): PreviewScene {
   const instances = annotations?.lane.enabled
     ? annotations.lane.instances.filter((instance) => instance.enabled)
     : [];
+  const textClips = annotations?.lane.enabled
+    ? annotations.lane.textClips?.filter((clip) => clip.enabled && clip.text.trim())
+    : undefined;
   const ids = new Set(instances.map((instance) => instance.snapshotId));
   return {
     ...source,
@@ -200,7 +203,11 @@ export function activeReviewPreviewScene(source: PreviewScene): PreviewScene {
       ? {
           annotationEffects: {
             ...annotations,
-            lane: { enabled: annotations.lane.enabled, instances },
+            lane: {
+              enabled: annotations.lane.enabled,
+              instances,
+              ...(textClips?.length ? { textClips } : {}),
+            },
             snapshots: annotations.snapshots.filter((snapshot) => ids.has(snapshot.id)),
           },
         }
@@ -228,7 +235,7 @@ export function reviewPreviewPreparationKey(
                   ({ source: _source, ...metadata }) => metadata
                 ),
                 lane: {
-                  ...annotationEffects.lane,
+                  enabled: annotationEffects.lane.enabled,
                   instances: annotationEffects.lane.instances.map(
                     ({ transform: _transform, controls: _controls, anchors: _anchors, ...rest }) =>
                       rest

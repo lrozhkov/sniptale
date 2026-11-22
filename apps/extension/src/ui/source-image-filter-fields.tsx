@@ -1,4 +1,4 @@
-import { ArrowUp, ArrowDown, Trash2, Plus } from 'lucide-react';
+import { ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
   createSourceImageFilter,
@@ -7,7 +7,7 @@ import {
   type SourceImageFilter,
 } from '../features/image-filters/contract';
 import { translate, type TranslationKey } from '../platform/i18n';
-import { CollapsibleSection, ToggleField } from './compact-inspector-controls';
+import { CollapsibleSection, CompactSelect, ToggleField } from './compact-inspector-controls';
 import { DraftNumericRow } from './compact-inspector-controls/numeric-preview';
 const kinds = [
   'color',
@@ -102,30 +102,21 @@ export function SourceImageFilterFields(props: {
   return (
     <fieldset
       disabled={props.disabled}
-      className="min-w-0 space-y-2"
+      className="sniptale-parameter-stack"
       data-ui="shared.ui.source-image-filter-fields"
     >
-      <div
-        className="flex flex-wrap items-center gap-1"
-        role="group"
-        aria-label={translate('videoEditor.sidebar.sourceFiltersAdd')}
-      >
-        {kinds.map((kind) => (
-          <ContentToolbarButton
-            key={kind}
-            type="button"
-            size="compact"
-            tone="outline"
-            disabled={props.disabled || filters.length >= 16}
-            onClick={() =>
-              publish([...filters, createSourceImageFilter(kind, crypto.randomUUID())])
-            }
-            className="inline-flex items-center gap-1"
-          >
-            <Plus size={14} aria-hidden="true" />
-            {translate(addNames[kind])}
-          </ContentToolbarButton>
-        ))}
+      <div className="px-2">
+        <CompactSelect
+          aria-label={translate('videoEditor.sidebar.sourceFiltersAdd')}
+          placeholder={translate('videoEditor.sidebar.sourceFiltersAdd')}
+          value=""
+          disabled={props.disabled || filters.length >= 16}
+          options={kinds.map((kind) => ({ value: kind, label: translate(addNames[kind]) }))}
+          onChange={(kind) => {
+            if (filters.length < 16)
+              publish([...filters, createSourceImageFilter(kind, crypto.randomUUID())]);
+          }}
+        />
       </div>
       {filters.length === 0 ? (
         <p className="px-2 text-xs text-[var(--sniptale-color-text-secondary)]">
@@ -136,6 +127,7 @@ export function SourceImageFilterFields(props: {
         <CollapsibleSection
           key={entry.id}
           label={translate(names[entry.kind])}
+          aria-label={translate(names[entry.kind])}
           defaultOpen
           data-source-filter-id={entry.id}
         >
@@ -178,54 +170,62 @@ export function SourceImageFilterFields(props: {
           </div>
           <ToggleField
             label={translate('videoEditor.sidebar.sourceFiltersEnabled')}
+            showStatus
             value={entry.enabled}
             disabled={props.disabled}
             onChange={(enabled) => change(entry.id, { enabled })}
           />
-          <DraftNumericRow
-            label={translate('videoEditor.sidebar.sourceFiltersIntensity')}
-            value={entry.intensity * 100}
-            min={0}
-            max={100}
-            step={1}
-            precision={0}
-            unit="%"
-            disabled={!!props.disabled || !entry.enabled}
-            onChange={(value) => change(entry.id, { intensity: value / 100 })}
-          />
-          {Object.entries(entry.parameters).map(([key, value]) => {
-            const range =
-              entry.kind === 'vignette' && key === 'radius'
-                ? {
-                    min: 0,
-                    max: 2,
-                    step: 0.01,
-                    labelKey: 'videoEditor.sidebar.sourceFiltersVignetteRadius' as const,
-                  }
-                : ranges[key];
-            if (!range) return null;
-            return (
-              <DraftNumericRow
-                key={key}
-                label={translate(range.labelKey)}
-                value={value}
-                min={range.min}
-                max={range.max}
-                step={range.step}
-                precision={key === 'seed' ? 0 : 2}
-                disabled={!!props.disabled || !entry.enabled}
-                onChange={(value) =>
-                  publish(
-                    filters.map((item) =>
-                      item.id === entry.id
-                        ? { ...item, parameters: { ...item.parameters, [key]: value } }
-                        : item
+          <div className="sniptale-parameter-stack sniptale-parameter-dependents">
+            <DraftNumericRow
+              label={translate('videoEditor.sidebar.sourceFiltersIntensity')}
+              rangePresentation="field"
+              value={entry.intensity * 100}
+              min={0}
+              max={100}
+              step={1}
+              precision={0}
+              unit="%"
+              disabled={!!props.disabled || !entry.enabled}
+              onChange={(value) => change(entry.id, { intensity: value / 100 })}
+            />
+            {Object.entries(entry.parameters).map(([key, value]) => {
+              const range =
+                entry.kind === 'vignette' && key === 'radius'
+                  ? {
+                      min: 0,
+                      max: 2,
+                      step: 0.01,
+                      labelKey: 'videoEditor.sidebar.sourceFiltersVignetteRadius' as const,
+                    }
+                  : ranges[key];
+              if (!range) return null;
+              return (
+                <DraftNumericRow
+                  key={key}
+                  label={translate(range.labelKey)}
+                  {...(key === 'seed'
+                    ? { stepperPlacement: 'none' }
+                    : { rangePresentation: 'field' })}
+                  unit=""
+                  value={value}
+                  min={range.min}
+                  max={range.max}
+                  step={range.step}
+                  precision={key === 'seed' ? 0 : 2}
+                  disabled={!!props.disabled || !entry.enabled}
+                  onChange={(value) =>
+                    publish(
+                      filters.map((item) =>
+                        item.id === entry.id
+                          ? { ...item, parameters: { ...item.parameters, [key]: value } }
+                          : item
+                      )
                     )
-                  )
-                }
-              />
-            );
-          })}
+                  }
+                />
+              );
+            })}
+          </div>
         </CollapsibleSection>
       ))}
     </fieldset>

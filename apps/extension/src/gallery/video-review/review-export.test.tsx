@@ -114,11 +114,13 @@ it('blocks history and destructive shortcuts while the export controls are disab
     await act(async () =>
       fixture.host
         .querySelector<HTMLButtonElement>(
-          '[aria-label^="gallery.videoReview.cutLabel · 0.0 – 1.0"]'
+          '[data-ui="gallery.videoReview.sourceLane"] button[aria-label^="gallery.videoReview.cutLabel ·"]'
         )!
         .click()
     );
-    await fixture.click('pointerTool');
+    await act(async () =>
+      fixture.key(new KeyboardEvent('keydown', { key: 'v', code: 'KeyV', bubbles: true }))
+    );
     await dragTimePlane(fixture.host, 200, 200);
     await fixture.addFocus();
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));

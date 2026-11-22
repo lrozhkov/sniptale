@@ -3,6 +3,8 @@ import { Plus, Trash2 } from 'lucide-react';
 import { CompactSelect, NumericRow } from '../../../../../ui/compact-inspector-controls';
 import {
   cameraSourceTime,
+  cameraTimelineTime,
+  cameraTimingRate,
   type CameraPositionEdit,
 } from '../../../../../features/video/project/camera/animation';
 import {
@@ -20,6 +22,7 @@ export function CameraVisibilityControls(props: {
   clip: VideoProjectVideoClip;
   currentTime: number;
   sourceDuration: number;
+  timelineDuration?: number;
   disabled: boolean;
   onEdit?: (clipId: string, edit: CameraPositionEdit) => void;
 }) {
@@ -30,24 +33,46 @@ export function CameraVisibilityControls(props: {
     ranges.find((range) => range.id === selectedId) ??
     ranges.find((range) => isCameraHiddenAt([range], time)) ??
     ranges.at(-1);
-  const duration = Math.max(
-    props.sourceDuration + (props.clip.cameraTiming?.offsetSeconds ?? 0),
-    props.clip.sourceStart + props.clip.sourceDuration,
-    ranges.at(-1)?.end ?? 0
-  );
+  const resultClock = props.clip.cameraTiming?.timeDomain === 'result';
+  const clipEnd = resultClock
+    ? cameraSourceTime(props.clip, props.clip.startTime + props.clip.duration)
+    : props.clip.sourceStart + props.clip.sourceDuration;
+  const duration = resultClock
+    ? Math.max(
+        cameraSourceTime(
+          props.clip,
+          props.timelineDuration ?? props.clip.startTime + props.clip.duration
+        ),
+        clipEnd,
+        ranges.at(-1)?.end ?? 0
+      )
+    : Math.max(
+        props.sourceDuration + (props.clip.cameraTiming?.offsetSeconds ?? 0),
+        clipEnd,
+        ranges.at(-1)?.end ?? 0
+      );
   const nextStart = ranges.find((range) => range.start > time)?.start ?? duration;
-  const end = Math.min(
-    props.clip.sourceStart + props.clip.sourceDuration,
-    duration,
-    nextStart,
-    time + (props.clip.playbackRate ?? 1)
-  );
+  const end = Math.min(clipEnd, duration, nextStart, time + cameraTimingRate(props.clip));
   const disabled = props.disabled || !props.onEdit;
   const canAdd =
     ranges.length < MAX_CAMERA_HIDDEN_RANGES &&
     !isCameraHiddenAt(ranges, time) &&
     end - time >= 0.001;
   const edit = (command: CameraPositionEdit) => props.onEdit?.(props.clip.id, command);
+  const displayRanges = resultClock
+    ? ranges.map((range) => ({
+        ...range,
+        start: cameraTimelineTime(props.clip, range.start),
+        end: cameraTimelineTime(props.clip, range.end),
+      }))
+    : ranges;
+  const displaySelected = displayRanges.find((range) => range.id === selected?.id);
+  const displayDuration = resultClock
+    ? Math.max(
+        props.timelineDuration ?? props.clip.startTime + props.clip.duration,
+        displayRanges.at(-1)?.end ?? 0
+      )
+    : duration;
   return (
     <div data-ui="video-editor.camera-visibility">
       <InspectorDetails
@@ -55,8 +80,8 @@ export function CameraVisibilityControls(props: {
         label={translate('videoEditor.sidebar.cameraHiddenRanges')}
       >
         {renderCameraVisibilityActions({
-          ranges,
-          selected,
+          ranges: displayRanges,
+          selected: displaySelected,
           disabled,
           canAdd,
           time,
@@ -64,13 +89,23 @@ export function CameraVisibilityControls(props: {
           select,
           onEdit: edit,
         })}
-        {selected ? (
+        {displaySelected ? (
           <CameraVisibilityBounds
-            range={selected}
-            ranges={ranges}
-            duration={duration}
+            range={displaySelected}
+            ranges={displayRanges}
+            duration={displayDuration}
             disabled={disabled}
-            onEdit={edit}
+            onEdit={(command) =>
+              edit(
+                resultClock && command.kind === 'hide'
+                  ? {
+                      ...command,
+                      start: cameraSourceTime(props.clip, command.start),
+                      end: cameraSourceTime(props.clip, command.end),
+                    }
+                  : command
+              )
+            }
           />
         ) : null}
       </InspectorDetails>

@@ -370,14 +370,16 @@ it('aborts a two-phrase command after a failed real buffer Save and requests onl
         args.draft == null ? null : parseVideoWorkspaceDraft(args.draft, workspace.source.duration),
     };
   });
+  const read = vi.fn();
   const { session } = await render(['first', 'second'], {
     saveVideoWorkspaceSnapshot: save,
     commitVideoWorkspace: vi.fn(),
-    readVideoWorkspace: vi.fn(),
+    readVideoWorkspace: read,
     saveVideoWorkspaceDraft: vi.fn(),
     saveVideoWorkspaceAdvanced: vi.fn(),
     moveVideoWorkspaceHistory: vi.fn(),
   });
+  read.mockResolvedValue(structuredClone(session.getSnapshot().snapshot));
   await session.saveDraft(
     { id: 'draft', text: 'Unsaved', anchor: { kind: 'point', time: 0 } },
     null

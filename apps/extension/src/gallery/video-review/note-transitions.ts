@@ -1,6 +1,25 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 export type ReviewBeforeAction = (action: () => void) => void;
+
+/** Audio presentation commands read the most recently committed receivers. */
+export function useCommittedReviewAudioCommands<
+  T extends { beforeAction: ReviewBeforeAction | undefined },
+>(receivers: T) {
+  const committed = useRef(receivers);
+  useLayoutEffect(() => {
+    committed.current = receivers;
+  });
+  return committed;
+}
+
+export function runReviewBeforeAction(
+  beforeAction: ReviewBeforeAction | undefined,
+  action: () => void
+): void {
+  if (beforeAction) beforeAction(action);
+  else action();
+}
 
 /** A pending note owns one selected continuation; raw lifecycle callbacks never enter here. */
 export function createReviewNoteTransitions(args: {
@@ -91,7 +110,8 @@ export function useReviewNoteTransitions(
 /** Pointer owners retain typed ranges; admission holds their selection and final commit together. */
 export function deferReviewGesture(
   beforeAction: ReviewBeforeAction | undefined,
-  select: () => void
+  select: () => void,
+  selection: 'immediate' | 'click' = 'immediate'
 ) {
   let ready = false;
   let cancelled = false;
@@ -99,10 +119,15 @@ export function deferReviewGesture(
   (beforeAction ?? ((action) => action()))(() => {
     if (cancelled) return;
     ready = true;
-    select();
+    if (selection === 'immediate') select();
     commit?.();
   });
   return {
+    select() {
+      if (cancelled) return;
+      if (ready) select();
+      else commit = select;
+    },
     commit(action: () => void) {
       if (cancelled) return;
       if (ready) action();

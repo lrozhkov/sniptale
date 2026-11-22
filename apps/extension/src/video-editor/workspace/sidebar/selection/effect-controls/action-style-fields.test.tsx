@@ -58,15 +58,40 @@ it('edits each visual property without dropping the other authored values', asyn
       });
       act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
     };
+    const opacity = (index: number) => {
+      const row = container.querySelectorAll('.opacity-field')[index]!;
+      const range = row.querySelector<HTMLInputElement>('input[type="range"]')!;
+      const before = Number(range.value);
+      const key = before >= 100 ? 'ArrowDown' : 'ArrowUp';
+      const next = key === 'ArrowUp' ? (Math.floor(before / 5) + 1) * 5 : 95;
+      act(() => {
+        range.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+        range.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true }));
+      });
+      expect(index === 0 ? onClick : onKey).toHaveBeenLastCalledWith(
+        expect.objectContaining({ opacity: next / 100 })
+      );
+      const pencil = row.querySelector('button')!;
+      act(() => pencil.click());
+      const input = row.querySelector<HTMLInputElement>('input[role="spinbutton"]')!;
+      act(() => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+          input,
+          '50'
+        );
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    };
     number('videoEditor.sidebar.actionSize', '72');
     expect(onClick).toHaveBeenLastCalledWith({ ...clickStyle, size: 72 });
-    number('videoEditor.sidebar.actionOpacity', '50');
+    opacity(0);
     expect(onClick).toHaveBeenLastCalledWith({ ...clickStyle, opacity: 0.5 });
     number('videoEditor.sidebar.actionStroke', '6');
     expect(onClick).toHaveBeenLastCalledWith({ ...clickStyle, strokeWidth: 6 });
     number('videoEditor.sidebar.keyFontSize', '40');
     expect(onKey).toHaveBeenLastCalledWith({ ...keyStyle, fontSize: 40 });
-    number('videoEditor.sidebar.actionOpacity', '50', 1);
+    opacity(1);
     expect(onKey).toHaveBeenLastCalledWith({ ...keyStyle, opacity: 0.5 });
     number('videoEditor.sidebar.keyRadius', '12');
     expect(onKey).toHaveBeenLastCalledWith({ ...keyStyle, cornerRadius: 12 });

@@ -79,7 +79,7 @@ export async function suspendTabNavigationPageEffects(
   effects: TabNavigationPageEffects,
   binding: TabNavigationEffectBinding
 ): Promise<void> {
-  // Collect the outgoing document before optional cleanup can outlive navigation.
+  // Mark navigation pending before optional cleanup can outlive the current binding.
   if (effects.controlledCursor || effects.telemetry) {
     await suspendControlledCursorEffects(binding);
   }

@@ -1,7 +1,7 @@
 import { BlobReader, TextWriter, ZipReader } from '@zip.js/zip.js';
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { createMaintenanceLogEntry } from '../../../../apps/extension/src/composition/persistence/library-lifecycle/maintenance-log-model';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, SETTINGS_HARNESS_PATH } from '../extension-critical.helpers';

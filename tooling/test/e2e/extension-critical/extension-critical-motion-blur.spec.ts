@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { build } from 'esbuild';
 import { writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
@@ -75,7 +76,7 @@ import {
   seedReviewVideo,
   persistedFocus,
 } from '../support/quick-editor-media-fixture';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 for (const variant of [
   { width: 1280, height: 560, locale: 'ru', theme: 'light' },
@@ -129,11 +130,10 @@ for (const variant of [
       await enter
         .getByRole('switch', { name: label('gallery.videoReview.motionBlur'), exact: true })
         .click();
-      const strength = enter.getByRole('textbox', {
-        name: label('gallery.videoReview.motionBlurStrength'),
-        exact: true,
-      });
-      await strength.fill('20');
+      const strength = numericControl(enter, label('gallery.videoReview.motionBlurStrength'));
+      await (
+        await openNumericControl(enter, label('gallery.videoReview.motionBlurStrength'))
+      ).fill('20');
       await strength.press('Tab');
       await expect(strength).toHaveValue('20');
       await expect(exit.getByRole('switch')).toHaveAttribute('aria-checked', 'false');

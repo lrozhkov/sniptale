@@ -58,7 +58,7 @@ describe('timing-fields', () => {
   });
 });
 
-it('retains the AUDIO numeric limit separately from the contextual scrub in legacy composition', () => {
+it('uses exact audio fade fields and keeps the intentional playback rate range', () => {
   const asset = createVideoProjectAsset(
     'Music',
     'AUDIO',
@@ -76,5 +76,9 @@ it('retains the AUDIO numeric limit separately from the contextual scrub in lega
   const audio = createAudioClipFromAsset('track', asset);
   const markup = renderToStaticMarkup(renderClipTimingFields(audio, false, vi.fn(), vi.fn()));
   expect(markup).toContain('videoEditor.sidebar.fadeInLabel');
-  expect(markup).toContain('max="5"');
+  expect(markup).toContain('aria-label="videoEditor.sidebar.fadeInLabel increase"');
+  expect(markup).toContain('aria-label="videoEditor.sidebar.fadeOutLabel increase"');
+  expect(markup).not.toContain('aria-label="videoEditor.sidebar.fadeInLabel range"');
+  expect(markup).not.toContain('aria-label="videoEditor.sidebar.fadeOutLabel range"');
+  expect(markup).toContain('aria-label="videoEditor.sidebar.playbackRateLabel range"');
 });

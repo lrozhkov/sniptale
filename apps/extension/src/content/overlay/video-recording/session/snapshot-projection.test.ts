@@ -1,4 +1,15 @@
-import { expect, it, vi } from 'vitest';
+import { expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadContentCatalogFixture,
+  prepareContentTranslations,
+} from '../../../test-support/translations.test-support';
+
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadContentCatalogFixture>[0]) =>
+    loadContentCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareContentTranslations('en'));
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { projectVideoRecordingSurfaceSnapshot } from './snapshot-projection';
@@ -96,7 +107,7 @@ it('localizes the camera frame-rate failure code for the toolbar', () => {
   expect(dispatch).toHaveBeenCalledWith(
     expect.objectContaining({
       type: 'snapshot',
-      error: 'Камера не поддерживает выбранную частоту кадров. Выберите другую частоту.',
+      error: 'The camera does not support the selected frame rate. Choose another frame rate.',
     })
   );
 });

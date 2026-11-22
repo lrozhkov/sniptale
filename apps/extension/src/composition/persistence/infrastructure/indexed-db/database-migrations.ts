@@ -1,4 +1,9 @@
 import { requireMigrationStores } from './migration-validation';
+import {
+  estimateLegacyLibraryProjectBytes,
+  installLegacyLibraryProjectMigration,
+  LEGACY_LIBRARY_PROJECT_MIGRATION_STORES,
+} from './legacy-library-projects-migration';
 import { editorVectorLibraryMigration } from './vector-library-migration';
 import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
@@ -20,6 +25,7 @@ import {
   VIDEO_GL_TRANSITION_PRESETS_STORE,
   VOICE_INPUT_HISTORY_STORE,
   IMAGE_WORKSPACES_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   SYNC_CAPTURE_STORE,
   SYNC_OUTBOX_STORE,
@@ -27,13 +33,17 @@ import {
   SYNC_CONNECTION_STORE,
   SECRET_PROTECTION_STORE,
   ASSET_OPERATIONS_STORE,
+  ASSET_REFS_STORE,
+  ASSET_OWNERS_STORE,
   ASSET_RESIDENCY_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_REVIEW_IDENTITIES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   SCENARIO_ASSETS_STORE,
+  SCENARIO_PROJECT_REVISIONS_STORE,
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
   SCENARIO_PROJECT_UNITS_STORE,
@@ -1050,6 +1060,171 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
     diagnostic: 'Retained raster document stores are unavailable.',
   }),
   editorVectorLibraryMigration,
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 39, to: 40 }],
+    fromDatabaseVersion: 61,
+    toDatabaseVersion: 62,
+    risk: 'additive',
+    stores: [IMAGE_WORKSPACE_IDENTITIES_STORE],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    migrate(db) {
+      db.createObjectStore(IMAGE_WORKSPACE_IDENTITIES_STORE, { keyPath: 'aggregateId' });
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [IMAGE_WORKSPACE_IDENTITIES_STORE],
+        'Image lifetime store is unavailable.'
+      );
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'scenarioProjects', from: 12, to: 13 }],
+    fromDatabaseVersion: 62,
+    toDatabaseVersion: 63,
+    risk: 'additive',
+    stores: [SCENARIO_PROJECT_REVISIONS_STORE],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    migrate(db) {
+      db.createObjectStore(SCENARIO_PROJECT_REVISIONS_STORE, { keyPath: 'projectId' });
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [SCENARIO_PROJECT_REVISIONS_STORE],
+        'Scenario revision store is unavailable.'
+      );
+    },
+  },
+  contractOnlyMigration({
+    domainVersions: [{ domainId: 'scenarioProjects', from: 13, to: 14 }],
+    fromDatabaseVersion: 63,
+    toDatabaseVersion: 64,
+    stores: [SCENARIO_PROJECTS_STORE, SCENARIO_PROJECT_HISTORY_STORE, SCENARIO_PROJECT_UNITS_STORE],
+    validationStores: [
+      SCENARIO_PROJECTS_STORE,
+      SCENARIO_PROJECT_HISTORY_STORE,
+      SCENARIO_PROJECT_UNITS_STORE,
+    ],
+    diagnostic: 'Scenario editing history stores are unavailable.',
+  }),
+  contractOnlyMigration({
+    domainVersions: [{ domainId: 'videoProjects', from: 13, to: 14 }],
+    fromDatabaseVersion: 64,
+    toDatabaseVersion: 65,
+    stores: [VIDEO_PROJECTS_STORE],
+    validationStores: [VIDEO_PROJECTS_STORE, VIDEO_PROJECT_REVISIONS_STORE],
+    diagnostic: 'Video project history stores are unavailable.',
+  }),
+  contractOnlyMigration({
+    domainVersions: [{ domainId: 'videoProjects', from: 14, to: 15 }],
+    fromDatabaseVersion: 65,
+    toDatabaseVersion: 66,
+    stores: [VIDEO_PROJECTS_STORE],
+    validationStores: [VIDEO_PROJECTS_STORE, VIDEO_PROJECT_REVISIONS_STORE],
+    diagnostic: 'Video project inline history stores are unavailable.',
+  }),
+  contractOnlyMigration({
+    domainVersions: [{ domainId: 'mediaLibrary', from: 40, to: 41 }],
+    fromDatabaseVersion: 66,
+    toDatabaseVersion: 67,
+    stores: [IMAGE_WORKSPACES_STORE],
+    validationStores: [IMAGE_WORKSPACES_STORE, ASSET_REFS_STORE, ASSET_OWNERS_STORE],
+    diagnostic: 'Image packed history stores are unavailable.',
+  }),
+  contractOnlyMigration({
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 41, to: 42 },
+      { domainId: 'videoProjects', from: 15, to: 16 },
+      { domainId: 'scenarioProjects', from: 14, to: 15 },
+    ],
+    fromDatabaseVersion: 67,
+    toDatabaseVersion: 68,
+    stores: [
+      IMAGE_WORKSPACES_STORE,
+      VIDEO_WORKSPACES_STORE,
+      VIDEO_PROJECTS_STORE,
+      SCENARIO_PROJECTS_STORE,
+    ],
+    validationStores: [
+      IMAGE_WORKSPACES_STORE,
+      VIDEO_WORKSPACES_STORE,
+      VIDEO_WORKSPACE_HISTORY_STORE,
+      VIDEO_PROJECTS_STORE,
+      VIDEO_PROJECT_REVISIONS_STORE,
+      SCENARIO_PROJECTS_STORE,
+      SCENARIO_PROJECT_HISTORY_STORE,
+      SCENARIO_PROJECT_UNITS_STORE,
+      SCENARIO_PROJECT_REVISIONS_STORE,
+    ],
+    diagnostic: 'Editor history capacity stores are unavailable.',
+  }),
+  contractOnlyMigration({
+    domainVersions: [{ domainId: 'mediaLibrary', from: 42, to: 43 }],
+    fromDatabaseVersion: 68,
+    toDatabaseVersion: 69,
+    stores: [IMAGE_WORKSPACES_STORE],
+    validationStores: [IMAGE_WORKSPACES_STORE, ASSET_REFS_STORE, ASSET_OWNERS_STORE],
+    diagnostic: 'Image raster history stores are unavailable.',
+  }),
+  contractOnlyMigration({
+    domainVersions: [{ domainId: 'mediaLibrary', from: 43, to: 44 }],
+    fromDatabaseVersion: 69,
+    toDatabaseVersion: 70,
+    stores: [VIDEO_WORKSPACES_STORE],
+    validationStores: [
+      VIDEO_WORKSPACES_STORE,
+      VIDEO_WORKSPACE_HISTORY_STORE,
+      VIDEO_WORKSPACE_DRAFTS_STORE,
+    ],
+    diagnostic: 'Quick-edit workspace stores are unavailable.',
+  }),
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 44, to: 45 }],
+    fromDatabaseVersion: 70,
+    toDatabaseVersion: 71,
+    risk: 'additive',
+    stores: [VIDEO_REVIEW_IDENTITIES_STORE],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    migrate(db) {
+      db.createObjectStore(VIDEO_REVIEW_IDENTITIES_STORE, { keyPath: 'key' });
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [VIDEO_REVIEW_IDENTITIES_STORE],
+        'Quick Edit lifetime store is unavailable.'
+      );
+    },
+  },
+  {
+    backupCoverage: 'full',
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 45, to: 46 },
+      { domainId: 'assetGraph', from: 6, to: 7 },
+    ],
+    fromDatabaseVersion: 71,
+    toDatabaseVersion: 72,
+    risk: 'transforming',
+    stores: LEGACY_LIBRARY_PROJECT_MIGRATION_STORES,
+    estimateAdditionalBytes: estimateLegacyLibraryProjectBytes,
+    migrate(_database, transaction) {
+      return installLegacyLibraryProjectMigration(transaction);
+    },
+    validate(database) {
+      return requireMigrationStores(
+        database,
+        [...LEGACY_LIBRARY_PROJECT_MIGRATION_STORES, SYNC_CAPTURE_STORE],
+        'Legacy Library project stores are unavailable.'
+      );
+    },
+  },
 ];
 
 function projectPrototypeAnimationPreferences(value: unknown) {

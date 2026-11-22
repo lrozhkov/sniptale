@@ -11,6 +11,7 @@ import {
   type PreviewSceneKey,
 } from '../../workflows/video-review/preview-scene';
 import type { RefObject } from 'react';
+import type { ReviewTransportPosition } from './transport';
 import type { QuickPreviewPreferences } from '../../features/video/preview/quick-preferences';
 import { resolveQuickPreviewRasterSize } from '../../features/video/preview/raster';
 import type { createReviewPreviewRenderer } from '../../workflows/video-review/render-preview';
@@ -46,7 +47,8 @@ export interface PresentationInput {
   /** A paused inspector draft retains the displayed frame while its smaller preview renders. */
   deferFrames?: boolean;
   visible?: boolean;
-  seekRevision?: number;
+  seekRevision?: number | undefined;
+  readPosition?: (() => ReviewTransportPosition) | undefined;
   pausedSourceTime: number;
   pausedResultTime: number;
   sourceToResult(sourceTime: number): number | null;
@@ -63,13 +65,53 @@ export interface PresentationInput {
 }
 
 /** Requested FPS counts completed manual publications; native transport statistics are separate. */
+export type ReviewPreviewRendererStatus = PreviewRendererStatus & {
+  /** Present only for an output backed by the mounted independent video decoder. */
+  decodedSourceIdentity?: string;
+};
+
 export interface ReviewPreviewPresentationStatus {
   captionConflicts?: Prepared['captionConflicts'];
-  renderer?: PreviewRendererStatus;
+  renderer?: ReviewPreviewRendererStatus;
   phase: 'inactive' | 'pending' | 'ready' | 'failed';
   actualRaster: Size | null;
   presentedFPS: number | null;
   nativeVideoFPS: number | null;
+}
+
+type FrameStatistics = Pick<ReviewPreviewPresentationStatus, 'presentedFPS' | 'nativeVideoFPS'>;
+
+/** Only the mounted FPS output subscribes to this cached readout snapshot. */
+export interface ReviewPreviewFrameStatisticsSource {
+  read(): FrameStatistics;
+  subscribe(listener: () => void): () => void;
+}
+
+/** One presentation lifetime owns readout publication and reset. */
+export function createPresentationFrameStatistics() {
+  let current: FrameStatistics = { presentedFPS: null, nativeVideoFPS: null };
+  const listeners = new Set<() => void>();
+  const source: ReviewPreviewFrameStatisticsSource = {
+    read: () => current,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+  return {
+    source,
+    publish(value: FrameStatistics) {
+      if (
+        current.presentedFPS === value.presentedFPS &&
+        current.nativeVideoFPS === value.nativeVideoFPS
+      )
+        return;
+      current = { presentedFPS: value.presentedFPS, nativeVideoFPS: value.nativeVideoFPS };
+      for (const listener of listeners) listener();
+    },
+  };
 }
 
 export type Description = {
@@ -112,6 +154,7 @@ export function resolvePresentationDescription(
       position: comments[comment.id] ?? comment.position,
     })),
   };
+  const position = input.readPosition?.();
   const context = [
     input.sourceIdentity,
     input.annotationGesture,
@@ -120,6 +163,8 @@ export function resolvePresentationDescription(
     input.preferences,
     input.sourceFrameRate,
     input.seekRevision,
+    position?.epoch,
+    position?.mapRevision,
     input.backgroundPending,
     input.playing,
     input.deferFrames,
@@ -226,7 +271,7 @@ function samePresentationMetadata(
     left.phase === right.phase &&
     left.renderer?.backend === right.renderer?.backend &&
     left.renderer?.fallback === right.renderer?.fallback &&
-    left.nativeVideoFPS === right.nativeVideoFPS &&
+    left.renderer?.decodedSourceIdentity === right.renderer?.decodedSourceIdentity &&
     left.actualRaster?.width === right.actualRaster?.width &&
     left.actualRaster?.height === right.actualRaster?.height &&
     JSON.stringify(left.captionConflicts ?? []) === JSON.stringify(right.captionConflicts ?? [])
@@ -236,21 +281,25 @@ function samePresentationMetadata(
 /** Gate UI readout updates; explicit statistics consumers still receive every publication. */
 export function createPresentationFeedback(
   report: (value: ReviewPreviewPresentationStatus) => void,
-  statistics: (value: ReviewPreviewPresentationStatus) => void
+  statistics: (value: ReviewPreviewPresentationStatus) => void,
+  readout: (value: FrameStatistics) => void
 ) {
   let previous: { status: ReviewPreviewPresentationStatus; at: number } | null = null;
   return (value: ReviewPreviewPresentationStatus) => {
     const now = performance.now();
     const sameMetadata = previous !== null && samePresentationMetadata(previous.status, value);
-    const sameFPS = previous?.status.presentedFPS === value.presentedFPS;
+    const sameFPS =
+      previous?.status.presentedFPS === value.presentedFPS &&
+      previous?.status.nativeVideoFPS === value.nativeVideoFPS;
     const pendingReadout =
       previous &&
-      previous.status.presentedFPS !== null &&
-      value.presentedFPS !== null &&
+      ((previous.status.presentedFPS !== null && value.presentedFPS !== null) ||
+        (previous.status.nativeVideoFPS !== null && value.nativeVideoFPS !== null)) &&
       now - previous.at < PREVIEW_STATISTICS_INTERVAL_MS;
     if (!sameMetadata || (!sameFPS && !pendingReadout)) {
       previous = { status: value, at: now };
-      report(value);
+      if (!sameMetadata) report(value);
+      readout(value);
     }
     statistics(value);
   };

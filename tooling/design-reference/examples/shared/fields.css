@@ -35,8 +35,10 @@ textarea.text-input {
   border-color: transparent;
   background: transparent;
 }
-.text-field:not(:has(> .text-label:hover)) > .text-input:hover:not(:disabled):not(:read-only),
-.text-field:focus-within > .text-input:not(:disabled):not(:read-only) {
+.text-field:where(:not(.text-field--dictation)):not(:has(> .text-label:hover))
+  > .text-input:hover:not(:disabled):not(:read-only),
+.text-field:where(:not(.text-field--dictation)):focus-within
+  > .text-input:not(:disabled):not(:read-only) {
   background: var(--surface-hover);
   border-color: var(--field-border, var(--divider));
 }
@@ -57,20 +59,13 @@ html[data-input-mode='keyboard'] .text-input:focus-visible {
 .text-field[data-readonly='true'] .text-input {
   background: transparent;
 }
-.reference-case .field-description,
-.reference-case .field-error {
+.reference-case .field-description {
   font-size: 12px;
   line-height: 1.5;
   margin: 6px 0 0;
 }
 .reference-case .field-description {
   color: var(--secondary);
-}
-.reference-case .field-error {
-  color: #be123c;
-}
-.theme[data-theme='dark'] .reference-case .field-error {
-  color: #fda4af;
 }
 .field-description:empty,
 .field-error:empty {
@@ -123,6 +118,50 @@ html[data-input-mode='keyboard'] .text-input:focus-visible {
   margin-bottom: 0;
 }
 
+.text-field--suggestions {
+  --surface-hover: var(--reference-field-hover);
+  --field-border: var(--reference-field-hover-border);
+  position: relative;
+  max-inline-size: 320px;
+}
+.text-field--suggestions > .text-input {
+  border-color: var(--reference-field-border);
+  background: var(--reference-field-idle);
+}
+.text-suggestions {
+  position: absolute;
+  z-index: 2;
+  inset-inline: 0;
+  inset-block-start: calc(100% + 4px);
+  max-block-size: 156px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+.text-suggestions > button {
+  display: block;
+  inline-size: 100%;
+  min-block-size: var(--control-height);
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.text-suggestions > button:hover {
+  background: var(--surface-hover);
+}
+.text-suggestions > button[aria-selected='true'] {
+  background: color-mix(in srgb, var(--secondary) 18%, var(--panel));
+}
+
 /* Direct children keep field hover separate from the parameter name. */
 .text-field--clearable {
   display: grid;
@@ -172,7 +211,9 @@ html[data-input-mode='keyboard'] .text-input:focus-visible {
   font: 400 12px/16px var(--font-ui);
 }
 .reference-case .field-error {
-  font: 400 14px/20px var(--font-ui);
+  margin: var(--reference-field-error-gap) 0 0;
+  color: var(--reference-field-error-color);
+  font: var(--reference-field-error-font);
 }
 /* Authored multiline content retains a full-width editor in compact inspectors. */
 .inspector-controls .text-field[data-context='inspector']:has(> textarea) {
@@ -206,21 +247,259 @@ html[data-input-mode='keyboard'] .text-input:focus-visible {
   margin-top: 4px;
 }
 
-.text-field.text-field--clearable > .text-clear {
+.text-field.text-field--clearable:where(:not([slot='inspector-text'])) > .text-clear {
   visibility: hidden;
   pointer-events: none;
 }
-.text-field.text-field--clearable:not(:has(> .text-label:hover)):has(
-    > .text-input:hover,
-    > .text-clear:hover
-  )
+.text-field.text-field--clearable:where(:not([slot='inspector-text'])):not(
+    :has(> .text-label:hover)
+  ):has(> .text-input:hover, > .text-clear:hover)
   > .text-clear,
-.text-field.text-field--clearable:focus-within > .text-clear {
+.text-field.text-field--clearable:where(:not([slot='inspector-text'])):focus-within > .text-clear {
   visibility: visible;
   pointer-events: auto;
 }
 
-.text-field.text-field--clearable:has(> input:is(:hover, :focus), > .text-clear:is(:hover, :focus))
+.text-field.text-field--clearable:where(:not([slot='inspector-text'], .text-field--search)):has(
+    > input:is(:hover, :focus),
+    > .text-clear:is(:hover, :focus)
+  )
   > input {
   padding-inline-end: 36px;
+}
+
+.text-field--search {
+  --surface-hover: var(--reference-field-hover);
+  --field-border: var(--reference-field-hover-border);
+}
+.text-field.text-field--search > input[type='search'] {
+  padding-inline: 28px 34px;
+  background: var(--reference-field-idle);
+  border-color: var(--reference-field-border);
+}
+.text-field--search > input::-webkit-search-cancel-button {
+  display: none;
+}
+.text-field--search > .text-search-icon {
+  z-index: 1;
+  grid-area: 2 / 1;
+  align-self: center;
+  margin-inline-start: 8px;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  fill: none;
+  stroke: var(--secondary);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.text-field--dictation::before {
+  content: '';
+  grid-area: 2 / 1 / span 2 / 2;
+  border: 1px solid var(--reference-field-border);
+  border-radius: var(--radius);
+  background: var(--reference-field-idle);
+  pointer-events: none;
+}
+.text-field--dictation:is(:focus-within, :hover:not(:has(> .text-label:hover)))::before {
+  background: var(--reference-field-hover);
+  border-color: var(--reference-field-hover-border);
+}
+html[data-input-mode='keyboard'] .text-field--dictation:has(> textarea:focus-visible)::before {
+  border-color: var(--sniptale-color-border-strong);
+}
+.text-field.text-field--dictation > textarea.text-input {
+  min-height: 90px;
+  padding-inline-end: 36px;
+  background: transparent;
+  border-color: transparent;
+  outline: none;
+}
+.text-field.text-field--dictation > .text-clear {
+  margin-inline-end: 12px;
+}
+.text-field--dictation > .inspector-dictation.action-button {
+  grid-area: 3 / 1;
+  align-self: end;
+  justify-self: end;
+  z-index: 1;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  margin-inline-end: 12px;
+  margin-block: 4px;
+  padding: 0;
+  visibility: hidden;
+}
+.text-field--dictation > .inspector-dictation svg {
+  width: 14px;
+  height: 14px;
+}
+.text-field--dictation:is(:focus-within, :hover:not(:has(> .text-label:hover)))
+  > .inspector-dictation {
+  visibility: visible;
+}
+
+.text-field[slot='inspector-text'] {
+  --surface-hover: var(--reference-field-hover);
+  --field-border: var(--reference-field-hover-border);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--reference-inspector-value-width, 52%));
+  column-gap: 8px;
+  align-items: start;
+  margin: 0;
+  --text-voice-space: 0px;
+  --text-clear-space: 0px;
+  --text-accessory-offset: calc(1px + (var(--reference-inspector-action-width, 29px) - 24px) / 2);
+}
+.text-field[slot='inspector-text']:has(> .inspector-dictation) {
+  --text-voice-space: var(--reference-inspector-action-width, 29px);
+}
+.text-field[slot='inspector-text']:focus-within {
+  --field-border: var(--reference-field-focus);
+}
+.text-field[slot='inspector-text'] > .text-label {
+  grid-area: 1 / 1;
+  margin: 0;
+  padding-block: 7px;
+  line-height: var(--font-control-line);
+}
+.text-field[slot='inspector-text'] > .text-input {
+  grid-area: 1 / 2;
+  padding-inline-end: calc(
+    var(--control-padding-inline) + var(--text-voice-space) + var(--text-clear-space)
+  );
+  background: var(--reference-field-idle);
+  border-color: var(--reference-field-border);
+  cursor: text;
+}
+.text-field[slot='inspector-text'] > .text-input:focus-visible {
+  outline: 0;
+}
+.text-field[slot='inspector-text'] > textarea.text-input {
+  min-height: 64px;
+}
+.text-field:is([slot='inspector-text'], .text-field--dictation) > textarea.text-input {
+  --text-scroll-thumb: color-mix(in srgb, var(--secondary) 34%, transparent);
+  --text-resize-ink: color-mix(in srgb, var(--secondary) 52%, transparent);
+  cursor: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-scroll-thumb) transparent;
+}
+@supports selector(::-webkit-scrollbar) {
+  .text-field:is([slot='inspector-text'], .text-field--dictation) > textarea.text-input {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+  .text-field:is([slot='inspector-text'], .text-field--dictation)
+    > textarea.text-input::-webkit-scrollbar {
+    width: 7px;
+    cursor: default;
+  }
+  .text-field:is([slot='inspector-text'], .text-field--dictation)
+    > textarea.text-input::-webkit-scrollbar-track {
+    background: transparent;
+    cursor: default;
+  }
+  .text-field:is([slot='inspector-text'], .text-field--dictation)
+    > textarea.text-input::-webkit-scrollbar-thumb {
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: var(--text-scroll-thumb) padding-box;
+    cursor: default;
+  }
+  .text-field:is([slot='inspector-text'], .text-field--dictation)
+    > textarea.text-input::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--secondary) 52%, transparent);
+  }
+  .text-field:is([slot='inspector-text'], .text-field--dictation)
+    > textarea.text-input::-webkit-scrollbar-button {
+    display: none;
+  }
+  .text-field:is([slot='inspector-text'], .text-field--dictation)
+    > textarea.text-input::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  .text-field:is([slot='inspector-text'], .text-field--dictation)
+    > textarea.text-input::-webkit-resizer {
+    background: linear-gradient(
+        to top left,
+        transparent 2px,
+        var(--text-resize-ink) 2px 3px,
+        transparent 3px 5px,
+        var(--text-resize-ink) 5px 6px,
+        transparent 6px
+      )
+      right bottom / 8px 8px no-repeat;
+  }
+}
+@media (forced-colors: active) {
+  .text-field:is([slot='inspector-text'], .text-field--dictation) > textarea.text-input {
+    --text-resize-ink: CanvasText;
+  }
+  .text-field:is([slot='inspector-text'], .text-field--dictation)
+    > textarea.text-input::-webkit-resizer {
+    forced-color-adjust: none;
+  }
+}
+.text-field[slot='inspector-text'] > :is(.field-description, .field-error) {
+  grid-column: 2;
+}
+
+.text-field[slot='inspector-text'] > :is(.text-clear, .inspector-dictation).action-button {
+  grid-area: 1 / 2;
+  justify-self: end;
+  align-self: center;
+  z-index: 1;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  margin-inline-end: var(--text-accessory-offset);
+  padding: 0;
+  color: var(--reference-inspector-icon-ink);
+}
+.text-field[slot='inspector-text'] > :is(.text-clear, .inspector-dictation)[hidden] {
+  display: none;
+}
+.text-field[slot='inspector-text'] > .inspector-dictation.action-button {
+  align-self: start;
+  margin-block-start: 4px;
+  margin-inline-end: calc(var(--text-accessory-offset) + 5px);
+  opacity: 0;
+  pointer-events: none;
+}
+.text-field[slot='inspector-text']:is(
+    :focus-within,
+    :has(> :is(.text-input, .inspector-dictation):hover)
+  )
+  > .inspector-dictation {
+  opacity: 1;
+  pointer-events: auto;
+}
+.text-field[slot='inspector-text'] > .text-clear.action-button {
+  opacity: 0;
+  pointer-events: none;
+}
+.text-field[slot='inspector-text']:not(:has(> .text-input:focus)):has(
+    > .text-input:hover ~ .text-clear:not([hidden]),
+    > .text-clear:is(:hover, :focus-visible):not([hidden])
+  ) {
+  --text-clear-space: var(--reference-inspector-action-width, 29px);
+}
+.text-field[slot='inspector-text']:not(:has(> .text-input:focus))
+  > :is(.text-input:hover ~ .text-clear, .text-clear:hover, .text-clear:focus-visible) {
+  opacity: 1;
+  pointer-events: auto;
+}
+.text-field[slot='inspector-text'] > :is(.text-clear, .inspector-dictation) svg {
+  width: var(--reference-inspector-icon-size);
+  height: var(--reference-inspector-icon-size);
+  flex-basis: var(--reference-inspector-icon-size);
+}
+.text-field[slot='inspector-text'] > :is(.text-clear, .inspector-dictation) svg > * {
+  vector-effect: non-scaling-stroke;
+  stroke-width: var(--reference-inspector-icon-stroke);
 }

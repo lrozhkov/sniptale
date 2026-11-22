@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   loggerWarn: vi.fn(),
   notifyStartFailed: vi.fn(),
   requestBoundStop: vi.fn(),
-  translate: vi.fn(),
 }));
 
 vi.mock('../recording-control-lease', async (importOriginal) => ({
@@ -32,11 +31,6 @@ vi.mock('../runtime/manager', async (importOriginal) => ({
 vi.mock('../runtime/recording-completion', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../runtime/recording-completion')>()),
   failRecordingStartAfterTimeout: mocks.notifyStartFailed,
-}));
-
-vi.mock('../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
-  translate: mocks.translate,
 }));
 
 vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
@@ -68,7 +62,6 @@ beforeEach(() => {
   mocks.requestBoundStop.mockResolvedValue({ terminalError: null });
   mocks.clearActiveLease.mockResolvedValue(undefined);
   mocks.notifyStartFailed.mockResolvedValue(undefined);
-  mocks.translate.mockReturnValue('Recording start timed out');
 });
 
 afterEach(() => {
@@ -81,7 +74,7 @@ it('routes the default timer to the completion owner with its original identity'
   await vi.advanceTimersByTimeAsync(RECORDING_START_ACTIVATION_TIMEOUT_MS);
   expect(mocks.notifyStartFailed).toHaveBeenCalledExactlyOnceWith(
     'recording-1',
-    'Recording start timed out'
+    'start-activation-timeout'
   );
   expect(mocks.requestBoundStop).not.toHaveBeenCalled();
   expect(mocks.clearActiveLease).not.toHaveBeenCalled();

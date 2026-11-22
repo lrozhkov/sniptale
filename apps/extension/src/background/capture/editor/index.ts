@@ -105,6 +105,10 @@ export async function openEditorWithImage(
     title?: string | null;
   }
 ): Promise<void> {
+  if (sourceContext?.assetId) {
+    await browserTabs.create({ url: createEditorTabUrl(null, sourceContext.assetId) });
+    return;
+  }
   const capturedAt = Date.now();
   const { sourceFaviconUrl, sourceUrl, sourceTitle } =
     await resolveEditorSourceMetadata(sourceContext);

@@ -127,6 +127,12 @@ function fixture(projection?: 'outer' | 'nested') {
   };
 }
 
+async function publishDraft(f: ReturnType<typeof fixture>) {
+  await f.session.saveDraft(null, null);
+  await f.session.flush();
+  return f.session.getSnapshot().snapshot;
+}
+
 it('separates a coherent initial-open receipt from canonical state and returns a fresh exact DTO', async () => {
   const f = fixture();
   expect(f.session.getCheckpointExitReceipt()).toEqual(receipt(1));
@@ -142,11 +148,14 @@ it('separates a coherent initial-open receipt from canonical state and returns a
 });
 
 it.each(['outer', 'nested'] as const)(
-  'consumes %s projection metadata without changing snapshot or document semantics',
+  'keeps local admission separate from the legacy %s projection adapter',
   async (projection) => {
     const f = fixture(projection);
     const saved = await f.session.commit(operation);
     expect(saved).not.toHaveProperty('checkpointReceipt');
+    expect(f.projected).not.toHaveBeenCalled();
+    expect(f.session.getCheckpointExitReceipt()).toBeNull();
+    await f.session.flush();
     expect(f.session.getCheckpointExitReceipt()).toEqual(receipt(2));
     expect(JSON.stringify(f.session.getSnapshot())).not.toContain('checkpointReceipt');
     expect(f.session.getSnapshot().snapshot).toEqual(await f.read());
@@ -157,10 +166,10 @@ it.each(['outer', 'nested'] as const)(
 
 it('consumes plain native ACK metadata and clears authority on a later legacy ACK omission', async () => {
   const f = fixture();
-  expect(await f.session.saveDraft(null, null)).not.toHaveProperty('checkpointReceipt');
+  expect(await publishDraft(f)).not.toHaveProperty('checkpointReceipt');
   expect(f.session.getCheckpointExitReceipt()).toEqual(receipt(2));
   f.omit();
-  await f.session.saveDraft(null, null);
+  await publishDraft(f);
   expect(f.session.getCheckpointExitReceipt()).toBeNull();
   expect(f.session.getSnapshot().snapshot).toEqual(await f.read());
   await f.session.dispose();
@@ -170,17 +179,18 @@ it('does not expose an old receipt while a newer native ACK is pending and retai
   const f = fixture();
   const entered = deferred<void>();
   const ack = deferred<VideoWorkspaceSnapshot>();
-  f.save.mockImplementationOnce(async () => {
+  f.saveSnapshot.mockImplementationOnce(async () => {
     entered.resolve();
     return ack.promise;
   });
-  const first = f.session.saveDraft(null, null);
+  const first = publishDraft(f);
   await entered.promise;
   const second = f.session.saveDraft(null, null);
+  await second;
   expect(f.session.getCheckpointExitReceipt()).toBeNull();
   ack.resolve(f.acknowledge());
   await first;
-  await second;
+  await f.session.flush();
   expect(f.session.getCheckpointExitReceipt()).toEqual(receipt(3));
   await f.session.dispose();
 });
@@ -201,7 +211,7 @@ it('keeps confirmed-absence recovery equality independent of a prior receipt-bea
   const f = fixture();
   f.commit.mockRejectedValueOnce(new Error('Native refused'));
   await expect(f.session.commitDurable(operation)).rejects.toThrow('Native refused');
-  await f.session.saveDraft(null, null);
+  await publishDraft(f);
   expect(f.session.getCheckpointExitReceipt()).toEqual(receipt(2));
   await expect(f.session.recoverDurableOperation(operation, 1, { kind: 'text' })).resolves.toBe(
     false
@@ -241,11 +251,11 @@ it('never restores receipt authority after disposal when an older native ACK arr
   const f = fixture();
   const entered = deferred<void>();
   const ack = deferred<VideoWorkspaceSnapshot>();
-  f.save.mockImplementationOnce(async () => {
+  f.saveSnapshot.mockImplementationOnce(async () => {
     entered.resolve();
     return ack.promise;
   });
-  const saving = f.session.saveDraft(null, null);
+  const saving = publishDraft(f);
   await entered.promise;
   const disposal = f.session.dispose();
   expect(f.session.getCheckpointExitReceipt()).toBeNull();
@@ -281,12 +291,14 @@ it(
 
 it('refuses a receipt from another aggregate even when a legacy adapter returns a matching foreign snapshot', async () => {
   const f = fixture();
-  f.save.mockResolvedValueOnce({
+  f.saveSnapshot.mockResolvedValueOnce({
     ...f.initial,
     workspace: { ...f.initial.workspace, aggregateId: 'recording:other', revision: 2 },
     checkpointReceipt: { ...receipt(2), rootId: 'recording:other' },
   });
-  await f.session.saveDraft(null, null);
+  await expect(publishDraft(f)).rejects.toMatchObject({ code: 'conflict' });
+  expect(f.session.getSnapshot().snapshot.workspace.aggregateId).toBe(id);
+  expect(f.session.getSnapshot().dirty).toBe(true);
   expect(f.session.getCheckpointExitReceipt()).toBeNull();
   expect(f.session.getSnapshot().snapshot).not.toHaveProperty('checkpointReceipt');
   await f.session.dispose();
@@ -298,12 +310,12 @@ it('ignores malformed or mismatched ACK receipts without changing the accepted l
     { ...receipt(2), rootId: 'other' },
   ]) {
     const f = fixture();
-    f.save.mockResolvedValueOnce({
+    f.saveSnapshot.mockResolvedValueOnce({
       ...f.initial,
       workspace: { ...f.initial.workspace, revision: 2 },
       checkpointReceipt: invalid,
     });
-    await f.session.saveDraft(null, null);
+    await publishDraft(f);
     expect(f.session.getCheckpointExitReceipt()).toBeNull();
     expect(f.session.getSnapshot()).toMatchObject({ error: null, dirty: false });
     expect(f.session.getSnapshot().snapshot).not.toHaveProperty('checkpointReceipt');
@@ -323,19 +335,21 @@ it('opens safely without a receipt when a legacy opening adapter omits transient
 
 function projectCreationAck(initial: VideoWorkspaceSnapshot, command: string) {
   const sourceId = initial.workspace.sourceMediaId ?? initial.workspace.aggregateId;
-  const { sourceMediaId: _source, ...body } = initial.workspace;
+  const body = initial.workspace;
+  const projectId = `${sourceId.split(':', 1)[0]}:quick-project:${command}`;
   return {
     workspace: {
       ...body,
-      aggregateId: sourceId,
-      revision: body.revision + 1,
+      aggregateId: projectId,
+      sourceMediaId: sourceId,
+      revision: 1,
       createdAt: body.createdAt + 1,
     },
     draft: null,
     checkpointReceipt: { ...receipt(2), rootId: initial.workspace.aggregateId },
-    archiveCheckpointReceipt: {
+    newProjectCheckpointReceipt: {
       ...receipt(5),
-      rootId: `${sourceId.split(':', 1)[0]}:quick-project:${command}`,
+      rootId: projectId,
     },
     ...(initial.workspace.aggregateId !== sourceId
       ? {
@@ -349,24 +363,27 @@ it('forwards only validated creation roles and keeps all metadata out of canonic
   const f = fixture();
   const command = token(77);
   const ack = projectCreationAck(f.initial, command);
-  const create = vi.fn(async () => ({ ...ack, retainedEditorCheckpointReceipt: receipt(2) }));
+  const create = vi.fn(async () => ({
+    ...ack,
+    retainedEditorCheckpointReceipt: { ...receipt(2), rootId: 'recording:other' },
+  }));
   const session = createVideoReviewSession(f.initial, {
     ...f.deps,
     createVideoWorkspaceProject: create,
   });
   const created = await session.createProject(command);
-  expect(created.archiveCheckpointReceipt).toEqual(ack.archiveCheckpointReceipt);
+  expect(created.newProjectCheckpointReceipt).toEqual(ack.newProjectCheckpointReceipt);
   expect(created.retainedEditorCheckpointReceipt).toBeUndefined();
   expect(created).not.toHaveProperty('checkpointReceipt');
   expect(session.getCheckpointExitReceipt()).toBeNull();
   expect(JSON.stringify(session.getSnapshot())).not.toMatch(
-    /checkpointReceipt|archiveCheckpointReceipt|retainedEditorCheckpointReceipt/u
+    /checkpointReceipt|newProjectCheckpointReceipt|retainedEditorCheckpointReceipt/u
   );
   await session.dispose();
   await f.session.dispose();
 });
 
-it('preserves the archive B and retained A roles when the newly selected default is C', async () => {
+it('preserves receipt roles for both projects when the editor used an independent ID', async () => {
   const f = fixture();
   const command = token(78);
   const initial = {
@@ -384,10 +401,10 @@ it('preserves the archive B and retained A roles when the newly selected default
     createVideoWorkspaceProject: vi.fn(async () => ack),
   });
   const created = await session.createProject(command);
-  expect(created.workspace.aggregateId).toBe(id);
-  expect(created.archiveCheckpointReceipt).toEqual(ack.archiveCheckpointReceipt);
+  expect(created.workspace.aggregateId).toBe(ack.newProjectCheckpointReceipt.rootId);
+  expect(created.newProjectCheckpointReceipt).toEqual(ack.newProjectCheckpointReceipt);
   expect(created.retainedEditorCheckpointReceipt).toEqual(ack.retainedEditorCheckpointReceipt);
-  expect(created.archiveCheckpointReceipt?.rootId).not.toBe(id);
+  expect(created.newProjectCheckpointReceipt?.rootId).not.toBe(id);
   expect(created.retainedEditorCheckpointReceipt?.rootId).not.toBe(id);
   expect(session.getCheckpointExitReceipt()).toBeNull();
   expect(JSON.stringify(session.getSnapshot())).not.toContain('CheckpointReceipt');
@@ -399,21 +416,21 @@ it('does not resurrect prior creation roles from a completed command replay or a
   const f = fixture();
   const command = token(79);
   const ack = projectCreationAck(f.initial, command);
-  const { checkpointReceipt: _generic, archiveCheckpointReceipt: _archive, ...canonical } = ack;
+  const { checkpointReceipt: _generic, newProjectCheckpointReceipt: _archive, ...canonical } = ack;
   const create = vi
     .fn()
     .mockResolvedValueOnce(ack)
     .mockResolvedValueOnce(canonical)
-    .mockResolvedValueOnce({ ...ack, archiveCheckpointReceipt: receipt(2) });
+    .mockResolvedValueOnce({ ...ack, newProjectCheckpointReceipt: receipt(2) });
   const session = createVideoReviewSession(f.initial, {
     ...f.deps,
     createVideoWorkspaceProject: create,
   });
   await session.createProject(command);
   const replay = await session.createProject(command);
-  expect(replay).not.toHaveProperty('archiveCheckpointReceipt');
+  expect(replay).not.toHaveProperty('newProjectCheckpointReceipt');
   expect(replay).not.toHaveProperty('retainedEditorCheckpointReceipt');
-  expect((await session.createProject(command)).archiveCheckpointReceipt).toBeUndefined();
+  expect((await session.createProject(command)).newProjectCheckpointReceipt).toBeUndefined();
   await session.dispose();
   await f.session.dispose();
 });
@@ -437,7 +454,7 @@ it('drops delayed creation role authority after this mounted session has been di
   const disposal = session.dispose();
   reply.resolve(ack);
   const created = await creating;
-  expect(created).not.toHaveProperty('archiveCheckpointReceipt');
+  expect(created).not.toHaveProperty('newProjectCheckpointReceipt');
   expect(created).not.toHaveProperty('retainedEditorCheckpointReceipt');
   await disposal;
   await f.session.dispose();

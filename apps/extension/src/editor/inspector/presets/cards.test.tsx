@@ -69,11 +69,11 @@ it('filters tagged cards while pinning the selected template and exposes clear a
   expect(host.querySelector('[data-editor-template-card="hidden"]')).toBeNull();
   expect(host.textContent).toContain('Review');
 
-  const input = host.querySelector<HTMLInputElement>('input[type="text"]');
+  const input = host.querySelector<HTMLInputElement>('input[type="search"]')!;
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
   await act(async () => {
     setter?.call(input, 'absent');
-    input?.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('input', { bubbles: true }));
   });
   expect(host.querySelector('[data-editor-template-card="selected"]')).not.toBeNull();
   expect(host.querySelector('[data-editor-template-card="matching"]')).toBeNull();

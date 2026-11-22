@@ -75,6 +75,9 @@ it('adds empty scenario history and DB48 reference indexes before publishing cur
     [VIDEO_VISUAL_PREFERENCES_STORE, { keyPath: ['kind', 'packId'] }],
     [VIDEO_GL_TRANSITION_PRESETS_STORE, { keyPath: 'id' }],
     ['editor_vector_library', { keyPath: 'key' }],
+    ['image_workspace_identities', { keyPath: 'aggregateId' }],
+    ['scenario_project_revisions', { keyPath: 'projectId' }],
+    ['video_review_identities', { keyPath: 'key' }],
   ]);
   expect(createIndex.mock.calls).toEqual([
     ['projectId', 'projectId'],
@@ -122,7 +125,7 @@ it('adds empty scenario history and DB48 reference indexes before publishing cur
     [ROW_REFERENCE_INDEX, ROW_REFERENCE_FIELD, { multiEntry: true }],
   ]);
   await vi.waitFor(() =>
-    expect(openCursor).toHaveBeenCalledTimes(REFERENCE_INDEX_STORES.length + 2)
+    expect(openCursor).toHaveBeenCalledTimes(REFERENCE_INDEX_STORES.length + 4)
   );
   expect(tx.objectStore.mock.calls).toEqual([
     [SYNC_OUTBOX_STORE],
@@ -140,9 +143,13 @@ it('adds empty scenario history and DB48 reference indexes before publishing cur
     ...REFERENCE_INDEX_STORES.slice(1).map((name) => [name]),
     ['video_workspaces'],
     ['video_workspace_history'],
+    ['image_workspaces'],
+    ['video_workspaces'],
   ]);
-  expect(openCursor.mock.calls).toEqual(REFERENCE_INDEX_STORES.map(() => []).concat([[], []]));
-  expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 12 });
+  expect(openCursor.mock.calls).toEqual(
+    REFERENCE_INDEX_STORES.map(() => []).concat([[], [], [], []])
+  );
+  expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 15 });
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(getAll).not.toHaveBeenCalled();
   expect(tx.abort).not.toHaveBeenCalled();

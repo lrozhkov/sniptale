@@ -164,6 +164,7 @@ it('adopts prepared resource ownership only on commit and preserves disabled aut
   autosave.adoptPreparedDocument({
     aggregateId: 'target',
     revision: 7,
+    sourceGeneration: 'restored-target',
     sourceUrl: '',
     sourceTitle: 'Target',
     documentAssetsByRuntimeUrl: map,
@@ -202,6 +203,41 @@ it('adopts prepared resource ownership only on commit and preserves disabled aut
   );
   autosave.dispose();
   expect(releaseTarget).toHaveBeenCalledOnce();
+});
+
+it('does not adopt an old acknowledgement after the same root opens another lifetime', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  const autosave = createEditorSessionAutosaveService();
+  activate(autosave);
+  autosave.updateContext({ sourceGeneration: 'old-lifetime' });
+  let release: () => void = () => undefined;
+  commitWorkspaceMock.mockImplementationOnce(async () => {
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return {
+      revision: 1,
+      sourceGeneration: 'old-lifetime',
+      documentAssetsByRuntimeUrl: new Map(),
+      documentAssetsByVectorDefinitionId: new Map(),
+    };
+  });
+  const oldSave = autosave.saveNow(() => createDocument('old')).catch((error: unknown) => error);
+  await vi.advanceTimersByTimeAsync(0);
+  const hydration = autosave.beginHydration(() => true);
+  autosave.updateContext({ durableRevision: 7, sourceGeneration: 'restored-lifetime' });
+  hydration.finish(true);
+  release();
+  await oldSave;
+  expect(autosave.getDurableRevision()).toBe(7);
+  await autosave.saveNow(() => createDocument('restored edit'));
+  expect(commitWorkspaceMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      expectedRevision: 7,
+      expectedGeneration: 'restored-lifetime',
+    })
+  );
+  autosave.dispose();
 });
 
 function vectorAsset(assetId: string) {

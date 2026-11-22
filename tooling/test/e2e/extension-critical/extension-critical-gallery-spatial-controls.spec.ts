@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
 import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
@@ -11,7 +12,7 @@ import {
   persistedFocus,
 } from '../support/quick-editor-media-fixture';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 enableGpuPreviewProof();
 
@@ -149,8 +150,8 @@ for (const variant of [
     const controls = dialog.locator('[data-ui="gallery.videoReview.spatialControls"]');
     const tool = (key: Message) => tools.getByRole('button', { name: label(key), exact: true });
     const exact = async (key: Message, value: string) => {
-      const input = dialog.getByRole('textbox', { name: label(key), exact: true });
-      await input.fill(value);
+      const input = numericControl(dialog, label(key));
+      await (await openNumericControl(dialog, label(key))).fill(value);
       await input.press('Enter');
       await expect(input).not.toBeFocused();
     };
@@ -238,7 +239,7 @@ for (const variant of [
       expect(await historyCursor(page)).toBe(cursor);
       expect(await persistedFocus(page)).toEqual(initial);
       const scaleRange = dialog.locator(
-        `input[type="range"][aria-label="${label('gallery.videoReview.zoomScale')} range"]`
+        `input[type="range"][aria-label="${label('gallery.videoReview.zoomScale')}"]`
       );
       await scaleRange.focus();
       await page.keyboard.down('ArrowRight');
@@ -382,28 +383,16 @@ for (const variant of [
         exact: true,
       });
       await entrance.scrollIntoViewIfNeeded();
-      if (variant.width === 1920 && variant.locale === 'ru') {
-        const curve = entrance.getByRole('button', {
-          name: label('gallery.videoReview.zoomTransitionType'),
+      const curve = entrance.getByRole('group', {
+        name: label('gallery.videoReview.focusCurveType'),
+        exact: true,
+      });
+      await expect(
+        curve.getByRole('button', {
+          name: label('gallery.videoReview.focusCurveLinear'),
           exact: true,
-        });
-        await curve.click();
-        await expect(
-          page.getByRole('option', {
-            name: label('gallery.videoReview.transitionLinear'),
-            exact: true,
-          })
-        ).toBeVisible();
-        await page.keyboard.press('Escape');
-        await expect(curve).toBeFocused();
-      } else {
-        await expect(
-          entrance.getByRole('button', {
-            name: label('gallery.videoReview.transitionLinear'),
-            exact: true,
-          })
-        ).toBeVisible();
-      }
+        })
+      ).toBeVisible();
       await expect(
         entrance.getByRole('switch', { name: label('gallery.videoReview.motionBlur'), exact: true })
       ).toHaveAttribute('aria-checked', 'false');
@@ -525,8 +514,8 @@ async function setupSpatialProof(page: Page, origin: string) {
   const number = async (key: Message, value: string) => {
     if (key === 'gallery.videoReview.zoomScale')
       await button('gallery.videoReview.spatialToolPosition').click();
-    const input = dialog.getByRole('textbox', { name: label(key), exact: true });
-    await input.fill(value);
+    const input = numericControl(dialog, label(key));
+    await (await openNumericControl(dialog, label(key))).fill(value);
     await input.press('Enter');
   };
   const enable = async (key: Message) => {

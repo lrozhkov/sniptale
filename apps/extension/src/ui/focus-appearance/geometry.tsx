@@ -19,6 +19,8 @@ export function FocusRoundnessField(props: {
       step={1}
       precision={0}
       unit="%"
+      scrubEnabled={false}
+      stepperPlacement="sides"
       value={props.value * 100}
       onPreview={(value) => props.onPreview(value === null ? null : value / 100)}
       onChange={(value) => props.onChange(value / 100)}
@@ -28,6 +30,7 @@ export function FocusRoundnessField(props: {
 /** Keep numeric area edits and pointer edits inside the same normalized bounds. */
 export function FocusAreaFields(props: {
   area: FocusArea;
+  fields?: 'position' | 'size' | undefined;
   onPreview(area: FocusArea | null): void;
   onChange(area: FocusArea): void;
 }) {
@@ -38,24 +41,31 @@ export function FocusAreaFields(props: {
       ['width', 'focusAreaWidth'],
       ['height', 'focusAreaHeight'],
     ] as const
-  ).map(([field, label]) => (
-    <PreviewNumericRow
-      key={field}
-      label={translate(`gallery.videoReview.${label}`)}
-      min={field === 'x' || field === 'y' ? 0 : 1}
-      max={100}
-      step={1}
-      precision={1}
-      unit="%"
-      value={props.area[field] * 100}
-      onPreview={(next) =>
-        props.onPreview(
-          next === null ? null : clampQuickEditSpotlightArea({ ...props.area, [field]: next / 100 })
-        )
-      }
-      onChange={(next) =>
-        props.onChange(clampQuickEditSpotlightArea({ ...props.area, [field]: next / 100 }))
-      }
-    />
-  ));
+  )
+    .filter(([field]) => {
+      const position = field === 'x' || field === 'y';
+      return props.fields === undefined || position === (props.fields === 'position');
+    })
+    .map(([field, label]) => (
+      <PreviewNumericRow
+        key={field}
+        label={translate(`gallery.videoReview.${label}`)}
+        min={field === 'x' || field === 'y' ? 0 : 1}
+        max={100}
+        step={1}
+        precision={1}
+        unit="%"
+        value={props.area[field] * 100}
+        onPreview={(next) =>
+          props.onPreview(
+            next === null
+              ? null
+              : clampQuickEditSpotlightArea({ ...props.area, [field]: next / 100 })
+          )
+        }
+        onChange={(next) =>
+          props.onChange(clampQuickEditSpotlightArea({ ...props.area, [field]: next / 100 }))
+        }
+      />
+    ));
 }

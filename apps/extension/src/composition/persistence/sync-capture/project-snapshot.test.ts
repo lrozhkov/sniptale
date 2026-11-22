@@ -16,7 +16,112 @@ import {
   collectCapturedProjectEditingMediaIds,
   isSupportedCaptureProject,
   collectCapturedProjectRecordingIds,
+  parseCapturedVideoProjectRows,
+  collectCapturedProjectScenarioDependencies,
 } from './project-snapshot';
+
+it('refuses a captured history head whose inverse file is absent', () => {
+  const project = createVideoProjectEntry();
+  project.history = {
+    version: 1,
+    epoch: 'epoch',
+    past: [{ assetId: 'missing-inverse' }],
+    future: [],
+    sources: [],
+  };
+  expect(
+    parseCapturedVideoProjectRows({ project, assets: [], exports: [], media: [], refs: [] })
+  ).toBeNull();
+});
+
+it.each(['project-asset', 'library-asset', 'scenario-asset'] as const)(
+  'requires the complete historical %s graph with no current placement',
+  (kind) => {
+    const project = createVideoProjectEntry();
+    project.history = {
+      version: 1,
+      epoch: 'epoch',
+      past: [{ assetId: 'inverse' }],
+      future: [],
+      sources: [{ kind, id: 'historical' }],
+    };
+    const body = ref('body');
+    if (kind === 'scenario-asset') body.mimeType = 'image/png';
+    const rows: CapturedVideoProjectRows = {
+      project,
+      assets: [],
+      exports: [],
+      media: [],
+      refs: [body, { ...ref('inverse'), mimeType: 'application/json', sha256: 'a'.repeat(64) }],
+    };
+    if (kind === 'project-asset')
+      rows.assets = [
+        createProjectAssetEntry({
+          id: 'historical',
+          assetId: body.assetId,
+          mimeType: body.mimeType,
+          size: body.size,
+        }),
+      ];
+    if (kind === 'library-asset')
+      rows.media = [
+        createMediaLibraryEntry({
+          id: 'historical',
+          source: { kind: 'stored-asset', assetId: body.assetId },
+          mimeType: body.mimeType,
+          size: body.size,
+        }),
+      ];
+    if (kind === 'scenario-asset') {
+      rows.scenarioAssets = [
+        {
+          id: 'historical',
+          projectId: 'parent',
+          assetId: body.assetId,
+          createdAt: 1,
+          galleryAssetId: null,
+          mimeType: body.mimeType,
+          size: body.size,
+          width: 640,
+          height: 360,
+        },
+      ];
+      project.history.sources = [
+        ...project.history.sources,
+        { kind: 'scenario-project', id: 'parent' },
+      ];
+      expect(collectCapturedProjectScenarioDependencies(rows)).toEqual(
+        new Map([['parent', ['historical']]])
+      );
+    }
+    expect(parseCapturedVideoProjectRows(rows)).not.toBeNull();
+    rows.refs = rows.refs.filter((item) => item.assetId !== body.assetId);
+    expect(parseCapturedVideoProjectRows(rows)).toBeNull();
+  }
+);
+
+it('includes historical recording roots in editing dependencies without changing the current project', () => {
+  const rows: CapturedVideoProjectRows = {
+    project: createVideoProjectEntry(),
+    assets: [],
+    exports: [],
+    media: [],
+    refs: [],
+  };
+  rows.project.history = {
+    version: 1,
+    epoch: 'epoch',
+    past: [{ assetId: 'inverse' }],
+    future: [],
+    sources: [{ kind: 'recording', id: 'past-recording' }],
+  };
+  expect(collectCapturedProjectRecordingIds(rows.project.project, rows.project.history)).toEqual(
+    new Set(['past-recording'])
+  );
+  expect(collectCapturedProjectEditingMediaIds(rows)).toEqual(
+    new Set(['recording:past-recording'])
+  );
+});
 
 const metadata = {
   width: 640,
@@ -214,4 +319,24 @@ it('admits authored focus paths and retains recording source bindings in the dep
   };
   expect(isSupportedCaptureProject(project)).toBe(true);
   expect([...collectCapturedProjectRecordingIds(project)]).toEqual(['external-recording']);
+});
+
+it('preserves recording traversal order when the shared collector filters other source families', () => {
+  const project = createVideoProjectEntry().project;
+  project.source = { kind: 'recording', recordingId: 'z-source' };
+  project.baseRecordingId = 'a-base';
+  project.assets = [
+    material('owned', {
+      kind: 'project-asset',
+      projectAssetId: 'private',
+      originRecordingId: 'm-origin',
+    }),
+    material('library', { kind: 'library-asset', mediaId: 'unrelated-library' }),
+    material('recording', { kind: 'recording', recordingId: 'z-source' }),
+  ];
+  expect([...collectCapturedProjectRecordingIds(project)]).toEqual([
+    'z-source',
+    'a-base',
+    'm-origin',
+  ]);
 });

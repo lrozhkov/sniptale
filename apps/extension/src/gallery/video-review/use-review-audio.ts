@@ -25,6 +25,7 @@ import {
   updateQuickEditVoiceoverTempo,
 } from '../../features/video/review/advanced/audio';
 import { listMediaLibrary } from '../../composition/persistence/media-library';
+import type { ReviewCommandContext } from './command-context';
 
 export type ReviewAudioAsset = { filename: string; duration?: number };
 
@@ -38,9 +39,12 @@ type ReviewAudioArgs = {
   voiceoverEnabled?: boolean;
   edits?: readonly ReviewEdit[];
   selectedOriginalId?: string | null;
-  onOriginalSelection?(id: string | null): void;
+  onOriginalSelection?(id: string | null, context?: ReviewCommandContext): void;
   selectedId?: string | null;
-  onSelectionChange?(selection: { lane: ReviewAudioLane; id: string } | null): void;
+  onSelectionChange?(
+    selection: { lane: ReviewAudioLane; id: string } | null,
+    context?: ReviewCommandContext
+  ): void | boolean;
 };
 
 /** Owns audio-track selection and bounded clip mutations; writes go through autosave. */
@@ -48,14 +52,22 @@ export function useReviewAudio(args: ReviewAudioArgs) {
   const original = useOriginalAudioRanges(args);
   const [localSelectedId, setLocalSelectedId] = useState<string | null>(null);
   const selectedId = args.selectedId === undefined ? localSelectedId : args.selectedId;
-  const setSelected = (id: string | null, lane?: ReviewAudioLane) => {
-    if (args.selectedId === undefined) setLocalSelectedId(id);
+  const setSelected = (
+    id: string | null,
+    lane?: ReviewAudioLane,
+    context?: ReviewCommandContext
+  ) => {
     const resolvedLane =
       lane ??
       (['voiceover', 'music'] as const).find((candidate) =>
         args.audio[candidate].some((clip) => clip.id === id)
       );
-    args.onSelectionChange?.(id && resolvedLane ? { lane: resolvedLane, id } : null);
+    if (
+      args.onSelectionChange?.(id && resolvedLane ? { lane: resolvedLane, id } : null, context) ===
+      false
+    )
+      return;
+    if (args.selectedId === undefined) setLocalSelectedId(id);
   };
   const [assets, setAssets] = useReviewAudioAssets();
   const selected = (['voiceover', 'music'] as const)
@@ -96,7 +108,8 @@ export function useReviewAudio(args: ReviewAudioArgs) {
       clip: QuickEditAudioClip,
       lane: ReviewAudioLane,
       assetDuration?: number,
-      filename = ''
+      filename = '',
+      context?: ReviewCommandContext
     ) => {
       setAssets((current) =>
         new Map(current).set(clip.assetId, {
@@ -105,11 +118,16 @@ export function useReviewAudio(args: ReviewAudioArgs) {
         })
       );
       addClip(clip, lane);
-      setSelected(clip.id, lane);
+      setSelected(clip.id, lane, context);
     },
-    markImported: (clip: QuickEditAudioClip, duration: number, filename: string) => {
+    markImported: (
+      clip: QuickEditAudioClip,
+      duration: number,
+      filename: string,
+      context?: ReviewCommandContext
+    ) => {
       setAssets((current) => new Map(current).set(clip.assetId, { duration, filename }));
-      setSelected(clip.id, 'voiceover');
+      setSelected(clip.id, 'voiceover', context);
     },
     ...clipActions,
     setOriginal: (patch: Partial<QuickEditOriginalAudio>) =>
@@ -132,10 +150,12 @@ function createReviewAudioClipActions(
     patch: (clips: QuickEditAudioClip[]) => QuickEditAudioClip[],
     discrete = false
   ) => args.setAudio((audio) => ({ ...audio, [lane]: patch(audio[lane]) }), discrete);
-  const laneDuration = (lane: ReviewAudioLane) =>
-    args.audio[lane].some((clip) => clip.sourceAnchor) && args.audio.voiceoverSegments
-      ? args.audio.voiceoverSegments.at(-1)!.sourceEnd
-      : args.timelineDuration;
+  const laneDuration = (lane: ReviewAudioLane, clip?: QuickEditAudioClip) =>
+    clip?.timeDomain === 'result'
+      ? args.timelineDuration
+      : args.audio[lane].some((clip) => clip.sourceAnchor) && args.audio.voiceoverSegments
+        ? args.audio.voiceoverSegments.at(-1)!.sourceEnd
+        : args.timelineDuration;
   const updateClip = (
     lane: ReviewAudioLane,
     id: string,
@@ -148,7 +168,7 @@ function createReviewAudioClipActions(
         clips.map((clip) => {
           if (clip.id !== id) return clip;
           const next = patch(clip);
-          return next.id === id ? clampQuickEditAudioClip(next, laneDuration(lane)) : next;
+          return next.id === id ? clampQuickEditAudioClip(next, laneDuration(lane, next)) : next;
         }),
       discrete
     );
@@ -172,7 +192,7 @@ function createReviewAudioClipActions(
         moveQuickEditAudioClip(
           clip,
           timelineStart,
-          laneDuration(lane),
+          laneDuration(lane, clip),
           args.audio.voiceoverSegments
         )
       ),
@@ -188,7 +208,7 @@ function createReviewAudioClipActions(
           clip,
           edge,
           timelineTime,
-          laneDuration(lane),
+          laneDuration(lane, clip),
           assetDuration ?? args.assets.get(clip.assetId)?.duration,
           args.audio.voiceoverSegments
         )
@@ -274,7 +294,7 @@ function useReviewAudioAssets() {
   const [assets, setAssets] = useState<ReadonlyMap<string, ReviewAudioAsset>>(new Map());
   useEffect(() => {
     let active = true;
-    void listMediaLibrary()
+    void listMediaLibrary({ includeProjectRetained: true })
       .then((items) => {
         if (!active) return;
         setAssets((current) => {
@@ -369,21 +389,32 @@ function useOriginalAudioRanges(args: Parameters<typeof useReviewAudio>[0]) {
     setOriginalTool,
     canAddOriginal,
     selectedOriginal: originalViews.find((range) => range.id === args.selectedOriginalId) ?? null,
-    selectOriginal: (id: string) => {
+    selectOriginal: (id: string, context?: ReviewCommandContext) => {
       setOriginalRangeSelected(true);
       setOriginalTool(false);
-      args.onOriginalSelection?.(id);
+      args.onOriginalSelection?.(id, context);
     },
-    addOriginal: (range: ReviewAnchor): boolean => {
+    addOriginal: (range: ReviewAnchor, context?: ReviewCommandContext): boolean => {
+      const ranges = context?.advanced.audio.original.ranges ?? originalRanges;
       if (range.kind !== 'range' || range.end - range.start < 0.01) {
         setOriginalFeedback('too-short');
         return false;
       }
-      if (!canAddOriginal(range)) {
+      if (
+        !(context
+          ? ranges.length < 512 &&
+            canPlaceOriginalAudioRange(
+              range,
+              ranges,
+              context.document.edits,
+              context.scope.sourceDuration
+            )
+          : canAddOriginal(range))
+      ) {
         setOriginalFeedback(
-          originalRanges.length >= 512
+          ranges.length >= 512
             ? 'limit'
-            : originalRanges.some((item) => item.start < range.end && item.end > range.start)
+            : ranges.some((item) => item.start < range.end && item.end > range.start)
               ? 'overlap'
               : 'cut'
         );
@@ -392,14 +423,13 @@ function useOriginalAudioRanges(args: Parameters<typeof useReviewAudio>[0]) {
       const id = crypto.randomUUID();
       setOriginalRangeSelected(true);
       updateOriginalRanges(
-        [
-          ...originalRanges,
-          { id, start: range.start, end: range.end, volume: defaultOriginalVolume },
-        ].sort((a, b) => a.start - b.start)
+        [...ranges, { id, start: range.start, end: range.end, volume: defaultOriginalVolume }].sort(
+          (a, b) => a.start - b.start
+        )
       );
       setOriginalTool(false);
       setOriginalFeedback(null);
-      args.onOriginalSelection?.(id);
+      args.onOriginalSelection?.(id, context);
       return true;
     },
     patchOriginal: (id: string, patch: Partial<{ start: number; end: number; volume: number }>) => {

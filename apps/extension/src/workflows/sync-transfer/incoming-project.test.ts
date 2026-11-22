@@ -6,7 +6,14 @@ vi.mock('../../composition/persistence/sync-capture/apply-video-project', () => 
 }));
 import { beforeEach, expect, it, vi } from 'vitest';
 
-import { parsePortableVideoProjectMetadata } from '../media-hub-backup/v6/root-codecs/projects';
+import {
+  parsePortableVideoProjectMetadata,
+  decodePortableVideoProjectAssetRefs,
+} from '../media-hub-backup/v6/root-codecs/projects';
+import { parseVideoProjectEntry } from '../../composition/persistence/projects/read-guards';
+import { createVideoProjectHistoryChange } from '../../features/video/project/history-change';
+import { collectVideoProjectHistorySources } from '../../features/video/project/history-capture';
+import type { AssetRef } from '../../composition/persistence/assets';
 import { parseRootEnvelope } from '../media-hub-backup/v6/codec';
 import { projectSyncCatalog } from './catalog-graph';
 import { createSyncAttempt, hashSyncText, parseSyncAttemptText } from './wire-record';
@@ -88,6 +95,125 @@ beforeEach(() => {
   io.resident.mockReset().mockResolvedValue({ refs: [], inlineOriginals: [] });
   vi.mocked(loadProjectReplicaExport).mockResolvedValue(null);
 });
+
+it.each(['success', 'journal-refusal', 'malformed-history'])(
+  'tracks rebound history through incoming staging and cleanup: %s',
+  async (mode) => {
+    const f = await fixture(true);
+    const envelope = projectEnvelope();
+    const metadata = parsePortableVideoProjectMetadata(envelope.metadata);
+    const entry = parseVideoProjectEntry({
+      ...metadata.entry,
+      project: decodePortableVideoProjectAssetRefs(metadata.entry.project),
+    });
+    if (!entry) throw new Error('Expected project');
+    const value =
+      mode === 'malformed-history'
+        ? 'null'
+        : JSON.stringify(
+            createVideoProjectHistoryChange({ ...entry.project, name: 'Before' }, entry.project)
+          );
+    const historyBlob = new Blob([value], { type: 'application/json' });
+    metadata.history = {
+      version: 1,
+      past: [{ objectId: 'history' }],
+      future: [],
+      sources: collectVideoProjectHistorySources(entry.project),
+    };
+    envelope.objects.push({
+      ...object('history', 'history.json'),
+      size: historyBlob.size,
+      mimeType: historyBlob.type,
+    });
+    envelope.descriptor.objectCount++;
+    envelope.descriptor.totalBytes += historyBlob.size;
+    envelope.metadata = parseRootEnvelope({ ...envelope, metadata }).metadata;
+    const selected = await attempt(parseRootEnvelope(envelope), 'history-op', 6);
+    const media = await attempt(mediaEnvelope().envelope, 'media-op');
+    for (const item of selected.objects)
+      f.data.set(
+        item.remoteKey,
+        item.objectId === 'history' ? historyBlob : new Blob([new Uint8Array(3)])
+      );
+    const files = new Map<string, File>([
+      ['borrowed', new File([new Uint8Array(3)], 'original.png', { type: 'image/png' })],
+    ]);
+    io.read.mockImplementation(async (ref: AssetRef) => {
+      const file = files.get(ref.assetId);
+      if (!file) throw new Error('Missing staged bytes');
+      return file;
+    });
+    io.stage.mockImplementation(
+      async (
+        args: Parameters<typeof import('../media-hub-backup/v6/staging').stageRootObjects>[0]
+      ) => {
+        const staged = [];
+        for (const item of args.objects) {
+          const parts: ArrayBuffer[] = [];
+          await (
+            await args.readObject(item)
+          ).pipeTo(
+            new WritableStream<Uint8Array>({
+              write(chunk) {
+                parts.push(new Uint8Array(chunk).buffer);
+              },
+            })
+          );
+          const assetId = `staged-${item.objectId}`;
+          const file = new File(parts, item.filename, { type: item.mimeType });
+          files.set(assetId, file);
+          staged.push({
+            objectId: item.objectId,
+            ref: {
+              assetId,
+              createdAt: 1,
+              size: file.size,
+              mimeType: file.type,
+              sha256: hashSyncText(await file.text()),
+              location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
+            },
+          });
+        }
+        return staged;
+      }
+    );
+    const assets = await import('../../composition/persistence/assets');
+    const write = vi
+      .spyOn(assets, 'writeBlobToAsset')
+      .mockRejectedValue(new Error('Inline history must not stage inverse files.'));
+    if (mode === 'journal-refusal') io.journal.mockRejectedValueOnce(new Error('Journal refused'));
+    try {
+      const pending = prepareCatalogReplica({
+        ...f,
+        catalog: { ...f.catalog, ...projectSyncCatalog('space', [media, selected]) },
+        rootKind: 'video-project',
+        rootId: 'project',
+        signal: new AbortController().signal,
+      });
+      if (mode === 'success') {
+        const journal = await pending;
+        if (journal.payload.kind !== 'video-project') throw new Error('Expected project');
+        expect(journal.payload.input.root.history?.refs).toEqual([]);
+        expect(journal.payload.input.root.history?.head).toMatchObject({
+          version: 2,
+          past: [{ value: expect.any(String) }],
+        });
+        expect(io.discard.mock.calls.flat()).toEqual(['staged-history']);
+      } else {
+        await expect(pending).rejects.toThrow(
+          mode === 'journal-refusal' ? 'Journal refused' : /history/i
+        );
+        expect(new Set(io.discard.mock.calls.flat())).toEqual(
+          new Set(['staged-private', 'staged-history'])
+        );
+      }
+      expect(io.discard).not.toHaveBeenCalledWith('borrowed');
+      expect(write).not.toHaveBeenCalled();
+    } finally {
+      write.mockRestore();
+    }
+  }
+);
 
 it('prepares editing bytes and checks borrowed originals without downloading exports', async () => {
   const f = await fixture(true);

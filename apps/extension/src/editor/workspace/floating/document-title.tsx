@@ -1,3 +1,4 @@
+import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { LoaderCircle } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { translate } from '../../../platform/i18n';
@@ -100,20 +101,16 @@ export function EditorDocumentTitleEditor(props: {
       </div>
       {editing ? (
         <div className="relative w-full min-w-0">
-          <input
+          <ProductInput
             ref={focusInput}
             aria-label={translate('editor.page.renameImage')}
+            invalid={failed}
             aria-invalid={failed}
             aria-describedby={failed ? 'image-rename-error' : undefined}
             aria-busy={saving}
             readOnly={saving}
             value={draft}
-            className={[
-              'block h-9 w-full min-w-0 rounded-[4px] border border-[var(--sniptale-color-border-strong)]',
-              'bg-[var(--sniptale-color-surface-panel)] px-2 py-1.5 text-[13px] font-medium leading-[18px]',
-              'text-[var(--sniptale-color-text-primary)] outline-none focus-visible:ring-1',
-              'focus-visible:ring-[var(--sniptale-color-border-strong)]',
-            ].join(' ')}
+            className={saving ? 'pe-8!' : undefined}
             onChange={(event) => setDraft(event.target.value)}
             onBlur={() => {
               if (!failed) void finish(false);

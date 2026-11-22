@@ -2,6 +2,7 @@ import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { browserAction } from '@sniptale/platform/browser/action';
 import { browserWindows } from '@sniptale/platform/browser/windows';
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
+import type { VideoRecordingInterruptionReason } from '@sniptale/runtime-contracts/video/types/types';
 import { buildEditorUrl } from './editor';
 import { EDITOR_EMBED_SESSION_QUERY_PARAM } from '../../../features/editor/contracts/embed';
 import { buildScenarioEditorUrl } from './scenario-editor';
@@ -62,7 +63,13 @@ function buildCameraRecorderPageUrl(params: {
 function buildVideoEditorProjectUrl(
   projectId?: string | null,
   recordingId?: string | null,
-  review?: { aggregateId: string; revision: number; createdAt: number; sourceAssetId: string }
+  review?: {
+    aggregateId: string;
+    revision: number;
+    createdAt: number;
+    sourceAssetId: string;
+    original?: { mediaId: string; createdAt: number; generation: string | null };
+  }
 ): string {
   const url = new URL(buildVideoEditorPageUrl());
 
@@ -79,6 +86,11 @@ function buildVideoEditorProjectUrl(
     url.searchParams.set('reviewRevision', String(review.revision));
     url.searchParams.set('reviewCreatedAt', String(review.createdAt));
     url.searchParams.set('reviewSourceAssetId', review.sourceAssetId);
+    if (review.original) {
+      url.searchParams.set('reviewOriginalId', review.original.mediaId);
+      url.searchParams.set('reviewOriginalCreatedAt', String(review.original.createdAt));
+      url.searchParams.set('reviewOriginalGeneration', review.original.generation ?? '');
+    }
   }
 
   return url.toString();
@@ -288,6 +300,15 @@ export async function openTeleprompterPage(): Promise<void> {
   const url = new URL(runtimeInfo.getURL('apps/extension/src/camera-recorder/index.html'));
   url.searchParams.set('teleprompter', '1');
   url.searchParams.set('draft', '1');
+  await openRecordingCompanion(url);
+}
+
+/** Opens the recording result without recording control authority or raw diagnostics. */
+export async function openRecordingFailurePage(
+  reason: VideoRecordingInterruptionReason
+): Promise<void> {
+  const url = new URL(runtimeInfo.getURL('apps/extension/src/camera-recorder/index.html'));
+  url.searchParams.set('failure', reason);
   await openRecordingCompanion(url);
 }
 

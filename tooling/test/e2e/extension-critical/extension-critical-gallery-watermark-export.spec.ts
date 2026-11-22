@@ -1,7 +1,7 @@
 import { replaceNativeReviewWorkspace } from '../support/native-review-workspace';
 import { expect, test, type Page } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { createQuickEditWatermark } from '../../../../apps/extension/src/features/video/project/scene/watermark';
 import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import {

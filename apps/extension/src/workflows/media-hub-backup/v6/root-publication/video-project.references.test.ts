@@ -3,6 +3,41 @@ import { createVideoProjectMotionRegion } from '../../../../features/video/proje
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createVideoProjectEntryWithMediaClip } from '../../../../composition/persistence/projects/index.test-support';
 import { encodePortableVideoProjectAssetRefs } from '../root-codecs/projects';
+import { transformPortableVideoProjectHistorySources } from './video-project-references';
+
+it('remaps every historical source family through the current reference rules', () => {
+  const sources = transformPortableVideoProjectHistorySources(
+    [
+      { kind: 'recording', id: 'recording' },
+      { kind: 'library-asset', id: 'library' },
+      { kind: 'project-asset', id: 'private' },
+      { kind: 'scenario-project', id: 'scenario' },
+      { kind: 'scenario-asset', id: 'child' },
+    ],
+    new Map([['private', 'new-private']]),
+    {
+      'media:library-item:recording:recording': 'recording:new-recording',
+      'media:library-item:library': 'new-library',
+      'scenario-project:scenario': 'new-scenario',
+    },
+    { 'scenario-asset:child': 'new-child' }
+  );
+  expect(sources).toEqual([
+    { kind: 'recording', id: 'new-recording' },
+    { kind: 'library-asset', id: 'new-library' },
+    { kind: 'project-asset', id: 'new-private' },
+    { kind: 'scenario-project', id: 'new-scenario' },
+    { kind: 'scenario-asset', id: 'new-child' },
+  ]);
+  expect(() =>
+    transformPortableVideoProjectHistorySources(
+      [{ kind: 'library-asset', id: 'missing' }],
+      new Map(),
+      {},
+      {}
+    )
+  ).toThrow('unresolved');
+});
 
 const mocks = vi.hoisted(() => ({ mutate: vi.fn(), checkpoint: vi.fn(), database: vi.fn() }));
 vi.mock('../../../../composition/persistence/infrastructure/indexed-db/mutation', () => ({

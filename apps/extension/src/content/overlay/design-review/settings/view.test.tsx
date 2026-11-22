@@ -2,7 +2,18 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadContentCatalogFixture,
+  prepareContentTranslations,
+} from '../../../test-support/translations.test-support';
+
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadContentCatalogFixture>[0]) =>
+    loadContentCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareContentTranslations('ru'));
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
 import { DesignReviewSettings } from './view';
 import { NumericField } from './numeric-field';
@@ -408,4 +419,43 @@ it('keeps section field updates attached to their page CSS property and selected
   expect(updateValue).toHaveBeenLastCalledWith('object-fit', 'cover');
   edit(translate('content.designReview.objectPosition'), '10% 20%');
   expect(updateValue).toHaveBeenLastCalledWith('object-position', '10% 20%');
+});
+
+it.each([
+  ['1,5em', '0px', '2.5em'],
+  ['auto', '12rem', '1rem'],
+  ['', '12%', '1%'],
+])('steps focused CSS length %s through the existing unit owner', (value, fallback, expected) => {
+  const onChange = vi.fn();
+  act(() =>
+    root.render(
+      <NumericField
+        disabled={false}
+        label="Wheel length"
+        value={value}
+        defaultValue={fallback}
+        onChange={onChange}
+      />
+    )
+  );
+  const input = container.querySelector<HTMLInputElement>('input')!;
+  const ignored = new WheelEvent('wheel', {
+    altKey: true,
+    deltaY: -20,
+    bubbles: true,
+    cancelable: true,
+  });
+  input.dispatchEvent(ignored);
+  expect(onChange).not.toHaveBeenCalled();
+  input.focus();
+  const wheel = new WheelEvent('wheel', {
+    altKey: true,
+    deltaY: -20,
+    bubbles: true,
+    cancelable: true,
+  });
+  act(() => input.dispatchEvent(wheel));
+  expect(wheel.defaultPrevented).toBe(true);
+  expect(onChange).toHaveBeenCalledWith(expected);
+  expect(document.activeElement).toBe(input);
 });

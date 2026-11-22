@@ -111,10 +111,10 @@ it('uses shared switches and keeps acknowledged values until the caller accepts 
     ] as const) {
       await act(async () =>
         host
-          .querySelector<HTMLButtonElement>(
-            `[aria-label="popup.video.webcamPresentation${field} increase"]`
+          .querySelector<HTMLInputElement>(
+            `input[aria-label="popup.video.webcamPresentation${field}"]`
           )!
-          .click()
+          .dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }))
       );
       expect(onChange).toHaveBeenLastCalledWith(patch);
     }
@@ -131,10 +131,10 @@ it('uses shared switches and keeps acknowledged values until the caller accepts 
     );
     await act(async () =>
       host
-        .querySelector<HTMLButtonElement>(
-          '[aria-label="popup.video.webcamPresentationRoundness increase"]'
+        .querySelector<HTMLInputElement>(
+          'input[aria-label="popup.video.webcamPresentationRoundness"]'
         )!
-        .click()
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }))
     );
     expect(onChange).toHaveBeenLastCalledWith({
       appearance: expect.objectContaining({ roundness: 13 }),

@@ -18,7 +18,7 @@ vi.mock('../../../workflows/scenario-capture-edit/tour-edits', () => ({
 vi.mock('./resource-session', () => ({ useGuideResourceSession: () => enterSession }));
 const enterSession = async () => true;
 vi.mock('../../../composition/persistence/scenario/history', () => ({
-  getScenarioSavedVersions: io.load,
+  getScenarioEditingSnapshot: io.load,
 }));
 vi.mock('../../../composition/persistence/scenario/store/project-records/assets', () => ({
   getScenarioAssetBlob: async () => undefined,
@@ -48,8 +48,9 @@ beforeEach(() => {
   window.history.replaceState({}, '', '/?projectId=guide');
   const project = fixture();
   io.load.mockResolvedValue({
-    currentRevision: 1,
-    versions: [{ project, revision: 1, savedAt: 1 }],
+    project,
+    workspaceRevision: 1,
+    editingHistory: { version: 1 as const, past: [], future: [] },
   });
   io.saveTemplate.mockResolvedValue({ ...project, id: 'template', purpose: 'step-template' });
   io.apply.mockImplementation(async ({ project }) => ({

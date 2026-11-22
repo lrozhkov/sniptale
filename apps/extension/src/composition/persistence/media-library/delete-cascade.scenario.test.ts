@@ -13,13 +13,26 @@ import {
   createTourDocument,
   createTourImageSlide,
 } from '../../../features/scenario/project/public';
-import { materializeScenarioUnitStorage } from '../scenario/storage-units';
+import {
+  encodeScenarioUnitStorage,
+  materializeScenarioUnitStorage,
+} from '../scenario/storage-units';
 import { parseScenarioProjectEntry } from '../scenario/read-guards';
 import { createScenarioProjectEntry } from '../scenario/projects/entry';
 
-it.each([false, true])(
-  'removes canonical scenario placement after root byte replacement=%s',
-  async (replaced) => {
+it.each([
+  ...[false, true].flatMap((replaced) =>
+    (['current', 'past', 'future'] as const).map((placement) => ({
+      replaced,
+      placement,
+      exhausted: false,
+    }))
+  ),
+  { replaced: false, placement: 'future' as const, exhausted: true },
+  { replaced: false, placement: 'current' as const, exhausted: true },
+])(
+  'removes $placement Scenario placement (replaced=$replaced, exhausted=$exhausted)',
+  async ({ replaced, placement, exhausted }) => {
     const childPhysicalId = replaced ? 'frozen-old' : physicalId;
     const childId = 'scenario-child-1';
     const scenarioId = 'scenario-1';
@@ -35,7 +48,22 @@ it.each([false, true])(
       })
     );
     project.items.push(step);
-    const entry = createScenarioProjectEntry({ existing: undefined, project, updatedAt: 1 });
+    const base = createScenarioProjectEntry({ existing: undefined, project, updatedAt: 1 });
+    const entry = {
+      ...base,
+      workspaceRevision: exhausted ? Number.MAX_SAFE_INTEGER : base.workspaceRevision,
+      ...(placement === 'current'
+        ? {}
+        : {
+            project: { ...base.project, items: [] },
+            editingHistory: {
+              version: 1 as const,
+              past: placement === 'past' ? [base.project] : [],
+              future: placement === 'future' ? [base.project] : [],
+            },
+          }),
+    };
+    const native = placement === 'current' ? undefined : encodeScenarioUnitStorage(entry, []);
     const scenarioMediaId = `scenario-asset:${childId}`;
     replaceRows(
       new Map<string, Map<string, unknown>>([
@@ -54,7 +82,22 @@ it.each([false, true])(
             ],
           ]),
         ],
-        ['scenario_projects', new Map([[scenarioId, entry]])],
+        ['scenario_projects', new Map([[scenarioId, native?.head ?? entry]])],
+        [
+          'scenario_project_history',
+          new Map(
+            (native?.rows ?? []).map((row) => [JSON.stringify([row.projectId, row.revision]), row])
+          ),
+        ],
+        [
+          'scenario_project_units',
+          new Map(
+            (native?.units ?? []).map((row) => [
+              JSON.stringify([row.projectId, row.unitId, row.revision]),
+              row,
+            ])
+          ),
+        ],
         [
           'scenario_assets',
           new Map([
@@ -128,10 +171,24 @@ it.each([false, true])(
         storagePath: 'old-object',
       });
 
-    await deleteMediaAssetWithProjectCascade(scenarioMediaId, [
-      { id: scenarioId, kind: 'scenario', name: 'Guide', primary: false },
-      { id: montage.id, kind: 'video', name: montage.project.name, primary: false },
-    ]);
+    const expected = [
+      { id: scenarioId, kind: 'scenario' as const, name: 'Guide', primary: false },
+      { id: montage.id, kind: 'video' as const, name: montage.project.name, primary: false },
+    ];
+    if (exhausted) {
+      const before = structuredClone(rows);
+      await expect(deleteMediaAssetWithProjectCascade(scenarioMediaId, expected)).rejects.toThrow(
+        'revisions are exhausted'
+      );
+      expect(rows).toEqual(before);
+      return;
+    }
+    const beforeRefusal = structuredClone(rows);
+    await expect(deleteMediaAssetWithProjectCascade(scenarioMediaId, [])).rejects.toBeInstanceOf(
+      StaleMediaAssetDeletePreviewError
+    );
+    expect(rows).toEqual(beforeRefusal);
+    await deleteMediaAssetWithProjectCascade(scenarioMediaId, expected);
     expect(rows.get('video_projects')!.get(montage.id)).toMatchObject({
       usageReferenceKeys: ['indexed:v2'],
       project: { assets: [], clips: [] },
@@ -144,7 +201,11 @@ it.each([false, true])(
       )
     );
     if (!saved) throw new Error('Expected readable canonical scenario after cascade');
-    expect(saved.project.items[0]).toMatchObject({ blocks: [{ kind: 'image-slot' }] });
+    const states = placement === 'current' ? [saved.project] : saved.editingHistory?.[placement];
+    expect(states).toHaveLength(1);
+    expect(states?.[0]?.items[0]).toMatchObject({ blocks: [{ kind: 'image-slot' }] });
+    if (placement !== 'current') expect(saved.project.items).toEqual([]);
+    expect(saved.workspaceRevision).toBe(entry.workspaceRevision + 1);
     expect(rows.get('scenario_assets')?.has(childId)).toBe(false);
     expect(rows.get('media_library')?.has(scenarioMediaId)).toBe(false);
     expect(rows.get('asset_refs')?.has(physicalId)).toBe(false);

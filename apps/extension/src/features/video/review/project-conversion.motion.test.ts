@@ -674,3 +674,49 @@ it('keeps independent spatial motion consistent in Gallery and reopened Native e
     else expect(native.spatial).toBeUndefined();
   }
 });
+
+it.each([false, true])('transfers linked focus with a split or hidden endpoint (%s)', (hidden) => {
+  const input = motionFixture(false);
+  const focus = input.document.advancedContent.zoom.regions[0]!;
+  const cut = {
+    id: 'cut',
+    kind: 'cut' as const,
+    start: hidden ? 1 : 2,
+    end: hidden ? 5 : 3,
+    requestedStart: hidden ? 1 : 2,
+    requestedEnd: hidden ? 5 : 3,
+  };
+  input.document.edits = [cut];
+  input.document.advancedContent.zoom.regions = [
+    {
+      ...focus,
+      start: 1,
+      end: 4,
+      timeDomain: 'result',
+      linkTo: 'target',
+      linkEasing: 'linear',
+      visualAnchor: [{ start: 1, end: 4, offset: 0, rate: 1 }],
+    },
+    {
+      ...focus,
+      id: 'target',
+      start: 6,
+      end: 7,
+      timeDomain: 'result',
+      visualAnchor: [{ start: 6, end: 7, offset: 0, rate: 1 }],
+    },
+  ];
+  const result = planReviewProjectConversion(input);
+  if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+  const regions = result.project.motionRegions ?? [];
+  const target = regions.find((region) => region.id.includes(':target:'));
+  expect(target).toBeDefined();
+  const from = regions.filter((region) => region.id.includes(':focus:'));
+  if (hidden) {
+    expect(from).toHaveLength(0);
+    expect(target?.incomingConnection).toBeUndefined();
+  } else {
+    expect(from).toHaveLength(2);
+    expect(target?.incomingConnection).toEqual({ fromRegionId: from[1]!.id, easing: 'LINEAR' });
+  }
+});

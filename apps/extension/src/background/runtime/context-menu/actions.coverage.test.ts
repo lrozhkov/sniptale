@@ -1,3 +1,8 @@
+const catalogPreparation = vi.hoisted(() => vi.fn(async (): Promise<void> => undefined));
+vi.mock('../../../platform/i18n', async (original) => ({
+  ...(await original<typeof import('../../../platform/i18n')>()),
+  prepareTranslations: catalogPreparation,
+}));
 import { beforeEach, expect, it, vi } from 'vitest';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 
@@ -111,6 +116,7 @@ function createTab(url = 'https://example.test', id = 9): chrome.tabs.Tab {
 
 function resetContextMenuActionCoverageMocks(): void {
   vi.clearAllMocks();
+  catalogPreparation.mockReset().mockResolvedValue(undefined);
   browserTabsGetMock.mockResolvedValue(createTab('https://resolved.example', 12));
   copyContextMenuExportPreviewMock.mockResolvedValue(undefined);
   enableScreenshotModeMock.mockResolvedValue(undefined);
@@ -315,4 +321,53 @@ it('does not query preset availability without a supported active tab', async ()
   await expect(hasContextMenuVideoPreset(createTab('chrome://settings'))).resolves.toBe(false);
 
   expect(getContextMenuVideoPresetAvailabilityMock).not.toHaveBeenCalled();
+});
+
+it('preserves active state while translated menu work is pending and fails before side effects', async () => {
+  const deps = createDeps();
+  deps.screenshotModeState.set(9, true);
+  let fail!: (reason: Error) => void;
+  catalogPreparation.mockReturnValueOnce(
+    new Promise<void>((_, reject) => {
+      fail = reject;
+    })
+  );
+  const pending = handleBackgroundContextMenuAction({
+    deps,
+    menuId: CONTEXT_MENU_VIDEO_TAB_ID,
+    tab: createTab(),
+  });
+  const failed = expect(pending).rejects.toThrow('Catalog unavailable');
+  await Promise.resolve();
+  expect(ensureActivePageAccessRuntimeMock).not.toHaveBeenCalled();
+  expect(startContextMenuVideoRecordingMock).not.toHaveBeenCalled();
+  expect(deps.screenshotModeState.get(9)).toBe(true);
+  fail(new Error('Catalog unavailable'));
+  await failed;
+  expect(startContextMenuVideoRecordingMock).not.toHaveBeenCalled();
+  expect(deps.screenshotModeState.get(9)).toBe(true);
+});
+
+it('prepares preset availability before settings defaults can be created', async () => {
+  let complete!: () => void;
+  catalogPreparation.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      complete = resolve;
+    })
+  );
+  const pending = hasContextMenuVideoPreset(createTab());
+  expect(loadSettingsMock).not.toHaveBeenCalled();
+  complete();
+  await pending;
+  expect(loadSettingsMock).toHaveBeenCalledOnce();
+});
+
+it('keeps error feedback optional when translations are unavailable', async () => {
+  await showBackgroundContextMenuError({ error: new Error('failure') });
+  expect(catalogPreparation).not.toHaveBeenCalled();
+  catalogPreparation.mockRejectedValueOnce(new Error('Catalog unavailable'));
+  await expect(
+    showBackgroundContextMenuError({ error: new Error('failure'), tab: createTab() })
+  ).resolves.toBeUndefined();
+  expect(showContextMenuToastMock).not.toHaveBeenCalled();
 });

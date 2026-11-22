@@ -1,3 +1,4 @@
+import { projectReviewAnnotationEffect } from '../annotation-effects/timing';
 import { hasCursorComposition } from '../../project/motion/spatial';
 import { hasSourceImageFilters } from '../../../image-filters/contract';
 import { withCursorMotionPath } from '../../project/cursor-motion';
@@ -13,6 +14,11 @@ import { resolvePresentationSettings } from './presentation';
 import { resolveOriginalSourceAudio } from './original-audio-mutes';
 import { projectReviewVoiceover } from '../voiceover-edits';
 import { projectReviewFocus } from '../focus-edits';
+import {
+  projectReviewCursorMotions,
+  projectReviewCursorPath,
+  projectReviewWebcam,
+} from '../timeline-placement';
 import { reviewVisibleEditBoundaries } from '../timeline';
 import type { ReviewDocument } from '../types';
 import type {
@@ -76,7 +82,8 @@ export function resolveQuickEditEffectiveFeatures(
       advanced &&
       state.ui.tracks.annotationEffects !== false &&
       !!state.annotationEffects?.enabled &&
-      state.annotationEffects.instances.some((instance) => instance.enabled),
+      (state.annotationEffects.instances.some((instance) => instance.enabled) ||
+        !!state.annotationEffects.textClips?.some((clip) => clip.enabled && clip.text.trim())),
     watermarkApplied:
       advanced &&
       (state.watermark?.mode === 'text' ||
@@ -144,22 +151,42 @@ export function resolveQuickEditEffectiveState(
 ): QuickEditEffectiveState {
   const advanced = state.ui.mode === 'advanced';
   const features = resolveQuickEditEffectiveFeatures(state);
+  const segments = state.audio.voiceoverSegments;
+  const resultDuration = segments ? (segments.at(-1)?.resultEnd ?? 0) : Infinity;
+  const annotationEffects =
+    features.annotationEffectsApplied &&
+    (state.annotationEffects?.instances.some(
+      (instance) =>
+        instance.enabled &&
+        (!instance.visualAnchor ||
+          !segments ||
+          projectReviewAnnotationEffect(instance, segments).slices.length)
+    ) ||
+      state.annotationEffects?.textClips?.some(
+        (clip) => clip.enabled && clip.start < resultDuration && clip.text.trim()
+      ))
+      ? state.annotationEffects
+      : undefined;
   return {
     ...features,
     ...(state.sourceFilters ? { sourceFilters: state.sourceFilters } : {}),
     cursorMotions:
       advanced && state.cursorMotionEnabled !== false && state.ui.tracks.cursorMotion !== false
-        ? state.cursorMotions
+        ? usesResultCursorClock(state)
+          ? projectReviewCursorMotions(state.cursorMotions, state.audio.voiceoverSegments)
+          : state.cursorMotions
         : undefined,
     zoomRegions: resolveCursorRegions(state, features, cursorFacts),
     background: advanced ? state.background : { enabled: false },
     canvas: advanced ? state.canvas : undefined,
     windowHeader: advanced ? state.windowHeader : undefined,
-    webcam: features.webcamApplied ? state.webcam : undefined,
+    webcam: features.webcamApplied
+      ? projectReviewWebcam(state.webcam, state.audio.voiceoverSegments)
+      : undefined,
     watermark: features.watermarkApplied ? state.watermark : undefined,
     captions: features.captionsApplied ? state.captions : undefined,
     text: features.captionsApplied ? state.text : undefined,
-    annotationEffects: features.annotationEffectsApplied ? state.annotationEffects : undefined,
+    annotationEffects,
     presentation:
       features.presentationApplied && state.presentation
         ? resolvePresentationSettings(state.presentation)
@@ -179,7 +206,8 @@ export function resolveQuickEditEffectiveState(
       })),
     music: projectReviewVoiceover(
       features.musicApplied ? state.audio.music : [],
-      state.audio.voiceoverSegments
+      state.audio.voiceoverSegments,
+      'fill'
     )
       .filter((clip) => !clip.dormant)
       .filter((clip) => {
@@ -188,6 +216,18 @@ export function resolveQuickEditEffectiveState(
       })
       .map((clip) => ({ ...clip, volume: clip.volume * (state.audio.laneVolumes?.music ?? 1) })),
   };
+}
+
+/** Legacy source clocks remain unchanged until inserted time or authored result motion needs projection. */
+function usesResultCursorClock(state: QuickEditAdvancedState) {
+  return (
+    !!state.audio.voiceoverSegments?.some((segment) => segment.kind === 'freeze') ||
+    !!(
+      state.cursorMotionEnabled !== false &&
+      state.ui.tracks.cursorMotion !== false &&
+      state.cursorMotions?.some((motion) => motion.timeDomain === 'result')
+    )
+  );
 }
 
 function resolveCursorRegions(
@@ -240,6 +280,7 @@ function resolveCursorRegions(
   const cached = cursorRegions.get(owner) ?? [];
   const previous = cached.find((entry) => entry.key === key && entry.facts === cursorFacts?.facts);
   const pathKey = JSON.stringify({
+    timeMap: usesResultCursorClock(state) ? state.audio.voiceoverSegments : undefined,
     needsCursor,
     source: cursorFacts?.source,
     segments: state.cursorFocusPath?.segments,
@@ -278,9 +319,13 @@ function createCursorPaths(
       : state.cursorFocusPath
     : undefined;
   const cursorPath = withCursorMotionPath(
-    basePath,
+    usesResultCursorClock(state)
+      ? projectReviewCursorPath(basePath, state.audio.voiceoverSegments)
+      : basePath,
     state.cursorMotionEnabled !== false && state.ui.tracks.cursorMotion !== false
-      ? state.cursorMotions
+      ? usesResultCursorClock(state)
+        ? projectReviewCursorMotions(state.cursorMotions, state.audio.voiceoverSegments)
+        : state.cursorMotions
       : undefined
   );
   const observed =
@@ -291,9 +336,11 @@ function createCursorPaths(
     key,
     cursorPath,
     observed: withCursorMotionPath(
-      observed,
+      usesResultCursorClock(state)
+        ? projectReviewCursorPath(observed, state.audio.voiceoverSegments)
+        : observed,
       state.cursorMotionEnabled !== false && state.ui.tracks.cursorMotion !== false
-        ? state.cursorMotions
+        ? projectReviewCursorMotions(state.cursorMotions, state.audio.voiceoverSegments)
         : undefined
     ),
   };
@@ -355,7 +402,22 @@ function createCursorRegionProjection(
                   }
                 : {}),
               ...(observed ? { observed } : {}),
-              ...(state.audio.voiceoverSegments ? { timeMap: state.audio.voiceoverSegments } : {}),
+              ...(state.audio.voiceoverSegments
+                ? {
+                    timeMap: usesResultCursorClock(state)
+                      ? [
+                          {
+                            kind: 'keep' as const,
+                            rate: 1,
+                            sourceStart: 0,
+                            resultStart: 0,
+                            sourceEnd: state.audio.voiceoverSegments.at(-1)?.resultEnd ?? 0,
+                            resultEnd: state.audio.voiceoverSegments.at(-1)?.resultEnd ?? 0,
+                          },
+                        ]
+                      : state.audio.voiceoverSegments,
+                  }
+                : {}),
             },
           }
         : region;
@@ -494,7 +556,7 @@ export function resolveQuickEditExportPlan(args: {
   if (features.watermarkApplied) visual.push('watermark');
   if (features.captionsApplied) visual.push('captions');
   if (effective.cursorMotions?.some((m) => m.enabled)) visual.push('cursor-motion');
-  if (features.annotationEffectsApplied) visual.push('annotation-effects');
+  if (effective.annotationEffects) visual.push('annotation-effects');
   if (features.zoomApplied && effective.zoomRegions.length > 0) visual.push('zoom');
   if (features.backgroundApplied) visual.push('background');
   if (
@@ -540,6 +602,7 @@ export function hasSuppressedAdvancedFeatures(state: QuickEditAdvancedState): bo
     !!state.windowHeader ||
     !!state.webcam?.enabled ||
     !!state.annotationEffects?.instances.length ||
+    !!state.annotationEffects?.textClips?.length ||
     (!!state.captions?.enabled &&
       !!state.text?.fragments.some((fragment) => fragment.showInVideo && fragment.text.trim())) ||
     state.watermark?.mode === 'text' ||

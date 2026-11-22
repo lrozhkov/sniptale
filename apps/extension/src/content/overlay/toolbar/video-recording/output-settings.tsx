@@ -31,7 +31,7 @@ function OutputChoiceRow<T extends string>(props: {
   onChange(value: T): void;
 }) {
   return (
-    <InspectorParameterRow label={props.label} keepInline>
+    <InspectorParameterRow label={props.label}>
       <CompactSelect
         aria-label={props.label}
         dataUi={`content.toolbar.video-recording.output.${props.name}`}

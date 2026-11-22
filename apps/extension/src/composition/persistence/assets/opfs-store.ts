@@ -838,3 +838,14 @@ export async function collectPreparedAssetCleanupFailures(
     result.status === 'rejected' ? [result.reason as unknown] : []
   );
 }
+
+/** Retain the preparation error first when cleanup also fails. */
+export function throwAssetPreparationError(
+  error: unknown,
+  cleanupFailures: readonly unknown[],
+  cleanupMessage: string
+): never {
+  if (cleanupFailures.length)
+    throw new AggregateError([error, ...cleanupFailures], cleanupMessage, { cause: error });
+  throw error;
+}

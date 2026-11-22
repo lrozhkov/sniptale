@@ -14,6 +14,7 @@ const {
   getRecording,
   getRecordingTelemetry,
   readVideoWorkspace,
+  loadVideoReviewSource,
   getVideoProject,
   importRecordingProjectAssetMock,
   saveVideoProject,
@@ -25,6 +26,7 @@ const {
   getRecording: vi.fn(),
   getRecordingTelemetry: vi.fn(),
   readVideoWorkspace: vi.fn(),
+  loadVideoReviewSource: vi.fn(),
   getVideoProject: vi.fn(),
   importRecordingProjectAssetMock: vi.fn(),
   saveVideoProject: vi.fn(),
@@ -33,19 +35,52 @@ const {
 vi.mock('../../../workflows/sync-transfer/editing-admission', () => ({
   ensureNativeEditingRootAvailable,
 }));
+vi.mock('../../../workflows/video-review/source', () => ({ loadVideoReviewSource }));
 
 vi.mock('../../../composition/persistence/projects/index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/projects/index')>()),
   deleteProjectAsset,
   getProjectAsset,
   getVideoProject,
+  getVideoProjectWorkspace: async (id: string) => {
+    const result = await getVideoProject(id);
+    return result?.status === 'ready'
+      ? {
+          ...result,
+          workspaceRevision: result.workspaceRevision ?? 0,
+          history: result.history ?? { status: 'absent' },
+        }
+      : result;
+  },
 }));
 
 vi.mock('../../../composition/persistence/projects/index-mutations', async (importOriginal) => ({
   ...(await importOriginal<
     typeof import('../../../composition/persistence/projects/index-mutations')
   >()),
-  commitVideoProjectMutation: saveVideoProject,
+  commitVideoProjectWorkspaceMutation: async (
+    project: import('../../../features/video/project/types').VideoProject,
+    options: Parameters<
+      typeof import('../../../composition/persistence/projects/index-mutations').commitVideoProjectWorkspaceMutation
+    >[1]
+  ) => ({
+    project: await saveVideoProject(project, {
+      ...(options.expectedProject === null
+        ? { baseRevision: null }
+        : {
+            baseRevision: options.expectedProject.updatedAt,
+            expectedWorkspaceRevision: options.expectedWorkspaceRevision,
+          }),
+      ...(options.expectedReviewWorkspace
+        ? { expectedReviewWorkspace: options.expectedReviewWorkspace }
+        : {}),
+      ...(options.expectedReviewOriginal
+        ? { expectedReviewOriginal: options.expectedReviewOriginal }
+        : {}),
+      ...(options.libraryBindings ? { libraryBindings: options.libraryBindings } : {}),
+    }),
+    workspaceRevision: (options.expectedWorkspaceRevision ?? 0) + 1,
+  }),
 }));
 
 vi.mock('../../../composition/persistence/recordings/index', async (importOriginal) => ({
@@ -226,6 +261,59 @@ beforeEach(() => {
     updatedAt: project.updatedAt + 1,
   }));
   window.history.replaceState({}, '', '/video-editor.html');
+});
+
+it.each(['same', 'restored'] as const)(
+  'opens Montage from an unpublished Quick Edit original when its lifetime is %s',
+  async (lifetime) => {
+    const snapshot = await transferFixture();
+    const aggregateId = 'recording:quick-project:pending';
+    const original = { mediaId: 'recording:recording-1', createdAt: 1, generation: null };
+    loadVideoReviewSource.mockResolvedValueOnce({
+      original: { ...original, generation: lifetime === 'restored' ? 'new-generation' : null },
+      snapshot: {
+        workspace: { ...snapshot.workspace, aggregateId, revision: 1, history: [], cursor: 0 },
+        draft: null,
+      },
+    });
+    const params = new URLSearchParams({
+      review: aggregateId,
+      reviewRevision: '1',
+      reviewCreatedAt: '10',
+      reviewSourceAssetId: 'recording-body',
+      reviewOriginalId: original.mediaId,
+      reviewOriginalCreatedAt: '1',
+      reviewOriginalGeneration: '',
+    });
+    window.history.replaceState({}, '', `/video-editor.html?${params}`);
+    const attempt = loadInitialProjectFromLocation();
+    if (lifetime === 'restored') {
+      await expect(attempt).rejects.toThrow('Review original changed');
+      expect(saveVideoProject).not.toHaveBeenCalled();
+    } else {
+      await expect(attempt).resolves.toMatchObject({ project: { duration: 5 } });
+      expect(saveVideoProject).toHaveBeenCalledExactlyOnceWith(expect.anything(), {
+        baseRevision: null,
+        expectedReviewOriginal: { ...original, assetId: 'recording-body' },
+      });
+    }
+    expect(readVideoWorkspace).not.toHaveBeenCalled();
+  }
+);
+
+it('rejects an incomplete original transfer before preparing or writing a project', async () => {
+  const params = new URLSearchParams({
+    review: 'recording:quick-project:pending',
+    reviewRevision: '1',
+    reviewCreatedAt: '10',
+    reviewSourceAssetId: 'recording-body',
+    reviewOriginalId: 'recording:recording-1',
+    reviewOriginalCreatedAt: '1',
+  });
+  window.history.replaceState({}, '', `/video-editor.html?${params}`);
+  await expect(loadInitialProjectFromLocation()).rejects.toThrow('original transfer target');
+  expect(loadVideoReviewSource).not.toHaveBeenCalled();
+  expect(saveVideoProject).not.toHaveBeenCalled();
 });
 
 it('creates a separate editable project from saved Gallery cuts instead of the raw recording', async () => {
@@ -612,9 +700,11 @@ it('refuses archive source replacement before the first Native read and accepts 
   window.history.replaceState({}, '', freshUrl);
   const retried = await loadInitialProjectFromLocation();
   expect(retried.project?.duration).toBe(4);
+  const native = inspectVideoWorkspace(published.get(restored.workspace.aggregateId)).workspace;
+  expect(native).toBeDefined();
   expect(saveVideoProject).toHaveBeenCalledExactlyOnceWith(
     expect.objectContaining({ id: retried.project!.id }),
-    { baseRevision: null, expectedReviewWorkspace: restored.workspace }
+    { baseRevision: null, expectedReviewWorkspace: native }
   );
   expect(published).toEqual(publishedBefore);
   expect(selected).toEqual(before);

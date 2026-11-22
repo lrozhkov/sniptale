@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { inspectVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import { hydrateVideoProject } from '../../../../apps/extension/src/features/video/project/hydration';
@@ -5,7 +6,7 @@ import { resolveVideoProjectCompositionJoinPlans } from '../../../../apps/extens
 import { expect, test, type Page } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { ALL_FORMATS, BlobSource, EncodedPacketSink, Input } from 'mediabunny';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { startHostServer } from '../support/host-server';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
@@ -233,7 +234,7 @@ for (const variant of [
           await chooseInspectorValue(
             page,
             fields,
-            label('gallery.videoReview.zoomTransitionType'),
+            label('gallery.videoReview.cutTransition'),
             label(
               variant.type === 'dissolve'
                 ? 'gallery.videoReview.cutDissolve'
@@ -856,12 +857,9 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         exact: true,
       });
       await group.click();
-      const volume = page.getByRole('textbox', {
-        name: label('videoEditor.sidebar.volumeLabel'),
-        exact: true,
-      });
+      const volume = numericControl(page, label('videoEditor.sidebar.volumeLabel'));
       await expect(volume).toHaveValue('0');
-      await volume.fill('70');
+      await (await openNumericControl(page, label('videoEditor.sidebar.volumeLabel'))).fill('70');
       await volume.press('Enter');
       await expect
         .poll(

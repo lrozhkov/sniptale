@@ -58,6 +58,11 @@
   --sniptale-color-surface-panel-glass: rgba(24, 24, 27, 0.85);
   --sniptale-color-surface-overlay: rgba(9, 9, 11, 0.8);
   --sniptale-color-surface-input: rgba(255, 255, 255, 0.05);
+  --sniptale-color-field: #242427;
+  --sniptale-color-field-hover: #2c2c2c;
+  --sniptale-color-field-border: #3b3b3b;
+  --sniptale-color-field-focus: #767676;
+  --sniptale-color-field-selected: #444444;
   --sniptale-color-surface-hover: rgba(255, 255, 255, 0.08);
   --sniptale-color-surface-muted: color-mix(
     in srgb,
@@ -126,6 +131,11 @@
   --sniptale-color-surface-panel-glass: rgba(255, 255, 255, 0.85);
   --sniptale-color-surface-overlay: rgba(240, 233, 226, 0.7);
   --sniptale-color-surface-input: rgba(39, 39, 42, 0.055);
+  --sniptale-color-field: #f3f0ec;
+  --sniptale-color-field-hover: #ebebeb;
+  --sniptale-color-field-border: #dfdfdf;
+  --sniptale-color-field-focus: #969696;
+  --sniptale-color-field-selected: #d1d1d1;
   --sniptale-color-surface-hover: rgba(39, 39, 42, 0.075);
   --sniptale-color-surface-muted: color-mix(
     in srgb,

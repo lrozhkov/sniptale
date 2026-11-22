@@ -23,6 +23,7 @@ function ReviewCaptionStyleControls(props: {
       sizeControl={
         <ReviewNumberRow
           label={translate('gallery.videoReview.captionSize')}
+          rangePresentation="field"
           unit="%"
           value={props.style.fontSize * 100}
           min={1.5}
@@ -45,8 +46,9 @@ export function ReviewCaptionSceneControls(props: {
 }) {
   const settings = props.settings ?? createReviewCaptionSettings();
   return (
-    <div className="min-w-0 space-y-2" data-ui="gallery.videoReview.captionScene">
+    <div className="sniptale-parameter-stack" data-ui="gallery.videoReview.captionScene">
       <ToggleField
+        showStatus
         value={settings.enabled}
         disabled={props.disabled}
         label={translate('gallery.videoReview.captionsEnabled')}
@@ -67,42 +69,52 @@ export function ReviewCaptionSceneControls(props: {
 export function ReviewFragmentCaptionControls(props: {
   fragment: ReviewTextFragment;
   settings: ReviewCaptionSettings;
+  /** Inline fields belong to the parent inspector Appearance category. */
+  presentation?: 'disclosure' | 'inline';
   disabled: boolean;
   onChange(patch: { showInVideo?: boolean; style?: ReviewCaptionStyle | null }): void;
 }) {
   const { fragment } = props;
+  const style = (
+    <>
+      <ToggleField
+        showStatus
+        value={!fragment.style}
+        disabled={props.disabled}
+        label={translate('gallery.videoReview.captionInherit')}
+        onChange={() =>
+          props.onChange({ style: fragment.style ? null : { ...props.settings.style } })
+        }
+      />
+      {fragment.style && (
+        <ReviewCaptionStyleControls
+          style={fragment.style}
+          disabled={props.disabled}
+          onChange={(style) => props.onChange({ style })}
+        />
+      )}
+    </>
+  );
   return (
     <>
       <ToggleField
+        showStatus
         label={translate('gallery.videoReview.textFragmentShown')}
         value={fragment.showInVideo}
         disabled={props.disabled}
         onChange={(showInVideo) => props.onChange({ showInVideo })}
       />
-      {fragment.showInVideo && (
-        <ReviewDetails
-          preferenceId="group:text-style"
-          label={translate('gallery.videoReview.captionStyle')}
-        >
-          <ToggleField
-            value={!fragment.style}
-            disabled={props.disabled}
-            label={translate('gallery.videoReview.captionInherit')}
-            onChange={() =>
-              props.onChange({
-                style: fragment.style ? null : { ...props.settings.style },
-              })
-            }
-          />
-          {fragment.style && (
-            <ReviewCaptionStyleControls
-              style={fragment.style}
-              disabled={props.disabled}
-              onChange={(style) => props.onChange({ style })}
-            />
-          )}
-        </ReviewDetails>
-      )}
+      {fragment.showInVideo &&
+        (props.presentation === 'inline' ? (
+          style
+        ) : (
+          <ReviewDetails
+            preferenceId="group:text-style"
+            label={translate('gallery.videoReview.captionStyle')}
+          >
+            {style}
+          </ReviewDetails>
+        ))}
     </>
   );
 }

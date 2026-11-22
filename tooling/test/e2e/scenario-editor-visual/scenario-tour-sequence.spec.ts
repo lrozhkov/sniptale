@@ -1,10 +1,11 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { createHash } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { expect, type Page } from '@playwright/test';
 import { test } from '../support/extension-fixture';
 import { SCENARIO_EDITOR_VISUAL_HARNESS_PATH } from '../extension-critical.helpers';
-import { createTranslator } from '../../../../apps/extension/src/platform/i18n';
+import { createTranslator } from '../support/catalog-fixture';
 import { openVisualHarness, createPageIssueCollector } from './scenario-editor-visual.helpers';
 
 function pcmAudio(seconds: number) {
@@ -294,11 +295,8 @@ async function frameSelectedTourAction(page: Page, t: ReturnType<typeof createTr
     .getByRole('button', { name: t('scenario.editor.tourCamera'), exact: true });
   await cameraCategory.click();
   await choose(page, t('scenario.editor.tourCameraMode'), t('scenario.editor.tourCameraManual'));
-  const zoom = panel.getByRole('textbox', {
-    name: t('scenario.editor.tourCameraZoom'),
-    exact: true,
-  });
-  await zoom.fill('200');
+  const zoom = numericControl(panel, t('scenario.editor.tourCameraZoom'));
+  await (await openNumericControl(panel, t('scenario.editor.tourCameraZoom'))).fill('200');
   await zoom.press('Enter');
   const frameControl = page
     .locator('.tour-header-controls')

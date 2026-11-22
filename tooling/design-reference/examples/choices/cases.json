@@ -8,8 +8,26 @@
     {
       "id": "choices.segments",
       "title": "Короткие значения параметра",
-      "states": ["selected", "disabled", "keyboard"],
+      "states": ["selected", "keyboard"],
       "proof": "Exclusive values use native radio semantics, not navigation tabs."
+    },
+    {
+      "id": "choices.lens",
+      "title": "Форма и параметры линзы",
+      "states": ["circle", "rectangle", "pointer", "optical"],
+      "proof": "Labeled silhouettes update the preview and show the applicable size controls."
+    },
+    {
+      "id": "choices.segment-fit",
+      "title": "Переключатель при изменении ширины панели",
+      "states": ["equal", "intrinsic", "inline-dropdown", "disabled"],
+      "proof": "The choice keeps its value and row when the segments change to a dropdown."
+    },
+    {
+      "id": "choices.switch-status",
+      "title": "Switch со статусом",
+      "states": ["enabled", "disabled", "dependent", "keyboard"],
+      "proof": "State and the switch share one action. Turning off the feature keeps the dependent values."
     },
     {
       "id": "choices.tiles",

@@ -1,7 +1,20 @@
 // @vitest-environment jsdom
+
+import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
+import {
+  loadScenarioCatalogFixture,
+  prepareScenarioTranslations,
+} from './test-support/translations.test-support';
 import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, beforeEach, expect, it, vi } from 'vitest';
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadScenarioCatalogFixture>[0]) =>
+    loadScenarioCatalogFixture(locale),
+}));
+
+beforeAll(prepareScenarioTranslations);
+
 import { createGuideProject, createGuideStep } from '../../features/scenario/project/factories';
 
 const io = vi.hoisted(() => ({
@@ -32,15 +45,13 @@ vi.mock('./library-browser', () => ({
 vi.mock('./runtime/resource-session', () => ({ useGuideResourceSession: () => enterSession }));
 const enterSession = async () => true;
 vi.mock('../../composition/persistence/scenario/history', () => ({
-  getScenarioSavedVersions: async (id: string) => {
+  getScenarioEditingSnapshot: async (id: string) => {
     const project = await io.load(id);
     return project
       ? {
-          currentRevision: 1,
-          versions: [
-            { project, revision: 1, savedAt: project.updatedAt },
-            ...(io.previous() ?? []),
-          ],
+          project,
+          workspaceRevision: 1,
+          editingHistory: { version: 1, past: io.previous() ?? [], future: [] },
         }
       : null;
   },
@@ -64,6 +75,7 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
   useAppLocale: () => 'en',
 }));
 vi.mock('../../ui/page-bootstrap', () => ({ renderPageShell: io.mount }));
+import { useGuideHistory } from './runtime/history';
 import { GUIDE_AUTOSAVE_IDLE_MS } from './runtime/autosave';
 import { ScenarioEditorPage } from './ScenarioEditorPage';
 import type { GuideLibraryBrowser } from './library-browser';
@@ -93,9 +105,10 @@ beforeEach(() => {
   project.items.push(createGuideStep('First step', 'first'));
   io.load.mockResolvedValue(project);
   io.asset.mockResolvedValue(undefined);
-  io.save.mockImplementation(async (value, { expectedRevision: revision }) =>
-    committedSnapshot({ ...value, updatedAt: 101 }, revision + 1)
-  );
+  io.save.mockImplementation(async (value, { expectedRevision: revision, editingHistory }) => ({
+    ...committedSnapshot({ ...value, updatedAt: 101 }, revision + 1),
+    editingHistory,
+  }));
   io.duplicate.mockImplementation(async (value, name) =>
     committedSnapshot({ ...value, id: 'copy', name, updatedAt: 102 }, 37)
   );
@@ -149,17 +162,24 @@ it('saves the edited project title and added steps against the loaded revision',
       name: 'Renamed guide',
       items: expect.arrayContaining([expect.objectContaining({ id: 'first' })]),
     }),
-    { expectedRevision: 1, historyActionId: expect.any(String) }
+    {
+      expectedRevision: 1,
+      historyActionId: expect.any(String),
+      editingHistory: expect.objectContaining({
+        version: 1,
+        past: expect.any(Array),
+        future: expect.any(Array),
+      }),
+    }
   );
-  expect(io.save).toHaveBeenCalledTimes(2);
-  expect(io.save.mock.calls[1]![0].items).toHaveLength(2);
-  expect(io.save.mock.calls[1]![1]).toEqual({
-    expectedRevision: 2,
-    historyActionId: expect.any(String),
-  });
-  expect(io.save.mock.calls[1]![1].historyActionId).not.toBe(
-    io.save.mock.calls[0]![1].historyActionId
-  );
+  expect(io.save).toHaveBeenCalledOnce();
+  const [saved, options] = io.save.mock.calls[0]!;
+  expect(saved.items).toHaveLength(2);
+  expect(options.editingHistory.past.map((project: GuideProject) => project.name)).toEqual([
+    'Local guide',
+    'Renamed guide',
+  ]);
+  expect(options.editingHistory.past[1].items).toHaveLength(1);
   expect(container.querySelector('[aria-label="Autosave: Saved"]')).not.toBeNull();
   expect(container.querySelector('.guide-page-feedback')).toBeNull();
 });
@@ -222,6 +242,11 @@ it('recovers a conflicted edit buffer by copying it and retains it if copying fa
   expect(io.save).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'copy' }), {
     expectedRevision: 37,
     historyActionId: expect.any(String),
+    editingHistory: expect.objectContaining({
+      version: 1,
+      past: expect.any(Array),
+      future: expect.any(Array),
+    }),
   });
 });
 
@@ -256,6 +281,11 @@ it('preserves Undo during autosave and adopts the acknowledged revision', async 
   expect(io.save).toHaveBeenLastCalledWith(expect.objectContaining({ items: expect.any(Array) }), {
     expectedRevision: 2,
     historyActionId: expect.any(String),
+    editingHistory: expect.objectContaining({
+      version: 1,
+      past: expect.any(Array),
+      future: expect.any(Array),
+    }),
   });
 });
 
@@ -294,6 +324,11 @@ it('keeps image import undoable and saves Undo against its new revision', async 
   expect(io.save).toHaveBeenLastCalledWith(expect.anything(), {
     expectedRevision: 37,
     historyActionId: expect.any(String),
+    editingHistory: expect.objectContaining({
+      version: 1,
+      past: expect.any(Array),
+      future: expect.any(Array),
+    }),
   });
 });
 
@@ -314,7 +349,7 @@ it('skips autosave when Undo then Redo restores the durable snapshot', async () 
 
 it('opens stored revisions in ordinary undo and autosaves against the current revision', async () => {
   const previous = createGuideProject('Previous guide', 'guide', 90);
-  io.previous.mockReturnValue([{ project: previous, revision: 0, savedAt: 90 }]);
+  io.previous.mockReturnValue([previous]);
   await render();
   await click('Undo');
   expect(container.querySelector('input')?.value).toBe('Previous guide');
@@ -322,6 +357,11 @@ it('opens stored revisions in ordinary undo and autosaves against the current re
   expect(io.save).toHaveBeenCalledWith(previous, {
     expectedRevision: 1,
     historyActionId: expect.any(String),
+    editingHistory: expect.objectContaining({
+      version: 1,
+      past: expect.any(Array),
+      future: expect.any(Array),
+    }),
   });
   await click('Redo');
   expect(container.querySelector('input')?.value).toBe('Local guide');
@@ -350,4 +390,123 @@ it('protects actual page input across held pointer saves and completes without b
   expect(io.save.mock.calls.at(-1)![0].name).toBe('Completed');
   expect(io.release).toHaveBeenCalledOnce();
   expect(document.activeElement).toBe(field);
+});
+
+it('restores both history branches through the React owner without treating loading as an edit', async () => {
+  let history!: ReturnType<typeof useGuideHistory>;
+  const edited = vi.fn();
+  function Probe() {
+    history = useGuideHistory({ canEdit: () => true, onEdit: edited, onFailure: vi.fn() });
+    return (
+      <>
+        <output>{history.project?.name}</output>
+        <button aria-label="Restore undo" onClick={history.undo} disabled={!history.canUndo}>
+          Undo
+        </button>
+        <button aria-label="Restore redo" onClick={history.redo} disabled={!history.canRedo}>
+          Redo
+        </button>
+      </>
+    );
+  }
+  await act(async () => root.render(<Probe />));
+  const current = createGuideProject('Restored current', 'guide', 100);
+  const before = { ...current, name: 'Before current' };
+  const after = { ...current, name: 'After current' };
+  act(() => history.reset(current, [before], [after]));
+  expect(edited).not.toHaveBeenCalled();
+  expect(history.actionId).toBeUndefined();
+  expect(history.editingHistory).toEqual({ version: 1, past: [before], future: [after] });
+  const redo = container.querySelector('[aria-label="Restore redo"]');
+  const undo = container.querySelector('[aria-label="Restore undo"]');
+  if (!(redo instanceof HTMLButtonElement) || !(undo instanceof HTMLButtonElement))
+    throw new Error('History controls did not mount');
+  expect(redo.disabled).toBe(false);
+  expect(undo.disabled).toBe(false);
+  await act(async () => redo.click());
+  expect(container.querySelector('output')?.textContent).toBe('After current');
+  await act(async () => undo.click());
+  expect(container.querySelector('output')?.textContent).toBe('Restored current');
+  expect(edited).toHaveBeenCalledTimes(2);
+  expect(io.save).not.toHaveBeenCalled();
+});
+
+it('keeps consecutive numeric holds as separate Undo actions in one persisted checkpoint', async () => {
+  await render();
+  const link = container.querySelector<HTMLAnchorElement>('a[href="#first"]');
+  if (!link) throw new Error('Missing step navigation');
+  await act(async () => link.click());
+  await click('Numbering');
+  await click('Restart numbering');
+  const input = () => container.querySelector<HTMLInputElement>('input[aria-label="Start at"]')!;
+  const increase = container.querySelector<HTMLButtonElement>('[aria-label="Start at increase"]');
+  if (!increase) throw new Error('Missing numeric stepper');
+  const pointer = async (type: string, target: EventTarget) => {
+    await act(async () =>
+      target.dispatchEvent(
+        new MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        })
+      )
+    );
+  };
+  await pointer('pointerdown', increase);
+  for (const elapsed of [220, 70, 70]) {
+    await act(async () => vi.advanceTimersByTimeAsync(elapsed));
+  }
+  expect(input().value).toBe('4');
+  await pointer('pointerup', increase);
+  await pointer('pointerdown', increase);
+  await pointer('pointerup', increase);
+  expect(input().value).toBe('5');
+  await click('Undo');
+  expect(input().value).toBe('4');
+  await click('Undo');
+  expect(input().value).toBe('1');
+  await click('Redo');
+  expect(input().value).toBe('4');
+  await click('Redo');
+  expect(input().value).toBe('5');
+  await settleAutosave();
+  expect(io.save).toHaveBeenCalledOnce();
+  const [saved, options] = io.save.mock.calls[0]!;
+  expect(saved.items[0].numbering?.restartAt).toBe(5);
+  expect(
+    options.editingHistory.past.slice(-2).map((project: GuideProject) => {
+      const item = project.items[0];
+      return item?.kind === 'step' ? item.numbering?.restartAt : undefined;
+    })
+  ).toEqual([1, 4]);
+  expect(options.editingHistory.future).toEqual([]);
+});
+
+it('keeps a caret click inside the focused field in the current text edit', async () => {
+  await render();
+  await editField('input[aria-label="Scenario"]', 'Local guide A');
+  const title = container.querySelector<HTMLInputElement>('input[aria-label="Scenario"]')!;
+  await act(async () =>
+    title.dispatchEvent(
+      new MouseEvent('pointerdown', {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+      })
+    )
+  );
+  await act(async () =>
+    title.dispatchEvent(
+      new MouseEvent('pointerup', {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+      })
+    )
+  );
+  await editField('input[aria-label="Scenario"]', 'Local guide AB');
+  await click('Undo');
+  expect(title.value).toBe('Local guide');
+  await click('Redo');
+  expect(title.value).toBe('Local guide AB');
 });

@@ -1,4 +1,15 @@
+import { betaV68Fixture } from './beta-v68';
+import { betaV69Fixture } from './beta-v69';
+import { betaV70Fixture } from './beta-v70';
+import { betaV71Fixture } from './beta-v71';
+import { betaV72Fixture } from './beta-v72';
+import { betaV67Fixture } from './beta-v67';
+import { betaV66Fixture } from './beta-v66';
+import { betaV64Fixture } from './beta-v64';
+import { betaV65Fixture } from './beta-v65';
+import { betaV63Fixture } from './beta-v63';
 import { betaV61Fixture } from './beta-v61';
+import { betaV62Fixture } from './beta-v62';
 import { betaV60Fixture } from './beta-v60';
 import { betaV59Fixture } from './beta-v59';
 import { betaV58Fixture } from './beta-v58';
@@ -136,4 +147,15 @@ export const SUPPORTED_BETA_DATABASE_FIXTURES: readonly BetaDatabaseFixtureContr
   betaV59Fixture,
   betaV60Fixture,
   betaV61Fixture,
+  betaV62Fixture,
+  betaV63Fixture,
+  betaV64Fixture,
+  betaV65Fixture,
+  betaV66Fixture,
+  betaV67Fixture,
+  betaV68Fixture,
+  betaV69Fixture,
+  betaV70Fixture,
+  betaV71Fixture,
+  betaV72Fixture,
 ];

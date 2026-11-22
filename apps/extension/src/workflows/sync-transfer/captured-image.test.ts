@@ -3,7 +3,7 @@ import {
   assetResidencyCopyId,
   type AssetResidencyCopy,
 } from '../../composition/persistence/assets/residency-records';
-import { hashSyncText } from './wire-record';
+import { hashSyncText, parseSyncOperationText, syncOperationVersionForRoot } from './wire-record';
 import { createScenarioReplicaFixture } from '../../composition/persistence/sync-capture/test-support/scenario-replica.test-support';
 import { applyPreparedImageReplica } from '../../composition/persistence/sync-capture/apply-image';
 import { commitImagePresentation } from '../../composition/persistence/image-aggregates/mutations';
@@ -29,6 +29,13 @@ import { prepareCapturedOutgoing } from './outgoing';
 import { encodeCapturedImageRoot } from './captured-image';
 import { preparePortableReplica } from './prepared-root';
 import { parsePortableMediaMetadata } from '../media-hub-backup/v6/root-codecs/media';
+import * as nativeOutgoing from '../../composition/persistence/sync-capture/outgoing';
+import { installPersistenceLockManagerForTests } from '../../composition/persistence/infrastructure/mutation-barrier';
+import type { SyncRemoteStore } from './remote-store';
+import {
+  IMAGE_HISTORY_VALUE_TOKEN_PREFIX,
+  encodeEditorImageHistorySnapshot,
+} from '../../features/editor-history/image-snapshot';
 
 const io = vi.hoisted(() => ({
   live: vi.fn(),
@@ -730,6 +737,236 @@ function verifiedDeferredCopy(ref: AssetRef, index = 0): AssetResidencyCopy {
   };
 }
 
+function imageRowsWithHistory() {
+  const rows = imageRows();
+  const snapshots = [0, 1].map((index) => {
+    const assetId = `history-state-${index}`;
+    const blob = new Blob(
+      [
+        JSON.stringify({
+          ...createEditorDocumentFixture(),
+          sourceImageData: 'data:image/png;base64,ZG9jdW1lbnQ=',
+          displayName: `Picture ${index}`,
+        }),
+      ],
+      { type: 'application/json' }
+    );
+    io.bytes.set(assetId, blob);
+    rows.refs.push({
+      ...rows.refs[0]!,
+      assetId,
+      size: blob.size,
+      mimeType: blob.type,
+      location: { kind: 'opfs', objectKey: `objects/${assetId}` },
+      sha256: null,
+    });
+    return { assetId };
+  });
+  rows.workspace!.history = {
+    version: 1,
+    epoch: 'sync-history',
+    cursor: 0,
+    snapshots,
+    values: [],
+    actions: [null, { operation: 'rename', target: null }],
+  };
+  io.read.mockImplementation(async (ref: AssetRef, name: string) => {
+    const blob = io.bytes.get(ref.assetId) ?? new Blob(['document'], { type: 'image/png' });
+    return new File([blob], name, { type: blob.type });
+  });
+  return rows;
+}
+
+it('prepares portable Image history and remaps all historical resources on receipt', async () => {
+  const rows = imageRowsWithHistory();
+  const encoded = await encodeCapturedImageRoot(rows);
+  const portable = parsePortableMediaMetadata(encoded.envelope.metadata);
+  expect(portable.workspace?.history).toMatchObject({ cursor: 0, epoch: 'sync-history' });
+  expect(syncOperationVersionForRoot(encoded.envelope)).toBe(3);
+  expect(portable.workspace?.history?.snapshots).toHaveLength(2);
+  const verified = new Map<string, AssetRef>();
+  for (const object of encoded.objects) {
+    const blob = await readArchiveRootObjectSource(object);
+    const assetId = `received-${object.ref.objectId}`;
+    io.bytes.set(assetId, blob);
+    verified.set(object.ref.objectId, {
+      ...rows.refs[0]!,
+      assetId,
+      size: blob.size,
+      mimeType: object.ref.mimeType,
+      location: { kind: 'opfs', objectKey: `objects/${assetId}` },
+    });
+  }
+  const result = await preparePortableReplica({
+    envelope: encoded.envelope,
+    verifiedObjects: verified,
+    senderDependencies: [],
+    admission: {
+      operationId: 'history-receive',
+      sourceDigest: 'a'.repeat(64),
+      connectionGeneration: 1,
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      expectedLocalGeneration: 0,
+      expectedBasis: [],
+      expectedWorkspaceRevision: null,
+      dependencies: [],
+    },
+  });
+  expect(result.kind).toBe('image');
+  if (result.kind !== 'image') throw new Error('Expected Image.');
+  const portableHistory = portable.workspace!.history!;
+  if (portableHistory.version !== 1) throw new Error('Expected legacy file history.');
+  expect(result.input.workspace?.history?.snapshots).toEqual(
+    portableHistory.snapshots.map(({ objectId }) => ({
+      assetId: `received-${objectId}`,
+    }))
+  );
+  io.canonical = nativeImageCapture(rows);
+  const prepared = await prepareCapturedOutgoing(io.canonical);
+  const operation = await parseSyncOperationText(prepared.recordText);
+  expect(operation.version).toBe(3);
+  for (const version of [1, 2])
+    await expect(
+      parseSyncOperationText(JSON.stringify({ ...operation, version }))
+    ).rejects.toThrow();
+});
+
+it('keeps a shared unloaded history bitmap remote while reading only history metadata', async () => {
+  const rows = imageRowsWithHistory();
+  const history = rows.workspace!.history!;
+  if (history.version !== 1) throw new Error('Expected legacy file history.');
+  const id = `${IMAGE_HISTORY_VALUE_TOKEN_PREFIX}shared-source`;
+  for (const { assetId } of history.snapshots) {
+    const blob = io.bytes.get(assetId)!;
+    const text = (await blob.text()).replace('data:image/png;base64,ZG9jdW1lbnQ=', id);
+    io.bytes.set(assetId, new Blob([text], { type: 'application/json' }));
+    rows.refs.find((ref) => ref.assetId === assetId)!.size = io.bytes.get(assetId)!.size;
+  }
+  rows.workspace!.history = {
+    ...history,
+    values: [
+      {
+        id,
+        kind: 'image',
+        assetId: 'document-source',
+        dataUrl: { header: 'data:image/png;base64,', lastCharacter: 'Q', padding: 1 },
+      },
+    ],
+  };
+  const originalRead = io.read.getMockImplementation()!;
+  io.read.mockImplementation(async (ref: AssetRef, name: string) => {
+    if (ref.assetId === 'document-source') throw new Error('Bitmap must stay remote.');
+    return originalRead(ref, name);
+  });
+  const copy = verifiedDeferredCopy(rows.refs[0]!);
+  const encoded = await encodeCapturedImageRoot(rows, new Map([['document-source', copy]]));
+  const metadata = parsePortableMediaMetadata(encoded.envelope.metadata);
+  const value = metadata.workspace!.history!.values[0]!;
+  if (!('objectId' in value)) throw new Error('Expected immutable image resource.');
+  const objectId = value.objectId;
+  expect(objectId).toBe(metadata.workspace!.document.sourceImage.objectId);
+  expect(encoded.retainedObjects).toContainEqual({
+    objectId,
+    remoteKey: copy.remote.key,
+    sha256: copy.remote.sha256,
+  });
+  expect(io.read.mock.calls.some(([ref]) => ref.assetId === 'document-source')).toBe(false);
+});
+
+it.each(['installed', 'busy', 'refused', 'digest-mismatch'] as const)(
+  'recovers missing history JSON before publication locks: %s',
+  async (outcome) => {
+    const rows = imageRowsWithHistory();
+    const ref = rows.refs.find(({ assetId }) => assetId === 'history-state-0')!;
+    const blob = io.bytes.get(ref.assetId)!;
+    ref.sha256 = hashSyncText(await blob.text());
+    const copy = verifiedDeferredCopy(ref);
+    io.bytes.delete(ref.assetId);
+    let restored = false;
+    let heldLocks = 0;
+    const read = vi.fn(async () => {
+      expect(heldLocks).toBe(0);
+      return outcome === 'digest-mismatch'
+        ? new Blob(['x'.repeat(blob.size)]).stream()
+        : blob.stream();
+    });
+    const remote: SyncRemoteStore = {
+      read,
+      list: async () => ({ objects: [], prefixes: [], nextCursor: null }),
+      stat: async () => ({ size: blob.size }),
+      write: async () => undefined,
+    };
+    const authorization = { incarnation: 'connection', revision: 1 };
+    const load = vi.spyOn(nativeOutgoing, 'loadNativeOutgoingRecoveryCopy').mockResolvedValue(copy);
+    const restore = vi
+      .spyOn(nativeOutgoing, 'restoreNativeOutgoingAsset')
+      .mockImplementation(async (input) => {
+        expect(heldLocks).toBe(0);
+        expect(input.authorization).toEqual(authorization);
+        expect(await input.sourceBlob.text()).toBe(await blob.text());
+        if (outcome === 'busy') return 'busy';
+        if (outcome === 'refused') throw new Error('Recovery source changed.');
+        io.bytes.set(ref.assetId, input.sourceBlob);
+        restored = true;
+        return 'installed';
+      });
+    io.read.mockImplementation(async (resource: AssetRef, name: string) => {
+      if (resource.assetId === ref.assetId && !restored)
+        throw new DOMException('Missing', 'NotFoundError');
+      const bytes = io.bytes.get(resource.assetId) ?? new Blob(['document'], { type: 'image/png' });
+      return new File([bytes], name, { type: bytes.type });
+    });
+    installPersistenceLockManagerForTests({
+      request: async (_name, _options, operation) => {
+        heldLocks++;
+        try {
+          return await operation();
+        } finally {
+          heldLocks--;
+        }
+      },
+    });
+    io.canonical = nativeImageCapture(rows);
+    try {
+      const pending = prepareCapturedOutgoing(io.canonical, {
+        remote,
+        authorization,
+        signal: new AbortController().signal,
+      });
+      if (outcome === 'installed') {
+        const result = await pending;
+        expect(result.objects.length).toBeGreaterThan(0);
+      } else {
+        await expect(pending).rejects.toThrow();
+        expect(io.accepted).toBeNull();
+        expect(io.bytes.has(ref.assetId)).toBe(false);
+      }
+      expect(read).toHaveBeenCalledTimes(1);
+      expect(load).toHaveBeenCalledWith({ capture: io.canonical, ref, authorization });
+      expect(restore).toHaveBeenCalledTimes(outcome === 'digest-mismatch' ? 0 : 1);
+      if (outcome === 'busy') {
+        restore.mockImplementationOnce(async (input) => {
+          io.bytes.set(ref.assetId, input.sourceBlob);
+          restored = true;
+          return 'installed';
+        });
+        await expect(
+          prepareCapturedOutgoing(io.canonical, {
+            remote,
+            authorization,
+            signal: new AbortController().signal,
+          })
+        ).resolves.toMatchObject({ operationId: 'image-op' });
+      }
+    } finally {
+      installPersistenceLockManagerForTests(null);
+      load.mockRestore();
+      restore.mockRestore();
+    }
+  }
+);
+
 it(
   'retains an unloaded image document slot while inline original and presentation ' +
     'remain genuine local objects',
@@ -934,3 +1171,238 @@ it.each([0, 1])(
     expect(encoded.objects).toHaveLength(1);
   }
 );
+
+async function packHistoryRows(
+  rows: CapturedImageRows,
+  snapshots: string[],
+  values: readonly { id: string; kind: 'json'; value: string }[] = []
+) {
+  const blob = new Blob([JSON.stringify({ version: 1, snapshots, values })], {
+    type: 'application/json',
+  });
+  const assetId = 'packed-history';
+  io.bytes.set(assetId, blob);
+  rows.refs = rows.refs.filter((ref) => ref.mimeType !== 'application/json');
+  rows.refs.push({
+    ...rows.refs[0]!,
+    assetId,
+    size: blob.size,
+    mimeType: blob.type,
+    sha256: null,
+    location: { kind: 'opfs', objectKey: `objects/${assetId}` },
+  });
+  rows.workspace!.history = {
+    version: 2,
+    epoch: 'packed-history',
+    cursor: snapshots.length - 1,
+    snapshots: snapshots.map(() => ({ assetId })),
+    values: values.map((unit) => ({ id: unit.id, kind: 'json', assetId })),
+    actions: snapshots.map((_, index) =>
+      index === 0 ? null : { operation: 'update', target: null }
+    ),
+  };
+  return rows;
+}
+
+it('transports one Image history bundle and restores both directions', async () => {
+  const rows = imageRowsWithHistory();
+  const snapshots = await Promise.all(
+    rows.workspace!.history!.snapshots.map(async ({ assetId }) => io.bytes.get(assetId)!.text())
+  );
+  await packHistoryRows(rows, snapshots);
+  rows.workspace!.history!.cursor = 0;
+  io.read.mockClear();
+  const encoded = await encodeCapturedImageRoot(rows);
+  expect(
+    encoded.objects.filter((object) => object.ref.mimeType === 'application/json')
+  ).toHaveLength(1);
+  expect(io.read.mock.calls.filter(([ref]) => ref.mimeType === 'application/json')).toHaveLength(1);
+  const portable = parsePortableMediaMetadata(encoded.envelope.metadata);
+  expect(portable.workspace?.history).toMatchObject({
+    version: 2,
+    cursor: 0,
+    actions: rows.workspace!.history!.actions,
+  });
+  expect(new Set(portable.workspace!.history!.snapshots.map((entry) => entry.objectId)).size).toBe(
+    1
+  );
+  const verified = new Map<string, AssetRef>();
+  for (const object of encoded.objects) {
+    const blob = await readArchiveRootObjectSource(object);
+    const assetId = `received-${object.ref.objectId}`;
+    io.bytes.set(assetId, blob);
+    verified.set(object.ref.objectId, {
+      ...rows.refs[0]!,
+      assetId,
+      size: blob.size,
+      mimeType: object.ref.mimeType,
+      location: { kind: 'opfs', objectKey: `objects/${assetId}` },
+    });
+  }
+  const result = await preparePortableReplica({
+    envelope: encoded.envelope,
+    verifiedObjects: verified,
+    senderDependencies: [],
+    admission: {
+      operationId: 'packed-image-receive',
+      sourceDigest: 'a'.repeat(64),
+      connectionGeneration: 1,
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      expectedLocalGeneration: 0,
+      expectedBasis: [],
+      expectedWorkspaceRevision: null,
+      dependencies: [],
+    },
+  });
+  if (result.kind !== 'image') throw new Error('Expected Image.');
+  expect(result.input.workspace?.history).toMatchObject({
+    version: 2,
+    cursor: 0,
+    snapshots: portable.workspace!.history!.snapshots.map(({ objectId }) => ({
+      assetId: `received-${objectId}`,
+    })),
+  });
+});
+
+it('transports an admitted drawing larger than the general metadata envelope in one history resource', async () => {
+  const rows = imageRowsWithHistory();
+  const document = {
+    ...createEditorDocumentFixture(),
+    sourceImageData: 'data:image/png;base64,ZG9jdW1lbnQ=',
+    canvasJson: JSON.stringify({
+      objects: [{ type: 'textbox', text: 'Authored '.repeat(140_000) }],
+    }),
+  };
+  const values: { id: string; kind: 'json'; value: string }[] = [];
+  const snapshot = encodeEditorImageHistorySnapshot(
+    document,
+    {
+      intern(value, kind) {
+        if (kind !== 'json') throw new Error('Expected drawing JSON.');
+        const id = IMAGE_HISTORY_VALUE_TOKEN_PREFIX + values.length;
+        values.push({ id, kind, value });
+        return id;
+      },
+    },
+    new Set()
+  );
+  const current = await io.bytes.get(rows.workspace!.history!.snapshots[1]!.assetId)!.text();
+  await packHistoryRows(rows, [snapshot, current], values);
+  const encoded = await encodeCapturedImageRoot(rows);
+  expect(
+    new TextEncoder().encode(JSON.stringify(encoded.envelope.metadata)).byteLength
+  ).toBeLessThan(1024 * 1024);
+  expect(
+    encoded.objects.filter((object) => object.ref.mimeType === 'application/json')
+  ).toHaveLength(1);
+  expect(
+    encoded.objects.find((object) => object.ref.mimeType === 'application/json')!.ref.size
+  ).toBeGreaterThan(1024 * 1024);
+  io.canonical = nativeImageCapture(rows);
+  const prepared = await prepareCapturedOutgoing(io.canonical);
+  expect((await parseSyncOperationText(prepared.recordText)).version).toBe(3);
+});
+
+it('applies independent image projects against one committed original and rejects a stale source basis', async () => {
+  const fixture = createScenarioReplicaFixture();
+  const media = () => fixture.fixture.rows.get('media_library')!;
+  const workspaces = () => fixture.fixture.rows.get('image_workspaces')!;
+  media().clear();
+  io.live.mockResolvedValue(fixture.database);
+  const files = new Map<string, Blob>();
+  io.read.mockImplementation(
+    async (ref: AssetRef, filename: string) =>
+      new File([files.get(ref.assetId) ?? 'document'], filename, { type: ref.mimeType })
+  );
+
+  async function prepare(rows: CapturedImageRows, operationId: string) {
+    const encoded = await encodeCapturedImageRoot(rows);
+    const verifiedObjects = new Map<string, AssetRef>();
+    for (const object of encoded.objects) {
+      const blob = await readArchiveRootObjectSource(object);
+      const assetId = `${operationId}-${object.ref.objectId}`;
+      files.set(assetId, blob);
+      verifiedObjects.set(object.ref.objectId, {
+        assetId,
+        createdAt: 1,
+        size: blob.size,
+        mimeType: blob.type,
+        location: { kind: 'opfs', objectKey: `objects/${assetId}` },
+        sha256: null,
+      });
+    }
+    const sourceId = rows.workspace?.sourceMediaId;
+    const imageOriginal = sourceId
+      ? { mediaId: sourceId, generation: 1, basis: ['shared-original'] }
+      : undefined;
+    expect(syncOperationVersionForRoot(encoded.envelope)).toBe(4);
+    const payload = await preparePortableReplica({
+      envelope: encoded.envelope,
+      verifiedObjects,
+      senderDependencies: imageOriginal ? [imageOriginal] : [],
+      admission: {
+        spaceId: 'space',
+        profileCreatedAt: 1,
+        connectionGeneration: 1,
+        operationId,
+        sourceDigest: hashSyncText(operationId),
+        expectedLocalGeneration: 0,
+        expectedBasis: [],
+        expectedWorkspaceRevision: null,
+        dependencies: [],
+        ...(imageOriginal ? { imageOriginal } : {}),
+      },
+    });
+    if (payload.kind !== 'image') throw new Error('Expected image replica.');
+    return payload.input;
+  }
+
+  const rows = imageRows();
+  const original = await prepare(
+    {
+      ...rows,
+      media: { ...rows.media, workspaceRevision: 0 },
+      workspace: null,
+      presentation: null,
+      refs: [],
+      savedIndependently: false,
+    },
+    'shared-original'
+  );
+  await expect(applyPreparedImageReplica(original)).resolves.toMatchObject({ status: 'applied' });
+  const acceptedOriginal = structuredClone(media().get(rows.media.id));
+
+  for (const aggregateId of ['first-project', 'second-project']) {
+    const input = await prepare(
+      {
+        ...rows,
+        workspace: {
+          ...rows.workspace!,
+          aggregateId,
+          sourceMediaId: rows.media.id,
+          lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+          document: { ...rows.workspace!.document, displayName: aggregateId },
+        },
+        presentation: { ...rows.presentation!, aggregateId },
+      },
+      aggregateId
+    );
+    await expect(
+      applyPreparedImageReplica({
+        ...input,
+        linkedOriginal: { ...input.linkedOriginal!, generation: 2 },
+      })
+    ).rejects.toThrow('Image replica predecessor changed');
+    expect(workspaces().has(aggregateId)).toBe(false);
+    await expect(applyPreparedImageReplica(input)).resolves.toMatchObject({ status: 'applied' });
+    await expect(applyPreparedImageReplica(input)).resolves.toMatchObject({ status: 'duplicate' });
+    expect(workspaces().get(aggregateId)).toMatchObject({
+      sourceMediaId: rows.media.id,
+      document: { displayName: aggregateId },
+    });
+  }
+
+  expect([...media().keys()]).toEqual([rows.media.id]);
+  expect(media().get(rows.media.id)).toEqual(acceptedOriginal);
+});

@@ -57,10 +57,12 @@ describe('EffectV1 scalar runtime resource limits', () => {
     ).toThrow(EffectRuntimeResourceError);
   });
 
-  it('keeps the outer sandbox watchdog above preparation and worker budgets', () => {
+  it('keeps the outer sandbox watchdog above preparation and all admitted worker budgets', () => {
     expect(EFFECT_RUNTIME_RESOURCE_LIMITS.sandboxRequestTimeoutMs).toBeGreaterThan(
       EFFECT_RUNTIME_RESOURCE_LIMITS.mediaDecodeTimeoutMs +
-        EFFECT_RUNTIME_RESOURCE_LIMITS.renderTimeoutMs
+        EFFECT_RUNTIME_RESOURCE_LIMITS.maxQueueDepth *
+          (EFFECT_RUNTIME_RESOURCE_LIMITS.workerStartupTimeoutMs +
+            EFFECT_RUNTIME_RESOURCE_LIMITS.renderTimeoutMs)
     );
   });
 });

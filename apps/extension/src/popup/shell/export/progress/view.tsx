@@ -1,6 +1,6 @@
 import { AlertTriangle, CheckCircle2, CircleStop, Loader2 } from 'lucide-react';
 
-import { createTranslator, SUPPORTED_LOCALES, translate } from '../../../../platform/i18n/popup';
+import { translate } from '../../../../platform/i18n/popup';
 import { cx, formatPhaseLabel } from '../selection/utils';
 import type { PopupExportProgressStep } from './steps';
 import {
@@ -146,12 +146,9 @@ function getProgressDescription(props: ExportProgressSectionProps) {
   }
 
   const activeStep = props.progressSteps.find((step) => step.status === 'active') ?? null;
-  const isBatchCollectingMessage = SUPPORTED_LOCALES.some((locale) =>
-    props.progress.message.startsWith(
-      createTranslator(locale)('popup.export.batchCollectingMessage')
-    )
-  );
-  if (isBatchCollectingMessage) return props.progress.message;
+  if (props.progress.collectingPageTitle !== undefined) {
+    return `${translate('popup.export.batchCollectingMessage')} ${props.progress.collectingPageTitle}`;
+  }
   if (activeStep) return activeStep.label;
 
   return formatPhaseLabel(props.progress);

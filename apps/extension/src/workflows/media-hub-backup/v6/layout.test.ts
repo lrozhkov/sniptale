@@ -1,6 +1,9 @@
 import { expect, it } from 'vitest';
 import {
   assertCursorAttachmentLayout,
+  assertImageHistoryLayout,
+  assertLinkedLibraryLayout,
+  MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT,
   assertReviewProjectLayout,
   hasCursorAttachmentMetadata,
   isSharedBackupLayout,
@@ -88,7 +91,60 @@ it('admits v5 through the manifest and shared envelope reader while refusing his
       sharedObjects: [],
     })
   ).toThrow('require library-folders-v5');
-  expect(() => parseManifestV6({ ...manifest, layout: 'library-folders-v6' })).toThrow(
+  expect(() => parseManifestV6({ ...manifest, layout: 'library-folders-v8' })).toThrow(
     'Unsupported'
   );
+});
+
+it.each([
+  'library-folders-v1',
+  'library-folders-v2',
+  'library-folders-v3',
+  'library-folders-v4',
+  'library-folders-v5',
+] as const)('refuses Image history under %s before root publication', (layout) => {
+  const metadata = { workspace: { history: { version: 1 } } };
+  expect(() => assertImageHistoryLayout(metadata, layout)).toThrow('requires library-folders-v6');
+  expect(resolveMediaHubBackupMetadataLayout(layout, metadata)).toBe(
+    MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT
+  );
+});
+
+it('retains previous shared capabilities and does not select Image layout from authored content', () => {
+  const layout = MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT;
+  expect(isSharedBackupLayout(layout)).toBe(true);
+  expect(resolveMediaHubBackupMetadataLayout(layout, { recording: { cursorAttachment: {} } })).toBe(
+    layout
+  );
+  expect(() =>
+    assertCursorAttachmentLayout({ recording: { eventsAttachment: {} } }, layout)
+  ).not.toThrow();
+  expect(() =>
+    assertReviewProjectLayout({ videoReview: { workspace: { project: {} } } }, layout)
+  ).not.toThrow();
+  expect(
+    resolveMediaHubBackupMetadataLayout('library-folders-v3', {
+      authored: { workspace: { history: [] } },
+    })
+  ).toBe('library-folders-v3');
+});
+
+it('selects the linked Library root layout for an explicit original claim or project link', () => {
+  for (const metadata of [{ savedIndependently: false }, { linkedSourceMediaId: 'original' }]) {
+    const layout = resolveMediaHubBackupMetadataLayout(
+      MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT,
+      metadata
+    );
+    expect(layout).toBe('library-folders-v7');
+    expect(isSharedBackupLayout(layout)).toBe(true);
+    expect(() => assertLinkedLibraryLayout(metadata, layout)).not.toThrow();
+    expect(() =>
+      assertLinkedLibraryLayout(metadata, MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT)
+    ).toThrow('require library-folders-v7');
+  }
+  expect(
+    resolveMediaHubBackupMetadataLayout('library-folders-v3', {
+      workspace: { document: { savedIndependently: false } },
+    })
+  ).toBe('library-folders-v3');
 });

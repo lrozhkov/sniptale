@@ -8,6 +8,27 @@
 .sniptale-library-workspace [data-ui='gallery.page.root'] {
   min-width: 1280px;
 }
+.sniptale-library-workspace :is([data-ui='gallery.header.search'], .gallery-facet-search) {
+  --sniptale-compact-font-size: 13px;
+}
+.sniptale-library-workspace [data-ui='gallery.header.search'] {
+  inline-size: 176px;
+}
+.sniptale-library-workspace [data-ui='gallery.header.clearSearch'] {
+  --sniptale-color-accent: var(--sniptale-color-text-muted-strong);
+}
+.sniptale-library-workspace .gallery-tag-entry:is(:focus-within, :has(input:hover)) {
+  background: var(--sniptale-color-surface-hover);
+}
+.sniptale-library-workspace .gallery-tag-entry .sniptale-field-clear {
+  --sniptale-color-accent: var(--sniptale-color-text-muted-strong);
+  visibility: hidden;
+}
+.sniptale-library-workspace
+  .gallery-tag-entry:has(input:is(:hover, :focus), .sniptale-field-clear:is(:hover, :focus))
+  .sniptale-field-clear {
+  visibility: visible;
+}
 .sniptale-library-workspace [data-ui='gallery.header.storage-menu'] {
   padding: 5px;
   border-radius: 4px;
@@ -74,10 +95,7 @@
 
 @layer utilities {
   .sniptale-library-workspace
-    button:is(
-      .sniptale-library-view-mode,
-      .gallery-saved-view-action
-    )[data-command-press][data-command-tone][data-command-chrome] {
+    button.gallery-saved-view-action[data-command-press][data-command-tone][data-command-chrome] {
     height: 32px !important;
     min-height: 32px !important;
     padding: 0 !important;
@@ -85,12 +103,31 @@
     background: transparent !important;
   }
   .sniptale-library-workspace
-    button.sniptale-library-view-mode[data-command-press][data-command-chrome][aria-pressed='true'] {
-    color: var(--sniptale-color-accent) !important;
+    [data-ui='gallery.header.view-mode']
+    > button[data-command-press][data-command-chrome] {
+    --sniptale-color-accent: var(--sniptale-color-text-muted-strong);
+    width: 28px !important;
+    height: 26px !important;
+    min-height: 26px !important;
+    padding: 0 !important;
+    border-color: transparent !important;
+    background: transparent !important;
   }
   .sniptale-library-workspace
-    button.sniptale-library-view-mode[data-command-press][data-command-chrome][aria-pressed='true']:hover {
-    color: var(--sniptale-color-accent-emphasis) !important;
+    [data-ui='gallery.header.view-mode']
+    > button[data-command-press][data-command-chrome][aria-pressed='true'] {
+    background: color-mix(
+      in srgb,
+      var(--sniptale-color-text-secondary) 22%,
+      var(--sniptale-color-surface-panel)
+    ) !important;
+    color: var(--sniptale-color-text-primary) !important;
+  }
+  .sniptale-library-workspace
+    [data-ui='gallery.header.view-mode']
+    > button[data-command-press][data-command-chrome][aria-pressed='false']:hover {
+    background: var(--sniptale-color-surface-hover) !important;
+    color: var(--sniptale-color-text-primary) !important;
   }
   .sniptale-library-workspace
     button.gallery-saved-view-action[data-danger='true']:hover:not(:disabled) {

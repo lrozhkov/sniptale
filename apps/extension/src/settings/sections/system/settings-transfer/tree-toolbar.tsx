@@ -1,6 +1,5 @@
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { Search, X } from 'lucide-react';
+import { SearchField } from '../../../../ui/compact-inspector-controls/row-controls';
 import { translate } from '../../../../platform/i18n';
 
 const buttonClassName =
@@ -23,69 +22,50 @@ export function SettingsTransferTreeToolbar(props: {
   return (
     <div
       className={
-        'flex items-center gap-2 border-b border-[var(--sniptale-color-border-soft)] ' +
+        'grid gap-2 border-b border-[var(--sniptale-color-border-soft)] ' +
         'bg-[var(--sniptale-color-surface-panel)] p-2.5'
       }
     >
-      <label
-        className={
-          'flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-[4px] border ' +
-          'border-[var(--sniptale-color-border-soft)] px-2.5'
-        }
-      >
-        <Search aria-hidden="true" size={15} />
-        <input
-          className={
-            'min-w-0 flex-1 bg-transparent text-sm outline-none ' +
-            'focus:placeholder:text-transparent focus:placeholder:opacity-0'
-          }
-          aria-label={translate('settings.settingsTransfer.searchLabel')}
+      <div className="w-full min-w-0 max-w-lg">
+        <SearchField
+          label={translate('settings.settingsTransfer.searchLabel')}
           placeholder={translate('settings.settingsTransfer.searchPlaceholder')}
           value={props.query}
-          onChange={(event) => props.onQueryChange(event.currentTarget.value)}
+          onChange={props.onQueryChange}
         />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <ProductActionButton
+          tone="secondary"
+          type="button"
+          className={buttonClassName}
+          disabled={props.expandableCount === 0}
+          onClick={props.onToggleExpansion}
+        >
+          {translate(
+            props.expanded
+              ? 'settings.settingsTransfer.collapseAll'
+              : 'settings.settingsTransfer.expandAll'
+          )}
+        </ProductActionButton>
+        <ProductActionButton
+          tone="secondary"
+          type="button"
+          className={buttonClassName}
+          disabled={props.scopeCount === 0}
+          onClick={props.onToggleScope}
+        >
+          {translate(resolveScopeActionKey(hasQuery, props.scopeSelected))}
+        </ProductActionButton>
         {hasQuery ? (
-          <span className="shrink-0 text-xs text-[var(--sniptale-color-text-muted)]">
+          <span role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
             {translate('settings.settingsTransfer.foundCount').replace(
               '{count}',
               String(props.matchCount)
             )}
           </span>
         ) : null}
-        {props.query ? (
-          <ContentToolbarButton
-            tone="close"
-            className={'sniptale-dismiss-button'}
-            type="button"
-            aria-label={translate('settings.settingsTransfer.clearSearch')}
-            onClick={() => props.onQueryChange('')}
-          >
-            <X aria-hidden="true" size={15} />
-          </ContentToolbarButton>
-        ) : null}
-      </label>
-      <ProductActionButton
-        tone="secondary"
-        type="button"
-        className={`${buttonClassName} shrink-0`}
-        disabled={props.expandableCount === 0}
-        onClick={props.onToggleExpansion}
-      >
-        {translate(
-          props.expanded
-            ? 'settings.settingsTransfer.collapseAll'
-            : 'settings.settingsTransfer.expandAll'
-        )}
-      </ProductActionButton>
-      <ProductActionButton
-        tone="secondary"
-        type="button"
-        className={`${buttonClassName} shrink-0`}
-        disabled={props.scopeCount === 0}
-        onClick={props.onToggleScope}
-      >
-        {translate(resolveScopeActionKey(hasQuery, props.scopeSelected))}
-      </ProductActionButton>
+      </div>
     </div>
   );
 }

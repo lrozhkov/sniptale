@@ -155,6 +155,7 @@ function OriginalAudioLevel(props: {
   return (
     <SliderField
       label={translate('videoEditor.sidebar.originalAudioLevel')}
+      rangePresentation="field"
       disabled={props.disabled}
       min={props.min ?? 0}
       max={1}

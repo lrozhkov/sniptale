@@ -22,6 +22,20 @@ it('returns the exact owner-issued scenario revision with its committed project'
   expect(commit).toHaveBeenCalledWith(project, { expectedRevision: 17 });
 });
 
+it('forwards both editing branches and returns the exact aggregate checkpoint ACK', async () => {
+  const project = createGuideProject('Checkpoint', 'checkpoint', 1);
+  const editingHistory = { version: 1 as const, past: [], future: [project] };
+  const result = { project, workspaceRevision: 18, editingHistory };
+  commit.mockResolvedValueOnce(result);
+  await expect(
+    scenarioProjects.saveScenarioProject(project, {
+      expectedRevision: 17,
+      editingHistory,
+    })
+  ).resolves.toBe(result);
+  expect(commit).toHaveBeenCalledWith(project, { expectedRevision: 17, editingHistory });
+});
+
 it('re-exports scenario project store roles through the canonical facade', () => {
   expect(scenarioProjectsFacade.saveScenarioProject).toBe(scenarioProjects.saveScenarioProject);
   expect(scenarioProjectsFacade.getScenarioProject).toBe(scenarioProjects.getScenarioProject);

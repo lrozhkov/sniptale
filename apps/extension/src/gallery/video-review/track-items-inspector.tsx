@@ -1,44 +1,43 @@
 import { useCallback, useMemo, useState, useRef, useLayoutEffect } from 'react';
-import { ArrowUpRight, Search, Trash2, X } from 'lucide-react';
+import { ArrowUpRight, Trash2, X } from 'lucide-react';
 import { translate, useAppLocale } from '../../platform/i18n';
 import type { QuickEditTrack } from '../../features/video/review/advanced/types';
 import type { LoadedReview } from './use-session';
-import type { useReviewEditorState } from './use-editor-state';
+import type { ReviewDocument, ReviewSelection } from '../../features/video/review/types';
+import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
+import type { ReviewAnnotationEffectSnapshot } from '../../features/video/review/annotation-effects/types';
 import type { useReviewAudio } from './use-review-audio';
 import { HistoryCheckbox } from './action-history-list';
 import { ReviewButton, reviewDeleteButtonClassName, reviewTimeLabel } from './controls';
 import { reviewTrackItems, removeReviewTrackItems, type ReviewTrackItem } from './track-items';
 import type { ReviewInspectorNavigation } from './inspector-navigation';
+import { ReviewSearchField } from './search-field';
 import './action-history.css';
 import './track-items.css';
 
-type State = Pick<
-  ReturnType<typeof useReviewEditorState>,
-  | 'snapshot'
-  | 'advanced'
-  | 'activeSelection'
-  | 'setActiveSelection'
-  | 'video'
-  | 'seek'
-  | 'session'
-  | 'run'
-  | 'flushAdvanced'
-  | 'busy'
-  | 'editing'
-  | 'canStart'
-  | 'beforeAction'
-  | 'annotationEffects'
->;
+type CollectionCommands = {
+  session: LoadedReview['session'];
+  open(selection: ReviewSelection, done: () => void): void;
+  canStart(): boolean;
+  run(action: () => Promise<unknown>): Promise<unknown>;
+  flushAnnotations(): Promise<void>;
+  flushAdvanced(): Promise<void>;
+};
 
 /** Track collections share History row/checkbox styling and keep batch choice separate from opening. */
 export function ReviewTrackItemsInspector(props: {
   track: QuickEditTrack;
-  state: State;
+  document: ReviewDocument;
+  advanced: QuickEditAdvancedState;
+  selection: ReviewSelection;
+  snapshots: readonly ReviewAnnotationEffectSnapshot[] | undefined;
+  busy: boolean;
+  commands: CollectionCommands;
   resource: LoadedReview;
   audio: Pick<ReturnType<typeof useReviewAudio>, 'assets'>;
   navigation: ReviewInspectorNavigation;
 }) {
-  const { state, track, resource, navigation } = props;
+  const { document, advanced, selection, snapshots, commands, track, resource, navigation } = props;
   const locale = useAppLocale();
   const selectLabel = translate('gallery.videoReview.trackItemsSelect');
   const [query, setQuery] = useState('');
@@ -50,18 +49,18 @@ export function ReviewTrackItemsInspector(props: {
     () =>
       reviewTrackItems({
         track,
-        document: { ...state.snapshot.document, advancedContent: state.advanced },
+        document: { ...document, advancedContent: advanced },
         source: resource.source,
         filename: resource.filename,
         assets: props.audio.assets,
-        snapshots: state.snapshot.snapshot.workspace.effectSnapshots ?? [],
+        snapshots: snapshots ?? [],
         locale,
       }),
     [
       track,
-      state.snapshot.document,
-      state.snapshot.snapshot.workspace.effectSnapshots,
-      state.advanced,
+      document,
+      snapshots,
+      advanced,
       resource.source,
       resource.filename,
       props.audio.assets,
@@ -88,26 +87,18 @@ export function ReviewTrackItemsInspector(props: {
     [filtered]
   );
   const count = matching.filter((id) => checked.includes(id)).length;
-  const disabled =
-    state.busy ||
-    state.editing.exporter.phase !== 'idle' ||
-    pending ||
-    state.annotationEffects.pending ||
-    !!state.annotationEffects.gestureId;
+  const disabled = props.busy || pending;
   useLayoutEffect(() => {
     if (navigation.shown !== 'track' && navigation.shown !== 'speech') return;
     list.current?.querySelector<HTMLElement>('[data-active]')?.scrollIntoView({ block: 'nearest' });
   }, [navigation.shown]);
   const open = (row: ReviewTrackItem) =>
-    state.beforeAction(() => {
-      state.video.current?.pause();
-      state.seek(row.start, false);
-      state.setActiveSelection(row.selection);
+    commands.open(row.selection, () => {
       navigation.setSection(row.selection.kind === 'none' ? 'track' : 'selected');
       // Selection renders before the scroll target is inspected; no synthetic click mutates the item.
       requestAnimationFrame(() => {
         if (!row.timelineKey) return;
-        const target = document.querySelector<HTMLElement>(
+        const target = window.document.querySelector<HTMLElement>(
           [
             `[data-review-removal-key="${CSS.escape(row.timelineKey)}"]`,
             `[data-review-action-key="${CSS.escape(row.timelineKey)}"]`,
@@ -127,20 +118,20 @@ export function ReviewTrackItemsInspector(props: {
     );
   }, []);
   const remove = async () => {
-    if (disabled || !checked.length || !state.canStart()) return;
+    if (disabled || !checked.length || !commands.canStart()) return;
     const ids = new Set(checked);
     setPending(true);
     try {
-      await state.run(async () => {
-        await state.annotationEffects.flush();
-        await state.flushAdvanced();
+      await commands.run(async () => {
+        await commands.flushAnnotations();
+        await commands.flushAdvanced();
         if (track === 'source') {
           for (const id of ids) {
-            const before = state.session
+            const before = commands.session
               .getSnapshot()
               .document.edits.find((item) => item.id === id);
             if (before)
-              await state.session.commit({
+              await commands.session.commit({
                 id: crypto.randomUUID(),
                 at: Date.now(),
                 target: 'edit',
@@ -149,10 +140,10 @@ export function ReviewTrackItemsInspector(props: {
               });
           }
         } else {
-          const before = state.session.getSnapshot().document.advancedContent;
+          const before = commands.session.getSnapshot().document.advancedContent;
           const after = removeReviewTrackItems(before, track, ids, resource.source.duration);
           if (before !== after)
-            await state.session.commit({
+            await commands.session.commit({
               id: crypto.randomUUID(),
               at: Date.now(),
               target: 'advancedContent',
@@ -165,7 +156,7 @@ export function ReviewTrackItemsInspector(props: {
       setPending(false);
     }
   };
-  const activeSelection = state.activeSelection;
+  const activeSelection = selection;
   const itemRows = useMemo(
     () =>
       filtered.slice(0, limit).map((row) => (
@@ -198,7 +189,11 @@ export function ReviewTrackItemsInspector(props: {
                 {reviewTimeLabel(row.start)}
                 {row.end > row.start ? ` – ${reviewTimeLabel(row.end)}` : ''}
               </span>
-              {row.detail ? <span className="truncate">{row.detail}</span> : null}
+              {row.detail ? (
+                <span className="truncate" title={row.detail}>
+                  {row.detail}
+                </span>
+              ) : null}
             </span>
             {row.inactive ? (
               <span className="text-xs text-[var(--sniptale-color-text-secondary)]">
@@ -223,19 +218,14 @@ export function ReviewTrackItemsInspector(props: {
       data-track={track}
     >
       <div className="review-track-items-toolbar">
-        <label className="review-track-items-search">
-          <Search size={14} aria-hidden="true" />
-          <input
-            type="search"
-            aria-label={translate('gallery.videoReview.trackItemsSearch')}
-            placeholder={translate('gallery.videoReview.trackItemsSearch')}
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setLimit(50);
-            }}
-          />
-        </label>
+        <ReviewSearchField
+          label={translate('gallery.videoReview.trackItemsSearch')}
+          query={query}
+          onChange={(query) => {
+            setQuery(query);
+            setLimit(50);
+          }}
+        />
         <div className="review-history-selection">
           <HistoryCheckbox
             label={translate('gallery.videoReview.trackItemsSelectAll')}

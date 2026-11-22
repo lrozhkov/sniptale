@@ -1,10 +1,11 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { build } from 'esbuild';
 import { expect, test } from '@playwright/test';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { writeFile } from 'node:fs/promises';
 
 test('scene lenses stay centered and clip naturally at every frame edge', async ({
@@ -322,24 +323,22 @@ for (const [width, height, locale, theme] of [
         });
       if (!(await appearance.evaluate((node) => (node as HTMLDetailsElement).open)))
         await appearance.locator('summary').click();
-      const amount = page.getByRole('textbox', {
-        name: label('gallery.videoReview.clickMagnification'),
-        exact: true,
-      });
+      const amount = numericControl(page, label('gallery.videoReview.clickMagnification'));
       await expect(amount).toHaveValue('1.6');
-      await amount.fill('2');
+      await (
+        await openNumericControl(page, label('gallery.videoReview.clickMagnification'))
+      ).fill('2');
       await amount.press('Enter');
       await expect(page.locator('[data-ui="gallery.videoReview.clickAnimation"]')).toBeVisible();
       await page
         .getByRole('group', { name: label('gallery.videoReview.clickLensOptics') })
         .getByRole('button', { name: label('gallery.videoReview.clickLensOptics_optical') })
         .click();
-      const edge = page.getByRole('textbox', {
-        name: label('gallery.videoReview.clickLensEdgeWidth'),
-        exact: true,
-      });
+      const edge = numericControl(page, label('gallery.videoReview.clickLensEdgeWidth'));
       await expect(edge).toHaveValue('8');
-      await edge.fill('4');
+      await (
+        await openNumericControl(page, label('gallery.videoReview.clickLensEdgeWidth'))
+      ).fill('4');
       await edge.press('Enter');
       await expect(edge).toHaveValue('4');
       await amount.scrollIntoViewIfNeeded();

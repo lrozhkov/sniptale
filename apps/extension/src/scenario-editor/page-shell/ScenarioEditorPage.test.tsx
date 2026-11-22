@@ -1,7 +1,18 @@
 // @vitest-environment jsdom
+import {
+  loadScenarioCatalogFixture,
+  prepareScenarioTranslations,
+} from './test-support/translations.test-support';
 import { act, type ReactNode, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, beforeEach, expect, it, vi } from 'vitest';
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadScenarioCatalogFixture>[0]) =>
+    loadScenarioCatalogFixture(locale),
+}));
+
+beforeAll(prepareScenarioTranslations);
+
 import {
   createGuideImageBlock,
   createGuideParagraphs,
@@ -32,15 +43,13 @@ vi.mock('./library-browser', () => ({
 vi.mock('./runtime/resource-session', () => ({ useGuideResourceSession: () => enterSession }));
 const enterSession = async () => true;
 vi.mock('../../composition/persistence/scenario/history', () => ({
-  getScenarioSavedVersions: async (id: string) => {
+  getScenarioEditingSnapshot: async (id: string) => {
     const project = await io.load(id);
     return project
       ? {
-          currentRevision: 1,
-          versions: [
-            { project, revision: 1, savedAt: project.updatedAt },
-            ...(io.previous() ?? []),
-          ],
+          project,
+          workspaceRevision: 1,
+          editingHistory: { version: 1, past: io.previous() ?? [], future: [] },
         }
       : null;
   },
@@ -154,12 +163,12 @@ it('requires explicit creation for an empty editor route', async () => {
   expect(container.querySelector('input')?.value).toBe('New guide');
 });
 
-it('opens recent scenarios with their saved revisions available to Undo', async () => {
+it('opens recent scenarios with their native history available to Undo', async () => {
   window.history.replaceState({}, '', '/');
   io.list.mockResolvedValue([
     { id: 'guide', name: 'Local guide', updatedAt: 100, availability: 'available' },
   ]);
-  io.previous.mockReturnValue([{ project: createGuideProject('Older', 'guide', 90) }]);
+  io.previous.mockReturnValue([createGuideProject('Older', 'guide', 90)]);
   await render();
   await act(async () => container.querySelector<HTMLButtonElement>('section button')?.click());
   await click('Undo');
@@ -267,7 +276,15 @@ it('renders optional blocks and keeps text edits isolated from images and other 
         project.items[2],
       ],
     }),
-    { expectedRevision: 1, historyActionId: expect.any(String) }
+    {
+      expectedRevision: 1,
+      historyActionId: expect.any(String),
+      editingHistory: expect.objectContaining({
+        version: 1,
+        past: expect.any(Array),
+        future: expect.any(Array),
+      }),
+    }
   );
   expect(io.asset).toHaveBeenCalledTimes(1);
   await act(async () => root.render(null));

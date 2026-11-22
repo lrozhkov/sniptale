@@ -15,6 +15,7 @@ export function createDimensionDraftActions({
   onChange: (value: number) => void;
   setDraft: (value: string) => void;
 }) {
+  let steppedValue: number | undefined;
   const resolveDraftValue = (): number => {
     if (draft.trim().length === 0) {
       return value;
@@ -33,7 +34,8 @@ export function createDimensionDraftActions({
       onChange(Math.max(min, toNumber(draft, value)));
     },
     applyStep(direction: 1 | -1) {
-      onChange(Math.max(min, resolveDraftValue() + direction * step));
+      steppedValue = Math.max(min, (steppedValue ?? resolveDraftValue()) + direction * step);
+      onChange(steppedValue);
     },
   };
 }

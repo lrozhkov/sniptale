@@ -1,7 +1,13 @@
 import { isRecordingClockTiming } from '../../../../../video/recording-frame-clock';
-import { isRecordingEventObservationPacket } from '../../../../../video/event-observations';
+import {
+  isFinalRecordingEventPackets,
+  isRecordingEventObservationPacket,
+} from '../../../../../video/event-observations';
 import type { RuntimeOffscreenRecordingObservationsMessage } from '../../../offscreen-command.types';
-import { isRecordingCursorObservationPacket } from '../../../../../video/cursor-observations';
+import {
+  isFinalRecordingCursorPackets,
+  isRecordingCursorObservationPacket,
+} from '../../../../../video/cursor-observations';
 import { isRecordingEventsDescriptor } from '../../../../../../features/video/project/recording-events/records';
 import { isCursorTrajectoryDescriptor } from '../../../../../../features/video/project/cursor-trajectory/records';
 import { isRecordingPointTransform } from '../../../../../../features/video/project/validation/recording-telemetry';
@@ -37,13 +43,18 @@ export const runtimeVideoOffscreenControlMessageContracts = {
           optional: {
             cursorPacket: isRecordingCursorObservationPacket,
             eventPacket: isRecordingEventObservationPacket,
+            eventPackets: isFinalRecordingEventPackets,
+            cursorPackets: isFinalRecordingCursorPackets,
           },
         });
         if (!guard(value)) return false;
-        const { cursorPacket, eventPacket } = value;
+        const { cursorPacket, eventPacket, cursorPackets, eventPackets } = value;
         return (
-          (cursorPacket === undefined) !== (eventPacket === undefined) &&
-          (cursorPacket ?? eventPacket)?.recordingId === value.recordingId
+          [cursorPacket, eventPacket, cursorPackets, eventPackets].filter(
+            (entry) => entry !== undefined
+          ).length === 1 &&
+          (cursorPacket ?? eventPacket ?? cursorPackets?.[0] ?? eventPackets?.[0])?.recordingId ===
+            value.recordingId
         );
       }
     ),

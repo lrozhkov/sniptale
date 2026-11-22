@@ -1,31 +1,24 @@
 import { promoteLinkedRecordingLifecycles } from '../library-lifecycle/project-recordings';
 import { promoteReferencedMediaLifecycles } from '../library-lifecycle/promotion';
 import type { VideoProject } from '../../../features/video/project/types';
-import { videoSourceReferences } from '../media-library/dependencies';
+import {
+  collectVideoProjectWorkspaceSources,
+  type PersistedVideoProjectHistory,
+} from './history-contracts';
+import type { VideoProjectHistorySourceReference } from '../../../features/video/project/history-capture';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { parseRecordingEntry } from '../recordings/index.guards';
 import { parseScenarioAssetEntry, parseScenarioProjectEntry } from '../scenario/read-guards';
 import { parseProjectAssetEntry } from './read-guards';
 import type { createProjectMutationStores } from './mutation-stores';
 
-type Locator = {
-  kind: 'library-asset' | 'recording' | 'project-asset' | 'scenario-asset' | 'scenario';
-  id: string;
-};
-function locators(project: VideoProject | undefined): Locator[] {
+type Locator = VideoProjectHistorySourceReference;
+function locators(
+  project: VideoProject | undefined,
+  history?: PersistedVideoProjectHistory
+): readonly Locator[] {
   if (!project) return [];
-  return [
-    ...project.assets.flatMap((asset) => videoSourceReferences(asset.source)),
-    ...(project.baseRecordingId
-      ? [{ kind: 'recording' as const, id: project.baseRecordingId }]
-      : []),
-    ...(project.source.kind === 'recording'
-      ? [{ kind: 'recording' as const, id: project.source.recordingId }]
-      : []),
-    ...(project.source.kind === 'scenario'
-      ? [{ kind: 'scenario' as const, id: project.source.scenarioProjectId }]
-      : []),
-  ];
+  return collectVideoProjectWorkspaceSources({ project, ...(history ? { history } : {}) });
 }
 const key = (locator: Locator) => JSON.stringify([locator.kind, locator.id]);
 
@@ -40,10 +33,11 @@ export async function assertNewProjectSources(
     | 'recordingStore'
     | 'scenarioAssetStore'
     | 'scenarioProjectStore'
-  >
+  >,
+  history?: { next?: PersistedVideoProjectHistory; previous?: PersistedVideoProjectHistory }
 ): Promise<void> {
-  const seen = new Set(locators(previous).map(key));
-  for (const locator of locators(candidate)) {
+  const seen = new Set(locators(previous, history?.previous).map(key));
+  for (const locator of locators(candidate, history?.next)) {
     if (seen.has(key(locator))) continue;
     seen.add(key(locator));
     let entry: { id: string } | null;
@@ -57,7 +51,7 @@ export async function assertNewProjectSources(
       case 'scenario-asset':
         entry = parseScenarioAssetEntry(await stores.scenarioAssetStore.get(locator.id));
         break;
-      case 'scenario':
+      case 'scenario-project':
         entry = parseScenarioProjectEntry(await stores.scenarioProjectStore.get(locator.id));
         break;
       case 'project-asset': {
@@ -78,15 +72,18 @@ export async function assertNewProjectSources(
   }
 }
 
-/** Called only by an accepted parent commit, never by source preparation. */
-export async function promoteProjectSourceLifecycles(
+/** Resolve Library origins for only this workspace and its retained history. */
+export async function readProjectSourceIds(
   project: VideoProject,
-  stores: Omit<Parameters<typeof assertNewProjectSources>[2], 'scenarioProjectStore'>,
-  now: number
-): Promise<void> {
+  stores: Pick<
+    ReturnType<typeof createProjectMutationStores>,
+    'mediaLibraryStore' | 'projectAssetStore' | 'scenarioAssetStore'
+  >,
+  history?: PersistedVideoProjectHistory
+) {
   const mediaIds = new Set<string>();
   const recordingIds = new Set<string>();
-  for (const locator of locators(project)) {
+  for (const locator of locators(project, history)) {
     if (locator.kind === 'recording') recordingIds.add(locator.id);
     if (locator.kind === 'library-asset') mediaIds.add(locator.id);
     if (locator.kind === 'project-asset') {
@@ -104,6 +101,17 @@ export async function promoteProjectSourceLifecycles(
         mediaIds.add(asset.borrowedMediaId ?? asset.galleryAssetId ?? `scenario-asset:${asset.id}`);
     }
   }
+  return { mediaIds, recordingIds };
+}
+
+/** Called only by an accepted parent commit, never by source preparation. */
+export async function promoteProjectSourceLifecycles(
+  project: VideoProject,
+  stores: Omit<Parameters<typeof assertNewProjectSources>[2], 'scenarioProjectStore'>,
+  now: number,
+  history?: PersistedVideoProjectHistory
+): Promise<void> {
+  const { mediaIds, recordingIds } = await readProjectSourceIds(project, stores, history);
   await promoteLinkedRecordingLifecycles({
     recordingIds,
     mediaStore: stores.mediaLibraryStore,

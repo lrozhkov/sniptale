@@ -2,19 +2,14 @@ import { useState } from 'react';
 import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
 import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import type { useReviewWorkspaceColor } from './workspace-color';
-import {
-  ColorField,
-  CompactSelect,
-  SelectField,
-  ToggleField,
-} from '../../ui/compact-inspector-controls';
+import { ColorField, SelectField, ToggleField } from '../../ui/compact-inspector-controls';
 import { translate, useAppLocale } from '../../platform/i18n';
 import {
   QUICK_PREVIEW_RASTER_PRESETS,
   QUICK_PREVIEW_FRAME_RATES,
   type QuickPreviewPreferences,
 } from '../../features/video/preview/quick-preferences';
-import { useReviewPreviewPreferences } from './use-preview-preferences';
+import type { useReviewPreviewPreferences } from './use-preview-preferences';
 import { ReviewButton, reviewSelectFieldClassName } from './controls';
 
 /** Runtime supplies actual dimensions; this panel owns no rendering or persisted project state. */
@@ -55,7 +50,7 @@ export function ReviewPreviewInspector(props: ReviewPreviewInspectorBinding) {
         onChange={(renderer: QuickPreviewPreferences['renderer']) => props.onChange({ renderer })}
       />
       {props.preferences.renderer === 'gpu' && props.rendererStatus?.fallback ? (
-        <p role="status" className="m-0 text-xs text-[var(--sniptale-color-text-muted)]">
+        <p role="status" className="review-inspector-notice">
           {translate(
             props.rendererStatus.fallback === 'device-failed'
               ? 'editor.scene.previewRendererFailed'
@@ -63,31 +58,27 @@ export function ReviewPreviewInspector(props: ReviewPreviewInspectorBinding) {
           )}
         </p>
       ) : null}
+      <SelectField
+        className={reviewSelectFieldClassName}
+        label={label('previewResolution')}
+        disabled={props.disabled}
+        value={props.preferences.rasterPreset}
+        options={QUICK_PREVIEW_RASTER_PRESETS.map((value) => ({
+          value,
+          label: value === 'current' ? translate('gallery.videoReview.previewCurrent') : value,
+        }))}
+        onChange={(rasterPreset: QuickPreviewPreferences['rasterPreset']) =>
+          props.onChange({ rasterPreset })
+        }
+      />
       <InspectorParameterRow label={translate('gallery.videoReview.previewActualRaster')}>
         <output
-          className="block w-full whitespace-nowrap px-2 text-right text-[13px] font-normal tabular-nums
+          className="block w-full whitespace-nowrap text-right text-[13px] font-normal tabular-nums
           text-[var(--sniptale-color-text-primary)]"
           aria-label={translate('gallery.videoReview.previewActualRaster')}
         >
           {props.actualRaster ? `${props.actualRaster.width} × ${props.actualRaster.height}` : '—'}
         </output>
-      </InspectorParameterRow>
-      <InspectorParameterRow label={label('previewResolution')}>
-        <div className="min-w-0 w-full">
-          <CompactSelect
-            appearance="plain"
-            aria-label={label('previewResolution')}
-            disabled={props.disabled}
-            value={props.preferences.rasterPreset}
-            options={QUICK_PREVIEW_RASTER_PRESETS.map((value) => ({
-              value,
-              label: value === 'current' ? translate('gallery.videoReview.previewCurrent') : value,
-            }))}
-            onChange={(rasterPreset: QuickPreviewPreferences['rasterPreset']) =>
-              props.onChange({ rasterPreset })
-            }
-          />
-        </div>
       </InspectorParameterRow>
 
       <div title={translate('gallery.videoReview.previewFrameRateLimit')}>
@@ -122,6 +113,7 @@ export function ReviewPreviewInspector(props: ReviewPreviewInspectorBinding) {
         }
       />
       <ToggleField
+        showStatus
         label={label('previewShowFrameRate')}
         disabled={props.disabled}
         value={props.preferences.showFrameRate}
@@ -211,25 +203,16 @@ function ReviewPreviewSettingsBinding(props: {
 
 /** Owns the transient renderer reports shown by local preview preferences. */
 export function useReviewPreviewInspector(props: {
+  preferences: ReturnType<typeof useReviewPreviewPreferences>;
+  rendererStatus: PreviewRendererStatus | null;
   workspaceColor: ReturnType<typeof useReviewWorkspaceColor>;
   projectFailed: boolean;
   retryProject(): Promise<unknown>;
 }) {
-  const preferences = useReviewPreviewPreferences();
-  const [rendererStatus, setRendererStatus] = useState<PreviewRendererStatus | null>(null);
   const [raster, setRaster] = useState<{ width: number; height: number } | null>(null);
   return {
-    preferences,
-    setRendererStatus,
     setRaster,
     raster,
-    inspector: (
-      <ReviewPreviewSettingsBinding
-        {...props}
-        preferences={preferences}
-        actualRaster={raster}
-        rendererStatus={rendererStatus}
-      />
-    ),
+    inspector: <ReviewPreviewSettingsBinding {...props} actualRaster={raster} />,
   };
 }

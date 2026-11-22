@@ -1,9 +1,10 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { enableGpuPreviewProof, installCameraFrameObserver } from '../support/gpu-preview-proof';
 import { hydrateVideoProject } from '../../../../apps/extension/src/features/video/project/hydration';
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { createVideoProjectFromMultiSourceRecording } from '../../../../apps/extension/src/features/video/project/factories/multi-source-recording';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { seedReviewWebcamBundle } from '../support/quick-editor-media-fixture';
@@ -514,10 +515,10 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await page.screenshot({ path: info.outputPath('camera-reopened.png'), fullPage: false });
       const shadow = page.locator('[data-ui="video-editor.media-shadow"]');
       const shadowLabel = label('gallery.videoReview.webcamShadowColor');
-      const intensity = shadow.getByRole('textbox', {
-        name: label('videoEditor.sidebar.mediaShadowIntensityLabel'),
-        exact: true,
-      });
+      const intensity = numericControl(
+        shadow,
+        label('videoEditor.sidebar.mediaShadowIntensityLabel')
+      );
       const readCamera = async () =>
         (await readNativeVideoProject(page))?.clips.find((clip) => clip.id === camera.id);
       const setColor = async (color: string) => {
@@ -539,7 +540,9 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         );
       };
       await intensity.scrollIntoViewIfNeeded();
-      await intensity.fill('80');
+      await (
+        await openNumericControl(shadow, label('videoEditor.sidebar.mediaShadowIntensityLabel'))
+      ).fill('80');
       await intensity.press('Enter');
       const sourcePixels = await pixels(stage, frame);
       await setColor('#ff0000');
@@ -607,7 +610,9 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
           return clip && 'shadowColor' in clip ? clip.shadowColor : null;
         })
         .toBe('#0000ff');
-      await intensity.fill('0');
+      await (
+        await openNumericControl(shadow, label('videoEditor.sidebar.mediaShadowIntensityLabel'))
+      ).fill('0');
       await intensity.press('Enter');
       await expect
         .poll(async () => {
@@ -811,10 +816,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await expect
         .poll(() => cropVideo.evaluate((node: HTMLVideoElement) => node.currentTime))
         .toBeCloseTo(2, 3);
-      const zoom = owner.getByRole('textbox', {
-        name: label('videoEditor.sidebar.cameraCropZoom'),
-        exact: true,
-      });
+      const zoom = numericControl(owner, label('videoEditor.sidebar.cameraCropZoom'));
       await zoom.scrollIntoViewIfNeeded();
       await expect(zoom).toHaveValue('100');
       const destinationBefore = await readCamera();
@@ -823,7 +825,9 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         const camera = await readCamera();
         return camera?.type === 'VIDEO' ? (camera.cameraPositions?.[0]?.crop ?? null) : null;
       };
-      await zoom.fill('200');
+      await (
+        await openNumericControl(owner, label('videoEditor.sidebar.cameraCropZoom'))
+      ).fill('200');
       await zoom.press('Enter');
       await expect.poll(positionCrop).toEqual({ zoom: 2, panX: 0, panY: 0 });
       expect((await readNativeVideoProject(page))?.version).toBe(11);
@@ -1390,13 +1394,12 @@ for (const variant of [
           )
         );
       } else {
-        const zoom = owner.getByRole('textbox', {
-          name: label('videoEditor.sidebar.cameraCropZoom'),
-          exact: true,
-        });
+        const zoom = numericControl(owner, label('videoEditor.sidebar.cameraCropZoom'));
         const unzoomed = await pixels(front);
         await zoom.scrollIntoViewIfNeeded();
-        await zoom.fill('200');
+        await (
+          await openNumericControl(owner, label('videoEditor.sidebar.cameraCropZoom'))
+        ).fill('200');
         await zoom.press('Enter');
         await expect.poll(async () => (await readCamera()).cameraAppearance?.zoom).toBe(2);
         await expect

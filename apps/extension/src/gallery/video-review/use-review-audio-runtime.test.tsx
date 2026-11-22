@@ -5,12 +5,45 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type {
   ReviewAudioEngine,
+  ReviewAudioClockSample,
   ReviewAudioPreparedClip,
   ReviewAudioClipBuffer,
 } from '../../workflows/video-review/audio-playback-engine';
-import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
+import type {
+  QuickEditAudioClip,
+  QuickEditOriginalAudio,
+} from '../../features/video/review/advanced/types';
 import { buildReviewTimeMap, createReviewTimeMap } from '../../features/video/review/timeline';
 import { FakeEngine, renderRuntime } from './review-audio-runtime.test-support';
+import type { ReviewPlaybackPresentationClock } from './playback-presentation-clock';
+import type { ReviewTransportAudioRequest, ReviewTransportPosition } from './transport';
+import { createReviewTransportController } from './transport';
+
+function liveClock(source: number, result = source) {
+  const listeners = new Set<() => void>();
+  let playing = true;
+  const clock: ReviewPlaybackPresentationClock = {
+    read: () => source,
+    readResult: () => result,
+    isPlaying: () => playing,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+  return {
+    clock,
+    listeners,
+    pause: () => {
+      playing = false;
+    },
+    publish(nextSource: number, nextResult = nextSource) {
+      source = nextSource;
+      result = nextResult;
+      for (const listener of listeners) listener();
+    },
+  };
+}
 
 const clip = (patch: Partial<QuickEditAudioClip> = {}): QuickEditAudioClip => ({
   id: 'a',
@@ -23,6 +56,829 @@ const clip = (patch: Partial<QuickEditAudioClip> = {}): QuickEditAudioClip => ({
   fadeIn: 0,
   fadeOut: 0,
   ...patch,
+});
+
+function transportRequest(epoch: number, resultTime: number): ReviewTransportAudioRequest {
+  return {
+    seekRevision: epoch,
+    position: {
+      epoch,
+      mapRevision: 0,
+      resultTime,
+      source: {
+        kind: 'video',
+        sourceTime: resultTime,
+        mediaTime: resultTime,
+        segmentId: 'source:0',
+      },
+      media: { sourceId: 'recording', time: resultTime },
+    },
+  };
+}
+
+it.each(['rolling preparation', 'scheduled worklet'] as const)(
+  'falls back to the aligned native original after a dry PCM %s failure',
+  async (failure) => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const onFailure = vi.fn();
+      const alignNativeOriginal = vi.fn(() => true);
+      const setOriginalProcessing = vi.fn();
+      const release = vi.fn();
+      const schedule = vi.fn();
+      const prepareProcessedClip = vi
+        .fn<NonNullable<ReviewAudioEngine['prepareProcessedClip']>>()
+        .mockResolvedValueOnce({ schedule, dispose: release })
+        .mockRejectedValue(new Error('PCM unavailable.'));
+      const engine = Object.assign(new FakeEngine(), {
+        prepareProcessedClip,
+        setOriginalProcessing,
+        supportsMappedOriginal: vi.fn(async () => true),
+      });
+      const edits = [
+        {
+          kind: 'cut' as const,
+          id: 'skip',
+          start: 6,
+          end: 10,
+          requestedStart: 6,
+          requestedEnd: 10,
+        },
+      ];
+      const request = transportRequest(1, 1);
+      const f = renderRuntime({
+        createEngine: () => engine,
+        transportControl: { readPosition: () => request.position, alignNativeOriginal },
+        mappedOriginal: true,
+        originalSource: { file: new Blob(), segments: buildReviewTimeMap(20, edits), edits },
+        onFailure,
+      });
+      await act(async () => root.render(<f.Harness />));
+      await act(async () => {
+        expect(await f.controls.preparePlayback(request, new AbortController().signal)).toBe(true);
+      });
+      await act(async () => f.controls.startPlayback(request));
+      expect(schedule).toHaveBeenCalledOnce();
+      const stops = engine.stops;
+      expect(setOriginalProcessing).toHaveBeenLastCalledWith(true);
+      if (failure === 'rolling preparation') {
+        engine.currentTime += 3.5;
+        await act(async () => vi.advanceTimersByTimeAsync(250));
+        expect(prepareProcessedClip).toHaveBeenCalledTimes(2);
+      } else {
+        const reportError = prepareProcessedClip.mock.calls[0]![4];
+        await act(async () => reportError(new Error('PCM underrun.')));
+      }
+      expect(alignNativeOriginal).toHaveBeenCalledOnce();
+      expect(setOriginalProcessing).toHaveBeenLastCalledWith(false);
+      expect(alignNativeOriginal.mock.invocationCallOrder[0]!).toBeLessThan(
+        setOriginalProcessing.mock.invocationCallOrder.at(-1)!
+      );
+      expect(release).toHaveBeenCalledOnce();
+      expect(engine.stops).toBe(stops);
+      expect(onFailure).not.toHaveBeenCalled();
+      act(() => f.controls.stopPlayback());
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+);
+
+it('primes both retained original-audio intervals and schedules their handoff on the graph clock', async () => {
+  const schedule = vi.fn<ReviewAudioPreparedClip['schedule']>(() => ({ stop: vi.fn() }));
+  const prepareProcessedClip = vi.fn<NonNullable<ReviewAudioEngine['prepareProcessedClip']>>(
+    async () => ({ schedule, dispose: vi.fn() })
+  );
+  const setOriginalProcessing = vi.fn();
+  const engine = Object.assign(new FakeEngine(), {
+    prepareProcessedClip,
+    setOriginalProcessing,
+    supportsMappedOriginal: vi.fn(async () => true),
+  });
+  const edits = [
+    {
+      kind: 'cut' as const,
+      id: 'skip',
+      start: 6,
+      end: 10,
+      requestedStart: 6,
+      requestedEnd: 10,
+    },
+  ];
+  const request = transportRequest(1, 5.5);
+  const f = renderRuntime({
+    createEngine: () => engine,
+    playing: false,
+    transportControl: { readPosition: () => request.position },
+    mappedOriginal: true,
+    originalSource: { file: new Blob(), segments: buildReviewTimeMap(20, edits), edits },
+  });
+  await act(async () => root.render(<f.Harness />));
+  await act(async () => {
+    expect(await f.controls.preparePlayback(request, new AbortController().signal)).toBe(true);
+  });
+  expect(prepareProcessedClip.mock.calls.map(([, entry]) => entry.sourceOffset)).toEqual([0, 10]);
+  expect(schedule).not.toHaveBeenCalled();
+  await act(async () => f.controls.startPlayback(request));
+  expect(setOriginalProcessing).toHaveBeenLastCalledWith(true);
+  expect(schedule).toHaveBeenCalledTimes(2);
+  const [outgoing, incoming] = schedule.mock.calls.map(([entry]) => entry);
+  expect(outgoing).toMatchObject({ offset: 5.5, duration: 0.5 });
+  expect(incoming?.offset).toBe(10);
+  expect(incoming?.when).toBe((outgoing?.when ?? 0) + 0.5);
+  await act(async () => root.render(<f.Harness playing mappedOriginal={false} />));
+  expect(setOriginalProcessing).toHaveBeenLastCalledWith(true);
+  act(() => f.controls.stopPlayback());
+});
+
+it('keeps native playback when optional original PCM cannot prime after a successful probe', async () => {
+  const onFailure = vi.fn();
+  const setOriginalProcessing = vi.fn();
+  const release = vi.fn();
+  const prepareProcessedClip = vi
+    .fn<NonNullable<ReviewAudioEngine['prepareProcessedClip']>>()
+    .mockResolvedValueOnce({ schedule: vi.fn(), dispose: release })
+    .mockRejectedValueOnce(new Error('PCM prime unavailable.'));
+  const engine = Object.assign(new FakeEngine(), {
+    prepareProcessedClip,
+    setOriginalProcessing,
+    supportsMappedOriginal: vi.fn(async () => true),
+  });
+  const edits = [
+    {
+      kind: 'cut' as const,
+      id: 'skip',
+      start: 6,
+      end: 10,
+      requestedStart: 6,
+      requestedEnd: 10,
+    },
+  ];
+  const request = transportRequest(1, 5.5);
+  const f = renderRuntime({
+    createEngine: () => engine,
+    playing: false,
+    transportControl: { readPosition: () => request.position },
+    mappedOriginal: true,
+    originalSource: { file: new Blob(), segments: buildReviewTimeMap(20, edits), edits },
+    onFailure,
+  });
+  await act(async () => root.render(<f.Harness />));
+  await act(async () => {
+    expect(await f.controls.preparePlayback(request, new AbortController().signal)).toBe(true);
+  });
+  expect(prepareProcessedClip).toHaveBeenCalledTimes(2);
+  expect(setOriginalProcessing).not.toHaveBeenCalledWith(true);
+  expect(onFailure).not.toHaveBeenCalled();
+  expect(release).toHaveBeenCalledOnce();
+  await act(async () => f.controls.startPlayback(request));
+  expect(setOriginalProcessing).toHaveBeenLastCalledWith(false);
+  act(() => f.controls.stopPlayback());
+});
+
+it('does not fail current playback when a superseded mapped-audio probe aborts', async () => {
+  const onFailure = vi.fn();
+  const controller = new AbortController();
+  const request = transportRequest(1, 5.5);
+  const supportsMappedOriginal = vi.fn<NonNullable<ReviewAudioEngine['supportsMappedOriginal']>>(
+    (_file, signal) =>
+      new Promise((_, reject) => {
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+      })
+  );
+  const engine = Object.assign(new FakeEngine(), { supportsMappedOriginal });
+  const edits = [
+    {
+      kind: 'cut' as const,
+      id: 'skip',
+      start: 6,
+      end: 10,
+      requestedStart: 6,
+      requestedEnd: 10,
+    },
+  ];
+  const f = renderRuntime({
+    createEngine: () => engine,
+    playing: false,
+    mappedOriginal: true,
+    transportControl: { readPosition: () => request.position },
+    originalSource: { file: new Blob(), segments: buildReviewTimeMap(20, edits), edits },
+    onFailure,
+  });
+  await act(async () => root.render(<f.Harness />));
+  let pending!: Promise<boolean>;
+  await act(async () => {
+    pending = f.controls.preparePlayback(request, controller.signal);
+  });
+  expect(supportsMappedOriginal).toHaveBeenCalledOnce();
+  await act(async () => {
+    controller.abort();
+    expect(await pending).toBe(false);
+  });
+  expect(onFailure).not.toHaveBeenCalled();
+});
+
+it('uses the accepted controller position at sixteen seconds before the React seek commit', async () => {
+  const engine = new FakeEngine();
+  vi.spyOn(engine, 'decode').mockResolvedValue({ duration: 30 });
+  const request = transportRequest(1, 16);
+  let position = request.position;
+  let release!: (blob: Blob) => void;
+  let requested!: () => void;
+  const started = new Promise<void>((resolve) => {
+    requested = resolve;
+  });
+  const asset = new Promise<Blob>((resolve) => {
+    release = resolve;
+  });
+  const f = renderRuntime({
+    createEngine: () => engine,
+    playing: false,
+    outputTime: 0,
+    seekRevision: 0,
+    music: [clip({ timelineStart: 0, duration: 30 })],
+    transportControl: { readPosition: () => position },
+    resolveAsset: () => {
+      requested();
+      return asset;
+    },
+  });
+  await act(async () => root.render(<f.Harness />));
+  let ready!: Promise<boolean>;
+  await act(async () => {
+    ready = f.controls.preparePlayback(request);
+    await started;
+  });
+  await act(async () =>
+    root.render(
+      <f.Harness
+        seekRevision={1}
+        outputTime={16}
+        music={[clip({ timelineStart: 0, duration: 30 })]}
+      />
+    )
+  );
+  await act(async () => {
+    release(new Blob());
+    expect(await ready).toBe(true);
+  });
+  await act(async () => f.controls.startPlayback(request));
+  expect(engine.scheduled).toHaveLength(1);
+  expect(engine.scheduled[0]!.schedule).toMatchObject({ offset: 16, duration: 14 });
+  const stops = engine.stops;
+  position = {
+    ...position,
+    resultTime: 17,
+    source: { ...position.source!, kind: 'freeze', sourceTime: 4, mediaTime: 3.98 },
+  };
+  await act(async () => root.render(<f.Harness playing seekRevision={2} outputTime={17} />));
+  await act(async () =>
+    root.render(<f.Harness playing={false} seekRevision={3} outputTime={17} />)
+  );
+  expect(engine.scheduled).toHaveLength(1);
+  expect(engine.stops).toBe(stops);
+  act(() => f.controls.stopPlayback());
+  expect(engine.stops).toBeGreaterThan(stops);
+});
+
+it('does not start controlled audio from React playing or seek updates', async () => {
+  const engine = new FakeEngine();
+  const request = transportRequest(1, 3);
+  const f = renderRuntime({
+    createEngine: () => engine,
+    playing: true,
+    music: [clip()],
+    transportControl: { readPosition: () => request.position },
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => root.render(<f.Harness />));
+  await act(async () => root.render(<f.Harness seekRevision={4} outputTime={4} />));
+  expect(engine.scheduled).toHaveLength(0);
+});
+
+it('prepares processed music at the controller freeze result position rather than the held source frame', async () => {
+  const schedule = vi.fn<ReviewAudioPreparedClip['schedule']>(() => ({ stop: vi.fn() }));
+  const dispose = vi.fn();
+  const prepareProcessedClip = vi.fn<NonNullable<ReviewAudioEngine['prepareProcessedClip']>>(
+    async () => ({ schedule, dispose })
+  );
+  const engine = Object.assign(new FakeEngine(), { prepareProcessedClip });
+  const initial = transportRequest(1, 16);
+  const request: ReviewTransportAudioRequest = {
+    ...initial,
+    position: {
+      ...initial.position,
+      source: { kind: 'freeze', sourceTime: 4, mediaTime: 3.98, segmentId: 'freeze' },
+    },
+  };
+  const f = renderRuntime({
+    createEngine: () => engine,
+    playing: false,
+    seekRevision: 0,
+    outputTime: 0,
+    music: [
+      clip({
+        timelineStart: 0,
+        duration: 30,
+        audioProcessing: {
+          version: 1,
+          bypassed: false,
+          effects: [createAudioEffectInstance('eq', 'b1b80118-71a9-4e59-89d2-a95ba0139aa1')],
+        },
+      }),
+    ],
+    transportControl: { readPosition: () => request.position },
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => root.render(<f.Harness />));
+  await act(async () => expect(await f.controls.preparePlayback(request)).toBe(true));
+  expect(prepareProcessedClip.mock.calls[0]?.[2]).toBe(16);
+  await act(async () => f.controls.startPlayback(request));
+  expect(schedule).toHaveBeenCalledOnce();
+  expect(schedule.mock.calls[0]?.[0]).toMatchObject({ offset: 16, duration: 14 });
+  await act(async () => root.render(<f.Harness seekRevision={1} playing />));
+  expect(prepareProcessedClip).toHaveBeenCalledOnce();
+  expect(dispose).not.toHaveBeenCalled();
+});
+
+it('borrows the existing audio reference clock without creating a graph and releases it in silent mode', async () => {
+  let active = true;
+  const engine = Object.assign(new FakeEngine(), {
+    readActiveClock: (): ReviewAudioClockSample | null =>
+      active
+        ? { identity: engine, graphTime: engine.currentTime, outputTime: engine.currentTime - 0.05 }
+        : null,
+  });
+  const createEngine = vi.fn(() => engine);
+  const request = transportRequest(1, 3);
+  const f = renderRuntime({
+    createEngine,
+    playing: false,
+    music: [clip()],
+    transportControl: { readPosition: () => request.position },
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => root.render(<f.Harness />));
+  expect(f.controls.readAudioClock()).toBeNull();
+  expect(createEngine).not.toHaveBeenCalled();
+  await act(async () => expect(await f.controls.preparePlayback(request)).toBe(true));
+  expect(f.controls.readAudioClock()).toMatchObject({
+    identity: engine,
+    graphTime: 100,
+    outputTime: 99.95,
+  });
+  engine.currentTime = 100.5;
+  expect(f.controls.readAudioClock()).toMatchObject({
+    identity: engine,
+    graphTime: 100.5,
+    outputTime: 100.45,
+  });
+  active = false;
+  expect(f.controls.readAudioClock()).toBeNull();
+  active = true;
+  expect(f.controls.readAudioClock()).toMatchObject({
+    identity: engine,
+    graphTime: 100.5,
+    outputTime: 100.45,
+  });
+  Object.defineProperty(engine, 'readActiveClock', { value: undefined });
+  expect(f.controls.readAudioClock()).toBeNull();
+  await act(async () => root.render(<f.Harness silent />));
+  expect(f.controls.readAudioClock()).toBeNull();
+});
+
+it('prepares original processing from the accepted freeze map before the same-revision React commit', async () => {
+  const schedule = vi.fn<ReviewAudioPreparedClip['schedule']>(() => ({ stop: vi.fn() }));
+  const prepareProcessedClip = vi.fn<NonNullable<ReviewAudioEngine['prepareProcessedClip']>>(
+    async () => ({ schedule, dispose: vi.fn() })
+  );
+  const engine = Object.assign(new FakeEngine(), {
+    prepareProcessedClip,
+    setOriginalProcessing: vi.fn(),
+  });
+  const original: QuickEditOriginalAudio = {
+    muted: false,
+    volume: 1,
+    audioProcessing: {
+      version: 1,
+      bypassed: false,
+      effects: [createAudioEffectInstance('eq', 'b1b80118-71a9-4e59-89d2-a95ba0139aa1')],
+    },
+  };
+  const media = {
+    sourceId: 'recording',
+    time: 0,
+    paused: true,
+    ended: false,
+    seeking: false,
+    readyState: 4,
+    errorCode: null,
+  };
+  let controller!: ReturnType<typeof createReviewTransportController>;
+  const failure = vi.fn();
+  const file = new Blob();
+  const f = renderRuntime({
+    createEngine: () => engine,
+    playing: false,
+    original,
+    outputTime: 0,
+    seekRevision: 0,
+    originalSource: { file, segments: buildReviewTimeMap(20, []), edits: [] },
+    transportControl: {
+      readPosition: () => controller.readPosition(),
+      readTimeMap: () => controller.getTimeMapSnapshot(),
+    },
+    onFailure: failure,
+  });
+  const configuration = { sourceId: 'recording', duration: 20, edits: [], original };
+  controller = createReviewTransportController(configuration, {
+    now: () => 0,
+    schedule: () => () => {},
+    media: {
+      read: () => media,
+      seek: (time) => {
+        media.time = time;
+      },
+      play: async () => {
+        media.paused = false;
+      },
+      pause: () => {
+        media.paused = true;
+      },
+      configure: () => {},
+      recoveryMode: () => {},
+      reload: () => {},
+    },
+    audio: {
+      prepare: (signal, request) => f.controls.preparePlayback(request, signal),
+      start: (request) => f.controls.startPlayback(request),
+      stop: () => f.controls.stopPlayback(),
+    },
+    onFailure: failure,
+  });
+  await act(async () => root.render(<f.Harness />));
+  controller.configure({
+    ...configuration,
+    edits: [
+      {
+        id: 'hold',
+        kind: 'freeze',
+        start: 4,
+        end: 4,
+        requestedStart: 4,
+        requestedEnd: 4,
+        duration: 2,
+        frameTime: 3.98,
+        frameDuration: 0.04,
+      },
+    ],
+  });
+  controller.seekResult(7);
+  await act(async () => controller.play());
+  expect(prepareProcessedClip).toHaveBeenCalledOnce();
+  expect(prepareProcessedClip.mock.calls[0]?.[1]).toMatchObject({
+    sourceOffset: 4,
+    timelineStart: 6,
+    duration: 16,
+  });
+  expect(prepareProcessedClip.mock.calls[0]?.[2]).toBe(1);
+  expect(schedule.mock.calls[0]?.[0]).toMatchObject({ offset: 5, duration: 15 });
+  const accepted = controller.getTimeMapSnapshot();
+  await act(async () =>
+    root.render(
+      <f.Harness
+        playing
+        seekRevision={controller.getStatusSnapshot().seekRevision}
+        originalSource={{ file, segments: accepted.segments, edits: accepted.edits }}
+      />
+    )
+  );
+  expect(prepareProcessedClip).toHaveBeenCalledOnce();
+  expect(failure).not.toHaveBeenCalled();
+  controller.dispose();
+});
+
+it.each(['epoch', 'mapRevision', 'abort'] as const)(
+  'refuses controlled preparation after %s changes before React commit',
+  async (change) => {
+    const engine = new FakeEngine();
+    const request = transportRequest(1, 3);
+    let position: ReviewTransportPosition = request.position;
+    const controller = new AbortController();
+    let release!: (blob: Blob) => void;
+    let requested!: () => void;
+    const started = new Promise<void>((resolve) => {
+      requested = resolve;
+    });
+    const asset = new Promise<Blob>((resolve) => {
+      release = resolve;
+    });
+    const failure = vi.fn();
+    const f = renderRuntime({
+      createEngine: () => engine,
+      playing: false,
+      music: [clip()],
+      transportControl: { readPosition: () => position },
+      onFailure: failure,
+      resolveAsset: () => {
+        requested();
+        return asset;
+      },
+    });
+    await act(async () => root.render(<f.Harness />));
+    await act(async () => {
+      const pending = f.controls.preparePlayback(request, controller.signal);
+      await started;
+      if (change === 'abort') controller.abort();
+      else position = { ...position, [change]: position[change] + 1 };
+      release(new Blob());
+      expect(await pending).toBe(false);
+    });
+    expect(engine.scheduled).toHaveLength(0);
+    expect(failure).not.toHaveBeenCalled();
+  }
+);
+
+it('integrates controller seek cancellation and sixteen-second looping without React time commits', async () => {
+  const engine = new FakeEngine();
+  vi.spyOn(engine, 'decode').mockResolvedValue({ duration: 30 });
+  let now = 0;
+  const media = {
+    sourceId: 'recording',
+    time: 0,
+    paused: true,
+    ended: false,
+    seeking: false,
+    readyState: 4,
+    errorCode: null,
+  };
+  let release!: (blob: Blob) => void;
+  let requested!: () => void;
+  const started = new Promise<void>((resolve) => {
+    requested = resolve;
+  });
+  const asset = new Promise<Blob>((resolve) => {
+    release = resolve;
+  });
+  const failure = vi.fn();
+  let controller!: ReturnType<typeof createReviewTransportController>;
+  const f = renderRuntime({
+    createEngine: () => engine,
+    playing: false,
+    seekRevision: 0,
+    outputTime: 0,
+    music: [clip({ timelineStart: 0, duration: 30 })],
+    transportControl: {
+      readPosition: () => controller.readPosition(),
+      readSchedulingPosition: () => controller.readSchedulingPosition(),
+    },
+    resolveAsset: () => {
+      requested();
+      return asset;
+    },
+    onFailure: failure,
+  });
+  controller = createReviewTransportController(
+    {
+      sourceId: 'recording',
+      duration: 30,
+      edits: [],
+      original: { muted: false, volume: 1 },
+    },
+    {
+      now: () => now,
+      schedule: () => () => {},
+      media: {
+        read: () => media,
+        seek: (time) => {
+          media.time = time;
+        },
+        play: async () => {
+          media.paused = false;
+        },
+        pause: () => {
+          media.paused = true;
+        },
+        configure: () => {},
+        recoveryMode: () => {},
+        reload: () => {},
+      },
+      audio: {
+        prepare: (signal, request) => f.controls.preparePlayback(request, signal),
+        start: (request) => f.controls.startPlayback(request),
+        stop: () => f.controls.stopPlayback(),
+      },
+      onFailure: failure,
+    }
+  );
+  await act(async () => root.render(<f.Harness />));
+  controller.seekResult(16);
+  let pending!: Promise<void>;
+  await act(async () => {
+    pending = controller.play();
+    await started;
+  });
+  act(() => controller.seekResult(17));
+  await act(async () => {
+    release(new Blob());
+    await pending;
+  });
+  expect(engine.scheduled).toHaveLength(0);
+  await act(async () => controller.play());
+  expect(engine.scheduled).toHaveLength(1);
+  expect(engine.scheduled[0]!.schedule).toMatchObject({ offset: 17 });
+  act(() => controller.setRange({ start: 16, end: 16.4, result: { start: 16, end: 16.4 } }));
+  await act(async () => controller.play());
+  expect(engine.scheduled).toHaveLength(2);
+  await act(async () => {
+    now += 500;
+    media.time = 16.5;
+    controller.tick();
+  });
+  await vi.waitFor(() => expect(engine.scheduled).toHaveLength(3));
+  expect(engine.scheduled.at(-1)!.schedule).toMatchObject({ offset: 16 });
+  expect(controller.readPosition().resultTime).toBe(16);
+  expect(failure).not.toHaveBeenCalled();
+  controller.dispose();
+});
+
+it('joins the real controller output projection to unchanged graph-scheduled music', async () => {
+  let now = 0;
+  const engine = new FakeEngine();
+  engine.readActiveClock = () => ({
+    identity: engine,
+    graphTime: engine.currentTime,
+    outputTime: engine.currentTime - 0.05,
+  });
+  const video = { current: document.createElement('video') };
+  let controller!: ReturnType<typeof createReviewTransportController>;
+  const f = renderRuntime({
+    createEngine: () => engine,
+    video,
+    music: [clip({ timelineStart: 0, duration: 30 })],
+    resolveAsset: async () => new Blob(),
+    transportControl: {
+      readPosition: () => controller.readPosition(),
+      readSchedulingPosition: () => controller.readSchedulingPosition(),
+    },
+  });
+  let paused = true;
+  controller = createReviewTransportController(
+    { sourceId: 'source', duration: 30, edits: [], original: { muted: false, volume: 1 } },
+    {
+      now: () => now,
+      schedule: () => () => {},
+      media: {
+        read: () => ({
+          sourceId: 'source',
+          time: video.current.currentTime,
+          paused,
+          ended: false,
+          seeking: false,
+          readyState: 4,
+          errorCode: null,
+        }),
+        seek: (time) => {
+          video.current.currentTime = time;
+        },
+        pause: () => {
+          paused = true;
+        },
+        play: async () => {
+          paused = false;
+        },
+        configure: () => {},
+        recoveryMode: () => {},
+        reload: () => {},
+      },
+      audio: {
+        readClock: () => f.controls?.readAudioClock() ?? null,
+        prepare: (signal, request) => f.controls.preparePlayback(request, signal),
+        start: (request) => f.controls.startPlayback(request),
+        stop: () => f.controls.stopPlayback(),
+      },
+    }
+  );
+  await act(async () => root.render(<f.Harness />));
+  controller.seekSource(3, false);
+  await act(async () => controller.play());
+  expect(engine.scheduled).toHaveLength(1);
+  expect(engine.scheduled[0]?.schedule).toMatchObject({ when: 100, offset: 3, duration: 27 });
+  now = 100;
+  engine.currentTime = 100.1;
+  video.current.currentTime = 3.1;
+  act(() => controller.tick());
+  expect(controller.readPosition().resultTime).toBeCloseTo(3.05, 8);
+  expect(engine.scheduled).toHaveLength(1);
+  controller.dispose();
+});
+
+it('keeps original native gain on its graph source phase while the public preview clock is delayed', async () => {
+  let now = 0;
+  vi.spyOn(performance, 'now').mockImplementation(() => now);
+  const clock = liveClock(2.98);
+  const engine = new FakeEngine();
+  const video = { current: document.createElement('video') };
+  video.current.currentTime = 3.03;
+  const request = transportRequest(1, 2.98);
+  const f = renderRuntime({
+    createEngine: () => engine,
+    video,
+    playing: true,
+    playbackClock: clock.clock,
+    transportControl: { readPosition: () => request.position },
+    original: { muted: false, volume: 1, ranges: [{ id: 'loud', start: 3, end: 4, volume: 2 }] },
+  });
+  await act(async () => root.render(<f.Harness />));
+  await act(async () => f.controls.startPlayback(request));
+  expect(engine.gains.at(-1)).toBe(2);
+  video.current.currentTime = 4.03;
+  now = 100;
+  clock.publish(3.98);
+  expect(engine.gains.at(-1)).toBe(1);
+});
+
+it('updates source gain from the live clock without React time renders and releases its subscription', async () => {
+  let now = 0;
+  vi.spyOn(performance, 'now').mockImplementation(() => now);
+  const clock = liveClock(0);
+  const engine = new FakeEngine();
+  const f = renderRuntime({
+    createEngine: () => engine,
+    playing: true,
+    playbackClock: clock.clock,
+    original: { muted: false, volume: 1, ranges: [{ id: 'loud', start: 3, end: 4, volume: 2 }] },
+  });
+  await act(async () => root.render(<f.Harness />));
+  const gains = engine.gains.length;
+  for (now = 1; now < 100; now++) clock.publish(3.5);
+  expect(engine.gains).toHaveLength(gains);
+  now = 100;
+  clock.publish(3.5);
+  expect(engine.gains.at(-1)).toBe(2);
+  now = 200;
+  clock.publish(4.5);
+  expect(engine.gains.at(-1)).toBe(1);
+  await act(async () => root.render(<f.Harness playing={false} />));
+  clock.pause();
+  const pausedGains = engine.gains.length;
+  now = 300;
+  clock.publish(3.5);
+  expect(engine.gains).toHaveLength(pausedGains);
+  await act(async () => root.unmount());
+  expect(clock.listeners.size).toBe(0);
+});
+
+it('uses live result time for drift during a frozen source and retains music through correction', async () => {
+  let now = 0;
+  vi.spyOn(performance, 'now').mockImplementation(() => now);
+  const clock = liveClock(3, 3);
+  const engine = new FakeEngine();
+  const f = renderRuntime({
+    createEngine: () => engine,
+    playing: true,
+    outputTime: 0,
+    playbackClock: clock.clock,
+    music: [clip()],
+    voiceover: [clip({ id: 'voice' })],
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => root.render(<f.Harness />));
+  expect(engine.scheduled).toHaveLength(2);
+  expect(engine.scheduled[0]!.schedule).toMatchObject({ offset: 1 });
+  const stops = engine.stops;
+  engine.currentTime = 100.1;
+  now = 100;
+  await act(async () => clock.publish(3, 3.1));
+  expect(engine.scheduled).toHaveLength(2);
+  engine.currentTime = 100.5;
+  now = 200;
+  await act(async () => clock.publish(3, 3.2));
+  expect(engine.scheduled).toHaveLength(3);
+  expect(engine.stops).toBe(stops);
+  expect(engine.scheduled.at(-1)!.schedule).toMatchObject({ offset: expect.closeTo(1.2, 8) });
+});
+
+it('reports a real audio resume failure during live-clock drift correction', async () => {
+  let now = 0;
+  vi.spyOn(performance, 'now').mockImplementation(() => now);
+  const clock = liveClock(3);
+  const engine = new FakeEngine();
+  const onFailure = vi.fn();
+  const f = renderRuntime({
+    createEngine: () => engine,
+    playing: true,
+    playbackClock: clock.clock,
+    voiceover: [clip()],
+    resolveAsset: async () => new Blob(),
+    onFailure,
+  });
+  await act(async () => root.render(<f.Harness />));
+  engine.failResume = true;
+  engine.currentTime = 101;
+  now = 100;
+  await act(async () => clock.publish(3.2));
+  expect(onFailure).toHaveBeenCalledOnce();
 });
 
 it('keeps music alive through a source Cut jump and reschedules only a real output seek', async () => {
@@ -116,7 +972,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   host.remove();
-  vi.clearAllMocks();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -678,7 +1534,7 @@ it('anchors real drift recovery to the current mapped media time instead of a st
     playing: true,
     outputTime: 3,
     sourceToResult: map.sourceToTimeline,
-    music: [clip({ timelineStart: 0, duration: 8 })],
+    voiceover: [clip({ timelineStart: 0, duration: 8 })],
     resolveAsset: async () => new Blob(),
   });
   await act(async () => root.render(<Harness />));
@@ -1079,4 +1935,161 @@ it('starts prepared audio before the native Play request and adopts it on the la
   expect(prepareProcessedClip).toHaveBeenCalledOnce();
   await act(async () => root.render(<f.Harness playing={false} outputTime={0.8} />));
   expect(dispose).toHaveBeenCalledOnce();
+});
+
+it.each([1, 2])(
+  'prepares ordinary music at %sx before Play and reuses its decoded tempo buffer',
+  async (rate) => {
+    const engine = new FakeEngine();
+    const decode = vi.spyOn(engine, 'decode');
+    const prepare = vi.spyOn(engine, 'prepareClip');
+    const f = renderRuntime({
+      createEngine: () => engine,
+      playing: false,
+      music: [clip({ timelineStart: 0, playbackRate: rate })],
+      resolveAsset: async () => new Blob(),
+    });
+    await act(async () => root.render(<f.Harness />));
+    await act(async () => expect(await f.controls.preparePlayback()).toBe(true));
+    expect(decode).toHaveBeenCalledOnce();
+    expect(prepare).toHaveBeenCalledTimes(rate === 1 ? 0 : 1);
+    expect(engine.scheduled).toHaveLength(0);
+    await act(async () => root.render(<f.Harness playing />));
+    expect(decode).toHaveBeenCalledOnce();
+    expect(prepare).toHaveBeenCalledTimes(rate === 1 ? 0 : 1);
+    expect(engine.scheduled).toHaveLength(1);
+  }
+);
+
+it('finishes accepted music preparation when the first decoded preview frame appears', async () => {
+  const supportsMappedOriginal = vi.fn(async () => true);
+  const engine = Object.assign(new FakeEngine(), { supportsMappedOriginal });
+  const asset = Promise.withResolvers<Blob>();
+  const started = Promise.withResolvers<void>();
+  const request = transportRequest(1, 1);
+  const edits = [
+    { kind: 'cut' as const, id: 'skip', start: 6, end: 10, requestedStart: 6, requestedEnd: 10 },
+  ];
+  const f = renderRuntime({
+    createEngine: () => engine,
+    music: [clip()],
+    mappedOriginal: false,
+    originalSource: { file: new Blob(), segments: buildReviewTimeMap(20, edits), edits },
+    transportControl: { readPosition: () => request.position },
+    resolveAsset: () => {
+      started.resolve();
+      return asset.promise;
+    },
+  });
+  await act(async () => root.render(<f.Harness />));
+  let pending!: Promise<boolean>;
+  await act(async () => {
+    pending = f.controls.preparePlayback(request, new AbortController().signal);
+    await started.promise;
+  });
+  await act(async () => root.render(<f.Harness mappedOriginal />));
+  await act(async () => {
+    asset.resolve(new Blob());
+    expect(await pending).toBe(true);
+  });
+  await act(async () => f.controls.startPlayback(request));
+  expect(engine.scheduled).toHaveLength(1);
+  expect(supportsMappedOriginal).not.toHaveBeenCalled();
+  act(() => f.controls.stopPlayback());
+});
+
+it('cancels a pending ordinary music preparation without scheduling stale audio', async () => {
+  const engine = new FakeEngine();
+  let release!: (blob: Blob) => void;
+  let requested!: () => void;
+  const started = new Promise<void>((resolve) => {
+    requested = resolve;
+  });
+  const asset = new Promise<Blob>((resolve) => {
+    release = resolve;
+  });
+  const failure = vi.fn();
+  const f = renderRuntime({
+    createEngine: () => engine,
+    playing: false,
+    music: [clip()],
+    resolveAsset: () => {
+      requested();
+      return asset;
+    },
+    onFailure: failure,
+  });
+  await act(async () => root.render(<f.Harness />));
+  await act(async () => {
+    const pending = f.controls.preparePlayback();
+    await started;
+    f.controls.stopPlayback();
+    release(new Blob());
+    expect(await pending).toBe(false);
+  });
+  expect(engine.scheduled).toHaveLength(0);
+  expect(failure).not.toHaveBeenCalled();
+});
+
+it('schedules ready music synchronously when resynchronizing after clock drift', async () => {
+  const engine = new FakeEngine();
+  const f = renderRuntime({
+    createEngine: () => engine,
+    outputTime: 3,
+    music: [clip()],
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => root.render(<f.Harness />));
+  await act(async () => expect(await f.controls.preparePlayback()).toBe(true));
+  await act(async () => root.render(<f.Harness playing />));
+  expect(engine.scheduled).toHaveLength(1);
+  act(() => {
+    f.controls.startPlayback();
+    // Teardown and replacement must share one turn; a later effect may block microtasks.
+    expect(engine.scheduled).toHaveLength(2);
+  });
+});
+
+it('keeps background music continuous during native clock corrections but resets it on a real seek', async () => {
+  const engine = new FakeEngine();
+  const stops: ReturnType<typeof vi.fn>[] = [];
+  const schedule = engine.scheduleClip.bind(engine);
+  vi.spyOn(engine, 'scheduleClip').mockImplementation((placement, buffer) => {
+    schedule(placement, buffer);
+    const stop = vi.fn();
+    stops.push(stop);
+    return { stop };
+  });
+  const node = document.createElement('video');
+  node.currentTime = 3;
+  const f = renderRuntime({
+    video: { current: node },
+    createEngine: () => engine,
+    playing: true,
+    outputTime: 3,
+    sourceToResult: (time) => time,
+    seekRevision: 0,
+    music: [clip()],
+    voiceover: [clip({ id: 'voice' })],
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => root.render(<f.Harness />));
+  expect(engine.scheduled).toHaveLength(2);
+  const stopsBeforeDrift = engine.stops;
+  // The native video stalled while the Web Audio clock continued running.
+  engine.currentTime = 100.5;
+  node.currentTime = 3.1;
+  await act(async () => root.render(<f.Harness outputTime={3.1} />));
+  expect(engine.stops).toBe(stopsBeforeDrift);
+  expect(engine.scheduled).toHaveLength(3); // Only synchronized voiceover is replaced.
+  expect(stops[0]).toHaveBeenCalledOnce(); // Voiceover.
+  expect(stops[1]).not.toHaveBeenCalled(); // Music continues on its original clock.
+  node.currentTime = 5;
+  await act(async () => root.render(<f.Harness outputTime={5} seekRevision={1} />));
+  expect(engine.stops).toBeGreaterThan(stopsBeforeDrift);
+  expect(engine.scheduled).toHaveLength(5);
+  expect(engine.scheduled.at(-1)!.schedule).toMatchObject({ offset: 3, duration: 1 });
+  const beforePause = engine.stops;
+  await act(async () => root.render(<f.Harness outputTime={5} seekRevision={1} playing={false} />));
+  expect(engine.stops).toBeGreaterThan(beforePause);
 });

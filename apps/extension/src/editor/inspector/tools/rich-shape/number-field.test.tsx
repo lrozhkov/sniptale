@@ -52,6 +52,35 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it('uses focused wheel steps with the numeric draft, bounds and retained focus', () => {
+  const onChange = vi.fn();
+  renderNumberField(onChange);
+  act(() => input().focus());
+  act(() => change('19'));
+  onChange.mockClear();
+  const forward = new WheelEvent('wheel', {
+    altKey: true,
+    bubbles: true,
+    cancelable: true,
+    deltaY: -1,
+  });
+  act(() => input().dispatchEvent(forward));
+  expect(input().value).toBe('20');
+  expect(onChange).toHaveBeenLastCalledWith(20);
+  expect(forward.defaultPrevented).toBe(true);
+  expect(document.activeElement).toBe(input());
+  act(() => {
+    input().dispatchEvent(
+      new WheelEvent('wheel', { altKey: true, bubbles: true, cancelable: true, deltaY: 1 })
+    );
+    input().dispatchEvent(
+      new WheelEvent('wheel', { altKey: true, bubbles: true, cancelable: true, deltaY: 1 })
+    );
+  });
+  expect(input().value).toBe('18');
+  expect(onChange.mock.calls).toEqual([[20], [19], [18]]);
+});
+
 it('covers number field clamping and keyboard commit behavior', () => {
   const onChange = vi.fn();
   renderNumberField(onChange);

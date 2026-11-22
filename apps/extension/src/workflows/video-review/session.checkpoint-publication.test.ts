@@ -35,16 +35,19 @@ function fixture(withWake = true) {
   const grant = deferred<{ release(): Promise<void> }>();
   const release = vi.fn(async (): Promise<void> => undefined);
   const acquired = vi.fn(() => grant.promise);
-  const read = vi.fn(async () => structuredClone(snapshot));
+  const read = vi.fn(async (expectedRevision = 1) => ({
+    ...structuredClone(snapshot),
+    workspace: { ...snapshot.workspace, revision: expectedRevision + 1 },
+  }));
   const session = createVideoReviewSession(snapshot, {
     acquireSyncCheckpointEdit: acquired,
     ...(withWake ? { wakeCheckpoints } : {}),
-    readVideoWorkspace: read,
-    saveVideoWorkspaceDraft: read,
-    saveVideoWorkspaceSnapshot: read,
-    saveVideoWorkspaceAdvanced: read,
-    moveVideoWorkspaceHistory: read,
-    commitVideoWorkspace: read,
+    readVideoWorkspace: async () => read(),
+    saveVideoWorkspaceDraft: async () => read(),
+    saveVideoWorkspaceSnapshot: (request) => read(request.expectedRevision),
+    saveVideoWorkspaceAdvanced: async () => read(),
+    moveVideoWorkspaceHistory: async () => read(),
+    commitVideoWorkspace: async () => read(),
   });
   return {
     wakeCheckpoints,
@@ -57,6 +60,11 @@ function fixture(withWake = true) {
   };
 }
 
+async function publishDraft(f: ReturnType<typeof fixture>) {
+  await f.session.saveDraft(null, null);
+  return f.session.saveBuffered();
+}
+
 it('waits for publication admission before a final native command and holds through acknowledgement', async () => {
   const f = fixture();
   const ack = deferred<VideoWorkspaceSnapshot>();
@@ -65,14 +73,14 @@ it('waits for publication admission before a final native command and holds thro
     started.resolve();
     return ack.promise;
   });
-  const save = f.session.saveDraft(null, null);
+  const save = publishDraft(f);
   expect(f.acquired).toHaveBeenCalledOnce();
   expect(f.read).not.toHaveBeenCalled();
   f.grant();
   await started.promise;
   expect(f.read).toHaveBeenCalledOnce();
   expect(f.release).not.toHaveBeenCalled();
-  ack.resolve(f.snapshot);
+  ack.resolve({ ...f.snapshot, workspace: { ...f.snapshot.workspace, revision: 2 } });
   await save;
   expect(f.release).toHaveBeenCalledOnce();
   await f.session.dispose();
@@ -82,11 +90,11 @@ it('keeps a successor action protected after an earlier capture acknowledgement'
   const f = fixture();
   const first = f.session.beginCheckpointEdit();
   f.grant();
-  await f.session.saveDraft(null, null);
+  await publishDraft(f);
   expect(f.release).not.toHaveBeenCalled();
   const second = f.session.beginCheckpointEdit();
   first();
-  await f.session.saveDraft(null, null);
+  await publishDraft(f);
   expect(f.release).not.toHaveBeenCalled();
   second();
   await Promise.resolve();
@@ -97,7 +105,7 @@ it('keeps a successor action protected after an earlier capture acknowledgement'
 
 it('releases a delayed grant after disposal without starting a native write', async () => {
   const f = fixture();
-  const save = f.session.saveDraft(null, null);
+  const save = publishDraft(f);
   const rejected = expect(save).rejects.toThrow('closed');
   const dispose = f.session.dispose();
   f.grant();
@@ -110,11 +118,11 @@ it('releases a delayed grant after disposal without starting a native write', as
 it('retries failed publication admission through the existing save error', async () => {
   const f = fixture();
   f.acquired.mockRejectedValueOnce(new Error('Admission failed'));
-  await expect(f.session.saveDraft(null, null)).rejects.toThrow('Admission failed');
+  await expect(publishDraft(f)).rejects.toThrow('Admission failed');
   expect(f.session.getSnapshot().error).toBe('storage');
   expect(f.read).not.toHaveBeenCalled();
   f.grant();
-  await f.session.saveDraft(null, null);
+  await publishDraft(f);
   expect(f.acquired).toHaveBeenCalledTimes(2);
   expect(f.session.getSnapshot().error).toBeNull();
   expect(f.release).toHaveBeenCalledOnce();
@@ -129,12 +137,12 @@ it('drains an active native write before disposal releases its publication lease
     started.resolve();
     return ack.promise;
   });
-  const save = f.session.saveDraft(null, null);
+  const save = publishDraft(f);
   f.grant();
   await started.promise;
   const disposal = f.session.dispose();
   expect(f.release).not.toHaveBeenCalled();
-  ack.resolve(f.snapshot);
+  ack.resolve({ ...f.snapshot, workspace: { ...f.snapshot.workspace, revision: 2 } });
   await save;
   await disposal;
   expect(f.release).toHaveBeenCalledOnce();
@@ -147,7 +155,7 @@ it('wakes Review once after its accepted final native ACK and release settle', a
   const end = f.session.beginCheckpointEdit();
   f.grant();
   f.read.mockResolvedValue({ ...f.snapshot, workspace: { ...f.snapshot.workspace, revision: 2 } });
-  await f.session.saveDraft(null, null);
+  await publishDraft(f);
   expect(f.wakeCheckpoints).not.toHaveBeenCalled();
   end();
   await Promise.resolve();
@@ -162,10 +170,10 @@ it('wakes Review once after its accepted final native ACK and release settle', a
 it('does not wake Review for a no-op or a refused native action', async () => {
   const f = fixture();
   f.grant();
-  await f.session.saveDraft(null, null);
+  await f.session.saveBuffered();
   expect(f.wakeCheckpoints).not.toHaveBeenCalled();
   f.read.mockRejectedValueOnce(new Error('Refused'));
-  await expect(f.session.saveDraft(null, null)).rejects.toThrow('Refused');
+  await expect(publishDraft(f)).rejects.toThrow('Refused');
   await f.session.dispose();
   expect(f.wakeCheckpoints).not.toHaveBeenCalled();
 });
@@ -175,7 +183,7 @@ it('keeps Review saved when its optional advisory wake rejects', async () => {
   f.grant();
   f.wakeCheckpoints.mockRejectedValueOnce(new Error('Worker unavailable'));
   f.read.mockResolvedValue({ ...f.snapshot, workspace: { ...f.snapshot.workspace, revision: 2 } });
-  await f.session.saveDraft(null, null);
+  await publishDraft(f);
   await f.session.dispose();
   expect(f.wakeCheckpoints).toHaveBeenCalledOnce();
   expect(f.session.getSnapshot()).toMatchObject({ error: null, dirty: false });
@@ -185,7 +193,7 @@ it('accepts an injected Review persistence adapter without a wake transport', as
   const f = fixture(false);
   f.grant();
   f.read.mockResolvedValue({ ...f.snapshot, workspace: { ...f.snapshot.workspace, revision: 2 } });
-  await f.session.saveDraft(null, null);
+  await publishDraft(f);
   await f.session.dispose();
   expect(f.wakeCheckpoints).not.toHaveBeenCalled();
   expect(transportWake).not.toHaveBeenCalled();

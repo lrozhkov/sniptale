@@ -14,7 +14,6 @@ import { DEFAULT_BORDER_PRESET } from '../../../features/highlighter/style/publi
 import { createDefaultSceneBackgroundSettings } from './scene-defaults';
 
 export const EDITOR_PRESETS_STORAGE_KEY = 'sniptale_editor_presets';
-const DEFAULT_EDITOR_PRESET_NAME = translate('shared.defaults.defaultEditorPresetName');
 const DEFAULT_EDITOR_PRESET_ID = 'system-default';
 
 const DEFAULT_EDITOR_PALETTE_SETTINGS: EditorPaletteSettings = {
@@ -24,7 +23,7 @@ const DEFAULT_EDITOR_PALETTE_SETTINGS: EditorPaletteSettings = {
 function createSystemPreset<TSettings>(settings: TSettings): EditorPreset<TSettings> {
   return {
     id: DEFAULT_EDITOR_PRESET_ID,
-    name: DEFAULT_EDITOR_PRESET_NAME,
+    name: translate('shared.defaults.defaultEditorPresetName'),
     order: 0,
     enabled: true,
     isSystemDefault: true,

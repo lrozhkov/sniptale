@@ -14,7 +14,7 @@ import type {
   VideoProjectVideoClip,
   VideoProjectSourceInteractionDocument,
 } from './types';
-import { getVideoClipSourceTime } from './timeline/rate';
+import { getVideoClipSourceTime, getVideoClipInteractionTime } from './timeline/rate';
 
 export type { VideoProjectSourceInteractionDocument } from './types/model';
 
@@ -157,6 +157,45 @@ export function parseVideoProjectSourceInteractionDocuments(
   return result;
 }
 
+/** Duplicate the bound authored document atomically within existing aggregate input budgets. */
+export function duplicateProjectSourceInteractionDocuments(
+  documents: readonly VideoProjectSourceInteractionDocument[],
+  instances: ReadonlyMap<string, string>,
+  createId: () => string
+) {
+  const cursorIds = new Map<string, string>();
+  const copies = documents.flatMap((document) => {
+    const sourceInstanceId = instances.get(document.binding.sourceInstanceId);
+    if (!sourceInstanceId) return [];
+    const cursorMotions = document.cursorMotions.map((motion) => {
+      const id = createId();
+      cursorIds.set(JSON.stringify([document.binding.sourceInstanceId, motion.id]), id);
+      return {
+        ...structuredClone(motion),
+        id,
+        points: motion.points.map((point) => {
+          const pointId = createId();
+          cursorIds.set(
+            JSON.stringify([document.binding.sourceInstanceId, motion.id, point.id]),
+            pointId
+          );
+          return { ...point, id: pointId };
+        }),
+      };
+    });
+    return [
+      {
+        ...structuredClone(document),
+        id: createId(),
+        binding: { ...document.binding, sourceInstanceId },
+        cursorMotions,
+      },
+    ];
+  });
+  const parsed = parseVideoProjectSourceInteractionDocuments([...documents, ...copies]);
+  return parsed ? { documents: parsed, cursorIds } : null;
+}
+
 /** Retained cut content can have no current placement; a live source identity cannot belong to another asset. */
 export function hasValidVideoProjectSourceInteractionReferences(project: VideoProject): boolean {
   return (project.sourceInteractionDocuments ?? []).every((document) => {
@@ -170,13 +209,75 @@ export function hasValidVideoProjectSourceInteractionReferences(project: VideoPr
         (clip) =>
           clip.type !== 'VIDEO' ||
           clip.sourceInstanceId !== document.binding.sourceInstanceId ||
-          clip.assetId === asset.id
+          (clip.assetId === asset.id &&
+            (!hasResultSourceInteractionContent(document) ||
+              clip.sourceInteractionTiming !== undefined))
       )
     );
   });
 }
 
-/** All consumers use the clip's admitted source clock, including speed, trim and visual holds. */
+/** Result authoring requires an admitted per-placement origin; source facts retain their clock. */
+export function hasResultSourceInteractionContent(
+  document: VideoProjectSourceInteractionDocument
+): boolean {
+  return (
+    document.cursorMotions.some((motion) => motion.timeDomain === 'result') ||
+    document.timeline.presses.some((press) => press.timeDomain === 'result') ||
+    document.timeline.overrides.some(
+      (override) => override.timeDomain === 'result' || override.source?.timeDomain === 'result'
+    )
+  );
+}
+
+/** The retained document owns the time domain of its derived action facts. */
+export function isResultSourceInteractionAction(
+  project: VideoProject,
+  event: import('./types').VideoProjectActionEvent
+): boolean {
+  const anchor = event.anchor;
+  if (anchor.kind === 'project') return false;
+  const document = project.sourceInteractionDocuments?.find(
+    (doc) =>
+      doc.binding.sourceInstanceId === anchor.sourceInstanceId &&
+      (anchor.kind === 'source'
+        ? doc.binding.assetId === anchor.assetId
+        : recordingIdForProjectAsset(
+            project.assets.find((asset) => asset.id === doc.binding.assetId)
+          ) === anchor.recordingId)
+  );
+  if (!document) return false;
+  const override = document.timeline.overrides.find(
+    (item) => item.ref.kind === 'action' && item.ref.id === anchor.sourceEventId
+  );
+  const press =
+    document.timeline.presses.find((item) => item.id === anchor.sourceEventId) ??
+    (event.id === JSON.stringify(['authored-source-input', document.id, anchor.sourceEventId])
+      ? override?.source
+      : undefined);
+  return (override?.timeDomain ?? press?.timeDomain) === 'result';
+}
+
+/** Focus edits retain the authored segment identity and its declared document clock. */
+export function isResultSourceCursorSegment(
+  project: VideoProject,
+  segment: import('./cursor-focus-path/types').CursorFocusSegment
+): boolean {
+  const binding = segment.binding;
+  return (
+    binding.kind !== 'project' &&
+    (project.sourceInteractionDocuments ?? []).some(
+      (document) =>
+        document.binding.sourceInstanceId === binding.sourceInstanceId &&
+        (binding.kind !== 'source' || document.binding.assetId === binding.assetId) &&
+        document.cursorMotions.some(
+          (motion) => motion.id === segment.id && motion.timeDomain === 'result'
+        )
+    )
+  );
+}
+
+/** Resolve physical source facts and retained result authoring through separate admitted clocks. */
 export function resolveProjectSourceInteractionDocument(
   project: VideoProject,
   time: number,
@@ -193,12 +294,18 @@ export function resolveProjectSourceInteractionDocument(
         time < clip.startTime + clip.duration &&
         project.tracks.some((track) => track.id === clip.trackId && track.visible)
     );
-    if (clip) return { document, clip, sourceTime: getVideoClipSourceTime(clip, time) };
+    if (clip)
+      return {
+        document,
+        clip,
+        sourceTime: getVideoClipSourceTime(clip, time),
+        resultTime: getVideoClipInteractionTime(clip, time),
+      };
   }
   return null;
 }
 
-/** Apply source cursor intervals to focus derivation without persisting a second authored path. */
+/** Apply retained cursor intervals in their declared clocks without a second authored path. */
 export function withProjectSourceCursorFocus(
   project: VideoProject,
   path: import('./cursor-focus-path/types').CursorFocusPath
@@ -224,12 +331,18 @@ export function withProjectSourceCursorFocus(
         : segment.binding.recordingId === recordingId);
     const scoped = withCursorMotionPath(
       { ...result, segments: result.segments.filter(sameSource) },
-      document.cursorMotions
-    )!;
+      document.cursorMotions.filter((motion) => motion.timeDomain !== 'result')
+    ) ?? { ...result, segments: result.segments.filter(sameSource) };
     result = {
       ...result,
       segments: [
         ...result.segments.filter((segment) => !sameSource(segment)),
+        ...(
+          withCursorMotionPath(
+            undefined,
+            document.cursorMotions.filter((motion) => motion.timeDomain === 'result')
+          )?.segments ?? []
+        ).map((segment) => ({ ...segment, binding })),
         ...scoped.segments.map((segment) => ({
           ...segment,
           binding,
@@ -240,7 +353,7 @@ export function withProjectSourceCursorFocus(
   return result;
 }
 
-/** Derive edited action facts for current placements; captured project events remain unchanged. */
+/** Derive action facts in the document clock; captured project events remain unchanged. */
 export function projectSourceInteractionActions(
   project: VideoProject,
   actions: readonly import('./types').VideoProjectActionEvent[]
@@ -294,6 +407,7 @@ export function projectSourceInteractionActions(
       const original = originals.get(marker.ref.id);
       if (original && original.anchor.kind !== 'project') {
         if (
+          marker.timeDomain !== 'result' &&
           marker.start === original.anchor.sourceTime &&
           marker.end - marker.start === (original.capturedDuration ?? 0)
         )

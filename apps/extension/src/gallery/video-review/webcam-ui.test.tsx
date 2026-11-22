@@ -58,6 +58,11 @@ beforeEach(() => {
       tags: [],
     },
     time: 3,
+    get sourceTime() {
+      return editor.time;
+    },
+    hideRange: null,
+    addHidden: vi.fn(),
     duration: 12,
     available: true,
     retry: vi.fn(() => undefined),
@@ -138,7 +143,23 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
+function reveal(selector: string) {
+  if (host.querySelector(selector)) return;
+  for (const tab of host.querySelectorAll<HTMLButtonElement>('[role="tab"]')) {
+    act(() => tab.click());
+    if (host.querySelector(selector)) return;
+  }
+}
+function section(id: string) {
+  act(() =>
+    host.querySelector<HTMLButtonElement>(`[role="tab"][aria-controls$="-${id}"]`)!.click()
+  );
+}
 async function enter(name: string, value: string) {
+  reveal(`[aria-label="${name}"]`);
+  act(() =>
+    host.querySelector<HTMLButtonElement>(`.opacity-field button[aria-label="${name}"]`)?.click()
+  );
   const node = field(name);
   expect(node).not.toBeNull();
   await act(async () => {
@@ -148,6 +169,9 @@ async function enter(name: string, value: string) {
   act(() => node.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
 }
 async function choose(name: string, option: string) {
+  reveal(
+    name === label('webcamShadowDirection') ? `[title="${option}"]` : `[aria-label="${name}"]`
+  );
   if (name === label('webcamShadowDirection')) {
     const direct = host.querySelector<HTMLButtonElement>(`[title="${option}"]`)!;
     expect(direct).not.toBeNull();
@@ -193,6 +217,7 @@ it('edits camera placement, appearance and signed timing through inspector contr
   expect(field('videoEditor.sidebar.cameraRoundness')).toBeNull();
   await choose('videoEditor.sidebar.cameraShape', label('webcamCircle'));
   expect(field('videoEditor.sidebar.cameraRoundness')).toBeNull();
+  section('webcam-layout');
   expect(field(label('webcam_height'))).toBeNull();
   await enter(label('webcamDiameter'), '30');
   expect(editor.placement!.width).toBe(0.3);
@@ -201,6 +226,7 @@ it('edits camera placement, appearance and signed timing through inspector contr
   await choose('videoEditor.sidebar.cameraShape', 'videoEditor.sidebar.cameraShapeSoft');
   await enter('videoEditor.sidebar.cameraRoundness', '35');
   await choose('videoEditor.sidebar.cameraShape', 'videoEditor.sidebar.cameraShapeRounded');
+  section('webcam-appearance');
   act(() =>
     host
       .querySelector<HTMLButtonElement>(`[role="switch"][aria-label="${label('webcamMirror')}"]`)!
@@ -215,6 +241,7 @@ it('edits camera placement, appearance and signed timing through inspector contr
     offsetSeconds: -1.25,
     appearance: { shape: 'rounded', roundness: 35, zoom: 2, panX: 0.25, panY: -0.3 },
   });
+  section('webcam-appearance');
   act(() =>
     host
       .querySelector<HTMLButtonElement>(`[role="switch"][aria-label="${label('webcamMirror')}"]`)!
@@ -232,6 +259,10 @@ it('selects a split pane and restores docked placement without rewriting its aut
   const dock = editor.placement;
   await choose(label('webcamSplit'), label('webcamSplit_left'));
   expect(editor.setSplit).toHaveBeenCalledWith('left');
+  expect(
+    field(label('webcamSplit')).compareDocumentPosition(field(label('webcamScreenBehavior'))) &
+      Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy();
   expect(field(label('webcamPlacement'))).toBeNull();
   await choose(label('webcamSplit'), label('webcamSplit_docked'));
   expect(editor.setSplit).toHaveBeenCalledWith(null);
@@ -258,13 +289,16 @@ it('edits an authored position and respects neighboring time bounds and transiti
   editor.selectedPosition = editor.camera!.positions[0];
   render = () => root.render(<ReviewWebcamInspector editor={editor} />);
   act(render);
+  section('webcam-timing');
+  expect(field(label('webcamOffset'))).not.toBeNull();
+  expect(field(label('webcamPositionTime'))).not.toBeNull();
   expect(field(label('webcamTransitionDuration'))).toBeNull();
   await choose(label('webcamTransition'), label('webcamSmooth'));
   await enter(label('webcamTransitionDuration'), '2');
   await enter(label('webcamPositionTime'), '9');
   expect(editor.selectedPosition).toMatchObject({ time: 7.999, transition: { duration: 2 } });
   expect(editor.camera!.positions[1]!.time).toBe(8);
-  await choose(label('webcamPosition'), '2 · 8.000 s');
+  await choose(label('webcamPosition'), '2 · 0:08.000');
   expect(editor.navigate).toHaveBeenLastCalledWith('second');
   await choose(label('webcamPosition'), label('webcamBasePosition'));
   expect(editor.navigate).toHaveBeenLastCalledWith(null);
@@ -276,7 +310,7 @@ it('edits an authored position and respects neighboring time bounds and transiti
   expect(editor.remove).toHaveBeenCalledOnce();
 });
 
-it('explains unavailable hide intervals and edits an existing hidden interval without exposing layout', async () => {
+it('explains unavailable hide intervals and keeps hidden bounds on the timeline without exposing layout', async () => {
   editor.canHide = vi.fn(() => false);
   render = () =>
     root.render(<ReviewWebcamInspector editor={editor} range={{ start: 3, end: 5 }} />);
@@ -288,16 +322,19 @@ it('explains unavailable hide intervals and edits an existing hidden interval wi
   editor.candidate = null;
   act(render);
   expect(field(label('webcamPlacement'))).toBeNull();
-  await enter(label('rangeStart'), '2');
-  expect(editor.hide).toHaveBeenLastCalledWith({ id: 'hidden', start: 2, end: 5 }, true);
-  await enter(label('rangeEnd'), '6');
-  expect(editor.hide).toHaveBeenLastCalledWith({ id: 'hidden', start: 3, end: 6 }, true);
+  expect(field(label('rangeStart'))).toBeNull();
+  expect(field(label('rangeEnd'))).toBeNull();
+  expect(host.querySelector('[role="tablist"]')).toBeNull();
+  expect(host.querySelector('[role="status"]')?.textContent).toBe(label('webcamHidden'));
+  click('removeEdit');
+  expect(editor.remove).toHaveBeenCalledOnce();
+  expect(editor.hide).not.toHaveBeenCalled();
   editor.camera = undefined;
   act(render);
   expect(host.textContent).toBe('');
 });
 
-it('keeps camera markers on the source axis and creates hide intervals through admitted drags', () => {
+it('keeps camera markers on the source axis and does not create hide intervals through lane drags', () => {
   editor.camera!.hiddenRanges = [{ id: 'hidden', start: 2, end: 3 }];
   editor.camera!.positions = [
     {
@@ -315,13 +352,16 @@ it('keeps camera markers on the source axis and creates hide intervals through a
   expect(field(label('webcamSettings'))).toBeNull();
   pointer(track, 'pointerdown', 100);
   pointer(track, 'pointerup', 100);
-  expect(editor.select).toHaveBeenCalledWith({ kind: 'webcam' });
+  expect(editor.select).toHaveBeenCalledWith({ kind: 'webcam' }, undefined);
   const markers = [
     track.querySelector<HTMLButtonElement>('[title="gallery.videoReview.webcamHidden"]')!,
     track.querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.webcamPosition"]')!,
   ];
   act(() => markers[0]!.click());
-  expect(editor.select).toHaveBeenLastCalledWith({ kind: 'webcam-hidden', id: 'hidden' });
+  expect(editor.select).toHaveBeenLastCalledWith(
+    { kind: 'webcam-hidden', id: 'hidden' },
+    undefined
+  );
   act(() => markers[1]!.click());
   expect(editor.navigate).toHaveBeenCalledWith('position');
   pointer(markers[1]!, 'pointerdown', 600);
@@ -330,10 +370,10 @@ it('keeps camera markers on the source axis and creates hide intervals through a
   pointer(track, 'pointerdown', 400);
   pointer(track, 'pointermove', 700);
   pointer(track, 'pointerup', 700);
-  expect(editor.hide).toHaveBeenCalledWith({ start: 4, end: 7 });
+  expect(editor.hide).not.toHaveBeenCalled();
   pointer(track, 'pointerdown', 500);
   pointer(track, 'pointerup', 500);
-  expect(editor.hide).toHaveBeenCalledTimes(1);
+  expect(editor.hide).not.toHaveBeenCalled();
   expect(host.querySelector('[aria-label="gallery.videoReview.compactTrackHeight"]')).toBeNull();
   act(() =>
     root.render(
@@ -568,7 +608,7 @@ it.each([false, true])(
     expect(editor.hide).not.toHaveBeenCalled();
     pointer(handle, 'pointerup', 150);
     expect(editor.resizeHidden).toHaveBeenCalledExactlyOnceWith('hidden', { start: 1.5, end: 4 });
-    expect(editor.select).toHaveBeenCalledWith({ kind: 'webcam-hidden', id: 'hidden' });
+    expect(editor.select).not.toHaveBeenCalled();
     expect(editor.duration).toBe(12);
   }
 );

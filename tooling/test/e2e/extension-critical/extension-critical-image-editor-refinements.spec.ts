@@ -1,4 +1,4 @@
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import type { Page } from '@playwright/test';
 import { expect, test } from '../support/extension-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
@@ -294,6 +294,77 @@ test('image refinements toolbar breakpoints and narrow outer scroll', async ({
 });
 
 for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`image frame uses exact radius and a compact style choice ${name}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    await page.setViewportSize(size);
+    await openEditor(page, hostOrigin, 'en');
+    await page.locator('[data-ui="editor.floating.layers.mode.frame"]').click();
+    const panel = page.locator('[data-ui="editor.frame-panel"]');
+    await panel.locator('[data-ui="editor.frame.background-mode"] button').nth(1).click();
+    const radiusLabel = translate('editor.compact.cornerRadius', 'en');
+    const radius = panel.getByRole('textbox', { name: radiusLabel, exact: true });
+    const radiusRow = panel.locator('[data-ui="editor.frame.source-basics"]');
+    await expect(radius).toBeVisible();
+    await expect(radiusRow.getByRole('slider', { includeHidden: true })).toHaveCount(0);
+    await expect(
+      panel.locator('[data-ui="editor.frame.padding-fields"] input[type="range"]')
+    ).not.toHaveCount(0);
+    await radius.fill('24');
+    await radius.press('Enter');
+    await expect(radius).toHaveValue('24');
+    await radius.hover();
+    await radiusRow.getByRole('button', { name: `${radiusLabel} increase`, exact: true }).click();
+    await expect(radius).toHaveValue('25');
+    await radius.fill('41');
+    await radius.press('Escape');
+    await expect(radius).toHaveValue('25');
+
+    const border = panel.locator('[data-ui="editor.frame.source-border"]');
+    await border.locator('summary').click();
+    const select = border.getByRole('button', {
+      name: translate('highlighter.editor.styleLabel', 'en'),
+      exact: true,
+    });
+    const row = border.locator('[data-ui="shared.ui.compact-inspector.select-field"]');
+    await expect(row).toHaveAttribute('data-layout', 'inline');
+    const radiusField = radiusRow.locator('[data-stepper-placement="sides"]');
+    const radiusBox = (await radiusField.boundingBox())!;
+    const selectBox = (await select.boundingBox())!;
+    expect(selectBox.x).toBeCloseTo(radiusBox.x, 0);
+    expect(selectBox.width).toBeCloseTo(radiusBox.width, 0);
+    await expect(select).toHaveCSS('border-top-width', '1px');
+    const initial = await select.textContent();
+    await select.press('Enter');
+    const menu = page.getByRole('listbox');
+    await expect(menu).toBeVisible();
+    await expect(select).toHaveAttribute('aria-expanded', 'true');
+    const scroller = page.locator('[data-ui="editor.floating.inspector-scroll"]');
+    const bounds = await scroller.evaluate((node) => {
+      const left = node.getBoundingClientRect().left + node.clientLeft;
+      return { left, right: left + node.clientWidth };
+    });
+    const menuBox = (await menu.boundingBox())!;
+    expect(menuBox.x).toBeGreaterThanOrEqual(bounds.left - 1);
+    expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(bounds.right + 1);
+    await page.screenshot({ path: info.outputPath('border-style-menu.png'), fullPage: false });
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+    await expect(select).toBeFocused();
+    expect(await select.textContent()).toBe(initial);
+    await select.press('Enter');
+    await expect(menu.getByRole('option', { selected: true })).toBeFocused();
+    await page.keyboard.press('End');
+    const lastOption = menu.getByRole('option').last();
+    await expect(lastOption).toBeFocused();
+    await expect(lastOption).toBeInViewport();
+    const selected = (await lastOption.textContent())!.trim();
+    await lastOption.press('Enter');
+    await expect(menu).toBeHidden();
+    await expect(select).toContainText(selected);
+  });
+
   test(`inspector aligned controls and window-header states ${name}`, async ({
     page,
     hostOrigin,
@@ -318,7 +389,10 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       .nth(1)
       .click();
     const groups = panel.locator('details[data-level="section"]');
-    await expect(groups).toHaveCount(3);
+    await expect(groups.locator(':scope > summary')).toHaveText([
+      translate('editor.scene.placementSection', 'en'),
+      translate('editor.compact.image', 'en'),
+    ]);
     expect(
       await groups.evaluateAll((nodes) => nodes.every((node) => node.hasAttribute('open')))
     ).toBe(true);
@@ -331,7 +405,23 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       await expect(
         panel.locator(`[data-ui="editor.frame.source-${kind}"] details`)
       ).not.toHaveAttribute('open');
+    if (size.height > 560) {
+      const floating = page.locator('[data-ui="editor.floating.layers-panel"]');
+      const handle = floating.locator('[data-ui="editor.floating.layers.resize-handle"]');
+      const handleBox = (await handle.boundingBox())!;
+      const height = (await floating.boundingBox())!.height;
+      const x = handleBox.x + handleBox.width / 2;
+      const y = handleBox.y + handleBox.height / 2;
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      await page.mouse.move(x, y + height - 360, { steps: 8 });
+      await page.mouse.up();
+      expect((await floating.boundingBox())!.height).toBeCloseTo(360, 0);
+    }
     const scroller = page.locator('[data-ui="editor.floating.inspector-scroll"]');
+    await scroller.evaluate((node) => {
+      node.scrollTop = 0;
+    });
     await scroller.hover();
     await page.mouse.wheel(0, 80);
     await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
@@ -620,6 +710,41 @@ for (const locale of ['en', 'ru'] as const) {
       await checkPicker(picker);
     });
   }
+}
+
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`metadata background palette stays within its value column ${viewport.name}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    await page.setViewportSize(viewport.size);
+    await openEditor(page, hostOrigin, 'ru');
+    await page.locator('[data-ui="editor.floating.layers.mode.meta"]').click();
+    const settings = translate('editor.compact.technicalDataTextSettings', 'ru');
+    await page.locator('summary').filter({ hasText: settings }).click();
+    const background = page.locator(
+      '[data-ui="content.toolbar.drawing-options.text.background-group"]'
+    );
+    await background
+      .locator('[data-ui="content.toolbar.drawing-options.text.background-none"]')
+      .click();
+    const swatches = background.locator(
+      '[data-ui="content.toolbar.drawing-options.quick-colors"] button'
+    );
+    await expect(swatches).toHaveCount(5);
+    expect(
+      await background.evaluate((group) => {
+        const value = group.closest('.sniptale-parameter-value')!;
+        const edge = value.getBoundingClientRect().right;
+        return [...group.querySelectorAll('button')].every(
+          (button) => button.getBoundingClientRect().right <= edge + 1
+        );
+      })
+    ).toBe(true);
+    await swatches.last().click();
+    await expect(swatches.last()).toHaveAttribute('aria-pressed', 'true');
+    await page.screenshot({ path: info.outputPath('metadata-background.png'), fullPage: false });
+  });
 }
 
 for (const locale of ['en', 'ru'] as const) {

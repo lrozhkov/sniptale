@@ -12,6 +12,7 @@ import {
 } from '../assets/operations';
 import { runStorageStartupPhase } from '../infrastructure/startup-diagnostics';
 import { sameMediaSource } from '../media-library/dependencies';
+import { readImageSourceClaims } from '../media-library/deletion-index';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import {
   cancelAssetPublication,
@@ -40,6 +41,7 @@ import type { MediaDependencyTarget } from '../media-library/dependencies';
 import {
   VIDEO_PROJECTS_STORE,
   SCENARIO_ASSETS_STORE,
+  IMAGE_WORKSPACES_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
 } from '../infrastructure/indexed-db/core';
@@ -76,6 +78,7 @@ import { scenarioAssetPublicationAdapter } from '../scenario/aggregate-mutations
 import { scenarioHtmlPublicationAdapter } from '../scenario/export-artifacts';
 import { editorVectorPublicationAdapter } from '../vector-elements';
 import { imageWorkspacePublicationAdapter } from '../image-aggregates/mutations';
+import { videoProjectWorkspacePublicationAdapter } from '../projects/workspace-commit';
 import { webSnapshotPublicationAdapter } from '../web-snapshots/publication';
 export { auditDurableAssets, collectOrphanAssetObjects } from './audit';
 import { collectOrphanAssetObjects } from './audit';
@@ -212,6 +215,8 @@ async function compensationIsStillExclusive(
     if (currentRef?.assetId !== item.assetId) return false;
     const target = await readCompensationMediaTarget(tx, item);
     if (!target) return false;
+    const images = await readImageSourceClaims(tx, target.id);
+    if (images.linked || images.unknown) return false;
     try {
       await assertMediaSourceReplaceable(target, {
         assets: tx.objectStore(PROJECT_ASSETS_STORE),
@@ -249,6 +254,7 @@ async function compensateRestoreOperation(
         WEB_SNAPSHOTS_STORE,
         VIDEO_PROJECTS_STORE,
         SCENARIO_ASSETS_STORE,
+        IMAGE_WORKSPACES_STORE,
         VIDEO_WORKSPACES_STORE,
         VIDEO_WORKSPACE_HISTORY_STORE,
       ],
@@ -584,6 +590,7 @@ async function recoverPublications(
             scenarioAssetPublicationAdapter,
             scenarioHtmlPublicationAdapter,
             imageWorkspacePublicationAdapter,
+            videoProjectWorkspacePublicationAdapter,
             editorVectorPublicationAdapter,
             webSnapshotPublicationAdapter,
             syncReplicaPublicationAdapter,

@@ -44,6 +44,7 @@ export type ExportProgressStepKey =
   | 'webSnapshotWarnings';
 
 export interface ExportProgress {
+  collectingPageTitle?: string;
   activeStepKey?: ExportProgressStepKey | null;
   completedStepKeys?: ExportProgressStepKey[];
   failedStepKeys?: ExportProgressStepKey[];

@@ -15,6 +15,8 @@ import {
 import { parseVideoDependencyEnvelope } from '../media-library/dependencies';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { parseVideoProjectEntry } from '../projects/read-guards';
+import { hasVideoProjectHistoryChanges } from '../projects/history-contracts';
+import { MediaAssetDeletionBlockedError } from '../media-library/deletion-errors';
 import { PROJECT_ASSET_OWNER_KIND, PROJECT_MEDIA_ASSET_ROLE } from '../projects/asset-publication';
 import { parseScenarioAssetEntry } from './read-guards';
 import { scenarioLibraryMediaId } from './library-publication';
@@ -71,6 +73,14 @@ export async function detachScenarioVideoAssets(
     const envelope = parseVideoDependencyEnvelope(raw);
     if (!envelope)
       throw new Error('Video project dependencies cannot be checked for scenario deletion.');
+    if (
+      envelope.historySources.some(
+        (source) =>
+          (source.kind === 'scenario-asset' && childIds.has(source.id)) ||
+          (removeProject && source.kind === 'scenario-project' && source.id === projectId)
+      )
+    )
+      throw new MediaAssetDeletionBlockedError('retained-history', 'video-project');
     const originated =
       removeProject &&
       envelope.source.kind === 'scenario' &&
@@ -81,6 +91,8 @@ export async function detachScenarioVideoAssets(
     if (!originated && !referenced) continue;
     const entry = parseVideoProjectEntry(raw);
     if (!entry) throw new Error('Related video project is invalid for scenario deletion.');
+    if (hasVideoProjectHistoryChanges(entry.history))
+      throw new MediaAssetDeletionBlockedError('retained-history', 'video-project');
     const assets = [];
     for (const asset of entry.project.assets) {
       if (asset.source.kind !== 'scenario-asset' || !childIds.has(asset.source.scenarioAssetId)) {
@@ -96,9 +108,10 @@ export async function detachScenarioVideoAssets(
       assets.push({ ...asset, source });
     }
     const now = Date.now();
+    const { historyPublicationId: _publicationId, ...independentEntry } = entry;
     await tx.objectStore(VIDEO_PROJECTS_STORE).put!(
       withVideoProjectUsage({
-        ...entry,
+        ...independentEntry,
         updatedAt: now,
         workspaceRevision: (entry.workspaceRevision ?? 0) + 1,
         project: {

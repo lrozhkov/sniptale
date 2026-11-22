@@ -1,7 +1,7 @@
-import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
-import { getColorAlpha } from '@sniptale/foundation/color';
+import { getColorAlpha, setColorAlpha } from '@sniptale/foundation/color';
 import { translate } from '../../platform/i18n';
 import {
   COMPACT_INLINE_VALUE_SURFACE_CLASS_NAME,
@@ -9,6 +9,9 @@ import {
   COMPACT_INLINE_VALUE_INPUT_CLASS_NAME,
 } from '../compact-inspector-controls/interactive-control-style';
 import { cx } from '../compact-inspector-controls/shared';
+import { useInspectorLayout } from '../compact-inspector-controls/layout';
+import { CopyColor, HexValue } from './inspector-color-value';
+import { ColorAlphaValue } from './inspector-alpha-value';
 import {
   COLOR_SELECTOR_TRANSPARENT,
   hexToHsl,
@@ -42,7 +45,7 @@ function buildTriggerDisplayValue(value: string, formatMode: ColorSelectorFormat
 }
 
 /** Inline structured-color editing shared by solid color and paint triggers. */
-export function ColorValue(props: {
+interface ColorValueProps {
   value: string;
   displayValue: string;
   label: string;
@@ -50,10 +53,90 @@ export function ColorValue(props: {
   allowAlpha: boolean;
   allowTransparent: boolean;
   onCommit: (value: string) => void;
-}) {
+}
+
+export function ColorValue(props: ColorValueProps) {
+  const framed = useInspectorLayout();
+  const hex = framed ? setColorAlpha(props.value, 1) : null;
+  if (!hex) return <ColorValueEdit {...props} />;
+  return <FramedColorValue {...props} hex={hex.toUpperCase()} />;
+}
+
+function FramedColorValue(props: ColorValueProps & { hex: string }) {
+  const errorTarget = useRef<HTMLDivElement>(null);
+  const isTransparent = props.value.trim().toLowerCase() === COLOR_SELECTOR_TRANSPARENT;
+  const transparentLabel = props.allowTransparent
+    ? translate('shared.ui.colorSelectorTransparent')
+    : undefined;
+  const alpha = getColorAlpha(props.value) ?? 1;
+  const fullHex = setColorAlpha(props.value, props.allowAlpha ? alpha : 1) ?? props.hex;
+  const copyValue = (
+    props.allowAlpha && fullHex.length === 7 ? `${fullHex}ff` : fullHex
+  ).toUpperCase();
+  const alphaLabel = `${props.label} · ${translate('shared.ui.colorSelectorAlpha')}`;
+
+  return (
+    <div className="sniptale-framed-color-value" data-alpha={props.allowAlpha || undefined}>
+      {!isTransparent ? (
+        <CopyColor
+          value={copyValue}
+          label={translate('shared.ui.colorSelectorCopy')}
+          copy={{
+            copiedHex: translate('shared.ui.colorSelectorCopied'),
+            copyHexFailed: translate('shared.ui.colorSelectorCopyFailed'),
+          }}
+          disabled={props.disabled}
+          className="color-copy sniptale-inline-color-copy"
+        />
+      ) : null}
+      <HexValue
+        key={props.disabled ? 'hex-locked' : 'hex-ready'}
+        value={isTransparent ? (transparentLabel ?? props.displayValue) : props.hex}
+        transparentLabel={transparentLabel}
+        disabled={props.disabled}
+        invalid={translate('shared.ui.colorSelectorInvalid')}
+        errorTarget={errorTarget}
+        label={props.label}
+        onCommit={({ color, hasAlpha }) => {
+          if (color === COLOR_SELECTOR_TRANSPARENT) {
+            if (!isTransparent) props.onCommit(color);
+            return;
+          }
+          if (!hasAlpha && !isTransparent && color.toUpperCase() === props.hex) return;
+          const next =
+            props.allowAlpha && hasAlpha
+              ? color
+              : setColorAlpha(color, props.allowAlpha && !isTransparent ? alpha : 1);
+          if (next && next !== props.value) props.onCommit(next);
+        }}
+      />
+      {props.allowAlpha ? (
+        <ColorAlphaValue
+          key={props.disabled ? 'alpha-locked' : 'alpha-ready'}
+          copy={{
+            alpha: alphaLabel,
+            editAlpha: alphaLabel,
+            invalid: (max) => `${alphaLabel} (0–${max})`,
+          }}
+          disabled={props.disabled}
+          errorTarget={errorTarget}
+          value={Math.round(alpha * 100)}
+          onChange={(value) => {
+            const next = setColorAlpha(props.value, value / 100);
+            if (next && next !== props.value) props.onCommit(next);
+          }}
+        />
+      ) : null}
+      <div className="sniptale-framed-color-errors" ref={errorTarget} />
+    </div>
+  );
+}
+
+function ColorValueEdit(props: ColorValueProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(props.value);
   const [invalid, setInvalid] = useState(false);
+  const errorId = useId();
   const completed = useRef(false);
   const scoped = useContext(CommandPressScope);
   const press = useCommandPress({
@@ -110,6 +193,7 @@ export function ColorValue(props: {
             ref={focusInput}
             aria-label={props.label}
             aria-invalid={invalid || undefined}
+            aria-describedby={invalid ? errorId : undefined}
             title={invalid ? translate('shared.ui.colorSelectorInvalid') : props.label}
             disabled={props.disabled}
             spellCheck={false}
@@ -121,6 +205,7 @@ export function ColorValue(props: {
             }}
             onBlur={() => finish(false, false)}
             onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing) return;
               event.stopPropagation();
               if (event.key === 'Enter' || event.key === 'Escape') {
                 event.preventDefault();
@@ -130,6 +215,7 @@ export function ColorValue(props: {
           />
           {invalid ? (
             <span
+              id={errorId}
               role="alert"
               className="block w-full shrink-0 truncate text-right text-[10px] leading-3"
             >
@@ -167,6 +253,7 @@ export function ColorSelectorTrigger(props: {
   disabled?: boolean;
   formatMode: ColorSelectorFormatMode;
   label: string;
+  pickerOnly?: boolean;
   value: string;
   allowAlpha?: boolean;
   allowTransparent?: boolean;
@@ -216,16 +303,18 @@ export function ColorSelectorTrigger(props: {
           }}
         />
       </button>
-      <ColorValue
-        key={String(props.active === true)}
-        value={props.value}
-        displayValue={displayValue}
-        label={props.label}
-        disabled={props.disabled === true || props.active === true}
-        allowAlpha={props.allowAlpha !== false}
-        allowTransparent={props.allowTransparent !== false}
-        onCommit={props.onCommit}
-      />
+      {props.pickerOnly ? null : (
+        <ColorValue
+          key={String(props.active === true)}
+          value={props.value}
+          displayValue={displayValue}
+          label={props.label}
+          disabled={props.disabled === true || props.active === true}
+          allowAlpha={props.allowAlpha !== false}
+          allowTransparent={props.allowTransparent !== false}
+          onCommit={props.onCommit}
+        />
+      )}
     </div>
   );
 }

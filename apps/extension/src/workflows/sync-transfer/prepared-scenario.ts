@@ -1,3 +1,4 @@
+import { detachScenarioHistory } from '../../composition/persistence/sync-capture/scenario-history';
 import type { ApplyPreparedVideoProjectRevisionInput } from '../../composition/persistence/sync-capture/apply-video-project';
 import type { VideoProjectEntry } from '../../composition/persistence/projects/contracts';
 import {
@@ -19,11 +20,13 @@ import {
 import { parseScenarioExportEntry } from '../../composition/persistence/scenario/read-guards';
 import { prepareScenarioProjectPublication } from '../media-hub-backup/v6/root-publication/scenario-project-publication';
 import type { PortableScenarioProjectMetadata } from '../media-hub-backup/v6/root-codecs/projects';
+import type { PortableVideoProjectHistory } from '../media-hub-backup/v6/root-codecs/video-project-history';
 
 type ScenarioDependencyRoot =
   | {
       kind: 'video-project';
       entry: { project: Pick<VideoProjectEntry['project'], 'assets' | 'source'> };
+      metadata?: { history?: PortableVideoProjectHistory };
     }
   | { kind: 'media' | 'image' | 'video-review' | 'scenario-project' };
 
@@ -94,8 +97,7 @@ export async function preparePortableScenarioRoot(args: {
     },
     staged: args.objectIds.map((objectId) => ({ objectId, ref: args.refFor(objectId) })),
   });
-  const { history, ...entry } = prepared.root.entry;
-  const historyText = history?.length ? JSON.stringify(history) : null;
+  const { current: entry, text: historyText } = detachScenarioHistory(prepared.root.entry);
   const historyRef =
     historyText === null
       ? undefined
@@ -167,7 +169,11 @@ export function portableSyncRootDependencyIds(
     )
   );
   const source = parsed.entry.project.source;
-  const provenance = source.kind === 'scenario' ? source.scenarioProjectId : undefined;
+  const provenance = new Set(source.kind === 'scenario' ? [source.scenarioProjectId] : []);
+  for (const locator of parsed.metadata?.history?.sources ?? []) {
+    if (locator.kind === 'scenario-asset') needed.add(locator.id);
+    if (locator.kind === 'scenario-project') provenance.add(locator.id);
+  }
   const children = declared.flatMap((item) => item.childIds);
   if (
     declared.length > MAX_CAPTURE_ROWS ||
@@ -178,9 +184,9 @@ export function portableSyncRootDependencyIds(
     declared.some(
       (item) =>
         item.rootKind !== 'scenario-project' ||
-        (!item.childIds.length && item.rootId !== provenance)
+        (!item.childIds.length && !provenance.has(item.rootId))
     ) ||
-    (provenance && !declared.some((item) => item.rootId === provenance))
+    [...provenance].some((id) => !declared.some((item) => item.rootId === id))
   )
     throw new Error('Portable Scenario dependency inventory differs from its authored sources.');
   return declared.map((item) => item.rootId).sort();

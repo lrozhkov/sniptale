@@ -228,7 +228,10 @@ function createTransaction(
                   : undefined
           ),
         getAll: vi.fn(async (): Promise<unknown[]> => []),
-        index: vi.fn(() => ({ count: vi.fn().mockResolvedValue(0) })),
+        index: vi.fn(() => ({
+          count: vi.fn().mockResolvedValue(0),
+          getAll: vi.fn(async (): Promise<unknown[]> => []),
+        })),
         put: vi.fn(async (value: unknown) => writes.push([name, 'put', value])),
       };
     },

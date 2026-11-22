@@ -55,6 +55,7 @@ export function useSelectionSettingsHistoryPreview(args: {
       captureSelectionBaseline();
       applyPreviewPatch?.();
       args.controller.previewActiveSettingsOnSelection();
+      if (readSelectionSnapshotKey() === baselineRef.current) baselineRef.current = null;
     },
   };
 }

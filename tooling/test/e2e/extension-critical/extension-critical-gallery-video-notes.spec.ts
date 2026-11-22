@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { startHostServer } from '../support/host-server';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
@@ -37,21 +37,17 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS)
           await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
           await page.locator('[data-ui="gallery.videoReview.enter"]').click();
           const source = dialog.locator('[data-ui="gallery.videoReview.sourceLane"]');
-          const sourceBox = (await source.boundingBox())!;
-          await page.mouse.move(
-            sourceBox.x + sourceBox.width / 6,
-            sourceBox.y + sourceBox.height / 2
-          );
+          const ruler = dialog.locator('[data-ui="gallery.videoReview.ruler"]');
+          await ruler.scrollIntoViewIfNeeded();
+          const rulerBox = (await ruler.boundingBox())!;
+          await page.mouse.move(rulerBox.x + rulerBox.width / 6, rulerBox.y + rulerBox.height / 2);
           await page.mouse.down();
-          await page.mouse.move(
-            sourceBox.x + sourceBox.width / 3,
-            sourceBox.y + sourceBox.height / 2,
-            {
-              steps: 5,
-            }
-          );
+          await page.mouse.move(rulerBox.x + rulerBox.width / 3, rulerBox.y + rulerBox.height / 2, {
+            steps: 5,
+          });
           await page.mouse.up();
-          await button('gallery.videoReview.addComment').first().click();
+          await button('gallery.videoReview.comments').click();
+          await button('gallery.videoReview.commentRange').click();
           const form = dialog.locator('[data-ui="gallery.videoReview.commentComposer"]');
           const field = form.getByRole('textbox', {
             name: label('gallery.videoReview.commentText'),
@@ -74,7 +70,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS)
           );
           await page.screenshot({ path: testInfo.outputPath('new-note.png'), fullPage: false });
           await button('gallery.videoReview.save').click();
-          const marker = source.getByRole('button').first();
+          const marker = source.locator('button[title="A saved note"]');
           await expect(marker).toBeVisible();
           const markerBox = (await marker.boundingBox())!;
           const noteSourceBox = (await source.boundingBox())!;
@@ -153,6 +149,11 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS)
           await expect(row).toContainText('An edited note');
           await button('common.actions.close').click();
           await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+          await page
+            .getByRole('dialog', { name: 'beta-v1.webm', exact: true })
+            .getByRole('button', { name: /^beta-v1\.webm / })
+            .click();
+          await button('gallery.videoReview.comments').click();
           await expect(row).toContainText('An edited note');
           await row.getByRole('button').first().click();
           await expect(remove).toBeVisible();
@@ -190,15 +191,16 @@ async function noteFormStyle(form: Locator) {
 }
 
 async function checkNoteComposition(form: Locator, field: Locator, cancel: Locator, save: Locator) {
+  await cancel.focus();
   await cancel.hover();
   const fieldBox = (await field.boundingBox())!;
   const cancelBox = (await cancel.boundingBox())!;
   const saveBox = (await save.boundingBox())!;
-  const voiceBox = (await form.locator('[data-ui="gallery.videoReview.voice"]').boundingBox())!;
-  // One-pixel tolerance allows subpixel layout rounding; painted controls need 4px clearance.
+  const voice = form.locator('.sniptale-textarea-accessory');
+  await expect(voice).toHaveCSS('opacity', '0');
   expect(cancelBox.y - (fieldBox.y + fieldBox.height)).toBeGreaterThanOrEqual(4);
-  expect(voiceBox.y - (fieldBox.y + fieldBox.height)).toBeGreaterThanOrEqual(4);
-  expect(Math.abs(voiceBox.x - fieldBox.x)).toBeLessThanOrEqual(1);
+  expect(cancelBox.x).toBeGreaterThanOrEqual(fieldBox.x);
+  expect(Math.abs(cancelBox.y - saveBox.y)).toBeLessThanOrEqual(1);
   expect(Math.abs(saveBox.x + saveBox.width - (fieldBox.x + fieldBox.width))).toBeLessThanOrEqual(
     1
   );
@@ -208,4 +210,9 @@ async function checkNoteComposition(form: Locator, field: Locator, cancel: Locat
   await expect(save).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(save).toHaveCSS('border-top-width', '0px');
   await field.hover();
+  await expect(voice).toHaveCSS('opacity', '1');
+  const voiceBox = (await voice.boundingBox())!;
+  expect(voiceBox.y - fieldBox.y).toBeGreaterThanOrEqual(4);
+  expect(fieldBox.x + fieldBox.width - voiceBox.x - voiceBox.width).toBeGreaterThanOrEqual(4);
+  await field.focus();
 }

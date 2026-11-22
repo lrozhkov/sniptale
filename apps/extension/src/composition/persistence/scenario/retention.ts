@@ -1,8 +1,7 @@
 import { captureScenarioProjectInTransaction } from '../sync-capture/capture';
 import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
 import { createScenarioProjectStore } from './storage';
-import { getScenarioResourceReferences } from '../../../features/scenario/project/public';
-import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
+import { collectScenarioResourceReferences } from './resource-references';
 import {
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
@@ -29,18 +28,6 @@ import { createScenarioProjectEntry } from './projects/entry';
 import { tryScenarioResourceCleanup } from './resource-sessions';
 import type { ScenarioProjectEntry } from './contracts';
 import { publishMediaHubLibraryChanged } from '../../../features/media-hub/events';
-
-/** Current and retained snapshots are the durable authority for logical child reachability. */
-function references(projects: GuideProject[]) {
-  const assets = new Set<string>();
-  const documents = new Set<string>();
-  for (const project of projects) {
-    const refs = getScenarioResourceReferences(project);
-    for (const id of refs.assets) assets.add(id);
-    for (const id of refs.documents) documents.add(id);
-  }
-  return { assets, documents };
-}
 
 /** Explicit CAS metadata mutation; open undo sessions continue protecting their physical children. */
 export async function clearScenarioSavedHistory(projectId: string, baseUpdatedAt: number) {
@@ -158,7 +145,7 @@ async function collectUnreachableChildren(
   existing: ScenarioProjectEntry
 ) {
   const projectId = existing.id;
-  const live = references([existing.project, ...(existing.history ?? []).map((v) => v.project)]);
+  const live = collectScenarioResourceReferences(existing);
   const assets = (
     await tx.objectStore(SCENARIO_ASSETS_STORE).index('projectId').getAll(projectId)
   ).map(parseScenarioAssetEntry);

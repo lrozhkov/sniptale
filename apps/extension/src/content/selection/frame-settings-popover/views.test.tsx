@@ -186,6 +186,7 @@ describe('FrameSettingsPopoverContent', () => {
   it('renders blur and focus controls inside the shared section contract', () => {
     const blurMarkup = renderContent('blur');
     const focusMarkup = renderContent('focus');
+    const parser = new DOMParser();
 
     expect(blurMarkup).toContain('shared.ui.content-popover-section');
     expect(blurMarkup).toContain('shared.ui.compact-inspector.numeric-row');
@@ -194,7 +195,6 @@ describe('FrameSettingsPopoverContent', () => {
     expect(blurMarkup).toContain(translate('content.overlayControls.showBorderTitle'));
     expect(blurMarkup).toContain('sniptale-glass-switch--on');
     expect(blurMarkup).toContain('select');
-    expect(blurMarkup).toContain('--sniptale-range-fill-ratio:45.83333333333333%');
     expect(focusMarkup).toContain('shared.ui.content-popover-section');
     expect(focusMarkup).toContain('shared.ui.compact-inspector.numeric-row');
     expect(focusMarkup).toContain('type="range"');
@@ -202,7 +202,17 @@ describe('FrameSettingsPopoverContent', () => {
     expect(focusMarkup).toContain(translate('content.overlayControls.showBorderTitle'));
     expect(focusMarkup).toContain(translate('content.overlayControls.focusBlurLabel'));
     expect(focusMarkup).toContain('sniptale-glass-switch--on');
-    expect(focusMarkup).toContain('--sniptale-range-fill-ratio:65%');
+    for (const [markup, label, value, progress] of [
+      [blurMarkup, translate('content.overlayControls.blurStrengthLabelPrefix'), '12', 11 / 24],
+      [focusMarkup, translate('content.overlayControls.focusDimmingLabelPrefix'), '65', 0.65],
+    ] as const) {
+      const document = parser.parseFromString(markup, 'text/html');
+      const field = document.querySelector('.opacity-field');
+      const track = field?.querySelector<HTMLElement>('.opacity-track');
+      expect(Number(track?.style.getPropertyValue('--progress'))).toBeCloseTo(progress);
+      expect(field?.querySelector<HTMLInputElement>('input[type="range"]')?.value).toBe(value);
+      expect(field?.querySelector('button.field-action')?.getAttribute('aria-label')).toBe(label);
+    }
     expect(blurMarkup.match(/sniptale-toolbar-menu-title/g)).toHaveLength(1);
     expect(focusMarkup.match(/sniptale-toolbar-menu-title/g)).toHaveLength(1);
     expect(blurMarkup).not.toContain('sniptale-glass-range-meta');

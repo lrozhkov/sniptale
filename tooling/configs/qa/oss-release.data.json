@@ -293,19 +293,19 @@
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.6-modified/patch-manifest.json",
-      "sha256": "b5201f8d0985605d3769439cc67a2cac1bbbc942de0e882087062e17af1a44cd",
+      "sha256": "ac5a954e5ea148e5a9efd33914e55e3c4cbd7a22f6177aeaac241e46f9733a02",
       "source": "LICENSES/dependencies/mediabunny-1.61.6-modified/patch-manifest.json",
       "distribution": "source"
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.6-modified/patch-payload.json.gz",
-      "sha256": "f9be915f3a4bfb3c6e7648e9c6b32b0da8e551f9f639ad22552d3c0db9111fd8",
+      "sha256": "48b03a105e7e78cc1554f77e13edcdd53af7fbf558c014982c59a4442146aed4",
       "source": "LICENSES/dependencies/mediabunny-1.61.6-modified/patch-payload.json.gz",
       "distribution": "source"
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.6-modified/source.patch",
-      "sha256": "67e9895b496ac9cb46acad2a2174c2893fe9bbef02f69c63f191e677b2a20cae",
+      "sha256": "e58d26e5b06cb842932a7fe64b2d74fb79d1eaa7b0f2c609539a4694c3201dbd",
       "source": "LICENSES/dependencies/mediabunny-1.61.6-modified/source.patch",
       "distribution": "source"
     },
@@ -445,18 +445,33 @@
       "source": "LICENSES/fonts/golos-ui.txt"
     },
     {
+      "archivePath": "LICENSES/fonts/jetbrains-mono.txt",
+      "sha256": "403581b69dac5cff4079205e01c6b467e56af449ecbd7247693ddb1baafa005b",
+      "source": "LICENSES/fonts/jetbrains-mono.txt"
+    },
+    {
+      "archivePath": "LICENSES/fonts/literata.txt",
+      "sha256": "9895ebc015226accf416b758ac1ca02a2fb4f83a89d316791ef697c3dc0852aa",
+      "source": "LICENSES/fonts/literata.txt"
+    },
+    {
+      "archivePath": "LICENSES/fonts/oswald.txt",
+      "sha256": "23916cdee678823c3c517c699cb2e043088de0d46c959eeaa168b54bb84534df",
+      "source": "LICENSES/fonts/oswald.txt"
+    },
+    {
       "archivePath": "NOTICE",
       "sha256": "ca04f3ab3cfdb979c94ad3adb04bc07d2a3b8db1cca680ebf3663422102a5d9a",
       "source": "NOTICE"
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "d99b2f37d79e23855a193d583fe394b650b101ef2a934472b6ebc36308e2d1bf",
+      "sha256": "3e1a958702c8851745b3b07e7f056ddbc1ac01fad58dad5bd395547afcb3a0f0",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "f4f2a35e6f5786cc9e5dedb9279da493f4c24e48fcc9cae5af533dfdc49bcd52",
+      "sha256": "2b92e734c317a6cfe17f737bca6a9021c93897bcf9862f2a93c940deda7bfbb9",
       "source": "THIRD_PARTY_NOTICES.md"
     },
     {
@@ -642,6 +657,75 @@
           "path": "packages/ui/src/styles/golos-text/golos-text-vf.woff2",
           "sha256": "ee021f497d8f5b323b9dc5653b88380be86a176de08cbe74d6fe721cafe9c843",
           "sourcePath": "packages/ui/src/styles/golos-text/golos-text-vf.woff2"
+        }
+      ]
+    },
+    {
+      "id": "jetbrains-mono",
+      "family": "JetBrains Mono",
+      "sourcePackage": "@fontsource-variable/jetbrains-mono",
+      "version": "5.3.0",
+      "sourceArchive": "https://registry.npmjs.org/@fontsource-variable/jetbrains-mono/-/jetbrains-mono-5.3.0.tgz",
+      "sourceArchiveSha256": "996fe6368a480c9ce15d4de22a2682b7c40b403718fee2b15e7272f244fd993f",
+      "license": "OFL-1.1",
+      "licensePath": "LICENSES/fonts/jetbrains-mono.txt",
+      "copyright": "Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono) JetBrainsMono-Italic[wght].ttf: Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)",
+      "artifacts": [
+        {
+          "path": "apps/extension/public/gallery-fonts/jetbrains-mono-cyrillic-wght-normal.woff2",
+          "sha256": "d274604c40757f98f07df623a8b8fb5194508a6fa4f5413a7a107f09e3b7452a",
+          "sourcePath": "package/files/jetbrains-mono-cyrillic-wght-normal.woff2"
+        },
+        {
+          "path": "apps/extension/public/gallery-fonts/jetbrains-mono-latin-wght-normal.woff2",
+          "sha256": "18be452724bfdc236c074ca94a249a7f41a86752c7d04ab258ce9ed5651f6a7e",
+          "sourcePath": "package/files/jetbrains-mono-latin-wght-normal.woff2"
+        }
+      ]
+    },
+    {
+      "id": "literata",
+      "family": "Literata",
+      "sourcePackage": "@fontsource-variable/literata",
+      "version": "5.3.0",
+      "sourceArchive": "https://registry.npmjs.org/@fontsource-variable/literata/-/literata-5.3.0.tgz",
+      "sourceArchiveSha256": "6511fb89c1b68ad10a422204580984dd3e27a129edc4cd015ee342f06a8fe4ac",
+      "license": "OFL-1.1",
+      "licensePath": "LICENSES/fonts/literata.txt",
+      "copyright": "Copyright 2017 The Literata Project Authors (https://github.com/googlefonts/literata) Literata-Italic[opsz,wght].ttf: Copyright 2017 The Literata Project Authors (https://github.com/googlefonts/literata)",
+      "artifacts": [
+        {
+          "path": "apps/extension/public/gallery-fonts/literata-cyrillic-wght-normal.woff2",
+          "sha256": "df20f1a8ca3c15497861c6dbf36c0c59507ee351301527ec89543747067ad4d7",
+          "sourcePath": "package/files/literata-cyrillic-wght-normal.woff2"
+        },
+        {
+          "path": "apps/extension/public/gallery-fonts/literata-latin-wght-normal.woff2",
+          "sha256": "9adbeac5b167fe5ad6c49d9e29aa0c76e2f1bb3b46bf4ebf12a9eca7d3525384",
+          "sourcePath": "package/files/literata-latin-wght-normal.woff2"
+        }
+      ]
+    },
+    {
+      "id": "oswald",
+      "family": "Oswald",
+      "sourcePackage": "@fontsource-variable/oswald",
+      "version": "5.3.0",
+      "sourceArchive": "https://registry.npmjs.org/@fontsource-variable/oswald/-/oswald-5.3.0.tgz",
+      "sourceArchiveSha256": "962bdb468592daece384e9e32d90eb84344301135488ff7adabff88443da6700",
+      "license": "OFL-1.1",
+      "licensePath": "LICENSES/fonts/oswald.txt",
+      "copyright": "Copyright 2016 The Oswald Project Authors (https://github.com/googlefonts/OswaldFont)",
+      "artifacts": [
+        {
+          "path": "apps/extension/public/gallery-fonts/oswald-cyrillic-wght-normal.woff2",
+          "sha256": "9307b75d3508236a0bae4f29ee3d2ce9aee545120ec9ef29e2cd1187bf6b0e5b",
+          "sourcePath": "package/files/oswald-cyrillic-wght-normal.woff2"
+        },
+        {
+          "path": "apps/extension/public/gallery-fonts/oswald-latin-wght-normal.woff2",
+          "sha256": "bd73278ee0c50041b91b4c03d1229e35b501637f46b6409e7da2d3a758446ea5",
+          "sourcePath": "package/files/oswald-latin-wght-normal.woff2"
         }
       ]
     }

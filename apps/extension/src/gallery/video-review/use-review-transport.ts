@@ -1,5 +1,6 @@
+import type { ReviewTransportFailure } from './transport';
 import type { ReviewEdit } from '../../features/video/review/types';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   createReviewRecordingActionAudioSource,
   type RecordingProjectActionAudioSource,
@@ -34,56 +35,68 @@ export function useReviewTransport(args: {
   actionsApplied?: boolean;
   onSeek(value: number): void;
   boundaries(): readonly number[] | undefined;
-  onTransportFailure(reason?: ReviewActionAudioUnavailable['reason']): void;
+  onTransportFailure(failure: ReviewTransportFailure): void;
   onTransportRecovered?(): void;
   onActionAudioRecovered?(): void;
   onInvalidRange?(): void;
   silent?: boolean;
+  mappedOriginal?: boolean;
 }) {
   const { session, source } = args.resource;
   const playbackAudio = useRef<ReturnType<typeof useReviewEditorAudioRuntime> | null>(null);
-  function failTransport(reason?: ReviewActionAudioUnavailable['reason']) {
-    playbackAudio.current?.stopPlayback();
-    pause();
-    args.onTransportFailure(reason);
-  }
-  const {
-    video,
-    pause,
-    seekResult,
-    readResultTime,
-    heldResultTime,
-    time,
-    onTime,
-    playing,
-    setPlaying,
-    playheadClock,
-    setPresentationActive,
-    onPresentedTime,
-    seek,
-    play,
-    playbackRange,
-    setPlaybackRange,
-    onEnded,
-    onMediaError,
-    recovering,
-    seekRevision,
-    navigationRevision,
-  } = useReviewPlayback({
+  const readEdits = useCallback(() => session.getSnapshot().document.edits, [session]);
+  const acceptedEdits = readEdits();
+  const playback = useReviewPlayback({
+    sourceId: args.resource.url,
     duration: source.duration,
     edits: args.edits,
+    readEdits,
     original: args.originalAudio,
     silent: args.silent ?? false,
     retainCutTime: args.silent ?? false,
     boundaries: args.boundaries,
     onSeek: args.onSeek,
-    onFailure: failTransport,
-    prepareAfterSeek: () => playbackAudio.current?.preparePlayback() ?? Promise.resolve(true),
-    onPreparedPlay: () => playbackAudio.current?.startPlayback(),
+    onFailure: args.onTransportFailure,
+    prepareAfterSeek: (signal, request) =>
+      playbackAudio.current?.preparePlayback(request, signal) ?? Promise.resolve(true),
+    onPreparedPlay: (request) => playbackAudio.current?.startPlayback(request),
+    onStopPlayback: () => playbackAudio.current?.stopPlayback(),
+    readAudioClock: () => playbackAudio.current?.readAudioClock() ?? null,
     onRecovered: args.onTransportRecovered,
     onInvalidRange: args.onInvalidRange,
   });
-  const timeline = useReviewTimeMap(source, args.edits, time, heldResultTime, readResultTime);
+  const {
+    video,
+    time,
+    playing,
+    playheadClock,
+    readPosition,
+    seekRevision,
+    syncConfiguration,
+    pause,
+  } = playback;
+  useLayoutEffect(() => {
+    let current = acceptedEdits;
+    const synchronize = () => {
+      const next = readEdits();
+      if (next === current) return;
+      current = next;
+      syncConfiguration();
+    };
+    const unsubscribe = session.subscribe(synchronize);
+    synchronize();
+    return unsubscribe;
+  }, [session, syncConfiguration, readEdits, acceptedEdits]);
+  function failTransport(reason?: ReviewActionAudioUnavailable['reason']) {
+    playback.transport.fail({ kind: 'audio', ...(reason ? { reason } : {}) });
+  }
+  const readHeldTime = useCallback(() => {
+    const position = readPosition();
+    return position.source?.kind === 'freeze' ? position.resultTime : null;
+  }, [readPosition]);
+  const discrete = playback.transport.getStatusSnapshot().position;
+  const heldTime = discrete.source?.kind === 'freeze' ? discrete.resultTime : null;
+  const timeline = useReviewTimeMap(source, acceptedEdits, time, heldTime, readHeldTime);
   const actionPlan = useMemo(
     () =>
       buildReviewActionAudioPlan({
@@ -114,7 +127,7 @@ export function useReviewTransport(args: {
         ? {
             project: args.resource.historyProject,
             source,
-            edits: args.edits,
+            edits: acceptedEdits,
             settings: args.actionAudio ?? [],
             applied: args.actionsApplied === true,
             interactionTimeline: args.interactionTimeline,
@@ -124,7 +137,7 @@ export function useReviewTransport(args: {
     [
       args.resource.historyProject,
       source,
-      args.edits,
+      acceptedEdits,
       args.actionAudio,
       args.actionsApplied,
       args.interactionTimeline,
@@ -154,7 +167,15 @@ export function useReviewTransport(args: {
   const recordingActionSource =
     recordingAudio?.request === recordingAudioRequest ? recordingAudio?.source : null;
   const actionSoundPreview = useReviewEditorAudioRuntime({
+    mappedOriginal: args.mappedOriginal === true,
+    transportControl: {
+      readPosition,
+      readSchedulingPosition: playback.transport.readSchedulingPosition,
+      readTimeMap: playback.transport.getTimeMapSnapshot,
+      alignNativeOriginal: playback.transport.alignNativeOriginal,
+    },
     video,
+    playbackClock: playheadClock,
     playing: playing && !args.silent,
     silent: args.silent ?? false,
     outputTime: timeline.sceneOutputTime,
@@ -164,7 +185,7 @@ export function useReviewTransport(args: {
     originalSource: {
       file: args.resource.file,
       segments: timeline.timeMap.getSegments(),
-      edits: args.edits,
+      edits: acceptedEdits,
     },
     voiceover: args.voiceover,
     music: args.music,
@@ -175,33 +196,13 @@ export function useReviewTransport(args: {
     onActionAudioRecovered: args.onActionAudioRecovered,
   });
   playbackAudio.current = actionSoundPreview;
-  return {
-    actionSoundPreview,
-    pause,
-    seekResult,
-    video,
-    time,
-    onTime,
-    playing,
-    setPlaying,
-    playheadClock,
-    setPresentationActive,
-    onPresentedTime,
-    seek,
-    play: async () => {
-      const active = playing || video.current?.paused === false;
-      if (!active && !args.silent) {
-        if (!(await actionSoundPreview.preparePlayback())) return;
-      } else if (active) actionSoundPreview.stopPlayback();
-      play();
+  const auditionAction = actionSoundPreview.audition;
+  const audition = useCallback(
+    (...parameters: Parameters<typeof auditionAction>) => {
+      pause();
+      auditionAction(...parameters);
     },
-    timeline,
-    playbackRange,
-    setPlaybackRange,
-    onEnded,
-    onMediaError,
-    recovering,
-    seekRevision,
-    navigationRevision,
-  };
+    [pause, auditionAction]
+  );
+  return { ...playback, actionSoundPreview: { ...actionSoundPreview, audition }, timeline };
 }

@@ -1,3 +1,5 @@
+import { parseReviewVisualAnchor } from '../visual-anchor';
+import type { QuickEditCursorMotion } from './types';
 import { parseCameraSpatialMotion } from '../../project/motion/spatial';
 import { parseReviewInteractionTimeline } from '../interaction-timeline';
 
@@ -86,6 +88,25 @@ const MIN_QUICK_EDIT_CAMERA_SCALE = 1;
 const MAX_QUICK_EDIT_ZOOM_REGIONS = 512;
 const MAX_QUICK_EDIT_AUDIO_CLIPS = 512;
 /** Quick-editor timeline coordinates are seconds, bounded like video project durations. */
+function parseReviewCursorMotions(raw: unknown): QuickEditCursorMotion[] | null {
+  if (!Array.isArray(raw) || raw.length > 512) return null;
+  if (!raw.some((entry) => isRecord(entry) && entry['visualAnchor'] !== undefined))
+    return parseCursorMotions(raw);
+  const motions: QuickEditCursorMotion[] = [];
+  const ids = new Set<string>();
+  for (const entry of raw) {
+    if (!isRecord(entry)) return null;
+    const { visualAnchor: value, ...fields } = entry;
+    const motion = parseCursorMotions([fields])?.[0];
+    if (!motion || ids.has(motion.id)) return null;
+    const visualAnchor = parseReviewVisualAnchor(value, motion.end - motion.start);
+    if (visualAnchor === null || (visualAnchor && motion.phaseClock)) return null;
+    ids.add(motion.id);
+    motions.push(visualAnchor ? { ...motion, visualAnchor } : motion);
+  }
+  return motions;
+}
+
 const MAX_QUICK_EDIT_TIME = 86_400;
 const MAX_QUICK_EDIT_TRANSITION = 60;
 const MAX_QUICK_EDIT_BACKGROUND_SIZE = 4_096;
@@ -189,6 +210,8 @@ function parseUiState(value: unknown): QuickEditUiState | null {
   if (initialized !== undefined && typeof initialized !== 'boolean') return null;
   const modeSelectionPending = value['modeSelectionPending'];
   if (modeSelectionPending !== undefined && typeof modeSelectionPending !== 'boolean') return null;
+  for (const key of ['liveSeekEnabled', 'annotationMagnetEnabled'])
+    if (value[key] !== undefined && typeof value[key] !== 'boolean') return null;
   const workspaceColors = parseWorkspaceColors(value['workspaceColors']);
   if (!workspaceColors) return null;
   const tracks = parseTrackVisibility(value['tracks']);
@@ -198,6 +221,12 @@ function parseUiState(value: unknown): QuickEditUiState | null {
     ...(value['workspaceColors'] === undefined ? {} : { workspaceColors }),
     ...(value['lockedTracks'] === undefined ? {} : { lockedTracks }),
     mode: value['mode'],
+    ...(typeof value['liveSeekEnabled'] === 'boolean'
+      ? { liveSeekEnabled: value['liveSeekEnabled'] }
+      : {}),
+    ...(typeof value['annotationMagnetEnabled'] === 'boolean'
+      ? { annotationMagnetEnabled: value['annotationMagnetEnabled'] }
+      : {}),
     ...(modeSelectionPending === undefined ? {} : { modeSelectionPending }),
     ...(initialized === undefined ? {} : { advancedTracksInitialized: initialized }),
     tracks,
@@ -272,6 +301,7 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
   const exit = parseZoomTransition(value['exit']);
   if (!transform || !enter || !exit) return null;
   if (value['linkTo'] !== undefined && !identity(value['linkTo'])) return null;
+  if (value['timeDomain'] !== undefined && value['timeDomain'] !== 'result') return null;
   const sourceAnchor = value['sourceAnchor'];
   if (
     sourceAnchor !== undefined &&
@@ -281,6 +311,17 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
       sourceAnchor['start'] >= sourceAnchor['end'])
   )
     return null;
+  const sourceDuration =
+    isRecord(sourceAnchor) &&
+    typeof sourceAnchor['start'] === 'number' &&
+    typeof sourceAnchor['end'] === 'number'
+      ? sourceAnchor['end'] - sourceAnchor['start']
+      : 0;
+  const visualAnchor = parseReviewVisualAnchor(
+    value['visualAnchor'],
+    Math.max(value['end'] - value['start'], sourceDuration)
+  );
+  if (visualAnchor === null) return null;
   if (
     value['linkEasing'] !== undefined &&
     value['linkEasing'] !== 'linear' &&
@@ -289,6 +330,8 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
     return null;
   if (value['overlapPolicy'] !== undefined && value['overlapPolicy'] !== 'suppress') return null;
   return {
+    ...(value['timeDomain'] === 'result' ? { timeDomain: 'result' as const } : {}),
+    ...(visualAnchor ? { visualAnchor } : {}),
     ...(cameraFollow ? { cameraFollow } : {}),
     ...(typeof value['followCursor'] === 'boolean' ? { followCursor: value['followCursor'] } : {}),
     ...(cursorComposition ? { cursorComposition } : {}),
@@ -565,7 +608,7 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
   )
     return null;
   const cursorMotions =
-    raw['cursorMotions'] === undefined ? undefined : parseCursorMotions(raw['cursorMotions']);
+    raw['cursorMotions'] === undefined ? undefined : parseReviewCursorMotions(raw['cursorMotions']);
   if (
     cursorMotions === null ||
     (cursorMotions && !supportsAdvancedSchema(raw['schemaVersion'], 29))
@@ -597,7 +640,8 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
     text === null ||
     captions === null ||
     annotationEffects === null ||
-    (annotationEffects && !supportsAdvancedSchema(raw['schemaVersion'], 15))
+    (annotationEffects && !supportsAdvancedSchema(raw['schemaVersion'], 15)) ||
+    (annotationEffects?.textClips?.length && !supportsAdvancedSchema(raw['schemaVersion'], 35))
   )
     return null;
   if (raw['webcam'] !== undefined && !supportsAdvancedSchema(raw['schemaVersion'], 3)) return null;
@@ -775,7 +819,7 @@ function supportsAdvancedSchema(version: unknown, firstHistorical: number): bool
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
     [
       2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
-      27, 28, 29, 30, 31, 32, 33,
+      27, 28, 29, 30, 31, 32, 33, 34,
     ].some((known) => known >= firstHistorical && version === known)
   );
 }

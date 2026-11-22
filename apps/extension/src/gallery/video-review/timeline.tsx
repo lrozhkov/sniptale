@@ -1,3 +1,4 @@
+import { ReviewTimelineHints } from './timeline-hints';
 import { ReviewPlaybackPresentationClockContext } from './playback-presentation-clock';
 import { createReviewDisplayMap } from '../../features/video/review/timeline';
 import { Keyboard, Mouse } from 'lucide-react';
@@ -7,7 +8,16 @@ import { ReviewTrackVisibilityButton } from './track-row';
 import { ReviewTimelinePanes } from './timeline-panes';
 import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import type { RecordingTelemetryCapabilities } from '../../features/video/project/types';
-import { useContext, Fragment, useCallback, useEffect, useMemo } from 'react';
+import {
+  memo,
+  useContext,
+  Fragment,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from 'react';
 import { REVIEW_TRACK_ORDER } from './track-order';
 import type { QuickEditTrack } from '../../features/video/review/advanced/types';
 import { reviewTrackStatusButtonClassName } from './controls';
@@ -21,7 +31,7 @@ import { createTrackProjection } from './track-projection';
 import { ReviewPlayhead, ReviewRulerRow, ReviewToolbar } from './timeline-chrome';
 import { ReviewSourceLane, ReviewEditBlock } from './timeline-selection';
 import type { ReactNode, CSSProperties } from 'react';
-import { translate } from '../../platform/i18n';
+import { translate, useAppLocale } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 import { ReviewTelemetryStrip, type ReviewCursorTimelineInteractions } from './timeline-telemetry';
@@ -37,7 +47,7 @@ import { createReviewTimeMap } from '../../features/video/review/timeline';
 
 type TimelineProps = ReviewCursorTimelineInteractions & {
   onHoverIntent?: ((starting: boolean) => void) | undefined;
-  onHoverTime?: ((time: number | null) => void) | undefined;
+  onHoverTime?: ((time: number | null, resultTime?: number) => void) | undefined;
   onHistoryRange?: ((range: { start: number; end: number }) => void) | undefined;
   cursorArchiveAvailable?: boolean | undefined;
   sourceId?: string | undefined;
@@ -58,6 +68,7 @@ type TimelineProps = ReviewCursorTimelineInteractions & {
   busy?: boolean;
   playbackRange?: ReviewPlaybackRange | null | undefined;
   onPlaybackRange?: ((range: ReviewPlaybackRange | null) => void) | undefined;
+  onPause?: (() => void) | undefined;
   annotationTool?: boolean;
   annotationDrawing?: boolean;
   sourceRangeTool?: boolean;
@@ -67,6 +78,7 @@ type TimelineProps = ReviewCursorTimelineInteractions & {
   resultDuration?: number;
   onSeekResult?: ((time: number) => void) | undefined;
   onFreezeDurationChange?: ((edit: ReviewEdit, duration: number) => unknown) | undefined;
+  onFreezeMove?: ((edit: ReviewEdit, time: number) => unknown) | undefined;
   sourceInsertions?: ReactNode;
   snapClock?: { output(time: number): number; fromDisplay?(time: number): number } | undefined;
   time: number;
@@ -79,6 +91,7 @@ type TimelineProps = ReviewCursorTimelineInteractions & {
   zoomAnchor?: number | null | undefined;
   historyControls?: ReactNode;
   utilityControls?: ReactNode;
+  navigationControls?: ReactNode;
   modeControl?: ReactNode;
   inspectorControls?: ReactNode;
   tools?: ReactNode;
@@ -129,6 +142,11 @@ function ReviewTimelineSurface(props: TimelineProps) {
     }
   );
   const { onHistoryRange, duration } = props;
+  const reportedHistory = useRef<{
+    report: NonNullable<TimelineProps['onHistoryRange']>;
+    start: number;
+    end: number;
+  } | null>(null);
   const reportHistoryRange = useCallback(() => {
     if (!onHistoryRange) return;
     const start = Math.max(
@@ -139,6 +157,11 @@ function ReviewTimelineSurface(props: TimelineProps) {
       )
     );
     const end = Math.max(start, Math.min(duration, start + duration / zoom));
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+    const previous = reportedHistory.current;
+    if (previous?.report === onHistoryRange && previous.start === start && previous.end === end)
+      return;
+    reportedHistory.current = { report: onHistoryRange, start, end };
     onHistoryRange({ start, end });
   }, [onHistoryRange, duration, width, zoom, viewport]);
   useEffect(() => reportHistoryRange(), [reportHistoryRange]);
@@ -197,6 +220,7 @@ function ReviewTimelineSurface(props: TimelineProps) {
       className={`@container flex min-h-0 ${reviewTimelineHeightClass(props)} min-w-0 max-w-full shrink-0 flex-col
         overflow-hidden border-t border-[var(--sniptale-color-border-soft)]`}
     >
+      <ReviewTimelineHints />
       <ReviewToolbar
         {...props}
         playbackRange={props.playbackRange}
@@ -255,6 +279,13 @@ function ReviewTimelineSurface(props: TimelineProps) {
             }}
             onPointerDown={plane.onPointerDown}
             onPointerMoveCapture={(event) => {
+              if (
+                event.target instanceof Element &&
+                event.target.closest('[data-playback-range-edge]')
+              ) {
+                hover.clear();
+                return;
+              }
               if (event.target instanceof Node && event.currentTarget.contains(event.target))
                 hover.move(event, plane.activeLane());
               else hover.clear();
@@ -286,6 +317,11 @@ function ReviewTimelineSurface(props: TimelineProps) {
               duration={props.duration}
               gutter={gutter}
               width={Math.max(1, width * zoom)}
+              edgeInteraction={
+                props.playbackRange && !plane.trackPreview && props.onPlaybackRange
+                  ? ruler.edgeInteraction
+                  : undefined
+              }
             />
             <ReviewTimelineResizeGuide
               key={props.sourceId}
@@ -298,6 +334,7 @@ function ReviewTimelineSurface(props: TimelineProps) {
               <ReviewRulerRow
                 controls={props.trackControls}
                 interaction={ruler.interaction}
+                range={plane.trackPreview ?? ruler.range}
                 time={props.time}
                 duration={props.duration}
                 gutter={gutter}
@@ -336,8 +373,8 @@ function reviewTimelineHeightClass(
   if (props.fillHeight) return 'h-full';
   return props.actionsTrackVisible !== false &&
     (props.markers.length || props.onAddCursorFocusKey || props.cursorArchiveAvailable)
-    ? 'max-h-[max(160px,min(42dvh,calc(100dvh-420px)))]'
-    : 'max-h-[min(42dvh,calc(100dvh-420px))]';
+    ? 'max-h-[max(var(--review-stacked-timeline-floor,0px),160px,min(42dvh,calc(100dvh-420px)))]'
+    : 'max-h-[max(var(--review-stacked-timeline-floor,0px),min(42dvh,calc(100dvh-420px)))]';
 }
 
 /** Independent semantic rows retain the compact capture-event presentation. */
@@ -356,9 +393,91 @@ function ReviewTimelineEvents(
     () => props.markers.filter((m) => reviewInteractionFamily(m) === props.family),
     [props.markers, props.family]
   );
+  const selectedKind = props.selectedTelemetryRef?.kind;
+  const selectedId = props.selectedTelemetryRef?.id;
+  const selectedTelemetryRef = useMemo(
+    () =>
+      markers.find((marker) => marker.ref.kind === selectedKind && marker.ref.id === selectedId)
+        ?.ref,
+    [markers, selectedKind, selectedId]
+  );
+  const projection = useMemo(
+    () => createTrackProjection(props.duration, props.edits ?? []),
+    [props.duration, props.edits]
+  );
+  const receiver = useRef({
+    marker: props.onMarker,
+    toggle: props.onToggleFamily,
+    update: props.interactionEditor?.update,
+    family: props.family,
+  });
+  useLayoutEffect(() => {
+    receiver.current = {
+      marker: props.onMarker,
+      toggle: props.onToggleFamily,
+      update: props.interactionEditor?.update,
+      family: props.family,
+    };
+  });
+  const commands = useMemo<EventLaneCommands>(
+    () => ({
+      marker: (marker) => receiver.current.marker(marker),
+      toggle: () => receiver.current.toggle?.(receiver.current.family),
+      update: (...args) => receiver.current.update?.(...args),
+    }),
+    []
+  );
   if (props.actionsTrackVisible === false) return null;
-  const enabled =
-    props.family === 'keyboard' ? props.keyboardEnabled !== false : props.mouseEnabled !== false;
+  return (
+    <ReviewEventLanePresentation
+      family={props.family}
+      sourceId={props.sourceId}
+      captureCapabilities={props.captureCapabilities}
+      markers={markers}
+      animated={animated}
+      enabled={
+        props.family === 'keyboard' ? props.keyboardEnabled !== false : props.mouseEnabled !== false
+      }
+      duration={props.duration}
+      width={props.width}
+      zoom={props.zoom}
+      selectedTelemetryRef={selectedTelemetryRef}
+      editable={!!props.interactionEditor}
+      projection={projection}
+      commands={commands}
+    />
+  );
+}
+
+type EventLaneCommands = {
+  marker(marker: ReviewTelemetryMarker): void;
+  toggle(): void;
+  update: NonNullable<TimelineProps['interactionEditor']>['update'];
+};
+
+/** Recorded lane geometry is independent from seek-only transport samples and command closures. */
+const ReviewEventLanePresentation = memo(function ReviewEventLanePresentation(props: {
+  family: 'keyboard' | 'mouse';
+  sourceId: TimelineProps['sourceId'];
+  captureCapabilities: TimelineProps['captureCapabilities'];
+  markers: TimelineProps['markers'];
+  animated: ReadonlySet<string>;
+  enabled: boolean;
+  duration: number;
+  width: number;
+  zoom: number;
+  selectedTelemetryRef: TimelineProps['selectedTelemetryRef'];
+  editable: boolean;
+  projection: ReturnType<typeof createTrackProjection>;
+  commands: EventLaneCommands;
+}) {
+  useAppLocale();
+  const interactionEditor = useMemo(
+    () => (props.editable ? { update: props.commands.update } : undefined),
+    [props.editable, props.commands]
+  );
+  const enabled = props.enabled;
+
   return (
     <ReviewTrackRow
       track={props.family}
@@ -368,18 +487,17 @@ function ReviewTimelineEvents(
           ? 'gallery.videoReview.historyKeyboard'
           : 'gallery.videoReview.historyMouse'
       )}
-      icon={props.family === 'keyboard' ? <Keyboard size={14} /> : <Mouse size={14} />}
+      icon={props.family === 'keyboard' ? Keyboard : Mouse}
       controls={
         <>
           <ReviewTrackVisibilityButton
             track={props.family}
             label={translate('gallery.videoReview.historyEffectsEnabled')}
             className={reviewTrackStatusButtonClassName}
-            aria-pressed={enabled}
-            onClick={() => props.onToggleFamily?.(props.family)}
-          >
-            {enabled ? <Eye size={14} /> : <EyeOff size={14} />}
-          </ReviewTrackVisibilityButton>
+            enabled={enabled}
+            onToggle={props.commands.toggle}
+            icon={enabled ? Eye : EyeOff}
+          />
         </>
       }
     >
@@ -390,23 +508,22 @@ function ReviewTimelineEvents(
       >
         <ReviewTelemetryStrip
           family={props.family}
-          interactionEditor={props.interactionEditor}
+          interactionEditor={interactionEditor}
           sourceId={props.sourceId}
           captureCapabilities={props.captureCapabilities}
-          markers={markers}
-          animatedIds={animated}
+          markers={props.markers}
+          animatedIds={props.animated}
           duration={props.duration}
-          time={props.time}
           width={props.width}
           zoom={props.zoom}
           selectedTelemetryRef={props.selectedTelemetryRef}
-          onMarker={props.onMarker}
+          onMarker={props.commands.marker}
         />
-        <ReviewTrackCuts projection={createTrackProjection(props.duration, props.edits ?? [])} />
+        <ReviewTrackCuts projection={props.projection} />
       </div>
     </ReviewTrackRow>
   );
-}
+});
 
 /** All visible source lanes share inserted display time; durable edits keep original source coordinates. */
 export function ReviewTimeline(props: TimelineProps) {
@@ -414,17 +531,84 @@ export function ReviewTimeline(props: TimelineProps) {
     () => createReviewDisplayMap(props.duration, props.edits ?? []),
     [props.duration, props.edits]
   );
+  // Inserted time changes event geometry only when the edit map or recorded events change.
+  const mappedMarkers = useMemo(
+    () =>
+      props.markers.map((marker) => ({
+        ...marker,
+        start:
+          marker.timeDomain === 'result'
+            ? display.resultToDisplay(marker.start)
+            : display.sourceToDisplay(marker.start),
+        end:
+          marker.timeDomain === 'result'
+            ? display.resultToDisplay(marker.end, 'end')
+            : display.sourceToDisplay(marker.end, 'end'),
+      })),
+    [props.markers, display]
+  );
   const clock = useContext(ReviewPlaybackPresentationClockContext);
-  const range = (value: ReviewAnchor, inverse = false): ReviewAnchor => {
-    const map = inverse ? display.displayToSource : display.sourceToDisplay;
-    return value.kind === 'point'
-      ? { kind: 'point', time: map(value.time) }
-      : {
-          kind: 'range',
-          start: map(value.start),
-          end: inverse ? map(value.end) : display.sourceToDisplay(value.end, 'end'),
-        };
-  };
+  const mappedClock = useMemo(
+    () =>
+      clock
+        ? {
+            ...clock,
+            read: () => {
+              const result = clock.readResult?.();
+              // Source-only recording can cross a cut without a visible result sample.
+              return result == null
+                ? display.sourceToDisplay(clock.read())
+                : display.resultToDisplay(result);
+            },
+          }
+        : null,
+    [clock, display]
+  );
+  const onHistoryRange = props.onHistoryRange;
+  const mappedHistoryRange = useCallback(
+    (value: { start: number; end: number }) =>
+      onHistoryRange?.({
+        start: display.displayToSource(value.start),
+        end: display.displayToSource(value.end),
+      }),
+    [onHistoryRange, display]
+  );
+  const onHoverTime = props.onHoverTime;
+  const previewHover = useCallback(
+    (value: number | null) => {
+      if (value === null) onHoverTime?.(null);
+      else onHoverTime?.(display.displayToSource(value), display.displayToResult(value));
+    },
+    [display, onHoverTime]
+  );
+  const range = useCallback(
+    (value: ReviewAnchor, inverse = false): ReviewAnchor => {
+      const map = inverse ? display.displayToSource : display.sourceToDisplay;
+      return value.kind === 'point'
+        ? { kind: 'point', time: map(value.time) }
+        : {
+            kind: 'range',
+            start: map(value.start),
+            end: inverse ? map(value.end) : display.sourceToDisplay(value.end, 'end'),
+          };
+    },
+    [display]
+  );
+  const mappedEdits = useMemo(
+    () =>
+      (props.edits ?? [])
+        .filter((edit) => edit.kind !== 'freeze')
+        .map((edit) => ({
+          ...edit,
+          start: display.sourceToDisplay(edit.start),
+          end: display.sourceToDisplay(edit.end, 'end'),
+        })),
+    [props.edits, display]
+  );
+  const mappedAnnotations = useMemo(
+    () => props.annotations.map((note) => ({ ...note, anchor: range(note.anchor) })),
+    [props.annotations, range]
+  );
   if (!display.parts.some((part) => part.segment.kind === 'freeze'))
     return (
       <ReviewPlaybackPresentationClockContext.Provider value={clock}>
@@ -443,13 +627,6 @@ export function ReviewTimeline(props: TimelineProps) {
     props.resultTime == null
       ? display.sourceToDisplay(props.time)
       : display.resultToDisplay(props.resultTime);
-  const mappedEdits = (props.edits ?? [])
-    .filter((edit) => edit.kind !== 'freeze')
-    .map((edit) => ({
-      ...edit,
-      start: display.sourceToDisplay(edit.start),
-      end: display.sourceToDisplay(edit.end, 'end'),
-    }));
   const insertions = display.parts
     .filter((part) => part.segment.kind === 'freeze')
     .map((part) => {
@@ -471,11 +648,16 @@ export function ReviewTimeline(props: TimelineProps) {
           onSnap={() => {}}
           onEdit={(view) => {
             props.onEdit?.(originalEdit(view));
-            props.onSeekResult?.(part.segment.resultStart);
           }}
           onChangeEdit={async (_view, value) => {
-            if (value.kind === 'range')
-              await props.onFreezeDurationChange?.(edit, value.end - value.start);
+            if (value.kind !== 'range') return;
+            if (Math.abs(value.start - part.start) > 1e-7) {
+              const withoutHold = createReviewDisplayMap(
+                props.duration,
+                (props.edits ?? []).filter((item) => item.id !== edit.id)
+              );
+              await props.onFreezeMove?.(edit, withoutHold.displayToSource(value.start));
+            } else await props.onFreezeDurationChange?.(edit, value.end - value.start);
           }}
           onSeek={seek}
           onSelect={props.onSelect}
@@ -483,21 +665,6 @@ export function ReviewTimeline(props: TimelineProps) {
         />
       );
     });
-  const mappedClock = clock
-    ? {
-        ...clock,
-        read: () => {
-          const hold = display.parts.find(
-            (part) =>
-              part.segment.kind === 'freeze' &&
-              props.resultTime != null &&
-              props.resultTime >= part.segment.resultStart &&
-              props.resultTime < part.segment.resultEnd
-          );
-          return hold ? current : display.sourceToDisplay(clock.read());
-        },
-      }
-    : null;
   return (
     <ReviewPlaybackPresentationClockContext.Provider value={mappedClock}>
       <ReviewTimelineSurface
@@ -508,11 +675,14 @@ export function ReviewTimeline(props: TimelineProps) {
                 ...props.interactionEditor,
                 update: (marker, start, end, enabled) =>
                   props.interactionEditor!.update(
-                    props.markers.find(
-                      (item) => item.ref.kind === marker.ref.kind && item.ref.id === marker.ref.id
-                    ) ?? marker,
-                    display.displayToSource(start),
-                    display.displayToSource(end),
+                    {
+                      ...(props.markers.find(
+                        (item) => item.ref.kind === marker.ref.kind && item.ref.id === marker.ref.id
+                      ) ?? marker),
+                      timeDomain: 'result',
+                    },
+                    display.displayToResult(start),
+                    display.displayToResult(end),
                     enabled
                   ),
               }
@@ -527,8 +697,12 @@ export function ReviewTimeline(props: TimelineProps) {
         playbackRange={
           props.playbackRange
             ? {
-                start: display.sourceToDisplay(props.playbackRange.start),
-                end: display.sourceToDisplay(props.playbackRange.end, 'end'),
+                start: props.playbackRange.result
+                  ? display.resultToDisplay(props.playbackRange.result.start)
+                  : display.sourceToDisplay(props.playbackRange.start),
+                end: props.playbackRange.result
+                  ? display.resultToDisplay(props.playbackRange.result.end, 'end')
+                  : display.sourceToDisplay(props.playbackRange.end, 'end'),
               }
             : props.playbackRange
         }
@@ -539,12 +713,8 @@ export function ReviewTimeline(props: TimelineProps) {
         zoomAnchor={
           props.zoomAnchor == null ? props.zoomAnchor : display.sourceToDisplay(props.zoomAnchor)
         }
-        markers={props.markers.map((marker) => ({
-          ...marker,
-          start: display.sourceToDisplay(marker.start),
-          end: display.sourceToDisplay(marker.end, 'end'),
-        }))}
-        annotations={props.annotations.map((note) => ({ ...note, anchor: range(note.anchor) }))}
+        markers={mappedMarkers}
+        annotations={mappedAnnotations}
         onSeek={seek}
         onSelect={(value) => props.onSelect(range(value, true))}
         {...(props.onEdit
@@ -563,7 +733,15 @@ export function ReviewTimeline(props: TimelineProps) {
           props.onTrackRangeCommit
             ? (value) => {
                 const next = range(value, true);
-                if (next.kind === 'range') props.onTrackRangeCommit!(next);
+                if (next.kind === 'range')
+                  props.onPlaybackRange?.({
+                    start: next.start,
+                    end: next.end,
+                    result: {
+                      start: display.displayToResult(value.start),
+                      end: display.displayToResult(value.end),
+                    },
+                  });
               }
             : undefined
         }
@@ -593,25 +771,17 @@ export function ReviewTimeline(props: TimelineProps) {
                     ? {
                         start: display.displayToSource(value.start),
                         end: display.displayToSource(value.end),
+                        result: {
+                          start: display.displayToResult(value.start),
+                          end: display.displayToResult(value.end),
+                        },
                       }
                     : null
                 )
             : undefined
         }
-        onHoverTime={
-          props.onHoverTime
-            ? (value) => props.onHoverTime!(value === null ? null : display.displayToSource(value))
-            : undefined
-        }
-        onHistoryRange={
-          props.onHistoryRange
-            ? (value) =>
-                props.onHistoryRange!({
-                  start: display.displayToSource(value.start),
-                  end: display.displayToSource(value.end),
-                })
-            : undefined
-        }
+        onHoverTime={onHoverTime ? previewHover : undefined}
+        onHistoryRange={onHistoryRange ? mappedHistoryRange : undefined}
         onMarker={(marker) =>
           props.onMarker(
             props.markers.find(

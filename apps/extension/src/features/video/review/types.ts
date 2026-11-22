@@ -1,6 +1,7 @@
 import type { CompositionJoinSettings } from '../project/scene/composition-join';
 /** Commands move the existing history cursor without appending an operation. */
-export type ReviewHistoryDirection = 'undo' | 'redo' | 'start';
+/** An exact selection uses a retained operation identity rather than a mutable array position. */
+export type ReviewHistoryMove = 'undo' | 'redo' | 'start' | { entryId: string };
 
 import type { Paint } from '@sniptale/foundation/paint';
 import type { ReviewSpeedRate } from './speed';
@@ -105,10 +106,14 @@ export type ReviewOperation = { id: string; at: number } & (
       preserveFocusAnchors?: true;
       /** New non-destructive policy; absent historical operations keep their recorded replay behavior. */
       preserveUnderCuts?: true;
+      /** Retains the authored visual intervals when CUT changes. */
+      preserveVisualAnchors?: true;
       /** Preserves whole voiceover records in source coordinates; playback alone is projected. */
       preserveVoiceoverAnchors?: true;
       /** Text follows native voiceover timing only for operations that record this policy. */
       preserveTextAnchors?: true;
+      /** Result-time text keeps offsets inside inserted holds; absent on legacy history. */
+      preserveResultText?: true;
       /** New Speed commands restore native sample timing before applying their absolute rate. */
       normalizeVoiceoverTempo?: true;
     }

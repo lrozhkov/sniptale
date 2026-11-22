@@ -1,5 +1,5 @@
 import { el, exampleCase } from '../shared/dom.js';
-import { TextField } from '../shared/fields.js';
+import { DictationSampleButton, TextField } from '../shared/fields.js';
 import { ActionButton, AsyncCommand } from '../shared/buttons.js';
 export function render(root, { manifest }) {
   const add = (key) => {
@@ -106,20 +106,30 @@ export function render(root, { manifest }) {
     multiline: true,
     context: 'inspector',
   });
+  const prompt = TextField({
+    label: 'Запрос',
+    multiline: true,
+    value: [
+      'Сделай фон светлее.',
+      'Сохрани содержимое кадра.',
+      'Используй мягкие тени.',
+      'Не добавляй подписи.',
+      'Оставь поля по краям.',
+      'Сохрани пропорции изображения.',
+    ].join('\n'),
+  });
+  prompt.element.classList.add('text-field--dictation');
+  prompt.element.append(DictationSampleButton(prompt.input, 'ru'));
   add('multiline').append(
     multiline.element,
     el('p', {
       text: 'Enter добавляет строку. Blur принимает текст. Escape возвращает принятое значение.',
-    })
+    }),
+    prompt.element
   );
-  const search = TextField({ label: 'Поиск сцен', placeholder: 'Название сцены' }),
-    results = el('p', { role: 'status', text: 'Найдено: 3' }),
-    names = ['Вступление', 'Демонстрация', 'Завершение'];
-  search.input.addEventListener('input', () => {
-    const count = names.filter((n) => n.toLowerCase().includes(search.draft.toLowerCase())).length;
-    results.textContent = count ? 'Найдено: ' + count : 'Сцены не найдены. Измените запрос.';
-  });
-  add('search').append(search.element, results);
+  add('search').append(...searchExample());
+  const locale = new URLSearchParams(location.search).get('lang') === 'en' ? 'en' : 'ru';
+  add('suggestions').append(suggestionExample(locale));
   add('long').append(
     TextField({
       label:
@@ -128,4 +138,136 @@ export function render(root, { manifest }) {
       multiline: true,
     }).element
   );
+}
+
+function suggestionExample(locale) {
+  const en = locale === 'en';
+  const label = en ? 'Tag' : 'Тег';
+  const field = TextField({
+    label,
+    placeholder: en ? 'Find or add a tag' : 'Найти или добавить тег',
+    clearLabel: en ? 'Clear tag' : 'Очистить тег',
+  });
+  const listId = field.input.id + '-suggestions';
+  const list = el('div', {
+    id: listId,
+    class: 'text-suggestions',
+    role: 'listbox',
+    'aria-label': en ? 'Suggested tags' : 'Подсказки тегов',
+    hidden: '',
+  });
+  const status = el('p', { class: 'field-status', role: 'status' });
+  const tags = en ? ['Design', 'Documentation', 'Review'] : ['Дизайн', 'Документация', 'Проверка'];
+  let active = -1;
+  let choices = [];
+
+  field.element.classList.add('text-field--suggestions');
+  field.input.setAttribute('role', 'combobox');
+  field.input.setAttribute('aria-autocomplete', 'list');
+  field.input.setAttribute('aria-controls', listId);
+  field.input.setAttribute('aria-expanded', 'false');
+
+  function close() {
+    active = -1;
+    list.hidden = true;
+    field.input.setAttribute('aria-expanded', 'false');
+    field.input.removeAttribute('aria-activedescendant');
+  }
+
+  function choose(value) {
+    if (!tags.includes(value)) tags.push(value);
+    field.setValue(value);
+    status.textContent = (en ? 'Selected: ' : 'Выбрано: ') + value;
+    close();
+  }
+
+  function show() {
+    const query = field.draft.trim();
+    const folded = query.toLocaleLowerCase(locale);
+    choices = tags
+      .filter((value) => value.toLocaleLowerCase(locale).includes(folded))
+      .map((value) => ({ value, label: value }));
+    if (query && !tags.some((value) => value.toLocaleLowerCase(locale) === folded)) {
+      choices.push({ value: query, label: en ? `Add “${query}”` : `Добавить «${query}»` });
+    }
+    list.replaceChildren(
+      ...choices.map((choice, index) => {
+        const option = el('button', {
+          id: listId + '-' + index,
+          type: 'button',
+          role: 'option',
+          tabindex: '-1',
+          'aria-selected': String(index === active),
+          text: choice.label,
+        });
+        option.addEventListener('mousedown', (event) => event.preventDefault());
+        option.addEventListener('click', () => choose(choice.value));
+        return option;
+      })
+    );
+    if (choices.length === 0) {
+      close();
+      return;
+    }
+    list.hidden = false;
+    field.input.setAttribute('aria-expanded', 'true');
+    field.input.removeAttribute('aria-activedescendant');
+  }
+
+  field.input.addEventListener('focus', show);
+  field.input.addEventListener('blur', close);
+  field.input.addEventListener('input', () => {
+    active = -1;
+    show();
+  });
+  field.input.addEventListener('keydown', (event) => {
+    if (event.isComposing || event.keyCode === 229) return;
+    if (event.key === 'Escape' && !list.hidden) {
+      event.preventDefault();
+      event.stopPropagation();
+      close();
+    } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      if (list.hidden) show();
+      if (!choices.length) return;
+      event.preventDefault();
+      active =
+        event.key === 'ArrowDown'
+          ? (active + 1) % choices.length
+          : active <= 0
+            ? choices.length - 1
+            : active - 1;
+      const option = list.children[active];
+      for (const entry of list.children)
+        entry.setAttribute('aria-selected', String(entry === option));
+      field.input.setAttribute('aria-activedescendant', option.id);
+      option.scrollIntoView({ block: 'nearest' });
+    } else if (event.key === 'Enter' && !list.hidden && choices[active]) {
+      event.preventDefault();
+      choose(choices[active].value);
+    }
+  });
+  field.input.after(list);
+  return el('div', {}, [field.element, status]);
+}
+
+function searchExample() {
+  const search = TextField({ label: 'Поиск сцен', placeholder: 'Название сцены' }),
+    results = el('p', { role: 'status', text: 'Найдено: 3' }),
+    names = ['Вступление', 'Демонстрация', 'Завершение'];
+  search.input.type = 'search';
+  search.element.classList.add('text-field--search');
+  const svgNamespace = 'http://www.w3.org/2000/svg';
+  const searchIcon = document.createElementNS(svgNamespace, 'svg');
+  searchIcon.setAttribute('class', 'text-search-icon');
+  searchIcon.setAttribute('aria-hidden', 'true');
+  searchIcon.setAttribute('viewBox', '0 0 24 24');
+  const searchPath = document.createElementNS(svgNamespace, 'path');
+  searchPath.setAttribute('d', 'M21 21l-4.3-4.3M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z');
+  searchIcon.append(searchPath);
+  search.input.before(searchIcon);
+  search.input.addEventListener('input', () => {
+    const count = names.filter((n) => n.toLowerCase().includes(search.draft.toLowerCase())).length;
+    results.textContent = count ? 'Найдено: ' + count : 'Сцены не найдены. Измените запрос.';
+  });
+  return [search.element, results];
 }

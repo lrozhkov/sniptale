@@ -18,22 +18,30 @@ export function PresentationFadeFields(props: {
 }) {
   useAppLocale();
   return (
-    <div className="min-w-0 space-y-1" data-ui="shared.ui.presentation-fade-fields">
+    <div className="sniptale-parameter-stack" data-ui="shared.ui.presentation-fade-fields">
       {props.enabledLabel && (
         <ToggleField
           label={props.enabledLabel}
+          showStatus
           value={props.value.enabled}
           onChange={(enabled) => props.onChange({ enabled })}
         />
       )}
       {(!props.enabledLabel || props.value.enabled) && (
-        <>
+        <div
+          className={
+            props.enabledLabel
+              ? 'sniptale-parameter-stack sniptale-parameter-dependents'
+              : 'sniptale-parameter-stack'
+          }
+        >
           <PreviewNumericRow
             label={translate('gallery.videoReview.presentationDuration')}
             value={props.duration ?? props.value.duration}
             min={0}
             max={60}
-            scrubMax={3}
+            scrubEnabled={false}
+            stepperPlacement="sides"
             step={0.1}
             unit="s"
             precision={2}
@@ -53,11 +61,12 @@ export function PresentationFadeFields(props: {
           />
           <ToggleField
             label={translate('gallery.videoReview.presentationAudioFade')}
+            showStatus
             value={props.value.audioFade ?? props.fallbackAudioFade}
             onChange={(audioFade) => props.onChange({ audioFade })}
           />
           {props.children}
-        </>
+        </div>
       )}
     </div>
   );

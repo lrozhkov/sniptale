@@ -268,3 +268,202 @@ it('retains GL identity and evaluates easing on the speed-adjusted result clock'
   expect(reviewCutTransitionAt(1.25, plans)?.incoming).toBe(0.9375);
   expect(reviewCutTransitionAt(1.5, plans)).toBeNull();
 });
+
+it.each([1, 4, 6, 9])('keeps finite cut transition portions with a freeze at %s', (at) => {
+  const freeze = {
+    id: 'hold',
+    kind: 'freeze' as const,
+    start: at,
+    end: at,
+    requestedStart: at,
+    requestedEnd: at,
+    duration: 2,
+    frameTime: at - 0.02,
+    frameDuration: 0.04,
+  };
+  const cut = {
+    id: 'cut',
+    kind: 'cut' as const,
+    start: 4,
+    end: 6,
+    requestedStart: 4,
+    requestedEnd: 6,
+    transition: { type: 'dissolve' as const, before: 0.5, after: 0.5 },
+  };
+  const [plan] = planReviewCutTransitions(12, [freeze, cut]);
+  expect(plan!.before).toBe(0.5);
+  expect(plan!.after).toBe(0.5);
+  expect(plan!.seam).toBe(at <= 4 ? 6 : 4);
+  expect(reviewCutTransitionAt(plan!.seam - 0.25, [plan!])).not.toBeNull();
+  expect(reviewCutTransitionAt(plan!.seam + 0.25, [plan!])).not.toBeNull();
+});
+
+it.each([
+  ['left', true, false],
+  ['right', false, true],
+  ['both', true, true],
+] as const)(
+  'uses the adjacent held raster and duration on the %s of a cut',
+  (_side, leftHeld, rightHeld) => {
+    const freeze = (at: number) => ({
+      id: `hold-${at}`,
+      kind: 'freeze' as const,
+      start: at,
+      end: at,
+      requestedStart: at,
+      requestedEnd: at,
+      duration: 0.25,
+      frameTime: at - 0.04,
+      frameDuration: 0.04,
+    });
+    const cut = {
+      id: 'cut',
+      kind: 'cut' as const,
+      start: 4,
+      end: 6,
+      requestedStart: 4,
+      requestedEnd: 6,
+      transition: { type: 'dissolve' as const, before: 0.5, after: 0.5 },
+    };
+    const edits = [cut, ...(leftHeld ? [freeze(4)] : []), ...(rightHeld ? [freeze(6)] : [])];
+    const [plan] = planReviewCutTransitions(12, edits);
+    expect(plan!.left).toEqual(
+      leftHeld ? { start: 3.96, end: 4, frameTime: 3.96 } : { start: 0, end: 4 }
+    );
+    expect(plan!.right).toEqual(
+      rightHeld ? { start: 5.96, end: 6, frameTime: 5.96 } : { start: 6, end: 12 }
+    );
+    expect(plan!.before).toBe(leftHeld ? 0.25 : 0.5);
+    expect(plan!.after).toBe(rightHeld ? 0.25 : 0.5);
+  }
+);
+
+it('keeps both transitions when a freeze is the only retained island between cuts', () => {
+  const cut = (id: string, start: number, end: number) => ({
+    id,
+    kind: 'cut' as const,
+    start,
+    end,
+    requestedStart: start,
+    requestedEnd: end,
+    transition: { type: 'dissolve' as const, before: 2, after: 2 },
+  });
+  const plans = planReviewCutTransitions(10, [
+    cut('a', 2, 4),
+    cut('b', 4, 6),
+    {
+      id: 'hold',
+      kind: 'freeze',
+      start: 4,
+      end: 4,
+      requestedStart: 4,
+      requestedEnd: 4,
+      duration: 1,
+      frameTime: 3.96,
+      frameDuration: 0.04,
+    },
+  ]);
+  expect(plans).toHaveLength(2);
+  expect(plans[0]!.right).toEqual(plans[1]!.left);
+  expect(plans[0]!.right).toEqual({ start: 3.96, end: 4, frameTime: 3.96 });
+  expect(plans[0]!.after).toBe(0.5);
+  expect(plans[1]!.before).toBe(0.5);
+});
+
+it('finds the incoming freeze after internal speed boundaries within the removed span', () => {
+  const [plan] = planReviewCutTransitions(10, [
+    {
+      id: 'cut',
+      kind: 'cut',
+      start: 4,
+      end: 6,
+      requestedStart: 4,
+      requestedEnd: 6,
+      transition: { type: 'dissolve', before: 0.5, after: 0.5 },
+    },
+    {
+      id: 'speed',
+      kind: 'speed',
+      start: 5,
+      end: 7,
+      requestedStart: 5,
+      requestedEnd: 7,
+      rate: 2,
+      audio: 'speed',
+    },
+    {
+      id: 'freeze',
+      kind: 'freeze',
+      start: 6,
+      end: 6,
+      requestedStart: 6,
+      requestedEnd: 6,
+      duration: 1,
+      frameTime: 5.96,
+      frameDuration: 0.04,
+    },
+  ]);
+  expect(plan!.right).toEqual({ start: 5.96, end: 6, frameTime: 5.96 });
+});
+
+it('does not expand short freeze portions when two holds reuse the same source frame', () => {
+  const cut = (id: string, start: number, end: number) => ({
+    id,
+    kind: 'cut' as const,
+    start,
+    end,
+    requestedStart: start,
+    requestedEnd: end,
+    transition: { type: 'dissolve' as const, before: 10, after: 10 },
+  });
+  const hold = (at: number) => ({
+    id: `hold-${at}`,
+    kind: 'freeze' as const,
+    start: at,
+    end: at,
+    requestedStart: at,
+    requestedEnd: at,
+    duration: 0.25,
+    frameTime: 3.96,
+    frameDuration: 0.04,
+  });
+  const plans = planReviewCutTransitions(12, [cut('a', 2, 4), hold(4), hold(6), cut('b', 6, 8)]);
+  expect(plans[0]!.after).toBe(0.25);
+  expect(plans[1]!.before).toBe(0.25);
+});
+
+it.each([4, 6])(
+  'fits neighboring windows when only the cut at %s adjoins the shared freeze',
+  (at) => {
+    const cut = (id: string, start: number, end: number) => ({
+      id,
+      kind: 'cut' as const,
+      start,
+      end,
+      requestedStart: start,
+      requestedEnd: end,
+      transition: { type: 'dissolve' as const, before: 10, after: 10 },
+    });
+    const plans = planReviewCutTransitions(10, [
+      cut('a', 2, 4),
+      cut('b', 6, 8),
+      {
+        id: 'hold',
+        kind: 'freeze',
+        start: at,
+        end: at,
+        requestedStart: at,
+        requestedEnd: at,
+        duration: 1,
+        frameTime: at - 0.04,
+        frameDuration: 0.04,
+      },
+    ]);
+    const [left, right] = plans;
+    expect(left!.seam + left!.after).toBeLessThanOrEqual(right!.seam - right!.before);
+    expect(at === 4 ? left!.after : right!.before).toBeLessThanOrEqual(1);
+    const boundary = left!.seam + left!.after;
+    const afterBoundary = reviewCutTransitionAt(boundary, plans);
+    expect(afterBoundary === null || afterBoundary.plan.id === 'b').toBe(true);
+  }
+);

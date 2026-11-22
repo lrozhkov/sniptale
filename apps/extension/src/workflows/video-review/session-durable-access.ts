@@ -1,3 +1,4 @@
+import { prepareReviewAnnotationAppend } from '../../features/video/review/annotation-effects/types';
 import { createSyncProductClient } from '../../platform/runtime-messaging/sync-product-client';
 import { acquireSyncCheckpointEdit } from '../../composition/persistence/sync-capture/checkpoint-publication';
 import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
@@ -39,17 +40,19 @@ import type { ReviewSpeechTarget } from '../../contracts/ai/audio';
 export const reviewSessionPersistence = {
   acquireSyncCheckpointEdit,
   wakeCheckpoints: () => createSyncProductClient().wakeCheckpoints(),
+  onFirstSave({ workspace }: VideoWorkspaceSnapshot) {
+    publishMediaHubLibraryChanged('update', [
+      workspace.sourceMediaId ?? workspace.aggregateId,
+      workspace.aggregateId,
+    ]);
+  },
   async renameVideoWorkspaceProject(...args: Parameters<typeof renameVideoWorkspaceProject>) {
     await renameVideoWorkspaceProject(...args);
     publishMediaHubLibraryChanged('update', [args[0]]);
   },
   async createVideoWorkspaceProject(args: Parameters<typeof createVideoWorkspaceProject>[0]) {
     const created = await createVideoWorkspaceProject(args);
-    publishMediaHubLibraryChanged('update', [
-      args.aggregateId,
-      args.archiveId,
-      created.workspace.aggregateId,
-    ]);
+    publishMediaHubLibraryChanged('update', [args.aggregateId, created.workspace.aggregateId]);
     return created;
   },
   saveVideoWorkspaceSnapshot,
@@ -238,13 +241,13 @@ export function createReviewAnnotationPublication(
   before: QuickEditAdvancedContent,
   candidate: ReviewAnnotationEffect
 ): ReviewOperation {
-  const existing = before.annotationEffects?.instances ?? [];
-  if (existing.some((instance) => instance.id === candidate.id))
+  const { lane, order } = prepareReviewAnnotationAppend(before.annotationEffects);
+  if (
+    lane.instances.some((instance) => instance.id === candidate.id) ||
+    lane.textClips?.some((clip) => clip.id === candidate.id)
+  )
     throw new Error('Annotation instance already exists.');
-  const instance = {
-    ...candidate,
-    order: Math.max(-1, ...existing.map((value) => value.order)) + 1,
-  };
+  const instance = { ...candidate, order };
   const operation: ReviewOperation = {
     id: crypto.randomUUID(),
     at: Date.now(),
@@ -253,8 +256,8 @@ export function createReviewAnnotationPublication(
     after: {
       ...before,
       annotationEffects: {
-        enabled: before.annotationEffects?.enabled ?? true,
-        instances: [...existing, instance],
+        ...lane,
+        instances: [...lane.instances, instance],
       },
     },
   };

@@ -2,27 +2,69 @@ import type { CaptureActionType, QuickActionDelay } from '../../../../../contrac
 import { translate } from '../../../../../platform/i18n';
 
 export const screenshotModeLabels: Record<string, string> = {
-  visible: translate('settings.quickActions.screenshotModeVisible'),
-  full: translate('settings.quickActions.screenshotModeFull'),
-  selection: translate('settings.quickActions.screenshotModeSelection'),
-  desktop: translate('settings.quickActions.screenshotModeDesktop'),
+  get visible() {
+    return translate('settings.quickActions.screenshotModeVisible');
+  },
+  get full() {
+    return translate('settings.quickActions.screenshotModeFull');
+  },
+  get selection() {
+    return translate('settings.quickActions.screenshotModeSelection');
+  },
+  get desktop() {
+    return translate('settings.quickActions.screenshotModeDesktop');
+  },
 };
 
 export const afterCaptureLabels: Record<CaptureActionType, string> = {
-  download_default: translate('settings.quickActions.afterCaptureDownloadDefault'),
-  ask_preset: translate('settings.quickActions.afterCaptureAskPreset'),
-  ask_system: translate('settings.quickActions.afterCaptureAskSystem'),
-  edit: translate('settings.quickActions.afterCaptureEdit'),
-  copy: translate('settings.quickActions.afterCaptureCopy'),
-  scenario: translate('settings.quickActions.afterCaptureScenario'),
-  save_to_library: translate('settings.quickActions.afterCaptureSaveToLibrary'),
+  get download_default() {
+    return translate('settings.quickActions.afterCaptureDownloadDefault');
+  },
+  get ask_preset() {
+    return translate('settings.quickActions.afterCaptureAskPreset');
+  },
+  get ask_system() {
+    return translate('settings.quickActions.afterCaptureAskSystem');
+  },
+  get edit() {
+    return translate('settings.quickActions.afterCaptureEdit');
+  },
+  get copy() {
+    return translate('settings.quickActions.afterCaptureCopy');
+  },
+  get scenario() {
+    return translate('settings.quickActions.afterCaptureScenario');
+  },
+  get save_to_library() {
+    return translate('settings.quickActions.afterCaptureSaveToLibrary');
+  },
 };
 
 export const delayOptions: { value: QuickActionDelay; label: string }[] = [
-  { value: 0, label: translate('settings.quickActions.delayNone') },
-  { value: 3, label: `3 ${translate('settings.quickActions.delayShortSuffix')}` },
-  { value: 5, label: `5 ${translate('settings.quickActions.delayShortSuffix')}` },
-  { value: 10, label: `10 ${translate('settings.quickActions.delayShortSuffix')}` },
+  {
+    value: 0,
+    get label() {
+      return translate('settings.quickActions.delayNone');
+    },
+  },
+  {
+    value: 3,
+    get label() {
+      return `3 ${translate('settings.quickActions.delayShortSuffix')}`;
+    },
+  },
+  {
+    value: 5,
+    get label() {
+      return `5 ${translate('settings.quickActions.delayShortSuffix')}`;
+    },
+  },
+  {
+    value: 10,
+    get label() {
+      return `10 ${translate('settings.quickActions.delayShortSuffix')}`;
+    },
+  },
 ];
 
 export const qualityOptions = [

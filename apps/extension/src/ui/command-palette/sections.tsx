@@ -1,7 +1,7 @@
 import { useContext, type RefObject } from 'react';
 import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
-import { Search, X } from 'lucide-react';
-import { InspectorFieldClear } from '../compact-inspector-controls/text-field';
+import { X } from 'lucide-react';
+import { SearchField } from '../compact-inspector-controls/row-controls';
 import { translate } from '../../platform/i18n';
 import type { CommandPaletteAction, LocalizedCommandPaletteGroup } from './types';
 import { CommandPaletteEmptyState, CommandPaletteResults } from './results';
@@ -14,41 +14,19 @@ export function CommandPaletteHeader(props: {
 }) {
   const compact = useContext(CommandPressScope);
   const close = useCommandPress({ enabled: compact, onClick: props.onClose });
-  const queryInput = (
-    <input
-      ref={props.inputRef}
-      value={props.query}
-      onChange={(event) => props.onQueryChange(event.target.value)}
-      placeholder={translate('shared.ui.commandPalettePlaceholder')}
-      className={[
-        'min-w-0 flex-1 bg-transparent text-sm',
-        compact ? 'w-full' : '',
-        'text-[var(--sniptale-color-text-primary)] outline-none',
-        'placeholder:text-[var(--sniptale-color-text-dim)]',
-      ].join(' ')}
-    />
-  );
+  const searchLabel = translate('shared.ui.commandPalettePlaceholder');
   return (
     <div className="border-b border-[var(--sniptale-color-border-subtle)] px-4 py-3">
-      <div className="flex items-center gap-3">
-        <Search
-          size={18}
-          strokeWidth={1.8}
-          className="shrink-0 text-[var(--sniptale-color-text-muted)]"
+      <div className="flex items-center gap-2">
+        <SearchField
+          className="flex-1"
+          inputRef={props.inputRef}
+          showClear={compact}
+          label={searchLabel}
+          placeholder={searchLabel}
+          value={props.query}
+          onChange={props.onQueryChange}
         />
-        {compact ? (
-          <div className="relative min-w-0 flex-1 pr-8">
-            {queryInput}
-            {props.query ? (
-              <InspectorFieldClear
-                label={translate('shared.ui.commandPalettePlaceholder')}
-                target={props.inputRef}
-              />
-            ) : null}
-          </div>
-        ) : (
-          queryInput
-        )}
         <button
           type="button"
           {...close.props}

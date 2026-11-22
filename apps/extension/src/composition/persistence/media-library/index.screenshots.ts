@@ -1,3 +1,4 @@
+import { createImageWorkspaceIdentity } from '../image-workspaces/identity';
 import {
   readAssetResidencyCopyInTransaction,
   retireAssetResidencyCopyInTransaction,
@@ -11,6 +12,7 @@ import { measureImageBlob } from '@sniptale/platform/browser/media/image-dimensi
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import {
   AGGREGATE_PRESENTATIONS_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
 } from '../infrastructure/indexed-db/core';
@@ -56,6 +58,7 @@ export async function saveScreenshotMediaAsset(
       [
         MEDIA_LIBRARY_STORE,
         ASSET_RESIDENCY_STORE,
+        IMAGE_WORKSPACE_IDENTITIES_STORE,
         IMAGE_WORKSPACES_STORE,
         AGGREGATE_PRESENTATIONS_STORE,
         ASSET_REFS_STORE,
@@ -87,6 +90,7 @@ export async function saveScreenshotMediaAsset(
         assetResidencyCopyId({ kind: 'inline-image', mediaId: assetId })
       );
       if (previousCopy) await retireAssetResidencyCopyInTransaction(tx, previousCopy, permit);
+      await createImageWorkspaceIdentity(tx, assetId);
       await mediaStore.put(entry);
       await presentationStore.put({
         aggregateId: assetId,

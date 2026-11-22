@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { z } from 'zod';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { getAIProviderDefinition } from '../../../../apps/extension/src/contracts/settings/ai-provider';
 import type { AIModelOperation } from '../../../../apps/extension/src/contracts/settings/model-operation';
 import { readLiveCredential } from './configuration';

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  prepare: vi.fn(),
   commandListener: null as ((command: string, tab?: chrome.tabs.Tab) => void) | null,
   enableScreenshotMode: vi.fn(),
   ensureActivePageAccessRuntime: vi.fn(),
@@ -70,6 +71,7 @@ vi.mock('../tab-mode-router-screenshot', async (importOriginal) => ({
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   translate: (key: string) => key,
+  prepareTranslations: mocks.prepare,
 }));
 
 import {
@@ -86,6 +88,7 @@ const state = createBackgroundRuntimeState();
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.commandListener = null;
+  mocks.prepare.mockReset().mockResolvedValue(undefined);
   mocks.enableScreenshotMode.mockResolvedValue(undefined);
   mocks.ensureActivePageAccessRuntime.mockResolvedValue(undefined);
   mocks.handleQuickAction.mockResolvedValue({ result: 'accepted' });
@@ -218,4 +221,41 @@ it('ignores undeclared events and surfaces known-command failures in the active 
       type: 'error',
     })
   );
+});
+
+it('holds translated capture work while preparation is pending without blocking page opening', async () => {
+  let complete!: () => void;
+  mocks.prepare.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      complete = resolve;
+    })
+  );
+  const pending = runExtensionCommand('capture-visible', state, tab);
+  expect(mocks.loadScreenshotCaptureRuntimeContext).not.toHaveBeenCalled();
+  expect(mocks.ensureActivePageAccessRuntime).not.toHaveBeenCalled();
+  expect(mocks.handleQuickAction).not.toHaveBeenCalled();
+  await runExtensionCommand('open-library', state, tab);
+  expect(mocks.openGalleryPage).toHaveBeenCalledOnce();
+  complete();
+  await pending;
+  expect(mocks.handleQuickAction).toHaveBeenCalledOnce();
+});
+
+it('rejects unavailable command translations before capture/default-data work', async () => {
+  mocks.prepare.mockRejectedValueOnce(new Error('Catalog unavailable'));
+  await expect(runExtensionCommand('capture-visible', state, tab)).rejects.toThrow(
+    'Catalog unavailable'
+  );
+  expect(mocks.loadScreenshotCaptureRuntimeContext).not.toHaveBeenCalled();
+  expect(mocks.ensureActivePageAccessRuntime).not.toHaveBeenCalled();
+  expect(mocks.handleQuickAction).not.toHaveBeenCalled();
+});
+
+it('does not attempt unavailable localized failure feedback or surface an unhandled rejection', async () => {
+  mocks.prepare.mockRejectedValue(new Error('Catalog unavailable'));
+  registerExtensionCommandListener(state);
+  mocks.commandListener?.('tools-drawing', tab);
+  await vi.waitFor(() => expect(mocks.prepare).toHaveBeenCalledTimes(2));
+  expect(mocks.showContextMenuToast).not.toHaveBeenCalled();
+  expect(mocks.enableScreenshotMode).not.toHaveBeenCalled();
 });

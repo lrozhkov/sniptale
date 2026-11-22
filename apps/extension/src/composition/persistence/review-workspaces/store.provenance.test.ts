@@ -51,7 +51,7 @@ vi.mock('mediabunny', () => ({
   },
 }));
 import { loadVideoReviewSource } from '../../../workflows/video-review/source';
-import { readVideoWorkspace } from './store';
+import { readVideoWorkspace, saveVideoWorkspaceSnapshot } from './store';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -129,12 +129,30 @@ it.each(['sniptale.video-edit.v1', 'sniptale.video-edit.v2'] as const)(
     expect(first.snapshot.workspace.cursor).toBe(0);
     expect(first.snapshot.workspace.advanced.presentation?.intro.mode).toBe('none');
     expect(first.snapshot.workspace.advanced.presentation?.fadeIn.duration).toBe(0.4);
-    const persisted = await readVideoWorkspace('recording:beta-v1-recording');
-    expect(persisted).toEqual(first.snapshot);
+    const { workspace } = first.snapshot;
+    expect(await readVideoWorkspace(workspace.aggregateId)).toBeNull();
+    const annotation = { id: 'note', text: 'New review', anchor: { kind: 'point', time: 1 } };
+    const accepted = await saveVideoWorkspaceSnapshot({
+      aggregateId: workspace.aggregateId,
+      expectedSourceAssetId: workspace.sourceAssetId,
+      expectedRevision: workspace.revision,
+      expectedDraftRevision: null,
+      original: first.original!,
+      workspace: {
+        ...workspace,
+        history: [{ id: 'action', at: 1, target: 'annotation', before: null, after: annotation }],
+        cursor: 1,
+      },
+      draft: null,
+    });
+    expect(await readVideoWorkspace('recording:beta-v1-recording')).toBeNull();
     const reopened = await loadVideoReviewSource(
-      'recording:beta-v1-recording',
+      workspace.aggregateId,
       new AbortController().signal
     );
-    expect(reopened.snapshot).toEqual(first.snapshot);
+    expect(reopened.snapshot).toEqual(accepted);
+    expect(reopened.snapshot.workspace.history.map((operation) => operation.target)).toEqual([
+      'annotation',
+    ]);
   }
 );

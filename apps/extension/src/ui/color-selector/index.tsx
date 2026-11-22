@@ -14,6 +14,7 @@ import {
 import { ColorSelectorPickerPopover } from './picker-popover';
 import { useColorSelectorState } from '@sniptale/ui/color-selector/state';
 import { ColorSelectorTrigger } from './trigger';
+import { useInspectorLayout } from '../compact-inspector-controls/layout';
 import type { CompactColorSelectorProps } from '@sniptale/ui/color-selector/types';
 import { FLOATING_INTERACTION_OWNER_ID_ATTRIBUTE } from '@sniptale/ui/floating-interactions/ownership';
 
@@ -25,6 +26,7 @@ function PickerLayer(props: {
   ownerId: string;
 }) {
   const { state, options } = props;
+  const framed = useInspectorLayout();
   const preferences = usePickerPreferences(options.density);
   const rootNode = state.rootRef.current;
   const portalTarget =
@@ -33,7 +35,7 @@ function PickerLayer(props: {
   const layerStyle = useColorSelectorLayerStyle(
     rootNode,
     state.pickerOpen,
-    options.floatingPlacement ?? 'auto',
+    options.floatingPlacement ?? (framed ? 'anchor' : 'auto'),
     options.floatingBoundaryRef?.current ?? null,
     state.layerRef,
     'picker',
@@ -45,7 +47,9 @@ function PickerLayer(props: {
       preferences.rememberColor(state.draftColor);
       state.handlePickerApply();
     } else state.handlePickerCancel();
-    state.rootRef.current?.querySelector('button')?.focus({ preventScroll: true });
+    state.rootRef.current
+      ?.querySelector<HTMLButtonElement>('[data-ui="shared.ui.color-selector.picker-trigger"]')
+      ?.focus({ preventScroll: true });
   };
   return createPortal(
     <ColorSelectorFloatingLayer
@@ -123,6 +127,7 @@ export function CompactColorSelector(props: CompactColorSelectorProps) {
         disabled={props.disabled === true}
         formatMode={state.formatMode}
         label={props.label}
+        pickerOnly={props.pickerOnly === true}
         value={state.draftColor}
         onCommit={state.handleRecentSelect}
         onOpenPicker={state.handleOpenPicker}

@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { persistedReviewContent } from '../support/voiceover-speech-fixture';
 import { test, expect } from './live-fixture';

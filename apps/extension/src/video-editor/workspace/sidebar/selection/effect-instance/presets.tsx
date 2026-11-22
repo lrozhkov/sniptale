@@ -1,3 +1,4 @@
+import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEffectPresetCatalog } from './preset-catalog';
 import { type AnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
@@ -187,8 +188,8 @@ function PresetLibraryActions({
             });
           }}
         >
-          <div className="sniptale-text-value">
-            <input
+          <div className="sniptale-text-value" data-framed>
+            <ProductInput
               ref={nameInput}
               autoFocus
               maxLength={120}
@@ -196,10 +197,6 @@ function PresetLibraryActions({
               value={name}
               aria-label={translate('videoEditor.effectsLibrary.presetName')}
               onChange={(event) => setName(event.target.value)}
-              className={[
-                'min-w-0 w-full rounded-[var(--sniptale-radius-sm)] border bg-transparent px-2 text-xs',
-                'border-[var(--sniptale-color-border-soft)]',
-              ].join(' ')}
             />
             {!busy && name ? (
               <InspectorFieldClear

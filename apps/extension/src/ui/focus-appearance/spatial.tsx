@@ -24,13 +24,13 @@ export function SpatialMotionFields(props: {
     <div className="sniptale-parameter-stack" data-ui="focus.spatialMotion">
       <ToggleField
         label={translate('gallery.videoReview.spatialMotion')}
+        showStatus
         value={value.enabled}
         onChange={(enabled) => props.onChange({ ...value, enabled })}
       />
       {value.enabled ? (
-        <>
+        <div className="sniptale-parameter-stack sniptale-parameter-dependents">
           <SegmentedRow<'orbit' | 'rise' | 'roll'>
-            layout="stacked"
             columns={3}
             label={translate('gallery.videoReview.spatialMotionPreset')}
             ariaLabel={translate('gallery.videoReview.spatialMotionPreset')}
@@ -62,7 +62,6 @@ export function SpatialMotionFields(props: {
             }
           />
           <SegmentedRow
-            layout="stacked"
             columns={2}
             label={translate('gallery.videoReview.spatialMotionEasing')}
             ariaLabel={translate('gallery.videoReview.spatialMotionEasing')}
@@ -103,7 +102,7 @@ export function SpatialMotionFields(props: {
               onChange={(next) => props.onChange({ ...value, end: { ...value.end, [key]: next } })}
             />
           ))}
-        </>
+        </div>
       ) : null}
     </div>
   );

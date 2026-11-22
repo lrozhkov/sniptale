@@ -492,6 +492,7 @@ function canonicalCamera() {
 it('selects a canonical camera interval without waiting for HTML metadata or clock', async () => {
   const f = canonicalCamera();
   const { acquire, release, frame } = f;
+  expect(f.source.canOverlapCapture).toBe(false);
   const captured = await f.source.captureFrame(
     { sourceTime: 0.5, settings: f.settings },
     f.resources,
@@ -505,6 +506,7 @@ it('selects a canonical camera interval without waiting for HTML metadata or clo
   expect(captured.status).toBe('ready');
   if (captured.status !== 'ready') throw new Error('Expected camera frame');
   expect(captured.frame.representedMediaTime).toBe(0.4);
+  expect(f.source.canOverlapCapture).toBe(true);
   expect(captured.frame.drawable.orientation).toEqual({ rotation: 90, flip: true });
   expect(release).not.toHaveBeenCalled();
   loaded[0]!.dispatchEvent(new Event('loadedmetadata'));
@@ -643,6 +645,7 @@ it('starts HTML compatibility only after actual canonical unsupported', async ()
   expect(compatible.status).toBe('ready');
   if (compatible.status !== 'ready') throw new Error('Expected compatibility camera');
   compatible.frame.release();
+  expect(f.source.canOverlapCapture).toBe(false);
   expect(f.acquire).toHaveBeenCalledOnce();
   expect(f.events.failed).not.toHaveBeenCalled();
 });

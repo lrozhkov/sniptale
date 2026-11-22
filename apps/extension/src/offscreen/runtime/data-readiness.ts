@@ -1,3 +1,4 @@
+import { prepareTranslations } from '../../platform/i18n';
 import { runStorageStartupPhase } from '../../composition/persistence/infrastructure/startup-diagnostics';
 import {
   initDB,
@@ -99,6 +100,7 @@ export const offscreenDataReadiness = createOffscreenDataReadiness({
 
 /** Replay the previous durable completion before admitting another recording writer. */
 export async function prepareOffscreenRecordingData(): Promise<void> {
+  await prepareTranslations('offscreen');
   await offscreenDataReadiness.ensureAdmission();
   const [{ reconcileRecordingCompletionOutbox }, { sendRuntimeMessage }] =
     await runStorageStartupPhase('recording-outbox-import', () =>

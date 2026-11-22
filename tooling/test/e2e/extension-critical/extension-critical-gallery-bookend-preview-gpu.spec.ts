@@ -4,7 +4,7 @@ import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { resolveMediaFitFrame } from '../../../../apps/extension/src/features/video/project/window-geometry';
 import type { QuickEditPresentationSettings } from '../../../../apps/extension/src/features/video/review/advanced/presentation';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';

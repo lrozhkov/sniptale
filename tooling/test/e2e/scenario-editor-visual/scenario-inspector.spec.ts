@@ -1,7 +1,7 @@
 import { expect, type Locator } from '@playwright/test';
 import { test } from '../support/extension-fixture';
 import { openVisualHarness, SCENARIO_VISUAL_THEMES } from './scenario-editor-visual.helpers';
-import { createTranslator } from '../../../../apps/extension/src/platform/i18n';
+import { createTranslator } from '../support/catalog-fixture';
 
 for (const theme of SCENARIO_VISUAL_THEMES) {
   test(`scenario inspector shares color and section patterns in ${theme}`, async ({
@@ -502,7 +502,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         .first();
       await expect.soft(segment).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       const segments = segment.locator('..');
-      await expect(segments).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(segments).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       const inactive = segments.locator('button[aria-pressed="false"]').first();
       expect(await inactive.evaluate((node) => getComputedStyle(node).backgroundColor)).not.toBe(
         await segment.evaluate((node) => getComputedStyle(node).backgroundColor)
@@ -665,11 +665,9 @@ for (const locale of ['ru', 'en'] as const) {
         await layout.scrollIntoViewIfNeeded();
         const heading = (await layout.locator('.guide-inspector-group-heading').boundingBox())!;
         const field = (await layout.locator('[data-ui="shared.ui.compact-select"]').boundingBox())!;
-        if (width === 420)
-          expect(
-            Math.abs(heading.y + heading.height / 2 - field.y - field.height / 2)
-          ).toBeLessThanOrEqual(1);
-        else expect(field.y).toBeGreaterThanOrEqual(heading.y + heading.height);
+        expect(
+          Math.abs(heading.y + heading.height / 2 - field.y - field.height / 2)
+        ).toBeLessThanOrEqual(1);
         const rows = appearance.locator('.sniptale-parameter-row');
         expect(await rows.count()).toBeGreaterThan(1);
         for (const row of await rows.all()) {
@@ -689,7 +687,11 @@ for (const locale of ['ru', 'en'] as const) {
           appearance.locator('[data-ui="shared.ui.compact-inspector.segmented-field"]').filter({
             hasText: t('scenario.editor.appearanceTheme'),
           })
-        ).toHaveAttribute('data-layout', width === 260 ? 'stacked' : 'inline');
+        ).toHaveAttribute('data-layout', 'inline');
+        const accent = appearance.locator('.guide-style-accent .inspector-hex-editor input');
+        expect(
+          await accent.evaluate((input) => input.scrollWidth - input.clientWidth)
+        ).toBeLessThanOrEqual(1);
         await page.screenshot({
           path: info.outputPath(`semantic-rows-${width}.png`),
           fullPage: false,

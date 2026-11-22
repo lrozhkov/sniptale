@@ -8,7 +8,15 @@ import {
   useResolvedPortalTheme,
 } from '@sniptale/ui/theme/safe-portal';
 import { isComposedEventWithinElement } from '@sniptale/ui/dom-events';
-import { Archive, FilePlus2, Keyboard, MoreHorizontal, PanelsTopLeft } from 'lucide-react';
+import {
+  Archive,
+  FilePlus2,
+  History,
+  Keyboard,
+  MoreHorizontal,
+  PanelsTopLeft,
+  X,
+} from 'lucide-react';
 import { ProductModalBody, ProductModalHeader } from '@sniptale/ui/product-modal';
 import { translate } from '../../platform/i18n';
 import { formatHotkey } from '../../features/keyboard-shortcuts/hotkey-format';
@@ -98,8 +106,10 @@ function KeyboardHelpDialog({ anchor, onClose }: { anchor: HTMLButtonElement; on
 export function ReviewKeyboardHelp(props: {
   busy?: boolean | undefined;
   onNewProject?: (() => void) | undefined;
+  onOpenEditHistory?: (() => void) | undefined;
   onBackup?: (() => void) | undefined;
   onBasicMode?: (() => void) | undefined;
+  onClose?: (() => void) | undefined;
 }) {
   const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
   const [open, setOpen] = useState(false);
@@ -214,6 +224,19 @@ export function ReviewKeyboardHelp(props: {
                     </span>
                   </ProductDropdownItem>
                 ) : null}
+                {props.onOpenEditHistory ? (
+                  <ProductDropdownItem
+                    role="menuitem"
+                    disabled={Boolean(props.busy)}
+                    onClick={() => {
+                      close();
+                      props.onOpenEditHistory?.();
+                    }}
+                  >
+                    <History size={16} aria-hidden="true" />
+                    {translate('gallery.videoReview.editHistoryTitle')}
+                  </ProductDropdownItem>
+                ) : null}
                 <ProductDropdownItem
                   role="menuitem"
                   onClick={() => {
@@ -248,6 +271,22 @@ export function ReviewKeyboardHelp(props: {
                   >
                     <PanelsTopLeft size={16} aria-hidden="true" />
                     {translate('gallery.videoReview.returnBasicMode')}
+                  </ProductDropdownItem>
+                ) : null}
+                {props.onClose ? (
+                  <ProductDropdownItem
+                    role="menuitem"
+                    disabled={Boolean(props.busy)}
+                    onMouseDown={(event) => {
+                      if (event.button === 0) event.preventDefault();
+                    }}
+                    onClick={() => {
+                      close();
+                      props.onClose?.();
+                    }}
+                  >
+                    <X size={16} aria-hidden="true" />
+                    {translate('common.actions.close')}
                   </ProductDropdownItem>
                 ) : null}
               </ProductDropdownMenu>

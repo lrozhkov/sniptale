@@ -8,7 +8,7 @@ Russian and English are the reference UI languages. Their current lengths do not
 
 | Text role | Default | When space remains insufficient |
 | --- | --- | --- |
-| Parameter name | Wrap at word boundaries | Stack value below name before words become letter columns |
+| Parameter name | Keep inline names on one line | Use end ellipsis and expose the full name |
 | Current parameter value | Wrap while keeping its value column stable | End ellipsis only for a declared dense single-line context |
 | Command | Content-sized target, flexible action row | Wrap or move the complete command to an overflow menu |
 | Critical/destructive command | Complete explicit action name | Do not truncate its meaning or hide the destructive object |

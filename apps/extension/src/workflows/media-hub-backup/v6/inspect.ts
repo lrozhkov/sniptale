@@ -8,7 +8,7 @@ import {
 import { createArchiveFingerprint, parseCatalog } from './catalog';
 import { parseBoundedJson, parseManifestV6 } from './codec';
 import { parseBackupRootEnvelope } from './shared-object-envelope';
-import { verifyBackupSharedObjects } from './shared-objects';
+import { digestBackupObject, verifyBackupSharedObjects } from './shared-objects';
 import {
   MAX_CATALOG_SHARD_BYTES,
   MAX_ROOT_METADATA_BYTES,
@@ -17,21 +17,27 @@ import {
 import { assertV6MetadataPath, MANIFEST_PATH } from './layout';
 import {
   MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT,
+  MEDIA_HUB_BACKUP_LINKED_LIBRARY_LAYOUT,
   isSharedBackupLayout,
   assertReviewProjectLayout,
   assertCursorAttachmentLayout,
+  assertImageHistoryLayout,
+  assertLinkedLibraryLayout,
 } from './layout';
 import { decodeBackupMetadata } from './metadata-transport';
 import { assertBackupByteBudget } from './errors';
 import { MAX_EXPANDED_ARCHIVE_METADATA_BYTES } from './contracts';
 import { assertArchiveRootMetadataIdentity } from './root-codecs/root-identity';
 import { assertArchiveRootObjectInventory } from './root-codecs/object-inventory';
+import { parsePortableMediaMetadata, type PortableMediaMetadata } from './root-codecs/media';
+import { parseLibraryLifecycle } from '../../../composition/persistence/library-lifecycle/parser';
 
 export interface InspectedMediaHubBackupV6 {
   descriptors: ArchiveRootDescriptor[];
   fingerprint: string;
   manifest: MediaHubBackupManifestV6;
   rootKeys: string[];
+  linkedProjectKinds?: ReadonlyMap<string, 'image' | 'video-review'>;
   thumbnailCount: number;
 }
 
@@ -95,6 +101,16 @@ interface InspectionAccumulator {
   rootDescriptors: ArchiveRootDescriptor[];
   rootKeys: string[];
   canonicalRootKeys: Set<string>;
+  librarySources: Map<
+    string,
+    {
+      original: Pick<PortableMediaMetadata['entry'], 'kind' | 'mimeType' | 'size' | 'source'>;
+      path: string;
+      restoresToLibrary: boolean;
+      mediaId?: string;
+      projectKind?: 'image' | 'video-review';
+    }
+  >;
   rootsByProfile: MediaHubBackupManifestV6['totals']['rootsByProfile'];
   thumbnailCount: number;
   totalBytes: number;
@@ -109,6 +125,7 @@ function createInspectionAccumulator(): InspectionAccumulator {
     expandedBytes: 0,
     catalogTexts: [],
     canonicalRootKeys: new Set(),
+    librarySources: new Map(),
     declaredPaths: new Set([MANIFEST_PATH]),
     rootDescriptors: [],
     rootKeys: [],
@@ -177,6 +194,39 @@ async function inspectRoot(args: {
   assertArchiveRootMetadataIdentity(args.descriptor, decoded.envelope.metadata);
   assertReviewProjectLayout(decoded.envelope.metadata, args.manifest.layout);
   assertCursorAttachmentLayout(decoded.envelope.metadata, args.manifest.layout);
+  assertImageHistoryLayout(decoded.envelope.metadata, args.manifest.layout);
+  assertLinkedLibraryLayout(decoded.envelope.metadata, args.manifest.layout);
+  if (
+    args.manifest.layout === MEDIA_HUB_BACKUP_LINKED_LIBRARY_LAYOUT &&
+    args.descriptor.rootKind === 'media' &&
+    args.descriptor.mediaSubtype === 'library-item'
+  ) {
+    const metadata = parsePortableMediaMetadata(decoded.envelope.metadata, {
+      allowLibraryRelationships: true,
+    });
+    const { kind, mimeType, size, source } = metadata.entry;
+    const lifecycle = parseLibraryLifecycle(metadata.entry.lifecycle, {
+      storageClass: 'library',
+      updatedAt: metadata.entry.updatedAt,
+    });
+    const original = decoded.envelope.objects.find(
+      ({ objectId }) => objectId === metadata.originalObjectId
+    );
+    if (!original) throw new Error('Archive Library original object is unavailable.');
+    args.state.librarySources.set(args.descriptor.rootId, {
+      original: { kind, mimeType, size, source },
+      path: original.path,
+      restoresToLibrary:
+        lifecycle != null &&
+        (lifecycle.storageClass === 'library' || !!(metadata.workspace || metadata.videoReview)),
+      ...(metadata.linkedSourceMediaId
+        ? {
+            mediaId: metadata.linkedSourceMediaId,
+            projectKind: metadata.workspace ? 'image' : 'video-review',
+          }
+        : {}),
+    });
+  }
   if (isSharedBackupLayout(args.manifest.layout))
     await assertArchiveRootObjectInventory(
       decoded.envelope,
@@ -261,6 +311,43 @@ function assertExactDeclaredEntries(reader: ArchiveReader, state: InspectionAccu
   }
 }
 
+async function inspectLinkedProjects(
+  state: InspectionAccumulator,
+  reader: ArchiveReader,
+  verifiedObjects: readonly { path: string; sha256: string }[]
+) {
+  const projects = new Map<string, 'image' | 'video-review'>();
+  const digests = new Map(verifiedObjects.map(({ path, sha256 }) => [path, sha256]));
+  const digest = async (path: string) => {
+    const existing = digests.get(path);
+    if (existing !== undefined) return existing;
+    const entry = reader.entry(path);
+    if (!entry) throw new Error('Archive Library original object is unavailable.');
+    const sha256 = await digestBackupObject(entry);
+    digests.set(path, sha256);
+    return sha256;
+  };
+  for (const [id, link] of state.librarySources) {
+    if (!link.mediaId || !link.projectKind) continue;
+    const source = state.librarySources.get(link.mediaId);
+    if (
+      !source ||
+      source.mediaId ||
+      source.original.kind !== link.original.kind ||
+      source.original.mimeType !== link.original.mimeType ||
+      source.original.size !== link.original.size ||
+      source.original.source.kind !== link.original.source.kind
+    )
+      throw new Error('Linked project has no matching archive original.');
+    if (!source.restoresToLibrary)
+      throw new Error('Archived project original must be saved in the Library.');
+    if (source.path !== link.path && (await digest(source.path)) !== (await digest(link.path)))
+      throw new Error('Linked project and its archive original have different original bytes.');
+    projects.set(id, link.projectKind);
+  }
+  return projects;
+}
+
 export async function inspectMediaHubBackupV6(file: Blob): Promise<InspectedMediaHubBackupV6> {
   const reader = await openArchiveReader(file);
   try {
@@ -292,6 +379,11 @@ export async function inspectMediaHubBackupV6(file: Blob): Promise<InspectedMedi
         throw new Error('Media backup shared object is unused or has no matching direct anchor.');
     }
     await verifyBackupSharedObjects(reader, manifest.sharedObjects ?? []);
+    const linkedProjectKinds = await inspectLinkedProjects(
+      state,
+      reader,
+      manifest.sharedObjects ?? []
+    );
     return {
       descriptors: state.rootDescriptors,
       fingerprint: await createArchiveFingerprint({
@@ -301,6 +393,7 @@ export async function inspectMediaHubBackupV6(file: Blob): Promise<InspectedMedi
       }),
       manifest,
       rootKeys: state.rootKeys,
+      ...(linkedProjectKinds.size ? { linkedProjectKinds } : {}),
       thumbnailCount: state.thumbnailCount,
     };
   } finally {

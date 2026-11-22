@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { EFFECT_RUNTIME_RESOURCE_LIMITS } from '../../../../features/video/composition/effect-runtime/runtime/resource-limits';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { animationRuntimeDuration } from '../../../../contracts/effect-runtime/animation';
@@ -121,8 +122,8 @@ it('recovers timed-out retained Native transport at upcoming preparation before 
   };
   const ports: MessagePort[] = [];
   try {
-    await vi.advanceTimersByTimeAsync(1500);
-    expect(document.querySelector('iframe')).toBeNull();
+    await vi.advanceTimersByTimeAsync(EFFECT_RUNTIME_RESOURCE_LIMITS.sandboxLoadTimeoutMs);
+    expect(initial!.isConnected).toBe(false);
     const input = futureInput(runtime.executor);
     advisory.update(input, provider);
     const replacement = document.querySelector('iframe');
@@ -130,7 +131,7 @@ it('recovers timed-out retained Native transport at upcoming preparation before 
     if (!replacement) throw new Error('Expected transport recovery before foreground request');
     expect(replacement).not.toBe(initial);
     const command = { ...createSandboxRenderRequest(), frameIndex: 0, time: 0 };
-    const requests: unknown[] = [];
+    const requests: { requestId: unknown; effectInstanceId: unknown }[] = [];
     const isPort = (value: unknown): value is MessagePort =>
       isRecord(value) &&
       typeof value['postMessage'] === 'function' &&
@@ -150,24 +151,39 @@ it('recovers timed-out retained Native transport at upcoming preparation before 
       const control = options['transfer'][0];
       ports.push(control);
       control.onmessage = (event) => {
-        requests.push(event.data);
-        expect(event.data).toMatchObject({
-          request: { kind: 'prepareGpuFrame', requestId: command.requestId },
-        });
+        const message: unknown = event.data;
+        if (!isRecord(message) || !isRecord(message['request']))
+          throw new Error('Expected a frame request.');
+        const request = message['request'];
+        const requestId = request['requestId'];
+        const effectInstanceId = request['effectInstanceId'];
+        requests.push({ requestId, effectInstanceId });
         const response = event.ports[0];
         if (!response) throw new Error('Expected frame response port');
+        expect(request['kind']).toBe('prepareGpuFrame');
+        const width = request['renderWidth'];
+        const height = request['renderHeight'];
+        const documentRef = request['documentRef'];
+        const assetSelectionRef = request['assetSelectionRef'];
+        if (
+          typeof width !== 'number' ||
+          typeof height !== 'number' ||
+          !isRecord(documentRef) ||
+          !isRecord(assetSelectionRef)
+        )
+          throw new Error('Expected frame dimensions and immutable references.');
         response.postMessage({
           kind: 'frame',
-          bitmap: new FakeImageBitmap(command.renderWidth, command.renderHeight),
-          width: command.renderWidth,
-          height: command.renderHeight,
-          effectInstanceId: command.effectInstanceId,
-          requestId: command.requestId,
-          sequenceId: command.sequenceId,
-          snapshotId: command.snapshotId,
+          bitmap: new FakeImageBitmap(width, height),
+          width,
+          height,
+          effectInstanceId,
+          requestId,
+          sequenceId: request['sequenceId'],
+          snapshotId: request['snapshotId'],
           acknowledged: {
-            documentId: command.documentRef.id,
-            assetSelectionId: command.assetSelectionRef.id,
+            documentId: documentRef['id'],
+            assetSelectionId: assetSelectionRef['id'],
           },
         });
       };
@@ -176,7 +192,9 @@ it('recovers timed-out retained Native transport at upcoming preparation before 
     });
     replacement.dispatchEvent(new Event('load'));
     await vi.advanceTimersByTimeAsync(0);
-    expect(requests).toEqual([]);
+    expect(requests).toEqual([{ requestId: expect.any(String), effectInstanceId: 'future' }]);
+    expect(requests[0]?.requestId).not.toBe(command.requestId);
+    expect(isolated.prepareGpuFrame).not.toHaveBeenCalled();
     advisory.update(input, provider);
     expect(document.querySelector('iframe')).toBe(replacement);
     advisory.dispose();
@@ -184,7 +202,11 @@ it('recovers timed-out retained Native transport at upcoming preparation before 
     await expect(runtime.executor.prepareGpuFrame!(command)).resolves.toMatchObject({
       kind: 'frame',
     });
-    expect(requests).toHaveLength(1);
+    expect(requests).toHaveLength(2);
+    expect(requests[1]).toEqual({
+      requestId: command.requestId,
+      effectInstanceId: command.effectInstanceId,
+    });
     expect(document.querySelector('iframe')).toBe(replacement);
     runtime.dispose();
     expect(document.querySelector('iframe')).toBeNull();

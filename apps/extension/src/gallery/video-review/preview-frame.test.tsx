@@ -202,3 +202,87 @@ it('hides disconnected settings and opens connected settings without changing tr
   act(() => gear.click());
   expect(open).toHaveBeenCalledOnce();
 });
+
+it('samples only the fullscreen rail without rendering its scene children and releases the clock', async () => {
+  vi.useFakeTimers();
+  try {
+    let resultTime: number | null = 2;
+    let running = true;
+    const listeners = new Set<() => void>();
+    const clock = {
+      read: () => 4,
+      isPlaying: () => running,
+      subscribe(listener: () => void) {
+        listeners.add(listener);
+        return () => {
+          listeners.delete(listener);
+        };
+      },
+    };
+    const readPosition = () => ({
+      epoch: 1,
+      mapRevision: 1,
+      resultTime,
+      source: { kind: 'freeze' as const, sourceTime: 4, mediaTime: 3.98, segmentId: 'hold' },
+      media: { sourceId: 'source', time: 3.98 },
+    });
+    const children = vi.fn(() => <video />);
+    act(() =>
+      root.render(
+        <ReviewPreviewFrame
+          time={2}
+          clock={clock}
+          readPosition={readPosition}
+          duration={10}
+          playing
+          disabled={false}
+          onPlay={vi.fn()}
+          onSeek={vi.fn()}
+        >
+          {children}
+        </ReviewPreviewFrame>
+      )
+    );
+    expect(listeners.size).toBe(0);
+    const toggle = host.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.videoReview.fullscreen"]'
+    )!;
+    await act(async () => toggle.click());
+    expect(listeners.size).toBe(1);
+    const count = children.mock.calls.length;
+    const seek = () => host.querySelector<HTMLInputElement>('input[type="range"]')!;
+    act(() => {
+      resultTime = 5;
+      for (const listener of listeners) listener();
+    });
+    act(() => vi.advanceTimersByTime(99));
+    expect(seek().value).toBe('2');
+    act(() => vi.advanceTimersByTime(1));
+    expect(seek().value).toBe('5');
+    expect(children).toHaveBeenCalledTimes(count);
+    act(() => {
+      resultTime = null;
+      for (const listener of listeners) listener();
+      vi.advanceTimersByTime(100);
+    });
+    expect(seek().value).toBe('5');
+    act(() => {
+      resultTime = 7;
+      running = false;
+      for (const listener of listeners) listener();
+    });
+    expect(seek().value).toBe('7');
+    expect(children).toHaveBeenCalledTimes(count);
+    await act(async () => document.exitFullscreen());
+    expect(listeners.size).toBe(0);
+    const exited = children.mock.calls.length;
+    act(() => {
+      resultTime = 9;
+      for (const listener of listeners) listener();
+      vi.advanceTimersByTime(100);
+    });
+    expect(children).toHaveBeenCalledTimes(exited);
+  } finally {
+    vi.useRealTimers();
+  }
+});

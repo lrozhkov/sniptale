@@ -7,6 +7,7 @@ import { initDB, type IndexedDbWriteTransaction } from '../infrastructure/indexe
 import {
   MEDIA_LIBRARY_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_REVIEW_IDENTITIES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   PROJECT_ASSETS_STORE,
@@ -36,10 +37,12 @@ import { createVideoWorkspaceStore, readWorkspaceStorage, writeWorkspaceStorage 
 import type { WorkspaceStorageReadTransaction } from './storage';
 import type { VideoWorkspaceProject } from './contracts';
 import { VideoWorkspaceError } from './store';
+import { fenceVideoReviewIdentity } from './identity';
 
 const PROJECT_STORES = [
   MEDIA_LIBRARY_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_REVIEW_IDENTITIES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   RECORDING_TELEMETRY_STORE,
@@ -145,13 +148,13 @@ export async function renameVideoWorkspaceProject(
 export async function deleteVideoWorkspaceProject(
   id: string,
   expectedRevision: number
-): Promise<void> {
+): Promise<string> {
   await initDB();
-  await runWithDurableAssetLifecycleLock(async (permit) => {
+  return runWithDurableAssetLifecycleLock(async (permit) => {
     const operation = buildPhysicalDeleteOperation([]);
     // Live editors hold the reader through disposal; reject before removing their CAS evidence.
-    const purged = await tryAssetResourceCleanup(async () => {
-      await runWithIndexedDbMutation(async (db) => {
+    const sourceMediaId = await tryAssetResourceCleanup(() =>
+      runWithIndexedDbMutation(async (db) => {
         const tx = db.transaction([...PROJECT_STORES, ASSET_OPERATIONS_STORE], 'readwrite', {
           durability: 'strict',
         });
@@ -172,11 +175,13 @@ export async function deleteVideoWorkspaceProject(
             'local-edit',
             workspace.revision
           );
+          await fenceVideoReviewIdentity(tx, 'retired-project', id, workspace.revision);
           await createVideoWorkspaceStore(tx).delete(id);
           await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(id);
           if (operation.privateSources?.length)
             await tx.objectStore(ASSET_OPERATIONS_STORE).put(operation);
           await tx.done;
+          return workspace.sourceMediaId ?? workspace.aggregateId;
         } catch (error) {
           try {
             tx.abort();
@@ -186,12 +191,12 @@ export async function deleteVideoWorkspaceProject(
           await tx.done.catch(() => undefined);
           throw error;
         }
-      });
-      return true;
-    });
-    if (!purged) throw new VideoWorkspaceError('conflict');
+      })
+    );
+    if (!sourceMediaId) throw new VideoWorkspaceError('conflict');
     // The committed journal retains retry authority if physical cleanup is unavailable.
     if (operation.privateSources?.length)
       await completePhysicalDeleteOperation(operation, permit).catch(() => undefined);
+    return sourceMediaId;
   });
 }

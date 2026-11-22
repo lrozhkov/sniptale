@@ -1,3 +1,4 @@
+import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { RemoteProjectActions } from './remote-project-actions';
 import { NativeCacheActions } from './native-cache-actions';
 import './preview.css';
@@ -68,7 +69,9 @@ function UnavailableProjectNotice({ item }: Pick<PreviewPanelProps, 'item'>) {
 
 function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item' | 'onPromote' | 'trashMode'>) {
   const isDraft = props.item.lifecycle?.storageClass === 'temporary';
-  const folder = getGalleryItemFolder(props.item.kind);
+  const projectRetainsOriginal =
+    isGalleryMediaItem(props.item) && props.item.savedIndependently === false;
+  const folder = getGalleryItemFolder(props.item);
   const CategoryIcon = getGalleryFolderIcon(folder);
 
   return (
@@ -76,11 +79,15 @@ function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item' | 'onPromote' 
       <div className="min-w-0">
         <h2 className="flex min-h-9 items-center gap-2 pr-20 text-[14px] leading-5 font-medium">
           <CategoryIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
-          {FOLDER_LABELS[folder]}
+          {props.item.type === 'image-project'
+            ? translate('gallery.preview.imageProject')
+            : FOLDER_LABELS[folder]}
         </h2>
         <div className="mt-1 flex items-center gap-2 text-sm text-[var(--sniptale-color-text-muted)]">
           <span>{formatDate(props.item.createdAt)}</span>
-          {!props.trashMode && props.item.lifecycle?.storageClass === 'library' ? (
+          {!props.trashMode &&
+          !projectRetainsOriginal &&
+          props.item.lifecycle?.storageClass === 'library' ? (
             <span
               title={translate('gallery.app.permanentStorage')}
               aria-label={translate('gallery.app.permanentStorage')}
@@ -88,6 +95,7 @@ function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item' | 'onPromote' 
               <BadgeCheck size={14} aria-hidden="true" />
             </span>
           ) : null}
+          {projectRetainsOriginal ? <PreviewPromotionAction {...props} /> : null}
         </div>
         {isDraft && !props.trashMode ? (
           <div
@@ -135,8 +143,8 @@ function PreviewFilenameField(
         </p>
       ) : (
         <div className="gallery-preview-filename-value">
-          <div className="gallery-preview-filename-input">
-            <input
+          <div className="gallery-preview-filename-input sniptale-text-value" data-framed>
+            <ProductInput
               ref={inputRef}
               aria-labelledby={inputId}
               placeholder={translate(
@@ -155,10 +163,8 @@ function PreviewFilenameField(
               }}
               aria-describedby={extension ? `${inputId}-extension` : undefined}
               readOnly={!editable}
-              className="w-full min-w-0 bg-transparent text-[13px] font-normal leading-[18px]
-              text-[var(--sniptale-color-text-primary)] outline-none"
             />
-            {stem ? (
+            {stem && editable ? (
               <InspectorFieldClear
                 target={inputRef}
                 label={translate(
@@ -185,7 +191,7 @@ function PreviewFilenameField(
 }
 
 function PreviewPanelSidebar(
-  props: PreviewPanelProps & { onReview?: () => void; pending?: boolean }
+  props: PreviewPanelProps & { onReview?: (projectId?: string) => void; pending?: boolean }
 ) {
   if (isGalleryRemoteItem(props.item))
     return (
@@ -247,7 +253,13 @@ function PreviewPanelSidebar(
               <PreviewSourceField item={props.item} trashMode={Boolean(props.trashMode)} />
             </div>
           </details>
-          <PreviewProjectUsage item={props.item} trashMode={Boolean(props.trashMode)} />
+          <PreviewProjectUsage
+            item={props.item}
+            trashMode={Boolean(props.trashMode)}
+            {...(props.onRemoveFromOriginals
+              ? { onRemoveFromOriginals: props.onRemoveFromOriginals }
+              : {})}
+          />
           <PreviewTagEditor
             {...(props.allTags === undefined ? {} : { allTags: props.allTags })}
             item={props.item}
@@ -306,18 +318,22 @@ export function PreviewPanel(props: PreviewPanelProps) {
     props.initialMode === 'edit' &&
     ((isGalleryMediaItem(item) && item.mimeType.startsWith('video/')) ||
       (item.type === 'quick-edit-project' && !item.unavailableReason));
-  const [reviewState, setReviewState] = useState(() => ({
-    itemId: item.id,
-    active: initialReview,
-  }));
-  const review = reviewState.itemId === item.id ? reviewState.active : initialReview;
+  type ReviewTarget = { aggregateId: string; sourceMediaId?: string };
+  const initialAggregateId = item.type === 'quick-edit-project' ? item.entityId : item.id;
+  const initialTarget = initialReview ? { aggregateId: initialAggregateId } : null;
+  const [reviewState, setReviewState] = useState<{ itemId: string; target: ReviewTarget | null }>(
+    () => ({ itemId: item.id, target: initialTarget })
+  );
+  const review = reviewState.itemId === item.id ? reviewState.target : initialTarget;
   const opener = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setReviewState((current) =>
-      current.itemId === item.id ? current : { itemId: item.id, active: initialReview }
+      current.itemId === item.id
+        ? current
+        : { itemId: item.id, target: initialReview ? { aggregateId: initialAggregateId } : null }
     );
-  }, [initialReview, item.id]);
+  }, [initialAggregateId, initialReview, item.id]);
 
   useEffect(() => {
     if (review) return;
@@ -331,10 +347,10 @@ export function PreviewPanel(props: PreviewPanelProps) {
   if (review && !props.trashMode)
     return (
       <VideoReview
-        aggregateId={item.type === 'quick-edit-project' ? item.entityId : item.id}
+        {...review}
         onClose={onClose}
         onBack={() => {
-          setReviewState({ itemId: item.id, active: false });
+          setReviewState({ itemId: item.id, target: null });
           requestAnimationFrame(() => {
             const button = document.querySelector<HTMLButtonElement>(
               '[data-ui="gallery.videoReview.enter"]'
@@ -348,11 +364,22 @@ export function PreviewPanel(props: PreviewPanelProps) {
   return (
     <PreviewPanelSurface
       {...props}
-      onReview={() => {
+      onReview={(projectId) => {
         if (props.trashMode) return;
         opener.current =
           document.activeElement instanceof HTMLElement ? document.activeElement : null;
-        setReviewState({ itemId: item.id, active: true });
+        if (projectId) {
+          setReviewState({ itemId: item.id, target: { aggregateId: projectId } });
+        } else if (isGalleryMediaItem(item)) {
+          const kind = item.source.kind === 'project-export' ? 'export' : item.source.kind;
+          setReviewState({
+            itemId: item.id,
+            target: {
+              aggregateId: `${kind}:quick-project:${crypto.randomUUID()}`,
+              sourceMediaId: item.entityId ?? item.id,
+            },
+          });
+        }
       }}
     />
   );
@@ -396,7 +423,7 @@ function usePreviewVideoDuration(
 }
 
 /** Preview-only layout; the parent owns editor mode and keyboard/focus lifecycle. */
-function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
+function PreviewPanelSurface(props: PreviewPanelProps & { onReview(projectId?: string): void }) {
   const { onReview, ...panel } = props;
   const { item, previewUrl, onPresented } = panel;
   const inspectorCollapsed = !props.trashMode && props.inspectorCollapsed;

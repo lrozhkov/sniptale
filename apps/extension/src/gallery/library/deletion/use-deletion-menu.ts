@@ -96,7 +96,10 @@ export function useDeletionMenu(
     }
   };
   const activatePermanent = async () => {
-    if (prepared) return run(prepared.confirm);
+    if (prepared) {
+      if (prepared.confirm) return run(prepared.confirm);
+      return;
+    }
     return prepare();
   };
   return {

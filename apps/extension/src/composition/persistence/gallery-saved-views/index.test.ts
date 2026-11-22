@@ -80,6 +80,12 @@ it('rejects duplicate names only inside the same category', async () => {
   await expect(
     createGallerySavedView({ filters, folderFilter: 'recording', name: 'Review' })
   ).resolves.toMatchObject({ folderFilter: 'recording' });
+  const imageProjects = await createGallerySavedView({
+    filters,
+    folderFilter: 'image-project',
+    name: 'Review',
+  });
+  await expect(listGallerySavedViews()).resolves.toContainEqual(imageProjects);
 });
 
 it('moves views only relative to siblings in the same category', async () => {

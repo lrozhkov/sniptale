@@ -1,6 +1,10 @@
 import type { IDBPTransaction } from 'idb';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
-import { VIDEO_PROJECT_REVISIONS_STORE } from '../infrastructure/indexed-db/core.stores';
+import {
+  VIDEO_PROJECT_REVISIONS_STORE,
+  VIDEO_PROJECTS_STORE,
+} from '../infrastructure/indexed-db/core.stores';
+import { parseVideoProjectEntry } from './read-guards';
 
 type ProjectRevisionTransaction = IDBPTransaction<unknown, string[], 'readwrite'>;
 
@@ -15,8 +19,9 @@ function validRevision(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
-async function highestProjectRevision(
-  tx: ProjectRevisionTransaction,
+/** Observe the retained admission token before preparation, including when the root is absent. */
+export async function readRetainedVideoProjectRevisionInTransaction(
+  tx: IDBPTransaction<unknown, string[], 'readwrite' | 'readonly'>,
   projectId: string,
   currentRevision: number
 ): Promise<number> {
@@ -34,13 +39,37 @@ async function highestProjectRevision(
   return Math.max(currentRevision, raw['revision']);
 }
 
+/** Read the current project and its retained admission token from one transaction. */
+export async function readVideoProjectRevisionSnapshot(
+  db: {
+    transaction(stores: string[], mode: 'readonly'): IDBPTransaction<unknown, string[], 'readonly'>;
+  },
+  projectId: string
+) {
+  const tx = db.transaction([VIDEO_PROJECTS_STORE, VIDEO_PROJECT_REVISIONS_STORE], 'readonly');
+  const raw: unknown = await tx.objectStore(VIDEO_PROJECTS_STORE).get(projectId);
+  const existing = parseVideoProjectEntry(raw);
+  if (raw !== undefined && !existing) throw new Error('Stored video project is invalid.');
+  const retained = await readRetainedVideoProjectRevisionInTransaction(
+    tx,
+    projectId,
+    existing?.workspaceRevision ?? 0
+  );
+  await tx.done;
+  return { existing, retained };
+}
+
 /** Allocate a fresh local token with the caller's accepted native mutation. */
 export async function allocateVideoProjectRevisionInTransaction(
   tx: ProjectRevisionTransaction,
   projectId: string,
   currentRevision: number
 ): Promise<number> {
-  const highest = await highestProjectRevision(tx, projectId, currentRevision);
+  const highest = await readRetainedVideoProjectRevisionInTransaction(
+    tx,
+    projectId,
+    currentRevision
+  );
   if (highest === Number.MAX_SAFE_INTEGER)
     throw new Error('Local video project revisions are exhausted.');
   const revision = highest + 1;
@@ -55,7 +84,11 @@ export async function retainVideoProjectRevisionInTransaction(
   projectId: string,
   currentRevision: number
 ): Promise<void> {
-  const revision = await highestProjectRevision(tx, projectId, currentRevision);
+  const revision = await readRetainedVideoProjectRevisionInTransaction(
+    tx,
+    projectId,
+    currentRevision
+  );
   const record: VideoProjectRevision = { version: 1, projectId, revision };
   await tx.objectStore(VIDEO_PROJECT_REVISIONS_STORE).put(record);
 }

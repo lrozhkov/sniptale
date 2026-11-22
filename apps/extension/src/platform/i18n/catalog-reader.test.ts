@@ -7,10 +7,10 @@ const catalogs = {
   ru: { actions: { save: 'Сохранить', empty: '' }, onlyRussian: 'Русский' },
 };
 
-it('reads a selected locale and falls back to Russian for unavailable values', () => {
+it('reads a selected locale and falls back to English for unavailable values', () => {
   expect(readCatalogTranslation(catalogs, 'en', 'actions.save')).toBe('Save');
-  expect(readCatalogTranslation(catalogs, 'en', 'onlyRussian')).toBe('Русский');
-  expect(readCatalogTranslation(catalogs, 'fr' as AppLocale, 'actions.save')).toBe('Сохранить');
+  expect(readCatalogTranslation(catalogs, 'ru', 'onlyEnglish')).toBe('English');
+  expect(readCatalogTranslation(catalogs, 'fr' as AppLocale, 'actions.save')).toBe('Save');
 });
 
 it('preserves empty text and returns unknown or non-leaf paths unchanged', () => {

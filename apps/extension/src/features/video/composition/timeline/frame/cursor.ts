@@ -181,7 +181,11 @@ export function resolveVideoCompositionCursor(
 ): VideoCompositionCursorState | null {
   const authored = resolveProjectSourceInteractionDocument(project, currentTime, sourceClipId);
   const motion = authored?.document.cursorEnabled
-    ? evaluateCursorMotion(authored.document.cursorMotions, authored.sourceTime)
+    ? evaluateCursorMotion(
+        authored.document.cursorMotions,
+        authored.sourceTime,
+        authored.resultTime
+      )
     : null;
   if (motion && authored) {
     const mapping = resolveCursorSourcePointMapping(project, authored.clip.id, currentTime);

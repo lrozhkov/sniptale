@@ -1,3 +1,4 @@
+import { materializeDetachedScenarioHistory } from './scenario-history';
 import { parsePreparedRemoteBinding } from './guards';
 import { preparedPresentationRefs } from './prepared-project';
 import { sha256 } from '@noble/hashes/sha2.js';
@@ -28,7 +29,7 @@ export interface PreparedScenarioReplicaExport {
 
 /** Durable JSON stage for an existing native Scenario publisher, with metadata bytes held by claimed refs. */
 export interface PreparedScenarioReplicaRoot {
-  entry: Omit<PreparedScenarioProjectArchiveRoot['entry'], 'history'>;
+  entry: Omit<PreparedScenarioProjectArchiveRoot['entry'], 'history' | 'editingHistory'>;
   historyRef?: AssetRef;
   assets: PreparedScenarioProjectArchiveRoot['assets'];
   exports: PreparedScenarioProjectArchiveRoot['exports'];
@@ -229,7 +230,7 @@ function assertPreparedScenarioAssociations(root: PreparedScenarioReplicaRoot): 
 export function parsePreparedScenarioReplicaRoot(value: unknown): PreparedScenarioReplicaRoot {
   if (!isRecord(value) || !isBoundedScenarioMetadata(value, false)) invalid();
   const entry = parseScenarioProjectEntry(value['entry']);
-  if (!entry || entry.history?.length) invalid();
+  if (!entry || entry.history?.length || entry.editingHistory !== undefined) invalid();
   const historyRef = parseScenarioHistoryRef(value['historyRef']);
   const presentation = parseScenarioPresentationBinding(value['presentation'], entry);
   const root: PreparedScenarioReplicaRoot = {
@@ -289,10 +290,7 @@ export async function hydratePreparedScenarioReplicaRoot(
     if (digest !== root.historyRef.sha256) invalid();
     history = JSON.parse(new TextDecoder().decode(bytes));
   }
-  const entry = parseScenarioProjectEntry({
-    ...root.entry,
-    ...(history === undefined ? {} : { history }),
-  });
+  const entry = materializeDetachedScenarioHistory(root.entry, history);
   if (!entry) invalid();
   const thumbnails = await Promise.all(
     root.thumbnails.map(

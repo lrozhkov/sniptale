@@ -278,6 +278,7 @@ it('shows grid in its own section through the complete selection body', () => {
   expect(gridSettings.onSetEnabled).toHaveBeenCalledWith(true);
   gridSettings.enabled = true;
   render();
+  clickGroup('videoEditor.sidebar.gridSettingsTitle');
   expect(grid().textContent).toContain('videoEditor.app.gridSizeLabel');
   expect(grid().textContent).toContain('videoEditor.app.gridColorLabel');
 });

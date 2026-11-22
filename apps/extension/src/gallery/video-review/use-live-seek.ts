@@ -95,7 +95,7 @@ type EditorState = ReturnType<typeof useReviewEditorState>;
 type LiveSeekState = {
   advanced: EditorState['advanced'];
   source: EditorState['source'];
-  time: number;
+  resultTime: number | null;
   snapshot: {
     document: Pick<EditorState['snapshot']['document'], 'edits' | 'annotations' | 'canvasComments'>;
     snapshot: {
@@ -116,14 +116,17 @@ export function useReviewLiveSeek(
   state: LiveSeekState,
   preferences: QuickPreviewPreferences,
   raster: { width: number; height: number } | null,
-  blocked: boolean
+  blocked: boolean,
+  preference?: { enabled: boolean; onChange(enabled: boolean): void }
 ) {
-  const [enabled, setEnabled] = useState(false);
+  const [localEnabled, setLocalEnabled] = useState(true);
+  const enabled = preference?.enabled ?? localEnabled;
+  const setEnabled = preference?.onChange ?? setLocalEnabled;
   const canvas = useRef<HTMLCanvasElement>(null);
   const queue = useRef<ReturnType<typeof createReviewLiveSeekQueue> | null>(null);
   const [presented, setPresented] = useState<{
     input: object;
-    anchor: number;
+    anchor: number | null;
     time: number;
   } | null>(null);
   const shown = useRef<typeof presented>(null);
@@ -133,14 +136,15 @@ export function useReviewLiveSeek(
     target: number | null;
     resource: LiveSeekResource;
   } | null>(null);
-  const latest = useRef({ time: state.time, enabled, blocked, resource });
-  latest.current = { time: state.time, enabled, blocked, resource };
+  const latest = useRef({ time: state.resultTime, enabled, blocked, resource });
+  latest.current = { time: state.resultTime, enabled, blocked, resource };
   const dismiss = useCallback(() => {
-    if (handoff.current) return;
+    if (handoff.current || !shown.current) return;
     setPresented(null);
     shown.current = null;
   }, []);
   const cancelHandoff = useCallback(() => {
+    if (!handoff.current && !shown.current) return;
     handoff.current = null;
     shown.current = null;
     setPresented(null);
@@ -206,6 +210,7 @@ export function useReviewLiveSeek(
     keyCues,
     clickCues,
   ]);
+  const anchorTime = enabled && !blocked ? state.resultTime : null;
   useEffect(() => {
     if (!handoff.current) dismiss();
     if (!enabled || blocked || !input) return;
@@ -275,7 +280,7 @@ export function useReviewLiveSeek(
     input,
     enabled,
     blocked,
-    state.time,
+    anchorTime,
     resource,
     source,
     advanced,
@@ -284,13 +289,17 @@ export function useReviewLiveSeek(
     cancelHandoff,
   ]);
   useLayoutEffect(() => {
+    mainFrame.current = null;
+    if (handoff.current && handoff.current.frame.input !== input) cancelHandoff();
+  }, [input, cancelHandoff]);
+  useLayoutEffect(() => {
     if (!enabled || blocked || (handoff.current && handoff.current.resource !== resource))
       cancelHandoff();
   }, [enabled, blocked, resource, cancelHandoff]);
   const hover = useCallback(
-    (time: number | null) => {
+    (time: number | null, resultTime?: number) => {
       if (handoff.current && time !== null) return;
-      const result = time === null ? null : map.sourceToTimeline(time);
+      const result = time === null ? null : (resultTime ?? map.sourceToTimeline(time));
       const end = map.getDuration();
       queue.current?.request(
         result === null
@@ -313,6 +322,7 @@ export function useReviewLiveSeek(
     queue.current?.request(null);
     setPresented(frame);
   }, []);
+  // Handoff targets and completion receipts use result time: one freeze raster can show distinct effects.
   const commit = useCallback(
     (time: number) => {
       const pending = handoff.current;
@@ -332,7 +342,11 @@ export function useReviewLiveSeek(
       queueMicrotask(() => {
         if (handoff.current !== pending || pending.target !== null) return;
         const time = readTime();
-        if (time !== undefined && Math.abs(time - pending.frame.anchor) > 0.000002) commit(time);
+        if (
+          time !== undefined &&
+          (pending.frame.anchor === null || Math.abs(time - pending.frame.anchor) > 0.000002)
+        )
+          commit(time);
         else cancelHandoff();
       });
     },
@@ -363,7 +377,7 @@ export function useReviewLiveSeek(
       enabled &&
       !blocked &&
       ((handoff.current?.frame === presented && handoff.current.resource === resource) ||
-        (presented.input === input && presented.anchor === state.time)),
+        (presented.input === input && presented.anchor === state.resultTime)),
     time: presented?.time ?? null,
   };
 }

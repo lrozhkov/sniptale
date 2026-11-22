@@ -1,9 +1,9 @@
 import type { Translate } from '../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { FolderOpen, Plus, Search } from 'lucide-react';
+import { FolderOpen, Plus } from 'lucide-react';
 import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
-import { InspectorFieldClear } from '../compact-inspector-controls/text-field';
-import { useContext, useRef, useState, type DragEvent, type ReactNode } from 'react';
+import { SearchField } from '../compact-inspector-controls/row-controls';
+import { useContext, useState, type DragEvent, type ReactNode } from 'react';
 import type { EditorStartItem } from './use-items';
 import { EditorStartThumbnail } from './thumbnail';
 export { useEditorStartItems, sortEditorStartItems } from './use-items';
@@ -65,11 +65,6 @@ const cardClassName = [
   'bg-[var(--sniptale-color-surface-panel)] text-left',
   'hover:bg-[var(--sniptale-color-surface-hover)] disabled:opacity-50',
   focusClassName,
-].join(' ');
-const searchClassName = [
-  'flex h-10 items-center gap-2 rounded-lg border',
-  'border-[var(--sniptale-color-border-soft)]',
-  'bg-[var(--sniptale-color-surface-panel)] px-3',
 ].join(' ');
 const emptyClassName = [
   'rounded-xl border border-dashed border-[var(--sniptale-color-border-soft)]',
@@ -160,24 +155,15 @@ function EditorStartSearch(props: {
   onChange: (value: string) => void;
 }) {
   const scoped = useContext(CommandPressScope);
-  const input = useRef<HTMLInputElement>(null);
   return (
-    <label className={`${searchClassName} relative ${scoped ? '!h-8 !rounded-[4px] pr-8' : ''}`}>
-      <Search size={16} aria-hidden="true" />
-      <span className="sr-only">{props.label}</span>
-      <input
-        ref={input}
-        autoFocus
-        value={props.value}
-        onChange={(event) => props.onChange(event.target.value)}
-        className={[
-          'bg-transparent outline-none',
-          scoped ? 'min-w-0 w-full text-[13px] font-medium leading-[18px]' : 'text-sm',
-        ].join(' ')}
-        placeholder={props.label}
-      />
-      {scoped && props.value ? <InspectorFieldClear label={props.label} target={input} /> : null}
-    </label>
+    <SearchField
+      label={props.label}
+      placeholder={props.label}
+      value={props.value}
+      showClear={scoped}
+      onChange={props.onChange}
+      inputProps={{ autoFocus: true }}
+    />
   );
 }
 

@@ -19,6 +19,7 @@ import { buildReviewTimeMap } from '../../../features/video/review/timeline';
 import {
   parseReviewAnnotation,
   parseReviewOperation,
+  type ReviewOperationLifetime,
   parseReviewSource,
   parseReviewDocumentBaseline,
 } from '../../../features/video/review/validation';
@@ -71,13 +72,14 @@ const aggregateId = (value: unknown): value is string =>
 function parseWorkspaceHistory(
   raw: unknown[],
   source: ReviewSource,
-  report: Report
+  report: Report,
+  operationLifetime: ReviewOperationLifetime
 ): { history: ReviewOperation[]; discardedHeaderChanges: Set<number> } | null {
   const history: ReviewOperation[] = [];
   const ids = new Set<string>();
   const discardedHeaderChanges = new Set<number>();
   for (const [index, value] of raw.entries()) {
-    const operation = parseReviewOperation(value, source.duration);
+    const operation = parseReviewOperation(value, source.duration, operationLifetime);
     if (!operation || ids.has(operation.id)) {
       report({
         check: 'history-operation',
@@ -177,7 +179,7 @@ function validEffectSnapshotClosure(
       return (
         document !== undefined &&
         document !== null &&
-        instance.end <= duration &&
+        (instance.timeDomain === 'result' || instance.end <= duration) &&
         reviewAnnotationEffectMatchesDocument(instance, document)
       );
     })
@@ -187,7 +189,8 @@ function validEffectSnapshotClosure(
 /** Rejects corrupt history, including invalid operations in the unapplied redo suffix. */
 function parseWorkspace(
   value: unknown,
-  report: Report
+  report: Report,
+  operationLifetime: ReviewOperationLifetime
 ): { workspace: VideoWorkspace; document: ReviewDocument } | null {
   if (
     !isRecord(value) ||
@@ -198,6 +201,7 @@ function parseWorkspace(
       value['formatVersion'] !== 3 &&
       value['formatVersion'] !== 4) ||
     !aggregateId(value['aggregateId']) ||
+    (value['generation'] !== undefined && !aggregateId(value['generation'])) ||
     !aggregateId(value['sourceAssetId']) ||
     (value['sourceMediaId'] !== undefined && !aggregateId(value['sourceMediaId'])) ||
     !revision(value['revision']) ||
@@ -227,7 +231,7 @@ function parseWorkspace(
     ? parseReviewDocumentBaseline(value['baseline'], source.duration)
     : undefined;
   if (completeBaseline === null || (!complete && 'baseline' in value)) return null;
-  const admitted = parseWorkspaceHistory(value['history'], source, report);
+  const admitted = parseWorkspaceHistory(value['history'], source, report, operationLifetime);
   if (!admitted) return null;
   const parsed = parseWorkspaceDocument({
     ...admitted,
@@ -252,6 +256,7 @@ function parseWorkspace(
   }
   const workspace: VideoWorkspace = {
     aggregateId: value['aggregateId'],
+    ...(typeof value['generation'] === 'string' ? { generation: value['generation'] } : {}),
     ...(typeof value['sourceMediaId'] === 'string'
       ? { sourceMediaId: value['sourceMediaId'] }
       : {}),
@@ -277,11 +282,18 @@ function parseWorkspace(
 }
 
 /** Admits complete history and its selected document without storage writes; rejected values retain only a bounded diagnostic. */
-export function inspectVideoWorkspace(value: unknown) {
+export function inspectVideoWorkspace(
+  value: unknown,
+  operationLifetime: ReviewOperationLifetime = 'retained'
+) {
   let failure: VideoWorkspaceDiagnostic = { check: 'workspace-envelope', reason: 'invalid' };
-  const admitted = parseWorkspace(value, (detail) => {
-    failure = detail;
-  });
+  const admitted = parseWorkspace(
+    value,
+    (detail) => {
+      failure = detail;
+    },
+    operationLifetime
+  );
   if (admitted) return { ...admitted, failure: null };
   const count = (value: unknown) =>
     typeof value === 'number' && Number.isSafeInteger(value) && value >= 0

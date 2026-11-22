@@ -29,7 +29,7 @@ export function AppearanceControlsCard({ state }: { state: AppearanceSectionStat
     <div className="space-y-1">
       <SettingsControlRow
         label={translate('settings.appearance.themeModeLabel', state.locale)}
-        valueMinimum={380}
+        className="[--sniptale-parameter-value-width:340px]"
       >
         <ThemeChips state={state} />
       </SettingsControlRow>
@@ -72,6 +72,9 @@ export function AppearanceControlsCard({ state }: { state: AppearanceSectionStat
       <SettingsControlRow label={translate('settings.appearance.popupStartupLabel', state.locale)}>
         <ProductSelect
           id="settings-popup-startup"
+          containerClassName="settings-compact-select-shell"
+          menuWidth={264}
+          menuClassName="settings-popup-startup-options"
           value={state.popupStartup.selection}
           onChange={state.popupStartup.updateSelection}
           options={state.popupStartup.options}

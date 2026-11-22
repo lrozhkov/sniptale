@@ -7,7 +7,7 @@ import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header
 import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import { createQuickEditZoomRegion } from '../../../../apps/extension/src/features/video/review/advanced/zoom';
 import { DEFAULT_CAMERA_DEPTH as DEFAULT_QUICK_EDIT_DEPTH } from '../../../../apps/extension/src/features/video/project/motion/spatial';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import {
   replayReviewHistory,
   reviewAdvancedContentBaseline,

@@ -142,7 +142,6 @@ function HeaderSegments<T extends string>({
     return (
       <SegmentedRow
         label={hideLabel ? undefined : label}
-        layout="stacked"
         columns={options.length === 2 ? 2 : 3}
         ariaLabel={label}
         value={value}

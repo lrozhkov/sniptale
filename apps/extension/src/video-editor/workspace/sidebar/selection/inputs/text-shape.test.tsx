@@ -142,12 +142,13 @@ function registerShapeFieldTests() {
     expect(container?.textContent).toContain('videoEditor.sidebar.strokeLabel');
     expect(container?.textContent).toContain('videoEditor.sidebar.strokeWidthLabel');
 
-    const strokeRange = Array.from(
-      container?.querySelectorAll<HTMLInputElement>('input[type="range"]') ?? []
-    ).find((input) => input.getAttribute('aria-label')?.includes('strokeWidthLabel'));
-
+    const stroke = container!.querySelector<HTMLInputElement>(
+      'input[aria-label="videoEditor.sidebar.strokeWidthLabel"]'
+    )!;
     await act(async () => {
-      setInputValue(strokeRange!, '6');
+      stroke.focus();
+      setInputValue(stroke, '6');
+      stroke.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     });
 
     expect(onUpdateShapeStyle).toHaveBeenCalledWith(clip.id, { strokeWidth: 6 });

@@ -5,11 +5,8 @@ import {
   AI_STORAGE_VERSION_KEY,
 } from '../../../../apps/extension/src/composition/persistence/ai-settings/constants';
 import { expect, test } from '@playwright/test';
-import {
-  translate,
-  type AppLocale,
-  type TranslationKey,
-} from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
+import type { AppLocale, TranslationKey } from '../../../../apps/extension/src/platform/i18n';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 

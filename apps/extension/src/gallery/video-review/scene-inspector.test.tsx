@@ -113,6 +113,64 @@ it('selects aspect and resolution, returns to native, and edits a lane master se
   }
 });
 
+it('dismisses open Canvas menus before cancelling the crop', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const onChange = vi.fn();
+  const source = { width: 1920, height: 1080 };
+  const crop = { x: 0.25, y: 0.25, width: 0.5, height: 0.5 };
+  const findCrop = () => host.querySelector('[data-ui="gallery.videoReview.sourceCropEditor"]');
+  const trigger = () =>
+    host.querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.sourceCropEdit"]')!;
+  const escape = (element: Element) =>
+    act(() =>
+      element.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      )
+    );
+  try {
+    act(() =>
+      root.render(
+        <ReviewCanvasSettings
+          source={source}
+          canvas={{ ...source, crop }}
+          cropPreview={{ file: new File(['video'], 'source.webm'), time: 2 }}
+          onChange={onChange}
+        />
+      )
+    );
+    act(() => trigger().click());
+    const editor = findCrop()!;
+    for (const [key, useOption] of [
+      ['videoEditor.sidebar.canvasFormatLabel', false],
+      ['videoEditor.sidebar.canvasResolutionLabel', true],
+    ] as const) {
+      const select = host.querySelector<HTMLButtonElement>(
+        `button[aria-label="${translate(key)}"]`
+      )!;
+      act(() => {
+        select.focus();
+        select.click();
+      });
+      const option = document.querySelector<HTMLButtonElement>('[role=listbox] [role=option]')!;
+      escape(useOption ? option : select);
+      expect(findCrop()).toBe(editor);
+      expect(document.querySelector('[role=listbox]')).toBeNull();
+      expect(document.activeElement).toBe(select);
+    }
+    escape(editor.querySelector('canvas')!);
+    expect(findCrop()).toBeNull();
+    expect(document.activeElement).toBe(trigger());
+    expect(onChange).not.toHaveBeenCalled();
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
 it('edits browser title and address independently and bounds Unicode text safely', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');

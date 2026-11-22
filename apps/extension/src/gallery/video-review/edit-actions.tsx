@@ -7,12 +7,15 @@ import {
   VideoResolutionPreset,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { reviewOutputCodecs } from '../../workflows/video-review/render-settings';
-import { SelectField } from '../../ui/compact-inspector-controls';
+import { SelectField, SegmentedRow } from '../../ui/compact-inspector-controls';
 import { reviewSelectFieldClassName } from './controls';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { useEffect, useMemo, type ReactNode } from 'react';
-import { createReviewFragment } from '../../features/video/review/fragment';
-import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
+import {
+  createReviewFragment,
+  type ReviewFragmentSelection,
+} from '../../features/video/review/fragment';
+import type { ReviewEdit } from '../../features/video/review/types';
 import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
 import {
   REVIEW_SPEED_RATES,
@@ -155,7 +158,9 @@ export function ReviewSpeedOptions(props: {
   onRate(value: ReviewSpeedRate): void;
   onAudio(value: 'speed' | 'mute'): void;
 }) {
-  const rateOptions = REVIEW_SPEED_RATES.map((rate) => ({
+  const rateOptions = REVIEW_SPEED_RATES.filter(
+    (rate) => (rate >= 0.5 && rate <= 8) || rate === props.rate
+  ).map((rate) => ({
     value: String(rate),
     label: `${rate < 0.25 ? `1/${1 / rate}` : rate}×`,
   }));
@@ -169,32 +174,32 @@ export function ReviewSpeedOptions(props: {
   };
   if (props.layout === 'inspector')
     return (
-      <>
+      <div className="sniptale-parameter-stack">
         <SelectField
-          className={reviewSelectFieldClassName}
           label={translate('gallery.videoReview.speedRate')}
+          className={reviewSelectFieldClassName}
           value={String(props.rate)}
           disabled={props.busy}
           options={rateOptions}
           onChange={changeRate}
         />
-        <SelectField
-          className={reviewSelectFieldClassName}
+        <SegmentedRow
+          ariaLabel={translate('gallery.videoReview.speedAudio')}
           label={translate('gallery.videoReview.speedAudio')}
           value={props.audio}
-          disabled={props.busy}
-          options={audioOptions}
+          columns={2}
+          options={audioOptions.map((option) => ({ ...option, disabled: props.busy }))}
           onChange={props.onAudio}
         />
-      </>
+      </div>
     );
   return (
     <>
       <ProductSelect
-        menuClassName="sniptale-parameter-menu"
+        menuClassName="sniptale-parameter-menu sniptale-inspector-select-menu"
         aria-label={translate('gallery.videoReview.speedRate')}
         controlSize="sm"
-        className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
+        className={`${reviewTextButtonClassName} sniptale-inspector-select !min-w-0 !py-0 !font-normal`}
         containerClassName="!w-auto !min-w-0 shrink-0"
         menuWidth={112}
         value={String(props.rate)}
@@ -203,10 +208,10 @@ export function ReviewSpeedOptions(props: {
         onChange={changeRate}
       />
       <ProductSelect<'speed' | 'mute'>
-        menuClassName="sniptale-parameter-menu"
+        menuClassName="sniptale-parameter-menu sniptale-inspector-select-menu"
         aria-label={translate('gallery.videoReview.speedAudio')}
         controlSize="sm"
-        className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
+        className={`${reviewTextButtonClassName} sniptale-inspector-select !min-w-0 !py-0 !font-normal`}
         containerClassName="!w-auto !min-w-0 shrink-0"
         menuWidth={180}
         value={props.audio}
@@ -386,13 +391,15 @@ export function ReviewEditActions(props: ReviewEditActionProps) {
 
 /** A range-only download affordance; unavailable or fully removed intervals cannot be exported. */
 export function ReviewFragmentAction(props: {
-  selection: ReviewAnchor;
+  selection: Parameters<typeof createReviewFragment>[0]['selection'];
   snapToKeyframes?: boolean;
   showLabel?: boolean;
+  persistent?: boolean;
+  iconOnly?: boolean;
   index: ReviewMediaIndex | null;
   edits: readonly ReviewEdit[];
   busy: boolean;
-  onDownload(selection: Extract<ReviewAnchor, { kind: 'range' }>): void;
+  onDownload(selection: ReviewFragmentSelection): void;
 }) {
   const { selection, index, edits } = props;
   const fragment = useMemo(
@@ -408,7 +415,7 @@ export function ReviewFragmentAction(props: {
         : null,
     [selection, index, edits, props.snapToKeyframes]
   );
-  if (selection.kind !== 'range') return null;
+  if (selection.kind !== 'range' && !props.persistent) return null;
   const audioUnavailable =
     !!index?.audioCodec &&
     !index.processedAudioCodec &&
@@ -424,11 +431,17 @@ export function ReviewFragmentAction(props: {
           ? 'gallery.videoReview.exportSelection'
           : 'gallery.videoReview.downloadSelection'
       )}
-      toolbarLabel={props.showLabel ? undefined : translate('gallery.videoReview.toolbarFragment')}
+      toolbarLabel={
+        props.showLabel || props.iconOnly
+          ? undefined
+          : translate('gallery.videoReview.toolbarFragment')
+      }
       title={rangeLabel + hint}
       disabled={!fragment || props.busy || audioUnavailable}
       className={props.showLabel ? `${reviewTextButtonClassName} !w-full justify-start` : plain}
-      onClick={() => props.onDownload(selection)}
+      onClick={() => {
+        if (selection.kind === 'range') props.onDownload(selection);
+      }}
     >
       <Download size={16} />
       {props.showLabel ? <span>{translate('gallery.videoReview.exportSelection')}</span> : null}
@@ -577,6 +590,7 @@ export function ReviewRenderOptions({
             }}
           />
           <DetailEnhancementField
+            hintPresentation="tooltip"
             value={settings.detailEnhancement}
             disabled={busy}
             onChange={(detailEnhancement) =>
@@ -638,7 +652,8 @@ export function ReviewInspectorActions({
   onExport,
   onOpenResult,
   toolKey,
-  fragmentAction,
+  fragmentAction: suppliedFragmentAction,
+  fragment,
 }: {
   exporter: Parameters<typeof ReviewRenderOptions>[0]['exporter'];
   advanced: boolean;
@@ -649,11 +664,31 @@ export function ReviewInspectorActions({
   onOpenResult(mediaId: string): void;
   toolKey: string;
   fragmentAction?: ReactNode;
+  fragment?: { selection: ReviewFragmentSelection; edits: readonly ReviewEdit[] } | undefined;
 }) {
   const { dismissCompletion } = exporter;
   useEffect(() => () => dismissCompletion(), [dismissCompletion, toolKey]);
   const exportPlan = exporter.plan();
   const checkingCodecs = exporter.checkingCodecs;
+  const fragmentAction =
+    suppliedFragmentAction ??
+    (fragment ? (
+      <ReviewFragmentAction
+        showLabel
+        selection={fragment.selection}
+        edits={fragment.edits}
+        index={exporter.index}
+        snapToKeyframes={!advanced}
+        busy={
+          busy ||
+          composerBusy ||
+          checkingCodecs ||
+          exporter.phase !== 'idle' ||
+          exporter.plan(fragment.selection).kind === 'unavailable'
+        }
+        onDownload={exporter.downloadSelection}
+      />
+    ) : null);
   const settings = advanced ? (
     <ReviewRenderOptions
       exporter={exporter}

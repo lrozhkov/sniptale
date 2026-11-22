@@ -1,7 +1,8 @@
 import { writeFile } from 'node:fs/promises';
 import type { BrowserContext, Locator, Page, TestInfo, ViewportSize } from '@playwright/test';
 import { expect, test } from '../support/extension-fixture';
-import { translate, type TranslationKey } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
+import type { TranslationKey } from '../../../../apps/extension/src/platform/i18n';
 
 type Composition = { locale: 'ru' | 'en'; theme: 'light' | 'dark'; viewport: ViewportSize };
 const ui = (page: Page, id: string) => page.locator(`[data-ui="${id}"]`);
@@ -477,7 +478,13 @@ async function opaqueBlurSurface(modal: Locator) {
   expect.soft(alpha, 'Blur settings hide underlying page content').toBe(255);
 }
 
-async function inspectAutoBlur(page: Page, composition: Composition, info: TestInfo) {
+async function inspectAutoBlur(
+  page: Page,
+  composition: Composition,
+  info: TestInfo,
+  proof: 'design' | 'interaction' = 'design'
+) {
+  if (proof === 'interaction') return inspectAutoBlurInteraction(page, composition, info);
   await ui(page, 'content.toolbar.mode-selector-button').click();
   await ui(page, 'content.toolbar.mode-option.highlighter').click();
   await ui(page, 'content.toolbar.future-frame-style.menu').click();
@@ -1534,4 +1541,150 @@ for (const width of [1280, 1920]) {
       }
     });
   }
+}
+
+async function inspectAutoBlurInteraction(page: Page, composition: Composition, info: TestInfo) {
+  const modal = page.locator('.sniptale-auto-blur-modal');
+  const open = async () => {
+    await ui(page, 'content.toolbar.auto-blur-button').click();
+    await expect(
+      ui(page, 'content.toolbar.auto-blur-menu').locator('.sniptale-toolbar-menu')
+    ).toBeVisible();
+    await ui(page, 'content.toolbar.auto-blur-configure').click();
+    await expect(modal.getByRole('treegrid')).toBeVisible();
+    await withinViewport(modal);
+  };
+  await open();
+  const first = modal.getByRole('checkbox', { name: 'first@example.org', exact: true });
+  const selected = await first.isChecked();
+  await first.click();
+  expect(await first.isChecked()).toBe(!selected);
+  await first.click();
+  expect(await first.isChecked()).toBe(selected);
+  const strength = modal.getByRole('textbox', {
+    name: tr(composition, 'content.autoBlur.blurStrength'),
+    exact: true,
+  });
+  await strength.scrollIntoViewIfNeeded();
+  await strength.fill('7');
+  await strength.press('Enter');
+  await expect(strength).toHaveValue('7');
+  await capture(page, info, 'interaction-auto-blur-configure');
+  const cancel = modal
+    .getByRole('button', {
+      name: tr(composition, 'content.autoBlur.cancel'),
+      exact: true,
+    })
+    .last();
+  await cancel.scrollIntoViewIfNeeded();
+  await cancel.click();
+  await expect(modal).toHaveCount(0);
+  await open();
+  await first.check();
+  for (const value of ['second@example.org', 'third@example.org'])
+    await modal.getByRole('checkbox', { name: value, exact: true }).uncheck();
+  const before = await page.locator('.sniptale-blur-overlay').count();
+  const apply = modal.getByRole('button', {
+    name: tr(composition, 'content.autoBlur.apply'),
+    exact: true,
+  });
+  await expect(apply).toBeEnabled();
+  await apply.scrollIntoViewIfNeeded();
+  await apply.click();
+  await expect(modal).toHaveCount(0);
+  await expect.poll(() => page.locator('.sniptale-blur-overlay').count()).toBeGreaterThan(before);
+}
+
+async function inspectDrawingAfterAutoBlur(page: Page, composition: Composition, info: TestInfo) {
+  await ui(page, 'content.toolbar.mode-selector-button').click();
+  await ui(page, 'content.toolbar.mode-option.drawing').click();
+  const pencil = ui(page, 'content.toolbar.drawing.pencil');
+  await pencil.click();
+  await expect(pencil).toHaveAttribute('aria-pressed', 'true');
+  if ((await pencil.getAttribute('aria-expanded')) === 'true') await pencil.click();
+  await expect(pencil).toHaveAttribute('aria-pressed', 'true');
+  const canvas = page.locator(
+    '[data-ui="content.drawing.surface"] canvas.sniptale-drawing-canvas[tabindex="0"]'
+  );
+  await expect(canvas).toBeVisible();
+  const start = { x: composition.viewport.width - 360, y: 300 };
+  await expect
+    .poll(() =>
+      canvas.evaluate((node, point) => {
+        const root = node.getRootNode();
+        return (
+          (root instanceof ShadowRoot
+            ? root.elementFromPoint(point.x, point.y)
+            : node.ownerDocument.elementFromPoint(point.x, point.y)) === node
+        );
+      }, start)
+    )
+    .toBe(true);
+  const pixels = () =>
+    canvas.evaluate((node) => {
+      if (!(node instanceof HTMLCanvasElement)) throw new Error('Expected drawing canvas');
+      return node.toDataURL();
+    });
+  const before = await pixels();
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 100, start.y + 40, { steps: 6 });
+  await page.mouse.up();
+  await expect.poll(pixels).not.toBe(before);
+  await capture(page, info, 'interaction-drawing-after-auto-blur');
+  const undo = ui(page, 'content.toolbar.history-undo-button');
+  await expect(undo).toBeEnabled();
+  await undo.click();
+  await expect.poll(pixels).toBe(before);
+}
+
+for (const composition of [
+  { locale: 'en', theme: 'dark', viewport: { width: 1280, height: 560 } },
+  { locale: 'ru', theme: 'dark', viewport: { width: 1920, height: 900 } },
+] satisfies Composition[]) {
+  const name =
+    `content interaction gates ${composition.locale} ${composition.theme} ` +
+    `${composition.viewport.width}x${composition.viewport.height}`;
+  test(name, async ({ context, extensionId }, info) => {
+    const origin = `https://sniptale-content-interaction-gates-${composition.locale}.test`;
+    await context.route(`${origin}/**`, (route) =>
+      route.fulfill({
+        contentType: 'text/html',
+        body:
+          `<!doctype html><html><head><meta charset="utf-8"><style>
+        body { margin: 0; padding: 160px 80px; background: #f0e9df; color: #17293d; font: 18px/1.5 sans-serif; }
+        </style></head><body><div>first@example.org</div>` +
+          `<div>second@example.org</div><div>third@example.org</div></body></html>`,
+      })
+    );
+    const { page, popup } = await activateHost(context, extensionId, origin, composition);
+    try {
+      await ui(page, 'content.toolbar.mode-selector-button').click();
+      await ui(page, 'content.toolbar.mode-option.cursor').click();
+      await expect(ui(page, 'content.toolbar.root')).toHaveAttribute('data-page-mode', 'cursor');
+      await ui(page, 'content.toolbar.settings-button').click();
+      await ui(page, 'content.toolbar.settings.customize-buttons').click();
+      const visibility = ui(page, 'content.toolbar.visibility.auto-blur');
+      await expect(visibility).toBeVisible();
+      if ((await visibility.getAttribute('aria-pressed')) === 'false') await visibility.click();
+      await expect(visibility).toHaveAttribute('aria-pressed', 'true');
+      await ui(page, 'content.toolbar.customize-done').click();
+      await expect(ui(page, 'content.toolbar.auto-blur-button')).toBeEnabled();
+      await inspectAutoBlur(page, composition, info, 'interaction');
+      await inspectDrawingAfterAutoBlur(page, composition, info);
+    } catch (error) {
+      await page
+        .screenshot({
+          path: info.outputPath('interaction-gates-failure.png'),
+          fullPage: false,
+          animations: 'disabled',
+        })
+        .catch(() => undefined);
+      throw error;
+    } finally {
+      await page.close();
+      await popup.close();
+      await context.unroute(`${origin}/**`);
+    }
+  });
 }

@@ -147,6 +147,7 @@ function CursorAppearanceFields(props: {
       />
       <SliderField
         label={translate('videoEditor.sidebar.cursorScaleLabel')}
+        rangePresentation="field"
         value={props.scale}
         min={0.2}
         max={4}

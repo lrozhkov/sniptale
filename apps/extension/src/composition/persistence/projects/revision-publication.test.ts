@@ -13,6 +13,65 @@ import {
   type PreparedVideoProjectRevision,
   type VideoProjectRevisionPublicationStores,
 } from './revision-publication';
+import type { AssetRef } from '../assets';
+
+const historyRef: AssetRef = {
+  assetId: 'history-json',
+  createdAt: 1,
+  location: { kind: 'opfs', objectKey: 'objects/history-json' },
+  mimeType: 'application/json',
+  sha256: 'a'.repeat(64),
+  size: 80,
+};
+
+it.each(['valid', 'missing', 'wrong-mime', 'bad-digest', 'extra'] as const)(
+  'publishes only the exact prepared history resource closure: %s',
+  async (mode) => {
+    const fixture = createReviewWorkspaceStoreFixture(() => false);
+    const root = prepared();
+    root.entry.history = {
+      version: 1,
+      epoch: 'restore',
+      past: [{ assetId: historyRef.assetId }],
+      future: [],
+      sources: [{ kind: 'project-asset', id: 'project-asset-1' }],
+    };
+    root.historyRefs = [historyRef];
+    if (mode === 'missing') root.historyRefs = [];
+    else if (mode === 'wrong-mime') root.historyRefs = [{ ...historyRef, mimeType: 'text/plain' }];
+    else if (mode === 'bad-digest') root.historyRefs = [{ ...historyRef, sha256: 'invalid' }];
+    else if (mode === 'extra') root.historyRefs = [historyRef, { ...historyRef, assetId: 'extra' }];
+    const before = structuredClone(fixture.rows);
+    const tx = fixture.database.transaction([...fixture.rows.keys()], 'readwrite');
+    const publish = publishPreparedVideoProjectRevisionInTransaction({
+      root,
+      stores: publicationStores(tx),
+      workspaceRevision: 9,
+    });
+    if (mode !== 'valid') {
+      await expect(publish).rejects.toThrow('history references');
+      tx.abort();
+      await expect(tx.done).rejects.toThrow();
+      expect(fixture.rows).toEqual(before);
+      return;
+    }
+    await publish;
+    await tx.done;
+    expect(fixture.rows.get('asset_refs')!.get(historyRef.assetId)).toEqual(historyRef);
+    expect(
+      fixture.rows
+        .get('asset_owners')!
+        .get(
+          JSON.stringify(['video-project-history', root.entry.id, 'history:change:history-json'])
+        )
+    ).toEqual({
+      assetId: historyRef.assetId,
+      ownerKind: 'video-project-history',
+      ownerId: root.entry.id,
+      role: 'history:change:history-json',
+    });
+  }
+);
 
 type Fixture = ReturnType<typeof createReviewWorkspaceStoreFixture>;
 type Transaction = ReturnType<Fixture['database']['transaction']>;
@@ -24,6 +83,7 @@ function publicationStores(tx: Transaction): VideoProjectRevisionPublicationStor
     refs: tx.objectStore('asset_refs'),
     owners: tx.objectStore('asset_owners'),
     media: tx.objectStore('media_library'),
+    imageIdentities: tx.objectStore('image_workspace_identities'),
     videoWorkspaces: tx.objectStore('video_workspaces'),
     videoDrafts: tx.objectStore('video_workspace_drafts'),
     thumbnails: tx.objectStore('thumbnails'),
@@ -143,7 +203,10 @@ it('publishes accepted project and prepared assets without changing independent 
   ]);
   expect(
     fixture.rows.get('video_workspaces')!.get(published.videoReview!.workspace.aggregateId)
-  ).toEqual(withReviewWorkspaceUsage(published.videoReview!.workspace));
+  ).toEqual({
+    ...withReviewWorkspaceUsage(published.videoReview!.workspace),
+    generation: expect.any(String),
+  });
   expect(
     fixture.rows.get('video_workspace_drafts')!.has(published.videoReview!.workspace.aggregateId)
   ).toBe(false);
@@ -188,6 +251,37 @@ it('publishes sidecars after the caller phase with the assigned local revision',
     presentationRevision: 9,
   });
   expect(root.presentation!.presentationRevision).toBe(400);
+});
+
+it('issues a fresh lifetime for restored image children and preserves reused identities', async () => {
+  const fixture = createReviewWorkspaceStoreFixture(() => false);
+  const root = prepared();
+  const asset = root.assets[0]!;
+  asset.entry = { ...asset.entry, mimeType: 'image/png' };
+  asset.ref = { ...asset.ref, mimeType: 'image/png' };
+  delete asset.videoReview;
+  const id = `project-asset:${asset.entry.id}`;
+  const identities = fixture.rows.get('image_workspace_identities')!;
+  identities.set(id, { version: 1, aggregateId: id, generation: 'previous', retired: true });
+  const tx = fixture.database.transaction([...fixture.rows.keys()], 'readwrite');
+  await publishPreparedVideoProjectRevisionInTransaction({
+    root,
+    stores: publicationStores(tx),
+    workspaceRevision: 9,
+  });
+  await tx.done;
+  const accepted = fixture.rows.get('image_workspace_identities')!.get(id);
+  expect(accepted).toMatchObject({ version: 1, aggregateId: id, retired: false });
+  expect(accepted).not.toMatchObject({ generation: 'previous' });
+  asset.reusePublished = true;
+  const retry = fixture.database.transaction([...fixture.rows.keys()], 'readwrite');
+  await publishPreparedVideoProjectRevisionInTransaction({
+    root,
+    stores: publicationStores(retry),
+    workspaceRevision: 10,
+  });
+  await retry.done;
+  expect(fixture.rows.get('image_workspace_identities')!.get(id)).toEqual(accepted);
 });
 
 it('rolls project asset and sidecar publication back when the caller aborts', async () => {

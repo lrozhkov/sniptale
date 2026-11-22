@@ -7,8 +7,8 @@ import { parseRootEnvelope } from '../media-hub-backup/v6/codec';
 import { type AssetResidencyCopy } from '../../composition/persistence/assets/residency-records';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { createArchivePathAllocator } from '../../composition/archive-transfer';
-import { parseScenarioProjectEntry } from '../../composition/persistence/scenario/read-guards';
-import { getScenarioResourceReferences } from '../../features/scenario/project/public';
+import { materializeDetachedScenarioHistory } from '../../composition/persistence/sync-capture/scenario-history';
+import { collectScenarioResourceReferences } from '../../composition/persistence/scenario/resource-references';
 import {
   parseCapturedScenarioRows,
   type CapturedScenarioRows,
@@ -38,22 +38,16 @@ export async function encodeCapturedScenarioRoot(
       throw new Error('Captured Scenario history bytes differ from their fingerprint.');
     history = JSON.parse(new TextDecoder().decode(bytes));
   }
-  const entry = parseScenarioProjectEntry({
-    ...rows.entry,
-    ...(history === undefined ? {} : { history }),
-  });
+  const entry = materializeDetachedScenarioHistory(rows.entry, history);
   if (!entry) throw new Error('Captured Scenario history is invalid.');
-  for (const project of [
-    entry.project,
-    ...(entry.history ?? []).map((version) => version.project),
-  ]) {
-    const refs = getScenarioResourceReferences(project);
-    if (
-      [...refs.assets].some((id) => !rows.assets.some((asset) => asset.id === id)) ||
-      [...refs.documents].some((id) => !rows.documents.some((document) => document.stepId === id))
+  const resources = collectScenarioResourceReferences(entry);
+  if (
+    [...resources.assets].some((id) => !rows.assets.some((asset) => asset.id === id)) ||
+    [...resources.documents].some(
+      (id) => !rows.documents.some((document) => document.stepId === id)
     )
-      throw new Error('Captured Scenario history resource is unavailable.');
-  }
+  )
+    throw new Error('Captured Scenario history resource is unavailable.');
   const table = new Map<string, unknown[]>([
     [stores.SCENARIO_PROJECTS_STORE, [entry]],
     [stores.SCENARIO_PROJECT_HISTORY_STORE, []],

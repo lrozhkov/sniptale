@@ -16,7 +16,20 @@ it('applies a loaded project and updates browser history through the explicit dr
 
   createApplyLoadedProject(setProject, setError)(project, 'recording-1');
 
-  expect(setProject).toHaveBeenCalledWith(project, 'recording-1');
+  expect(setProject).toHaveBeenCalledWith(project, 'recording-1', undefined);
   expect(setError).toHaveBeenCalledWith(null);
   expect(replaceVideoEditorUrl).toHaveBeenCalledWith(project.id, 'recording-1');
+});
+
+it('forwards the observed native opening snapshot to the session owner', () => {
+  const project = createEmptyVideoProject('Native');
+  const workspace = {
+    status: 'ready' as const,
+    project,
+    workspaceRevision: 9,
+    history: { status: 'absent' as const },
+  };
+  const setProject = vi.fn();
+  createApplyLoadedProject(setProject, vi.fn())(project, null, workspace);
+  expect(setProject).toHaveBeenCalledWith(project, null, workspace);
 });

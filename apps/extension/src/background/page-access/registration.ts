@@ -192,11 +192,11 @@ function isExpectedContentScriptRegistration(
 
 export async function injectContentRuntime(
   target: SupportedPageTarget,
-  options: { allFrames: boolean }
+  options: { allFrames: boolean; injectImmediately?: boolean }
 ): Promise<void> {
   await browserScripting.executeScript({
     files: [CONTENT_RUNTIME_FILE],
-    injectImmediately: false,
+    injectImmediately: options.injectImmediately === true,
     target: { allFrames: options.allFrames, tabId: target.tabId },
   });
 }

@@ -14,6 +14,7 @@ import {
 } from '../../workflows/video-review/gpu-preview-geometry';
 import { quickEditProjectionCss } from '../../features/video/composition/motion/spatial-geometry';
 import * as headerPreview from './use-window-header';
+import * as stageVideo from './stage-video';
 import type {
   QuickEditBackgroundSettings,
   QuickEditCameraTransform,
@@ -106,12 +107,88 @@ afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
   vi.restoreAllMocks();
+  Reflect.deleteProperty(HTMLVideoElement.prototype, 'requestVideoFrameCallback');
+  Reflect.deleteProperty(HTMLVideoElement.prototype, 'cancelVideoFrameCallback');
   vi.unstubAllGlobals();
 });
 
 const source = { duration: 4, width: 320, height: 180, mimeType: 'video/webm', size: 5 };
 const identity: QuickEditCameraTransform = { scale: 1, centerX: 0.5, centerY: 0.5 };
 const disabled: QuickEditBackgroundSettings = { enabled: false };
+
+it('keeps stage preparation and static media asleep as accepted cameras move', async () => {
+  presentation.active = true;
+  const media = vi.spyOn(stageVideo, 'ReviewSceneVideo');
+  const { createCanvasComment } = await import('../../features/video/review/comments');
+  const onGeometry = vi.fn();
+  const onSelect = vi.fn();
+  const onMove = vi.fn();
+  renderStage({
+    scene: { background: disabled, camera: identity },
+    comments: {
+      items: [{ ...createCanvasComment({ id: 'live' }), position: { x: 0.3, y: 0.4 } }],
+      annotations: [],
+      time: 0,
+      background: disabled,
+      camera: identity,
+      selectedId: 'live',
+      busy: false,
+      onSelect,
+      onMove,
+      onGeometry,
+    },
+  });
+  const publish = (centerX: number) => {
+    const input: Parameters<
+      typeof import('./use-preview-presentation').useReviewPreviewPresentation
+    >[0] = presentation.input.mock.lastCall![0];
+    act(() =>
+      input.onGeometry?.(
+        reviewPresentedGeometry(
+          { source, background: disabled, zoomRegions: [], comments: [], keys: [], clicks: [] },
+          { canonical: source, backing: { width: 800, height: 450 } },
+          centerX,
+          { scale: 2, centerX, centerY: 0.5 }
+        ),
+        centerX,
+        'blob:review'
+      )
+    );
+  };
+  publish(0.3);
+  const prepares = presentation.input.mock.calls.length;
+  const videos = media.mock.calls.length;
+  const first = onGeometry.mock.lastCall![0];
+  publish(0.5);
+  publish(0.7);
+  expect(onGeometry.mock.lastCall![0].videoTransform).not.toEqual(first.videoTransform);
+  expect(presentation.input).toHaveBeenCalledTimes(prepares);
+  expect(media).toHaveBeenCalledTimes(videos);
+  act(() =>
+    host
+      .querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.canvasComment"] button')!
+      .click()
+  );
+  expect(onSelect).toHaveBeenCalledWith('live');
+  const handle = host.querySelector<HTMLButtonElement>(
+    '[data-ui="gallery.videoReview.canvasComment"] button'
+  )!;
+  handle.setPointerCapture = vi.fn();
+  for (const [kind, x] of [
+    ['pointerdown', 100],
+    ['pointermove', 180],
+    ['pointerup', 180],
+  ] as const)
+    act(() =>
+      handle.dispatchEvent(
+        new MouseEvent(kind, { bubbles: true, button: 0, clientX: x, clientY: 100 })
+      )
+    );
+  expect(onMove).toHaveBeenCalledWith('live', {
+    x: expect.closeTo(0.3 + 80 / onGeometry.mock.lastCall![0].videoTransform.width, 7),
+    y: expect.closeTo(0.4, 7),
+  });
+});
 
 const renderStage = (
   props: Partial<
@@ -128,6 +205,8 @@ const renderStage = (
       | 'outerFadePlan'
       | 'captions'
       | 'onCaptionSelect'
+      | 'url'
+      | 'preview'
     >
   >
 ) => {
@@ -138,8 +217,9 @@ const renderStage = (
         outerFadePlan={props.outerFadePlan}
         captions={props.captions}
         onCaptionSelect={props.onCaptionSelect}
-        url="blob:review"
+        url={props.url ?? 'blob:review'}
         source={source}
+        preview={props.preview}
         video={{ current: null }}
         drawing={props.drawing ?? false}
         region={props.region}
@@ -854,7 +934,9 @@ it.each([false, true])(
       act(() => vi.advanceTimersByTime(999));
       expect(host.textContent).not.toContain(message);
       act(() => vi.advanceTimersByTime(1));
-      expect(host.textContent).toContain(message);
+      expect(
+        host.querySelector('[data-ui="gallery.videoReview.previewWaiting"]')?.getAttribute('title')
+      ).toContain(message);
       presentation.phase = 'ready';
       renderStage({});
       expect(host.textContent).not.toContain(message);
@@ -941,7 +1023,7 @@ it('keeps the camera grab surface on the completed outer window rather than the 
     onChange: vi.fn(),
     onInteract: vi.fn(),
   };
-  renderStage({ scene: { background: disabled, camera }, zoom });
+  renderStage({ scene: { background: disabled, camera } });
   const receipt = reviewPresentedGeometry(
     {
       source,
@@ -965,12 +1047,279 @@ it('keeps the camera grab surface on the completed outer window rather than the 
     throw new Error('Expected the mounted presentation geometry callback');
   const receiveGeometry = input.onGeometry;
   act(() => receiveGeometry(receipt));
+  const latestReceipt = reviewPresentedGeometry(
+    {
+      source,
+      background: disabled,
+      zoomRegions: [zoom.region],
+      comments: [],
+      keys: [],
+      clicks: [],
+    },
+    { canonical: source, backing: { width: 800, height: 450 } },
+    2,
+    { ...camera, centerX: 0.75 }
+  );
+  act(() => receiveGeometry(latestReceipt));
+  renderStage({
+    scene: { background: disabled, camera },
+    zoom: {
+      ...zoom,
+      region: { ...zoom.region, id: 'newly-selected' },
+    },
+  });
   const expected = quickEditProjectionCss(
-    reviewPresentedStageProjection(receipt, { width: 800, height: 450 }, 'window')
+    reviewPresentedStageProjection(latestReceipt, { width: 800, height: 450 }, 'window')
   );
   const target = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.zoomTarget"]')!;
   const transforms: string[] = [];
   for (let node: HTMLElement | null = target; node && node !== host; node = node.parentElement)
     if (node.style.transform) transforms.push(node.style.transform);
   expect(transforms).toEqual([expected]);
+});
+
+it('clears frame geometry on null, source replacement and unmount without accepting stale callbacks', () => {
+  presentation.active = true;
+  const onGeometry = vi.fn();
+  const props = {
+    scene: { background: disabled, camera: identity },
+    comments: {
+      items: [],
+      annotations: [],
+      time: 0,
+      background: disabled,
+      camera: identity,
+      selectedId: null,
+      busy: false,
+      onSelect: vi.fn(),
+      onMove: vi.fn(),
+      onGeometry,
+    },
+  };
+  renderStage(props);
+  const input: Parameters<
+    typeof import('./use-preview-presentation').useReviewPreviewPresentation
+  >[0] = presentation.input.mock.lastCall![0];
+  const receive = input.onGeometry!;
+  const receipt = reviewPresentedGeometry(
+    { source, background: disabled, zoomRegions: [], comments: [], keys: [], clicks: [] },
+    { canonical: source, backing: { width: 800, height: 450 } },
+    2,
+    { scale: 2, centerX: 0.7, centerY: 0.5 }
+  );
+  act(() => receive(receipt, 2, 'blob:review'));
+  const accepted = onGeometry.mock.lastCall![0].videoTransform;
+  act(() => receive(null, 0, 'blob:review'));
+  expect(onGeometry.mock.lastCall![0].videoTransform).not.toEqual(accepted);
+  act(() => receive(receipt, 2, 'blob:review'));
+  renderStage({ ...props, url: 'blob:replacement' });
+  expect(onGeometry.mock.lastCall![0].videoTransform).not.toEqual(accepted);
+  const count = onGeometry.mock.calls.length;
+  act(() => receive(receipt, 2, 'blob:review'));
+  expect(onGeometry).toHaveBeenCalledTimes(count);
+  const replacement: Parameters<
+    typeof import('./use-preview-presentation').useReviewPreviewPresentation
+  >[0] = presentation.input.mock.lastCall![0];
+  act(() => root.render(null));
+  act(() => replacement.onGeometry?.(receipt, 2, 'blob:replacement'));
+  expect(onGeometry).toHaveBeenCalledTimes(count);
+});
+
+it('retains accepted aspect through pending canvas changes and rescales live geometry on resize', () => {
+  presentation.active = true;
+  let resize = () => {};
+  const disconnect = vi.fn();
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: () => void) {
+        resize = callback;
+      }
+      observe() {}
+      disconnect = disconnect;
+    }
+  );
+  const onGeometry = vi.fn();
+  const props = {
+    scene: { background: disabled, camera: identity },
+    comments: {
+      items: [],
+      annotations: [],
+      time: 0,
+      background: disabled,
+      camera: identity,
+      selectedId: null,
+      busy: false,
+      onSelect: vi.fn(),
+      onMove: vi.fn(),
+      onGeometry,
+    },
+  };
+  renderStage(props);
+  const input: Parameters<
+    typeof import('./use-preview-presentation').useReviewPreviewPresentation
+  >[0] = presentation.input.mock.lastCall![0];
+  const receipt = reviewPresentedGeometry(
+    { source, background: disabled, zoomRegions: [], comments: [], keys: [], clicks: [] },
+    { canonical: source, backing: { width: 800, height: 450 } },
+    2,
+    { scale: 2, centerX: 0.7, centerY: 0.5 }
+  );
+  act(() => input.onGeometry?.(receipt, 2, 'blob:review'));
+  const stage = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.stage"]')!;
+  expect(stage.style.width).toBe('800px');
+  expect(stage.style.height).toBe('450px');
+  const canvas = { width: 640, height: 640 };
+  renderStage({ ...props, scene: { ...props.scene, canvas } });
+  expect(stage.style.width).toBe('800px');
+  expect(stage.style.height).toBe('450px');
+  expect(presentation.input.mock.lastCall![0].canonical).toEqual(canvas);
+  const next = reviewPresentedGeometry(
+    { source, background: disabled, canvas, zoomRegions: [], comments: [], keys: [], clicks: [] },
+    { canonical: canvas, backing: canvas },
+    3,
+    identity
+  );
+  act(() => input.onGeometry?.(next, 3, 'blob:review'));
+  expect(stage.style.width).toBe('450px');
+  expect(stage.style.height).toBe('450px');
+  const before = onGeometry.mock.lastCall![0];
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400);
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(225);
+  act(() => resize());
+  expect(stage.style.width).toBe('225px');
+  expect(stage.style.height).toBe('225px');
+  expect(onGeometry.mock.lastCall![0].videoTransform.width).toBeCloseTo(
+    before.videoTransform.width / 2
+  );
+  act(() => root.render(null));
+  expect(disconnect).toHaveBeenCalledOnce();
+});
+
+it('keeps decoded native comment time local while parent snapshots stay fixed', async () => {
+  const { createCanvasComment } = await import('../../features/video/review/comments');
+  const media = vi.spyOn(stageVideo, 'ReviewSceneVideo');
+  const callbacks: VideoFrameRequestCallback[] = [];
+  const cancel = vi.fn();
+  Object.defineProperties(HTMLVideoElement.prototype, {
+    requestVideoFrameCallback: {
+      configurable: true,
+      value: (callback: VideoFrameRequestCallback) => {
+        callbacks.push(callback);
+        return callbacks.length;
+      },
+    },
+    cancelVideoFrameCallback: { configurable: true, value: cancel },
+  });
+  const props: Parameters<typeof renderStage>[0] = {
+    scene: { background: disabled, camera: identity },
+    preview: {
+      preferences: {
+        renderer: 'legacy',
+        rasterPreset: 'current',
+        frameRate: 'current',
+        pausedQuality: 'same',
+        showFrameRate: false,
+      },
+      playing: true,
+      sourceToResult: (time) => time,
+    },
+    comments: {
+      items: [createCanvasComment({ id: 'timed', start: 1, end: 2 })],
+      annotations: [],
+      time: 0,
+      background: disabled,
+      camera: identity,
+      selectedId: null,
+      busy: false,
+      onSelect: vi.fn(),
+      onMove: vi.fn(),
+    },
+  };
+  renderStage(props);
+  const prepares = presentation.input.mock.calls.length;
+  const videos = media.mock.calls.length;
+  expect(callbacks.length).toBeGreaterThan(0);
+  act(() => callbacks.at(-1)!(0, { mediaTime: 1.2 } as VideoFrameCallbackMetadata));
+  expect(host.querySelector('[data-ui="gallery.videoReview.canvasComment"]')).not.toBeNull();
+  const pulse = () =>
+    host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.canvasComment"] button span')!
+      .style.opacity;
+  const firstPulse = pulse();
+  act(() => callbacks.at(-1)!(1, { mediaTime: 1.4 } as VideoFrameCallbackMetadata));
+  expect(pulse()).not.toBe(firstPulse);
+  const video = host.querySelector('video')!;
+  let seeking = true;
+  Object.defineProperty(video, 'seeking', { configurable: true, get: () => seeking });
+  const seekingPulse = pulse();
+  const late = callbacks.at(-1)!;
+  video.currentTime = 2.1;
+  act(() => video.dispatchEvent(new Event('seeking')));
+  act(() => late(2, { mediaTime: 1.8 } as VideoFrameCallbackMetadata));
+  expect(pulse()).toBe(seekingPulse);
+  seeking = false;
+  act(() => callbacks.at(-1)!(3, { mediaTime: 2.1 } as VideoFrameCallbackMetadata));
+  expect(host.querySelector('[data-ui="gallery.videoReview.canvasComment"]')).toBeNull();
+  expect(presentation.input).toHaveBeenCalledTimes(prepares);
+  expect(media).toHaveBeenCalledTimes(videos);
+  const previous = callbacks.at(-1)!;
+  renderStage({ ...props, url: 'blob:replacement' });
+  const replacement = callbacks.at(-1)!;
+  const count = presentation.input.mock.calls.length;
+  act(() => previous(4, { mediaTime: 1.2 } as VideoFrameCallbackMetadata));
+  expect(host.querySelector('[data-ui="gallery.videoReview.canvasComment"]')).toBeNull();
+  expect(presentation.input).toHaveBeenCalledTimes(count);
+  act(() => root.render(null));
+  const callbackCount = callbacks.length;
+  act(() => replacement(5, { mediaTime: 1.2 } as VideoFrameCallbackMetadata));
+  expect(callbacks).toHaveLength(callbackCount);
+  expect(cancel).toHaveBeenCalled();
+});
+
+it('uses accepted manual source time for content and viewport handles across a held result', async () => {
+  presentation.active = true;
+  const { createCanvasComment } = await import('../../features/video/review/comments');
+  renderStage({
+    scene: { background: disabled, camera: identity },
+    comments: {
+      items: [
+        { ...createCanvasComment({ id: 'content', start: 1, end: 2 }), attachment: 'content' },
+        { ...createCanvasComment({ id: 'viewport', start: 1, end: 2 }), attachment: 'viewport' },
+      ],
+      annotations: [],
+      time: 0,
+      background: disabled,
+      camera: identity,
+      selectedId: null,
+      busy: false,
+      onSelect: vi.fn(),
+      onMove: vi.fn(),
+    },
+  });
+  const input: Parameters<
+    typeof import('./use-preview-presentation').useReviewPreviewPresentation
+  >[0] = presentation.input.mock.lastCall![0];
+  const publish = (resultTime: number, sourceTime: number) =>
+    act(() =>
+      input.onGeometry?.(
+        reviewPresentedGeometry(
+          { source, background: disabled, zoomRegions: [], comments: [], keys: [], clicks: [] },
+          { canonical: source, backing: { width: 800, height: 450 } },
+          resultTime,
+          identity
+        ),
+        sourceTime,
+        'blob:review'
+      )
+    );
+  const handles = () => host.querySelectorAll('[data-ui="gallery.videoReview.canvasComment"]');
+  expect(handles()).toHaveLength(0);
+  publish(5, 1.2);
+  expect(handles()).toHaveLength(2);
+  const count = presentation.input.mock.calls.length;
+  publish(6, 1.2);
+  expect(handles()).toHaveLength(2);
+  publish(7, 2.1);
+  expect(handles()).toHaveLength(0);
+  expect(presentation.input).toHaveBeenCalledTimes(count);
 });

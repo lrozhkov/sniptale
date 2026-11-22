@@ -50,6 +50,20 @@
   user-select: text;
 }
 
+.sniptale-design-review-chrome .sniptale-feedback-search-field {
+  border-color: var(--sniptale-color-border-soft);
+  background: var(--sniptale-color-surface-input);
+}
+.sniptale-design-review-chrome .sniptale-feedback-search-field:is(:hover, :focus) {
+  background: var(--sniptale-color-surface-hover);
+}
+.sniptale-design-review-chrome .sniptale-feedback-search-field:focus {
+  border-color: var(--sniptale-color-border-strong);
+}
+.sniptale-design-review-chrome .sniptale-feedback-search-field:focus::placeholder {
+  color: transparent;
+}
+
 /* Fixed icon hit areas must not inherit the toolbar's text-button padding. */
 .sniptale-design-review-chrome .sniptale-feedback-icon-button,
 .sniptale-design-review-chrome .sniptale-feedback-header-actions .sniptale-btn {

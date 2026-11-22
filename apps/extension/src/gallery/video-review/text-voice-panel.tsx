@@ -469,7 +469,9 @@ function TextVoiceResults({
           key={preview.clipId}
           className="min-w-0 space-y-1 rounded border border-[var(--sniptale-color-border-soft)] p-2 text-xs"
         >
-          <p className="truncate">{preview.textSnapshot.text}</p>
+          <p className="truncate" title={preview.textSnapshot.text}>
+            {preview.textSnapshot.text}
+          </p>
           <p>
             {translate(sourceLabel[preview.textSnapshot.kind])} ·{' '}
             {translate('gallery.videoReview.textVoiceDuration').replace(

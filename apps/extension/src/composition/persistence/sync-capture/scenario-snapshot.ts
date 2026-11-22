@@ -15,7 +15,7 @@ import {
 } from '../scenario/read-guards';
 import { parseScenarioStepEditorDocumentEntry } from '../scenario/editor-documents/index.guards';
 import { readScenarioStorage } from '../scenario/storage';
-import { SCENARIO_HISTORY_BYTE_LIMIT, SCENARIO_HISTORY_LIMIT } from '../scenario/history-model';
+import { detachScenarioHistory, MAX_NATIVE_SCENARIO_HISTORY_BYTES } from './scenario-history';
 import { parseMediaLibraryEntry, parseMediaThumbnailEntry } from '../media-library/read-guards';
 import type { MediaLibraryEntry } from '../media-library/contracts';
 import { parseAggregatePresentationEntry } from '../aggregate-presentations/parser';
@@ -27,8 +27,7 @@ import {
 } from './contracts';
 import { describeImageMetadata } from './image-snapshot';
 
-export const MAX_NATIVE_SCENARIO_HISTORY_BYTES =
-  SCENARIO_HISTORY_BYTE_LIMIT + SCENARIO_HISTORY_LIMIT + 1;
+export { MAX_NATIVE_SCENARIO_HISTORY_BYTES } from './scenario-history';
 
 export type { CapturedScenarioRows } from './contracts';
 
@@ -37,6 +36,7 @@ export const SCENARIO_CAPTURE_STORES = [
   stores.SYNC_CAPTURE_STORE,
   stores.SYNC_OUTBOX_STORE,
   stores.ASSET_RESIDENCY_STORE,
+  stores.SCENARIO_PROJECT_REVISIONS_STORE,
   stores.SCENARIO_PROJECTS_STORE,
   stores.SCENARIO_PROJECT_HISTORY_STORE,
   stores.SCENARIO_PROJECT_UNITS_STORE,
@@ -234,6 +234,7 @@ export function parseCapturedScenarioRows(value: unknown): CapturedScenarioRows 
   if (
     !entry ||
     entry.history?.length ||
+    entry.editingHistory !== undefined ||
     !assets ||
     !documents ||
     !exports ||
@@ -324,8 +325,8 @@ export async function freezeScenarioInTransaction(
 ): Promise<CapturedScenarioRows> {
   const entry = parseScenarioProjectEntry((await readScenarioStorage(tx, id)).logical);
   if (!entry || entry.id !== id) invalid();
-  const { history, ...current } = entry;
-  const historyBytes = history?.length ? new TextEncoder().encode(JSON.stringify(history)) : null;
+  const { current, text } = detachScenarioHistory(entry);
+  const historyBytes = text === null ? null : new TextEncoder().encode(text);
   const assets = await readScenarioChildRows(
     tx,
     stores.SCENARIO_ASSETS_STORE,

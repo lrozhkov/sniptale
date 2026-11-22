@@ -1,5 +1,9 @@
-import { captureRootKey, pendingCheckpointKey } from '../sync-capture/contracts';
 import { enableScenarioDeletionReadGuard } from './aggregate-mutations.test-support';
+import { removeScenarioAssetReferences } from './asset-reference-removal';
+import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
+import { parseMediaLibraryEntry } from '../media-library/read-guards';
+import { createScenarioProjectStore } from './storage';
+import { captureRootKey, pendingCheckpointKey } from '../sync-capture/contracts';
 import {
   stores,
   getStore,
@@ -27,7 +31,10 @@ import {
   scenarioAssetPublicationAdapter,
 } from './aggregate-mutations';
 import { deleteOrphanedScenarioAggregateChild, deleteScenarioAggregate } from './aggregate-cleanup';
-import { backfillScenarioLibraryAssets } from './library-publication';
+import {
+  backfillScenarioLibraryAssets,
+  promoteScenarioSourceLifecycles,
+} from './library-publication';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 import { parseScenarioProjectEntry } from './read-guards';
 
@@ -841,4 +848,152 @@ it('does not borrow a later pending receipt when an already-committed asset jour
   });
   expect(replayed).not.toHaveProperty('checkpointReceipt');
   expect(getStore('sync_capture').get(pending.key)).toEqual(pending);
+});
+
+it.each(['past', 'future'] as const)(
+  'retains and promotes resources reachable only from the %s editing branch',
+  async (branch) => {
+    const project = createGuideProject('Branch resources', 'branch-resources', 1);
+    const step = createGuideStep('Retained image', 'step');
+    step.blocks.push(
+      createGuideImageBlock({
+        id: 'image',
+        assetId: 'branch-image',
+        editDocumentId: 'branch-document',
+        width: 10,
+        height: 10,
+        source: { kind: 'import', filename: 'retained.png' },
+      })
+    );
+    project.items.push(step);
+    const first = await commitScenarioAggregateMutation(project, {
+      children: {
+        assetPuts: [createAsset(project.id, 'branch-image')],
+        editorDocumentPuts: [createDocument(project.id, 'branch-document')],
+      },
+    });
+    const stored = await getScenarioProjectEntry(project.id);
+    if (!stored) throw new Error('Missing native Scenario');
+    const updatedAt = first.project.updatedAt + 1;
+    const checkpoint = {
+      ...stored,
+      project: { ...first.project, items: [], updatedAt },
+      updatedAt,
+      workspaceRevision: first.workspaceRevision + 1,
+      editingHistory: {
+        version: 1 as const,
+        past: branch === 'past' ? [first.project] : [],
+        future: branch === 'future' ? [first.project] : [],
+      },
+    };
+    await createScenarioProjectStore(db.transaction([...stores.keys()])).put(checkpoint);
+    const before = structuredClone(stores);
+    expect(await pruneScenarioResources(project.id)).toBe(0);
+    expect(stores).toEqual(before);
+    expect(getStore('scenario_assets').has('branch-image')).toBe(true);
+    expect(getStore('scenario_step_editor_documents').has('branch-document')).toBe(true);
+    const libraryId = 'scenario-asset:branch-image';
+    const origin = parseMediaLibraryEntry(getStore('media_library').get(libraryId));
+    if (!origin) throw new Error('Missing logical Scenario source');
+    getStore('media_library').set(libraryId, {
+      ...origin,
+      lifecycle: createLibraryLifecycle('temporary', updatedAt),
+    });
+    const { initDB } = await import('../infrastructure/indexed-db/core');
+    const database = await initDB();
+    const tx = database.transaction([...SCENARIO_CAPTURE_STORES], 'readwrite');
+    await promoteScenarioSourceLifecycles(tx, checkpoint, updatedAt + 1);
+    await tx.done;
+    expect(
+      parseMediaLibraryEntry(getStore('media_library').get(libraryId))?.lifecycle?.storageClass
+    ).toBe('library');
+  }
+);
+
+it('clears saved revisions and prunes orphaned children without resetting editing branches', async () => {
+  const project = createGuideProject('Metadata cleanup', 'metadata-cleanup', 1);
+  const step = createGuideStep('Image', 'step');
+  step.blocks.push(
+    createGuideImageBlock({
+      id: 'image',
+      assetId: 'old',
+      editDocumentId: 'old-document',
+      width: 10,
+      height: 10,
+      source: { kind: 'import', filename: 'old.png' },
+    })
+  );
+  project.items.push(step);
+  const first = await commitScenarioAggregateMutation(project, {
+    children: {
+      assetPuts: [createAsset(project.id, 'old')],
+      editorDocumentPuts: [createDocument(project.id, 'old-document')],
+    },
+  });
+  await commitScenarioAggregateMutation({ ...first.project, items: [] });
+  const stored = await getScenarioProjectEntry(project.id);
+  if (!stored) throw new Error('Missing stored Scenario');
+  const editingHistory = {
+    version: 1 as const,
+    past: [first.project],
+    future: [{ ...first.project, name: 'Future' }],
+  };
+  await createScenarioProjectStore(db.transaction([...stores.keys()])).put({
+    ...stored,
+    editingHistory,
+  });
+  await clearScenarioSavedHistory(project.id, stored.project.updatedAt);
+  const cleared = await getScenarioProjectEntry(project.id);
+  if (!cleared) throw new Error('Missing Scenario after archive cleanup');
+  expect(cleared.history).toBeUndefined();
+  expect(cleared.editingHistory).toEqual(editingHistory);
+  expect(await pruneScenarioResources(project.id)).toBe(0);
+  const sanitized = removeScenarioAssetReferences(
+    cleared,
+    new Set(['old']),
+    cleared.project.updatedAt + 1
+  );
+  await createScenarioProjectStore(db.transaction([...stores.keys()])).put(sanitized);
+  expect(await pruneScenarioResources(project.id)).toBe(2);
+  const after = await getScenarioProjectEntry(project.id);
+  expect(after?.editingHistory).toEqual(sanitized.editingHistory);
+  expect(after?.history).toBeUndefined();
+  expect(getStore('scenario_assets').has('old')).toBe(false);
+  expect(getStore('scenario_step_editor_documents').has('old-document')).toBe(false);
+});
+
+it('publishes a generic child command with one editing action and replays its exact journal', async () => {
+  const first = await commitScenarioAggregateMutation(
+    createGuideProject('Current', 'checkpoint-journal', 1)
+  );
+  const older = { ...first.project, name: 'Older action' };
+  const future = { ...first.project, name: 'Cancelled future' };
+  const base = await commitScenarioAggregateMutation(first.project, {
+    expectedRevision: first.workspaceRevision,
+    editingHistory: { version: 1, past: [older], future: [future] },
+  });
+  const next = { ...base.project, items: [createGuideStep('Imported image', 'imported-step')] };
+  next.items[0]!.blocks.push(
+    createGuideImageBlock({
+      id: 'imported-image',
+      assetId: 'imported-child',
+      width: 10,
+      height: 10,
+      source: { kind: 'import', filename: 'imported.png' },
+    })
+  );
+  const committed = await commitScenarioAggregateMutation(next, {
+    expectedRevision: base.workspaceRevision,
+    children: { assetPuts: [createAsset(next.id, 'imported-child')] },
+  });
+  expect(committed.editingHistory).toEqual({ version: 1, past: [older, base.project], future: [] });
+  expect((await getScenarioProjectEntry(next.id))?.editingHistory).toEqual(
+    committed.editingHistory
+  );
+  const assets = await import('../assets');
+  const ready = await vi.mocked(assets.createAssetPublicationJournal).mock.results.at(-1)!.value;
+  const before = structuredClone(stores);
+  await expect(scenarioAssetPublicationAdapter.publish(ready)).resolves.toBeUndefined();
+  expect(stores).toEqual(before);
+  expect(base.editingHistory?.future).toEqual([future]);
 });

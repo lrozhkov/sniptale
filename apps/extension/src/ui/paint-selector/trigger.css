@@ -8,12 +8,9 @@
   box-shadow: none;
 }
 
-[data-ui='shared.ui.paint-selector'][data-trigger-variant='swatch'] {
-  container: paint-inspector / inline-size;
-}
 .paint-inspector-field {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 12rem);
+  grid-template-columns: minmax(0, 1fr) minmax(0, min(55%, 12rem));
   align-items: center;
   gap: 8px;
   min-height: 36px;
@@ -24,7 +21,7 @@
   color: var(--sniptale-color-text-secondary);
   overflow-wrap: anywhere;
 }
-.paint-inspector-field > button {
+.paint-inspector-field > button:not(.sniptale-gradient-value) {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -40,10 +37,10 @@
   text-align: start;
   cursor: pointer;
 }
-.paint-inspector-field > button:hover:not(:disabled) {
+.paint-inspector-field > button:hover:not(:disabled, .sniptale-gradient-value) {
   color: var(--sniptale-color-text-primary-strong);
 }
-.paint-inspector-field > button:focus-visible {
+.paint-inspector-field > button:focus-visible:not(.sniptale-gradient-value) {
   outline: 2px solid var(--sniptale-color-accent);
   outline-offset: 0;
 }
@@ -66,10 +63,4 @@
 .paint-inspector-field > button > svg {
   flex: none;
   color: var(--sniptale-color-text-secondary);
-}
-@container paint-inspector (max-width: 280px) {
-  .paint-inspector-field {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 4px;
-  }
 }

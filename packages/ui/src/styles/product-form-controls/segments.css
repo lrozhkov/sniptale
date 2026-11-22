@@ -1,0 +1,79 @@
+[data-property-segments] {
+  gap: 2px;
+  padding: 0;
+  background: transparent;
+}
+
+[data-property-segments] [data-segment-face] {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background-color: transparent;
+  color: var(--sniptale-color-text-secondary);
+  font-weight: var(--sniptale-font-weight-interface, 400);
+  transition: none;
+  white-space: nowrap;
+}
+
+[data-property-segments] [data-segment-face]::before {
+  position: absolute;
+  z-index: -1;
+  inset: 2px 1px;
+  border: 1px solid transparent;
+  border-radius: inherit;
+  pointer-events: none;
+  content: '';
+}
+
+[data-property-segments] button[data-segment-face]:focus-visible,
+[data-property-segments] input:focus-visible + [data-segment-face] {
+  outline: 1px solid var(--sniptale-color-border-strong);
+  outline-offset: -2px;
+}
+
+[data-property-segments]
+  :is(
+    button[data-segment-face][aria-pressed='false']:enabled:hover,
+    label:hover > input:not(:checked, :disabled) + [data-segment-face]
+  )::before {
+  background-color: var(--sniptale-color-field-hover);
+}
+
+[data-property-segments]
+  :is(button[data-segment-face][aria-pressed='true'], input:checked + [data-segment-face]) {
+  color: var(--sniptale-color-text-primary);
+}
+
+[data-property-segments]
+  :is(button[data-segment-face][aria-pressed='true'], input:checked + [data-segment-face])::before {
+  border-color: var(--sniptale-color-field-border);
+  background-color: var(--sniptale-color-field);
+}
+
+/* Paint the accepted option immediately. Animate hover only on idle options. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-property-segments]
+    :is(
+      button[data-segment-face][aria-pressed='false']:enabled:hover,
+      label:hover > input:not(:checked, :disabled) + [data-segment-face]
+    )::before {
+    transition: background-color 110ms ease-out;
+  }
+}
+
+@media (forced-colors: active) {
+  [data-property-segments]
+    :is(button[data-segment-face][aria-pressed='true'], input:checked + [data-segment-face]) {
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+  [data-property-segments]
+    :is(
+      button[data-segment-face][aria-pressed='true'],
+      input:checked + [data-segment-face]
+    )::before {
+    border-color: Highlight;
+    background-color: Highlight;
+  }
+}

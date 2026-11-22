@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 
+import { legacyImageProjectId } from '../../../composition/persistence/media-library/legacy-projects';
+import { MissingAssetObjectError } from '../../../composition/persistence/assets';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEditorDocumentFixture } from './document.test-support';
 
@@ -10,8 +13,12 @@ const mocks = vi.hoisted(() => ({
   createId: vi.fn(),
   getBlob: vi.fn(),
   getEntry: vi.fn(),
+  ensureNative: vi.fn(),
+  readLocalDraft: vi.fn(),
+  inspectRecovery: vi.fn(),
   readAssetId: vi.fn(),
   restore: vi.fn(),
+  stored: vi.fn(),
   toDataUrl: vi.fn(),
 }));
 
@@ -19,6 +26,26 @@ vi.mock('../../../composition/persistence/media-library/index.library.ts', async
   ...(await original()),
   getMediaAssetBlob: mocks.getBlob,
   getMediaLibraryEntry: mocks.getEntry,
+}));
+vi.mock('../../../composition/persistence/image-workspaces/read', async (original) => ({
+  ...(await original()),
+  readImageWorkspace: mocks.readLocalDraft,
+  readImageOriginalSource: async (id: string, options?: { includeBlob?: boolean }) => {
+    if (options?.includeBlob === false) return mocks.inspectRecovery(id);
+    const [blob, asset] = await Promise.all([
+      mocks.getBlob().catch((error: unknown) => {
+        if (error instanceof Error && error.name === 'NotFoundError')
+          throw new MissingAssetObjectError('original');
+        throw error;
+      }),
+      mocks.getEntry(),
+    ]);
+    return { blob, asset, sourceGeneration: 'observed-generation' };
+  },
+}));
+vi.mock('../../../composition/persistence/image-workspaces', async (original) => ({
+  ...(await original()),
+  recoverAndGetStoredImageWorkspace: mocks.stored,
 }));
 vi.mock('../../../workflows/editor/bootstrap', async (original) => ({
   ...(await original()),
@@ -43,6 +70,9 @@ vi.mock('../../../platform/media-utils/data-url', async (original) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.stored.mockReset().mockResolvedValue(undefined);
+  mocks.ensureNative.mockReset().mockResolvedValue(undefined);
+  mocks.inspectRecovery.mockReset().mockResolvedValue({ asset: undefined, sourceGeneration: null });
   window.history.replaceState({}, '', '/apps/extension/src/editor/index.html');
 });
 
@@ -83,33 +113,41 @@ describe('stable editor aggregate identity', () => {
     expect(window.location.search).toBe('?theme=dark');
   });
 
-  it('starts a fresh local draft, replaces restore params, and activates autosave', async () => {
+  it('assigns a local project URL only after publication is acknowledged', async () => {
     window.history.replaceState(
       {},
       '',
       '/apps/extension/src/editor/index.html?assetId=library-1&bootstrap=boot-1&session=legacy&theme=dark'
     );
-    mocks.createId.mockReturnValue('draft-new');
-    const activate = vi.fn();
+    mocks.createId.mockReturnValueOnce('local-project').mockReturnValueOnce('local-original');
     const renderPresentation = vi.fn();
+    let onFirstPublication: (() => void) | undefined;
+    const activate = vi.fn((value: { onFirstPublication?: () => void }) => {
+      onFirstPublication = value.onFirstPublication;
+    });
+    const source = { dataUrl: 'data:image/png;base64,YQ==', width: 1, height: 1 };
     const { beginEditorPageLocalDraft } = await import('./');
-
     expect(
       beginEditorPageLocalDraft({
         autosaveService: { activate },
         renderPresentation,
         sourceTitle: 'local.png',
+        source,
       })
-    ).toBe('draft-new');
-
-    expect(window.location.search).toBe('?assetId=draft-new&theme=dark');
+    ).toBe('local-project');
+    expect(window.location.search).toBe('?theme=dark');
     expect(activate).toHaveBeenCalledWith({
-      aggregateId: 'draft-new',
+      aggregateId: 'local-project',
+      newOriginal: { ...source, mediaId: 'local-original', filename: 'local.png' },
+      onFirstPublication: expect.any(Function),
       durableRevision: 0,
       renderPresentation,
       sourceTitle: 'local.png',
       sourceUrl: '',
     });
+    onFirstPublication?.();
+    expect(new URLSearchParams(window.location.search).get('assetId')).toBe('local-project');
+    expect(new URLSearchParams(window.location.search).get('theme')).toBe('dark');
   });
 });
 
@@ -250,7 +288,7 @@ describe('editor aggregate restore', () => {
     });
   });
 
-  it('falls back to bootstrap and then immutable original', async () => {
+  it('uses bootstrap for a new image and the native original for an asset URL', async () => {
     mocks.restore.mockResolvedValue(undefined);
     mocks.bootstrap.mockResolvedValueOnce({
       dataUrl: 'data:image/png;base64,YQ==',
@@ -259,7 +297,7 @@ describe('editor aggregate restore', () => {
     mocks.getEntry.mockResolvedValueOnce({ createdAt: 250 });
     const { resolveEditorPageRestoreSource } = await import('./');
     await expect(
-      resolveEditorPageRestoreSource({ assetId: 'image-2', bootstrapId: 'boot' }, 'image-2', {
+      resolveEditorPageRestoreSource({ assetId: null, bootstrapId: 'boot' }, 'image-2', {
         restoreDraft: mocks.restore,
       })
     ).resolves.toEqual({
@@ -285,13 +323,14 @@ describe('editor aggregate restore', () => {
       assetId: 'image-2',
       filename: 'original.png',
       nativeRevision: 7,
+      sourceGeneration: 'observed-generation',
       capturedAt: 150,
     });
   });
 });
 
 vi.mock('../../../workflows/sync-transfer/editing-admission', () => ({
-  ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
+  ensureNativeEditingRootAvailable: mocks.ensureNative,
 }));
 
 it('replaces the library URL without bootstrap state and can restore the exact source location', async () => {
@@ -314,4 +353,152 @@ it('does not restore an older switch URL over a newer navigation owner', async (
   history.replaceState({}, '', '/editor?assetId=newer');
   undo();
   expect(location.search).toBe('?assetId=newer');
+});
+
+it('uses the native lifetime and source instead of a stale bootstrap for an existing asset URL', async () => {
+  mocks.restore.mockResolvedValue(undefined);
+  mocks.bootstrap.mockResolvedValue({
+    dataUrl: 'data:image/png;base64,b2xk',
+    title: 'Old bootstrap',
+  });
+  mocks.getEntry.mockResolvedValue({
+    id: 'native-capture',
+    filename: 'capture.png',
+    workspaceRevision: 0,
+    createdAt: 100,
+    sourceTitle: 'Native capture',
+  });
+  mocks.getBlob.mockResolvedValue(new Blob(['native'], { type: 'image/png' }));
+  mocks.toDataUrl.mockResolvedValue('data:image/png;base64,bmF0aXZl');
+  const { resolveEditorPageRestoreSource } = await import('./');
+  await expect(
+    resolveEditorPageRestoreSource(
+      { assetId: 'native-capture', bootstrapId: 'old' },
+      'native-capture',
+      { restoreDraft: mocks.restore }
+    )
+  ).resolves.toMatchObject({
+    kind: 'asset',
+    assetId: 'native-capture',
+    nativeRevision: 0,
+    sourceGeneration: 'observed-generation',
+    sourceTitle: 'Native capture',
+    dataUrl: 'data:image/png;base64,bmF0aXZl',
+  });
+});
+
+it('does not resurrect a removed native asset from its obsolete bootstrap', async () => {
+  mocks.restore.mockResolvedValue(undefined);
+  mocks.bootstrap.mockResolvedValue({ dataUrl: 'data:image/png;base64,b2xk' });
+  mocks.getEntry.mockResolvedValue(undefined);
+  mocks.getBlob.mockResolvedValue(undefined);
+  const { resolveEditorPageRestoreSource } = await import('./');
+  await expect(
+    resolveEditorPageRestoreSource({ assetId: 'removed', bootstrapId: 'old' }, 'removed', {
+      restoreDraft: mocks.restore,
+    })
+  ).resolves.toEqual({ kind: 'empty' });
+});
+
+it('loads a new independent editor session from its original', async () => {
+  mocks.readAssetId.mockReturnValue('new-project');
+  mocks.restore.mockResolvedValue(undefined);
+  mocks.getBlob.mockResolvedValue(new Blob(['original'], { type: 'image/png' }));
+  mocks.getEntry.mockResolvedValue({ filename: 'original.png', workspaceRevision: 7 });
+  mocks.toDataUrl.mockResolvedValue('data:image/png;base64,b3JpZ2luYWw=');
+  const { readEditorPageLocationState, resolveEditorPageRestoreSource } = await import('./');
+  const location = readEditorPageLocationState('?assetId=new-project&originalId=original');
+  expect(location).toMatchObject({ assetId: 'new-project', originalId: 'original' });
+  await expect(
+    resolveEditorPageRestoreSource(location, 'new-project', { restoreDraft: mocks.restore })
+  ).resolves.toMatchObject({
+    kind: 'asset',
+    assetId: 'new-project',
+    nativeRevision: 0,
+    sourceGeneration: null,
+    original: { mediaId: 'original', generation: 'observed-generation' },
+  });
+  expect(mocks.restore).toHaveBeenCalledWith('new-project', undefined);
+  expect(mocks.bootstrap).not.toHaveBeenCalled();
+});
+
+it('refuses a missing native original instead of replacing it from bootstrap pixels', async () => {
+  mocks.restore.mockResolvedValue(undefined);
+  mocks.bootstrap.mockResolvedValue({ dataUrl: 'data:image/png;base64,b2xk' });
+  mocks.getEntry.mockResolvedValue({ id: 'native-capture', workspaceRevision: 0 });
+  mocks.getBlob.mockResolvedValue(undefined);
+  const { resolveEditorPageRestoreSource } = await import('./');
+  await expect(
+    resolveEditorPageRestoreSource(
+      { assetId: 'native-capture', bootstrapId: 'old' },
+      'native-capture',
+      { restoreDraft: mocks.restore }
+    )
+  ).rejects.toMatchObject({ name: 'MissingEditorOriginalError' });
+});
+
+it.each([null, 'consumed-bootstrap'])(
+  'resumes the migrated Image project with bootstrap=%s',
+  async (bootstrapId) => {
+    const sourceMediaId = 'legacy-image';
+    const id = legacyImageProjectId(sourceMediaId);
+    mocks.stored.mockImplementation(async () => {
+      expect(mocks.restore).not.toHaveBeenCalled();
+      return { aggregateId: id, sourceMediaId };
+    });
+    const entry = {
+      aggregateId: id,
+      sourceMediaId,
+      revision: 5,
+      document: createEditorDocumentFixture(),
+    };
+    mocks.restore.mockResolvedValue(entry);
+    mocks.getEntry.mockResolvedValue({ createdAt: 40 });
+    const { resolveEditorPageRestoreSource } = await import('./');
+    const result = await resolveEditorPageRestoreSource(
+      { assetId: sourceMediaId, bootstrapId },
+      sourceMediaId,
+      { restoreDraft: mocks.restore }
+    );
+    expect(result).toEqual({ kind: 'draft', entry, capturedAt: 40 });
+    expect(mocks.restore).toHaveBeenCalledExactlyOnceWith(id, undefined);
+    expect(mocks.getEntry).toHaveBeenCalledExactlyOnceWith(sourceMediaId);
+  }
+);
+
+it('offers original recovery when migrated project admission finds a missing document file', async () => {
+  const sourceMediaId = 'legacy-image';
+  const id = legacyImageProjectId(sourceMediaId);
+  mocks.stored.mockResolvedValue({ aggregateId: id, sourceMediaId });
+  mocks.inspectRecovery.mockResolvedValue({
+    asset: { id, workspaceRevision: 8 },
+    sourceMediaId,
+    sourceGeneration: 'before-opening',
+  });
+  mocks.ensureNative.mockRejectedValueOnce(new Error('Native editing resources are unavailable.'));
+  mocks.readLocalDraft.mockRejectedValueOnce(new MissingAssetObjectError('history-object'));
+  const { resolveEditorPageRestoreSource } = await import('./');
+  await expect(
+    resolveEditorPageRestoreSource({ assetId: sourceMediaId, bootstrapId: null }, sourceMediaId, {
+      restoreDraft: mocks.restore,
+    })
+  ).rejects.toMatchObject({
+    name: 'MissingEditorDraftAssetError',
+    recovery: {
+      routeAssetId: sourceMediaId,
+      aggregateId: id,
+      sourceMediaId,
+      revision: 8,
+      generation: 'before-opening',
+    },
+  });
+  expect(mocks.inspectRecovery.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.ensureNative.mock.invocationCallOrder[0]!
+  );
+  expect(mocks.ensureNative).toHaveBeenCalledExactlyOnceWith({
+    rootKind: 'image-project',
+    rootId: id,
+  });
+  expect(mocks.readLocalDraft).toHaveBeenCalledExactlyOnceWith(id);
+  expect(mocks.restore).not.toHaveBeenCalled();
 });

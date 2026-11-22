@@ -5,6 +5,8 @@ import type {
   EffectRuntimeFrameFailure,
   EffectRuntimeRenderCommand,
 } from '../../contracts/effect-runtime/types';
+import { EffectRuntimeFrameError } from '../../features/video/composition/effect-runtime/runtime/frame-error';
+import { createReviewExportDiagnostics } from '../video-review/export-diagnostics';
 import { createEffectRuntimeSandboxExecutor } from './effect-runtime-sandbox';
 import * as sandboxRender from './effect-runtime-sandbox-render';
 
@@ -23,6 +25,7 @@ import {
   createSandboxWireRequest as createWireRequest,
   FakeImageBitmap,
   installCacheRetryResponder,
+  installSandboxResponder,
   installSynchronousMessageChannel,
   respondWithResourceLimit,
 } from './effect-runtime-sandbox.test-support';
@@ -77,7 +80,7 @@ it('fails closed and removes a sandbox iframe when its isolated page cannot load
   expect(iframe?.getAttribute('sandbox')).toBe('allow-scripts');
   expect(new URL(iframe!.src).search).toBe('');
   await expect(resultPromise).resolves.toEqual(
-    expect.objectContaining({ code: 'crashed', kind: 'error' })
+    expect.objectContaining({ code: 'circuitOpen', kind: 'error' })
   );
   expect(document.querySelector('iframe')).toBeNull();
   manager.dispose();
@@ -334,7 +337,7 @@ it.each([undefined, 'gpu-preview', 'gpu-scene', 'gpu-scene-plan'] as const)(
   }
 );
 
-it('reuses preloaded transport and retries failed preload without recreating after disposal', async () => {
+it('retains failed preload for the manager lifetime without recreating after disposal', async () => {
   const manager = new EffectRuntimeSandboxSessionManager(document, {
     loadTimeoutMs: 100,
     requestTimeoutMs: 100,
@@ -345,13 +348,15 @@ it('reuses preloaded transport and retries failed preload without recreating aft
   first.dispatchEvent(new Event('error'));
   await Promise.resolve();
   expect(document.querySelector('iframe')).toBeNull();
-  const request = manager.prepareGpuFrame(createRequest());
-  const replacement = document.querySelector('iframe');
-  expect(replacement).not.toBe(first);
-  expect(document.querySelectorAll('iframe')).toHaveLength(1);
-  expect(document.querySelector('iframe')).toBe(replacement);
+  await expect(manager.prepareGpuFrame(createRequest())).resolves.toMatchObject({
+    code: 'circuitOpen',
+  });
+  manager.preload();
+  await expect(manager.prepareGpuFrame(createRequest())).resolves.toMatchObject({
+    code: 'circuitOpen',
+  });
+  expect(document.querySelector('iframe')).toBeNull();
   manager.dispose();
-  await expect(request).resolves.toMatchObject({ kind: 'error', code: 'crashed' });
   manager.preload();
   expect(document.querySelector('iframe')).toBeNull();
 });
@@ -430,7 +435,7 @@ it('rejects a checked bitmap fallback returned to the plan-only parent', async (
   }
 });
 
-it('retries explicit transport preload without posting frames and retains readiness until disposal', async () => {
+it('requires a new executor after transport startup refusal and retains recovered readiness', async () => {
   installSynchronousMessageChannel();
   const executor = createEffectRuntimeSandboxExecutor({ compositionBackend: 'gpu-scene' });
   const first = document.querySelector('iframe')!;
@@ -442,20 +447,76 @@ it('retries explicit transport preload without posting frames and retains readin
     await Promise.resolve();
     expect(document.querySelector('iframe')).toBeNull();
     executor.preload!();
+    expect(document.querySelector('iframe')).toBeNull();
+    await expect(executor.prepareGpuFrame!(createRequest())).resolves.toMatchObject({
+      code: 'circuitOpen',
+    });
+    executor.dispose();
+    const recovered = createEffectRuntimeSandboxExecutor({ compositionBackend: 'gpu-scene' });
     const replacement = document.querySelector('iframe')!;
     expect(replacement).not.toBe(first);
     const requests: EffectRuntimeRenderMessage[] = [];
     installCacheRetryResponder(replacement, requests, ports);
     replacement.dispatchEvent(new Event('load'));
     await Promise.resolve();
-    executor.preload!();
+    recovered.preload!();
     expect(document.querySelector('iframe')).toBe(replacement);
     expect(requests).toEqual([]);
-    executor.dispose();
+    const prepared = recovered.renderFrame(createRequest());
+    await expect(prepared).resolves.toMatchObject({ kind: 'frame' });
+    recovered.dispose();
     executor.preload!();
     expect(document.querySelector('iframe')).toBeNull();
   } finally {
     executor.dispose();
+    for (const port of ports) port.close();
+  }
+});
+
+it('retains a broker startup refusal without replacing its iframe on later frames', async () => {
+  installSynchronousMessageChannel();
+  const manager = new EffectRuntimeSandboxSessionManager(document, {
+    loadTimeoutMs: 100,
+    requestTimeoutMs: 100,
+    compositionBackend: 'gpu-scene',
+  });
+  manager.preload();
+  const iframe = document.querySelector('iframe')!;
+  const requests: EffectRuntimeRenderMessage[] = [];
+  const ports: MessagePort[] = [];
+  let firstReply = true;
+  installSandboxResponder(iframe, requests, ports, (request) => {
+    const failure = createEffectRuntimeFailure(request, 'circuitOpen');
+    if (!firstReply) return failure;
+    firstReply = false;
+    return { ...failure, startupFailureCode: 'crashed' };
+  });
+  iframe.dispatchEvent(new Event('load'));
+  try {
+    const initial = await manager.renderFrame(createRequest());
+    expect(initial).toMatchObject({ code: 'circuitOpen', startupFailureCode: 'crashed' });
+    if (initial.kind !== 'error') throw new Error('Expected a broker startup refusal');
+    const sink = vi.fn();
+    const diagnostics = createReviewExportDiagnostics(
+      { destination: 'preview', route: 'render' },
+      sink
+    );
+    diagnostics.reportFailure(EffectRuntimeFrameError.fromFailure(initial), 'compose');
+    manager.preload();
+    const later = await manager.renderFrame(createRequest());
+    expect(later).toMatchObject({
+      code: 'circuitOpen',
+    });
+    expect(later).not.toHaveProperty('startupFailureCode');
+    if (later.kind !== 'error') throw new Error('Expected the circuit to stay open');
+    diagnostics.reportFailure(EffectRuntimeFrameError.fromFailure(later), 'compose');
+    expect(sink).toHaveBeenCalledExactlyOnceWith(
+      'preview outcome=failed route=render destination=preview stage=compose code=compose-failed effectCode=crashed'
+    );
+    expect(requests).toHaveLength(2);
+    expect(document.querySelector('iframe')).toBe(iframe);
+  } finally {
+    manager.dispose();
     for (const port of ports) port.close();
   }
 });
@@ -702,5 +763,111 @@ it('keeps a pure foreground reuse token through the actual completed standby han
   } finally {
     primary.dispose();
     rendered.mockRestore();
+  }
+});
+
+it('retries a speculative preload timeout on first demand without retrying a demanded timeout', async () => {
+  vi.useFakeTimers();
+  const manager = new EffectRuntimeSandboxSessionManager(document, {
+    loadTimeoutMs: 100,
+    requestTimeoutMs: 100,
+    compositionBackend: 'gpu-scene',
+  });
+  try {
+    manager.preload();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(document.querySelector('iframe')).toBeNull();
+    manager.preload();
+    expect(document.querySelector('iframe')).toBeNull();
+    const pending = manager.prepareGpuFrame(createRequest());
+    expect(document.querySelector('iframe')).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(pending).resolves.toMatchObject({ kind: 'error', code: 'circuitOpen' });
+    await expect(manager.prepareGpuFrame(createRequest())).resolves.toMatchObject({
+      kind: 'error',
+      code: 'circuitOpen',
+    });
+    expect(document.querySelector('iframe')).toBeNull();
+    manager.dispose();
+    manager.preload();
+    expect(document.querySelector('iframe')).toBeNull();
+  } finally {
+    manager.dispose();
+    vi.useRealTimers();
+  }
+});
+
+it('authenticates the replacement after a speculative preload timeout before posting a frame', async () => {
+  vi.useFakeTimers();
+  installSynchronousMessageChannel();
+  const manager = new EffectRuntimeSandboxSessionManager(document, {
+    loadTimeoutMs: 100,
+    requestTimeoutMs: 100,
+    compositionBackend: 'gpu-scene',
+  });
+  const ports: MessagePort[] = [];
+  try {
+    manager.preload();
+    await vi.advanceTimersByTimeAsync(100);
+    const pending = manager.renderFrame(createRequest());
+    const iframe = document.querySelector('iframe');
+    expect(iframe).not.toBeNull();
+    const requests: EffectRuntimeRenderMessage[] = [];
+    installCacheRetryResponder(iframe!, requests, ports);
+    expect(requests).toEqual([]);
+    iframe!.dispatchEvent(new Event('load'));
+    await expect(pending).resolves.toMatchObject({ kind: 'frame' });
+    expect(requests).toHaveLength(1);
+  } finally {
+    manager.dispose();
+    for (const port of ports) port.close();
+    vi.useRealTimers();
+  }
+});
+
+it('keeps both admitted requests alive across cold worker startup and serialized frames', async () => {
+  vi.useFakeTimers();
+  installSynchronousMessageChannel();
+  const executor = createEffectRuntimeSandboxExecutor();
+  const requests: EffectRuntimeRenderMessage[] = [];
+  const ports: MessagePort[] = [];
+  const commands = [createRequest(), { ...createRequest(), requestId: 'request-2', sequenceId: 2 }];
+  try {
+    const pending = commands.map((command) => executor.renderFrame(command));
+    const iframe = document.querySelector('iframe')!;
+    installSandboxResponder(iframe, requests, ports, (request, index, port) => {
+      if (!port) throw new Error('Expected a response port');
+      ports.push(port);
+      setTimeout(
+        () => {
+          port.postMessage({
+            effectInstanceId: request.effectInstanceId,
+            requestId: request.requestId,
+            sequenceId: request.sequenceId,
+            snapshotId: request.snapshotId,
+            kind: 'frame',
+            bitmap: createInputBitmap(),
+            width: request.renderWidth,
+            height: request.renderHeight,
+            acknowledged: {
+              documentId: request.documentRef.id,
+              assetSelectionId: request.assetSelectionRef.id,
+            },
+          });
+        },
+        2700 + index * 1200
+      );
+    });
+    iframe.dispatchEvent(new Event('load'));
+    await vi.advanceTimersByTimeAsync(5100);
+    expect(requests).toHaveLength(2);
+    const results = await Promise.all(pending);
+    for (const result of results) if (result.kind === 'frame') result.bitmap.close();
+    expect(results.map((result) => result.kind)).toEqual(['frame', 'frame']);
+    expect(document.querySelector('iframe')).toBe(iframe);
+  } finally {
+    executor.dispose();
+    for (const port of ports) port.close();
+    vi.useRealTimers();
   }
 });

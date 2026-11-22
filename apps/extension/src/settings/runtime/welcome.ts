@@ -1,3 +1,4 @@
+import { isAppLocale } from '@sniptale/runtime-contracts/i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { THEME_PREFERENCE_CHANGE_EVENT } from '@sniptale/ui/branding';
 import type { MicrophoneAccessState } from '@sniptale/platform/browser/user-media';
@@ -112,7 +113,7 @@ export function useWelcomeSetup(dependencies: WelcomeDependencies) {
     next,
     back: () => setStep(step === 2 ? 1 : 0),
     setLocale: (value: string) => {
-      if (value !== 'en' && value !== 'ru') return;
+      if (!isAppLocale(value)) return;
       void perform(() => deps.locale(value));
     },
     setTheme: (value: string) => {

@@ -19,6 +19,7 @@
     "./highlighter/surface-style": "./src/highlighter/surface-style.ts",
     "./highlighter/border-preset": "./src/highlighter/border-preset.ts",
     "./highlighter/step-badge": "./src/highlighter/step-badge.ts",
+    "./i18n": "./src/i18n.ts",
     "./messaging/capture-messages": "./src/messaging/capture-messages.ts",
     "./messaging/contracts/response": "./src/messaging/contracts/response.ts",
     "./messaging/contracts/runtime-message/content-action": "./src/messaging/contracts/runtime-message/content-action.ts",

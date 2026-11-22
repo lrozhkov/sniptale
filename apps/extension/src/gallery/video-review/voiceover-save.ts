@@ -1,3 +1,7 @@
+import {
+  reviewVoiceoverSourceAtOffset,
+  reviewVoiceoverSampleDelta,
+} from '../../features/video/review/voiceover-timing';
 import type { AudioTrimRange } from '../../composition/audio-recording/session-types';
 import type { ReviewTimeSegment } from '../../features/video/review/timeline';
 import {
@@ -11,6 +15,7 @@ import {
 } from '../../workflows/video-review/audio-import';
 import type { createVideoReviewSession } from '../../workflows/video-review/session';
 import type { useReviewAudio } from './use-review-audio';
+import type { ReviewCommandContext } from './command-context';
 
 type ReviewSession = ReturnType<typeof createVideoReviewSession>;
 
@@ -21,9 +26,13 @@ export async function saveReviewVoiceoverTake(args: {
   signal: AbortSignal;
   take: Blob;
   onRetained?: () => void;
+  context?: ReviewCommandContext;
   sourceStart: number;
+  sourceEnd?: number;
+  resultStart?: number;
+  resultEnd?: number;
   segments: readonly ReviewTimeSegment[];
-  audio: ReturnType<typeof useReviewAudio>;
+  audio: Pick<ReturnType<typeof useReviewAudio>, 'markImported'>;
   session: ReviewSession;
   takeIds: WeakMap<Blob, string>;
   preparedTakes: WeakMap<Blob, PreparedReviewAudio>;
@@ -47,7 +56,12 @@ export async function saveReviewVoiceoverTake(args: {
       (item) => item.id === clipId && item.assetId === assetId
     );
     if (clip && !args.signal.aborted && args.isCurrent())
-      args.audio.markImported(clip, duration, args.file.name);
+      args.audio.markImported(
+        clip,
+        duration,
+        args.file.name,
+        ...(args.context ? ([args.context] as const) : ([] as const))
+      );
   };
   if (attached()) {
     const prepared = args.preparedTakes.get(args.take);
@@ -83,7 +97,10 @@ export async function saveReviewVoiceoverTake(args: {
         args.sourceStart,
         args.segments,
         args.trim.trimStart,
-        args.onRetained
+        args.onRetained,
+        args.sourceEnd,
+        args.resultStart,
+        args.resultEnd
       ),
   });
   const prepared = args.preparedTakes.get(args.take);
@@ -101,18 +118,31 @@ async function commitRecordedClip(
   placement: number,
   segments: readonly ReviewTimeSegment[],
   trimOffset: number,
-  onRetained?: () => void
+  onRetained?: () => void,
+  sourceEnd?: number,
+  resultStart?: number,
+  resultEnd?: number
 ): Promise<void> {
   const before = session.getSnapshot().document.advancedContent;
   if (before.audio.voiceover.some((clip) => clip.id === clipId && clip.assetId === assetId)) {
     if (onRetained && (await session.hasDurableVoiceoverClip(clipId, assetId))) onRetained();
     return;
   }
-  const clip = {
-    ...importedAudioClip(assetId, duration, placement, placement + duration),
-    id: clipId,
-  };
-  const anchored = anchorReviewVoiceoverAtSource(clip, segments, trimOffset);
+  const trimmedStart = reviewVoiceoverSourceAtOffset(placement, trimOffset, 1, segments);
+  const at = resultStart === undefined ? placement : resultStart + trimOffset;
+  const limit =
+    resultStart === undefined
+      ? placement +
+        (sourceEnd === undefined
+          ? duration
+          : Math.min(duration, reviewVoiceoverSampleDelta(trimmedStart, sourceEnd, 1, segments)))
+      : Math.min(at + duration, resultEnd ?? segments.at(-1)?.resultEnd ?? at + duration);
+  if (limit <= at) throw new Error('Recording is outside the insertion interval');
+  const clip = { ...importedAudioClip(assetId, duration, at, limit), id: clipId };
+  const anchored =
+    resultStart === undefined
+      ? anchorReviewVoiceoverAtSource(clip, segments, trimOffset)
+      : { ...clip, timeDomain: 'result' as const };
   const voiceoverSegments = before.audio.voiceoverSegments ?? [...segments];
   try {
     await session.commitDurable({

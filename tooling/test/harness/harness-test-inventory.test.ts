@@ -47,6 +47,10 @@ it.each([
   ['tooling/ci/audio-effects.test.ts', 'tooling/ci/audio-effects-peer.test.ts'],
   ['tooling/dev-surface/server.test.ts', 'tooling/dev-surface/server-peer.test.ts'],
   [
+    'tooling/test/e2e/live/configuration.test.ts',
+    'tooling/test/e2e/live/configuration-peer.test.ts',
+  ],
+  [
     'tooling/test/harness/webdav-checkpoints.test.ts',
     'tooling/test/harness/webdav-checkpoints-peer.test.ts',
   ],

@@ -158,6 +158,9 @@ it('admits source mute bindings without reading or rewriting workspace rows and 
     ['video_visual_preferences', { keyPath: ['kind', 'packId'] }],
     ['video_gl_transition_presets', { keyPath: 'id' }],
     ['editor_vector_library', { keyPath: 'key' }],
+    ['image_workspace_identities', { keyPath: 'aggregateId' }],
+    ['scenario_project_revisions', { keyPath: 'projectId' }],
+    ['video_review_identities', { keyPath: 'key' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   const olderContracts = Object.entries(betaV14Fixture.domainVersions).map(
@@ -227,6 +230,9 @@ it('admits speech without rewriting workspace history or the durable asset graph
     ['video_visual_preferences', { keyPath: ['kind', 'packId'] }],
     ['video_gl_transition_presets', { keyPath: 'id' }],
     ['editor_vector_library', { keyPath: 'key' }],
+    ['image_workspace_identities', { keyPath: 'aggregateId' }],
+    ['scenario_project_revisions', { keyPath: 'projectId' }],
+    ['video_review_identities', { keyPath: 'key' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(transaction.objectStore.mock.calls).toEqual(
@@ -328,11 +334,36 @@ it('upgrades each retained source contract only after all required stores valida
       expect(db.createObjectStore.mock.calls).toEqual([
         ['editor_vector_library', { keyPath: 'key' }],
       ]);
+    else if (migration.toDatabaseVersion === 62)
+      expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith('image_workspace_identities', {
+        keyPath: 'aggregateId',
+      });
+    else if (migration.toDatabaseVersion === 63)
+      expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith('scenario_project_revisions', {
+        keyPath: 'projectId',
+      });
+    else if (migration.toDatabaseVersion === 71)
+      expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith('video_review_identities', {
+        keyPath: 'key',
+      });
     else expect(db.createObjectStore).not.toHaveBeenCalled();
     names.clear();
     expect(() => migration.validate(db, transaction)).toThrow();
     expect(db.deleteObjectStore).not.toHaveBeenCalled();
   }
+});
+
+it('advances native Montage history admission without rewriting stores', async () => {
+  const plan = buildDatabaseMigrationPlan(64, 65);
+  expect(plan).toHaveLength(1);
+  expect(plan![0]).toMatchObject({
+    fromDatabaseVersion: 64,
+    toDatabaseVersion: 65,
+    risk: 'additive',
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'videoProjects', from: 13, to: 14 }],
+  });
+  expect(await plan![0]!.estimateAdditionalBytes()).toBe(64 * 1024);
 });
 
 it('admits compact source gain without workspace migration and refuses incompatible contracts', () => {
@@ -368,6 +399,9 @@ it('admits compact source gain without workspace migration and refuses incompati
     ['video_visual_preferences', { keyPath: ['kind', 'packId'] }],
     ['video_gl_transition_presets', { keyPath: 'id' }],
     ['editor_vector_library', { keyPath: 'key' }],
+    ['image_workspace_identities', { keyPath: 'aggregateId' }],
+    ['scenario_project_revisions', { keyPath: 'projectId' }],
+    ['video_review_identities', { keyPath: 'key' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(
@@ -414,6 +448,9 @@ it('annotation admission preserves rows and aborts before publishing contracts o
     ['video_visual_preferences', { keyPath: ['kind', 'packId'] }],
     ['video_gl_transition_presets', { keyPath: 'id' }],
     ['editor_vector_library', { keyPath: 'key' }],
+    ['image_workspace_identities', { keyPath: 'aggregateId' }],
+    ['scenario_project_revisions', { keyPath: 'projectId' }],
+    ['video_review_identities', { keyPath: 'key' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.objectStore.mock.calls).toEqual(
@@ -614,7 +651,7 @@ it('creates the complete fresh schema with empty unindexed connection authority'
   const tx = { abort: vi.fn(), objectStore: vi.fn() };
   handleDatabaseUpgrade(db, 0, DB_VERSION, tx);
   expect([...names].sort()).toEqual([...EXPECTED_STORES].sort());
-  expect(names).toHaveLength(50);
+  expect(names).toHaveLength(53);
   expect(db.createObjectStore).toHaveBeenCalledWith('sync_connection', { keyPath: 'key' });
   expect(db.createObjectStore).toHaveBeenCalledWith('secret_protection', { keyPath: 'key' });
   expect(connectionIndex).not.toHaveBeenCalled();
@@ -813,3 +850,63 @@ it('creates the same exact nonunique due index for a fresh database', () => {
 });
 
 afterEach(() => vi.unstubAllGlobals());
+
+it('admits inline Montage history additively and fences older writers', async () => {
+  const plan = buildDatabaseMigrationPlan(65, 66);
+  expect(plan).toHaveLength(1);
+  expect(plan![0]).toMatchObject({
+    fromDatabaseVersion: 65,
+    toDatabaseVersion: 66,
+    risk: 'additive',
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'videoProjects', from: 14, to: 15 }],
+  });
+  expect(await plan![0]!.estimateAdditionalBytes()).toBe(64 * 1024);
+  expect(buildDatabaseMigrationPlan(66, 65)).toBeNull();
+});
+
+it('admits packed Image history additively and fences older writers', async () => {
+  const plan = buildDatabaseMigrationPlan(66, 67);
+  expect(plan).toHaveLength(1);
+  expect(plan![0]).toMatchObject({
+    fromDatabaseVersion: 66,
+    toDatabaseVersion: 67,
+    risk: 'additive',
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 40, to: 41 }],
+  });
+  expect(await plan![0]!.estimateAdditionalBytes()).toBe(64 * 1024);
+  expect(buildDatabaseMigrationPlan(67, 66)).toBeNull();
+});
+
+it('fences older writers before they can truncate 1000-action editor history', async () => {
+  const plan = buildDatabaseMigrationPlan(67, 68);
+  expect(plan).toHaveLength(1);
+  expect(plan![0]).toMatchObject({
+    fromDatabaseVersion: 67,
+    toDatabaseVersion: 68,
+    risk: 'additive',
+    backupCoverage: 'none',
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 41, to: 42 },
+      { domainId: 'videoProjects', from: 15, to: 16 },
+      { domainId: 'scenarioProjects', from: 14, to: 15 },
+    ],
+  });
+  expect(await plan![0]!.estimateAdditionalBytes()).toBe(64 * 1024);
+  expect(buildDatabaseMigrationPlan(68, 67)).toBeNull();
+});
+
+it('fences older mixed-budget Image writers before admitting separate raster history', async () => {
+  const plan = buildDatabaseMigrationPlan(68, 69);
+  expect(plan).toHaveLength(1);
+  expect(plan![0]).toMatchObject({
+    fromDatabaseVersion: 68,
+    toDatabaseVersion: 69,
+    risk: 'additive',
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 42, to: 43 }],
+  });
+  expect(await plan![0]!.estimateAdditionalBytes()).toBe(64 * 1024);
+  expect(buildDatabaseMigrationPlan(69, 68)).toBeNull();
+});

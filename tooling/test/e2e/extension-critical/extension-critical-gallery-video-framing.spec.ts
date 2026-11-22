@@ -1,5 +1,6 @@
+import { openNumericControl } from '../support/inspector-numeric';
 import { expect, test, type Page } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { startHostServer } from '../support/host-server';
 import {
   addReviewFocus,
@@ -145,11 +146,10 @@ for (const variant of [
         const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
         const button = (key: Parameters<typeof translate>[0]) =>
           dialog.getByRole('button', { name: label(key), exact: true });
-        const field = (key: Parameters<typeof translate>[0]) =>
-          dialog.getByRole('textbox', { name: label(key), exact: true });
         const setNumber = async (key: Parameters<typeof translate>[0], value: string) => {
-          await field(key).fill(value);
-          await field(key).press('Enter');
+          const editor = await openNumericControl(dialog, label(key));
+          await editor.fill(value);
+          await editor.press('Enter');
         };
         await button('gallery.videoReview.advancedEditing').click();
         await button('gallery.videoReview.scene').click();

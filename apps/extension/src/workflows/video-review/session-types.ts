@@ -49,6 +49,7 @@ export type ReviewSessionPersistence = Pick<
   | 'saveVideoWorkspaceAdvanced'
   | 'saveVideoWorkspaceDraft'
 > & {
+  onFirstSave?: (snapshot: VideoWorkspaceSnapshot) => void;
   acquireSyncCheckpointEdit?: typeof acquireSyncCheckpointEdit;
   wakeCheckpoints?: () => Promise<Extract<SyncProductResult, { kind: 'checkpoint-woken' }>>;
   renameVideoWorkspaceProject?: typeof renameVideoWorkspaceProject;
@@ -65,6 +66,8 @@ export type ReviewSessionState = {
   snapshot: VideoWorkspaceSnapshot;
   document: ReturnType<typeof replayReviewHistory>;
   autosaveEnabled: boolean;
+  /** Native publication is independent of local command admission. */
+  saving?: boolean;
   dirty: boolean;
   pending: number;
   error: Failure | null;

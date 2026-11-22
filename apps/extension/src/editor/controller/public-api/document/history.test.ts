@@ -15,6 +15,7 @@ import {
   redoEditorControllerSnapshot,
   resetEditorControllerToOriginal,
   undoEditorControllerSnapshot,
+  seekEditorControllerSnapshot,
 } from './history';
 
 const mocks = vi.hoisted(() => ({
@@ -78,6 +79,42 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.undoSnapshot.mockReturnValue(createEditorDocument('undo'));
   mocks.redoSnapshot.mockReturnValue(createEditorDocument('redo'));
+});
+
+it('jumps across several actions with one apply and publication, preserving Redo', async () => {
+  const controller = createResetController();
+  controller.history!.push(JSON.stringify(createEditorDocument('third')));
+  controller.history!.push(JSON.stringify(createEditorDocument('fourth')));
+  await seekEditorControllerSnapshot(controller, 0);
+  expect(controller.applyDocument).toHaveBeenCalledTimes(1);
+  expect(controller.publishHistoryDocument).toHaveBeenCalledTimes(1);
+  expect(controller.publishHistoryDocument).toHaveBeenCalledWith(createEditorDocument('original'));
+  expect(controller.history!.getState()).toMatchObject({ index: 0, canRedo: true, size: 4 });
+  await seekEditorControllerSnapshot(controller, 3);
+  expect(controller.publishHistoryDocument).toHaveBeenLastCalledWith(
+    createEditorDocument('fourth')
+  );
+});
+
+it('restores the previous document and cursor when a history jump fails, allowing retry', async () => {
+  const apply = vi.fn(async () => undefined).mockRejectedValueOnce(new Error('load refused'));
+  const controller = createResetController(apply);
+  await expect(seekEditorControllerSnapshot(controller, 0)).rejects.toThrow('load refused');
+  expect(apply).toHaveBeenLastCalledWith(
+    createEditorDocument('edited'),
+    expect.objectContaining({ resetHistory: false })
+  );
+  expect(controller.history!.getState().index).toBe(1);
+  expect(controller.publishHistoryDocument).toHaveBeenCalledWith(createEditorDocument('edited'));
+  await seekEditorControllerSnapshot(controller, 0);
+  expect(controller.history!.getState().index).toBe(0);
+});
+
+it('does not apply or publish when a jump selects the current or an invalid position', async () => {
+  const controller = createResetController();
+  for (const index of [1, -1, 2, Number.NaN]) await seekEditorControllerSnapshot(controller, index);
+  expect(controller.applyDocument).not.toHaveBeenCalled();
+  expect(controller.publishHistoryDocument).not.toHaveBeenCalled();
 });
 
 it('applies available undo, redo, and first-history documents with expected options', async () => {

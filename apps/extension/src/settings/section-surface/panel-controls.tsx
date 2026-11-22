@@ -58,8 +58,6 @@ export function SettingsControlRow(props: {
   description?: ReactNode;
   label: ReactNode;
   valueClassName?: string;
-  valueMinimum?: number;
-  keepInline?: boolean;
 }) {
   const control = (
     <div
@@ -75,13 +73,7 @@ export function SettingsControlRow(props: {
       className={['w-full max-w-[560px]', props.className ?? ''].join(' ')}
     >
       {typeof props.label === 'string' ? (
-        <InspectorParameterRow
-          label={props.label}
-          valueMinimum={props.valueMinimum ?? 220}
-          keepInline={props.keepInline ?? false}
-        >
-          {control}
-        </InspectorParameterRow>
+        <InspectorParameterRow label={props.label}>{control}</InspectorParameterRow>
       ) : (
         <div className="sniptale-parameter-row" data-layout="inline">
           <span className="sniptale-parameter-name">{props.label}</span>

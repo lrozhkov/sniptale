@@ -51,6 +51,7 @@ export async function buildReviewGpuScene(args: {
   sourceTime: number;
   orientation?: GpuPreviewLayer['orientation'];
   dimensions: PreviewSceneDimensions;
+  playback?: boolean;
   base: ReviewPresentedGeometry['layout'];
   radius: number;
   header: ImageBitmap | null;
@@ -66,6 +67,7 @@ export async function buildReviewGpuScene(args: {
   painter: ReturnType<typeof createReviewBackgroundPainter>;
   image: ImageBitmap | null;
   resultTime: number;
+  omitAnnotationText: boolean;
   primitives: ReviewGpuPrimitives;
   cameraOverride?: QuickEditCameraTransform | undefined;
   fps?: number | undefined;
@@ -165,7 +167,8 @@ export async function buildReviewGpuScene(args: {
     currentScene.cursorMotions,
     sourceTime,
     base.videoRect,
-    currentScene.source.height
+    currentScene.source.height,
+    currentGeometry.resultTime
   );
   const originalLayers: GpuPreviewLayer[] = [
     ...(artwork.decoration
@@ -234,6 +237,13 @@ export async function buildReviewGpuScene(args: {
         output: dimensions.canonical,
       });
   const exposure: GpuPreviewLayer[] = [];
+  const motionRaster =
+    args.playback && samples.length > 1
+      ? {
+          width: Math.min(dimensions.backing.width, dimensions.canonical.width),
+          height: Math.min(dimensions.backing.height, dimensions.canonical.height),
+        }
+      : dimensions.canonical;
   const singleExposure = samples.length === 1 && samples[0]!.alpha === 1;
   for (const [exposureIndex, sample] of samples.entries()) {
     const pose = reviewPresentedGeometry(
@@ -254,7 +264,8 @@ export async function buildReviewGpuScene(args: {
             currentScene.cursorMotions,
             sourceTime,
             plane.video,
-            currentScene.source.height
+            currentScene.source.height,
+            currentGeometry.resultTime
           )!.rect,
           clip: { rect: plane.clip, radius: radius * plane.clipScale },
         };
@@ -276,7 +287,11 @@ export async function buildReviewGpuScene(args: {
     });
     for (const layer of planeLayers)
       if (layer.source === source) sourceExposures.set(layer, exposureIndex);
-    const planeSource: GpuPreviewGroup = { ...original, layers: planeLayers };
+    const planeSource: GpuPreviewGroup = {
+      ...original,
+      output: focus ? motionRaster : original.output,
+      layers: planeLayers,
+    };
     if (focus || samples.length > 1)
       exposure.push({
         source: planeSource,
@@ -382,6 +397,8 @@ export async function buildReviewGpuScene(args: {
     dimensions,
     base,
     geometry: currentGeometry,
+    annotationTextTime: resultTime,
+    includeAnnotationText: !args.omitAnnotationText,
     sourceTime,
     fps: fps ?? 30,
     original,

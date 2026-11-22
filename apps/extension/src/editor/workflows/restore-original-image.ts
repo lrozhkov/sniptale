@@ -2,7 +2,7 @@ import {
   commitImagePresentation,
   readImageAggregateOriginalDocument,
 } from '../../composition/persistence/image-aggregates';
-import { getMediaAssetBlob } from '../../composition/persistence/media-library/index.library';
+import { readImageOriginalSource } from '../../composition/persistence/image-workspaces/read';
 import type { EditorDocument } from '../../features/editor/document/types';
 import { createImageThumbnailBlob } from '../../platform/media-utils/image-thumbnail';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -14,20 +14,28 @@ import {
 
 type OriginalImageController = {
   originalDocument: EditorDocument | null;
-  autosaveService: { getDurableRevision: () => number | null } | null;
+  autosaveService: {
+    getDurableRevision: () => number | null;
+    getSourceGeneration: () => string | null;
+  } | null;
   restoreOriginalDocument: (document: EditorDocument, isCurrent: () => boolean) => Promise<void>;
 };
 
 const logger = createLogger({ namespace: 'EditorOriginalRestore' });
 
-async function refreshOriginalPresentation(aggregateId: string, revision: number): Promise<void> {
+async function refreshOriginalPresentation(
+  aggregateId: string,
+  revision: number,
+  generation: string | null
+): Promise<void> {
   try {
-    const previewBlob = await getMediaAssetBlob(aggregateId);
+    const { blob: previewBlob } = await readImageOriginalSource(aggregateId);
     if (!previewBlob) return;
     const thumbnailBlob = await createImageThumbnailBlob(previewBlob);
     await commitImagePresentation({
       aggregateId,
       expectedWorkspaceRevision: revision,
+      expectedGeneration: generation,
       previewBlob,
       thumbnailBlob,
     });
@@ -56,6 +64,10 @@ export async function restoreOriginalEditorImage(
   await controller.restoreOriginalDocument(original, isCurrent);
   const revision = controller.autosaveService?.getDurableRevision();
   if (aggregateId && revision !== null && revision !== undefined && isCurrent()) {
-    await refreshOriginalPresentation(aggregateId, revision);
+    await refreshOriginalPresentation(
+      aggregateId,
+      revision,
+      controller.autosaveService?.getSourceGeneration() ?? null
+    );
   }
 }

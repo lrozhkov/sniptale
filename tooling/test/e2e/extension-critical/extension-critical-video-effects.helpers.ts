@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { createGlTransitionSelection } from '../../../../apps/extension/src/features/video/project/transition/gl-catalog';
 import { basename } from 'node:path';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { fileURLToPath } from 'node:url';
 import { expect, type Page } from '@playwright/test';
 import {
@@ -62,6 +62,7 @@ export async function openEffectVideoEditorHarness(
 ): Promise<void> {
   await applyHarnessBootstrap(page, {
     apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+    storage: { 'sniptale-locale-preference': 'ru' },
     ...(project ? { videoProjects: [project] } : {}),
   });
   const projectQuery = project ? `?project=${encodeURIComponent(project.id)}` : '';
@@ -70,7 +71,10 @@ export async function openEffectVideoEditorHarness(
   });
   if (!project) {
     await page
-      .getByRole('button', { name: translate('videoEditor.app.newProjectAction'), exact: true })
+      .getByRole('button', {
+        name: translate('videoEditor.app.newProjectAction', 'ru'),
+        exact: true,
+      })
       .click();
   }
 }
@@ -119,7 +123,10 @@ export async function importAndApplyEffect(
   const documentLabel = page.locator(`[data-effect-document="${args.documentId}"]`);
   await documentLabel.hover();
   const applyKey = 'videoEditor.effectsLibrary.applyToScene';
-  const addButton = documentLabel.getByRole('button', { name: translate(applyKey), exact: true });
+  const addButton = documentLabel.getByRole('button', {
+    name: translate(applyKey, 'ru'),
+    exact: true,
+  });
   await expect(addButton).toBeEnabled();
   await addButton.click();
   await page.locator('[data-ui="video-editor.materials.close"]').click();
@@ -176,10 +183,15 @@ export async function applyBuiltinSourceFilter(page: Page, locale: 'en' | 'ru' =
   await expect(fields).toBeVisible();
   await fields
     .getByRole('button', {
+      name: translate('videoEditor.sidebar.sourceFiltersAdd', locale),
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole('option', {
       name: translate('videoEditor.sidebar.sourceFiltersAddBlur', locale),
       exact: true,
     })
-    .first()
     .click();
   await page.locator('[data-ui="video-editor.materials.close"]').click();
 }

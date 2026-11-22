@@ -13,10 +13,7 @@ import {
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { isWebcamPresentationSettings } from '@sniptale/runtime-contracts/video/types/messages.surface';
-import type {
-  VideoProject,
-  VideoProjectExportSettings,
-} from '../../../features/video/project/types';
+import type { VideoProjectExportSettings } from '../../../features/video/project/types';
 import {
   VideoExportFormat,
   VideoExportQualityPreset,
@@ -34,7 +31,6 @@ import {
   isString,
 } from '../validators/primitives';
 import { isWebcamActualSettings, isWebcamQualitySettings } from './validators.webcam.ts';
-import { isExportReadyVideoProject } from '../../../features/video/project/validation';
 import { isBoundedVideoProjectExportSettings } from '../../../features/video/project/export/settings-validation';
 export { isProjectExportInputReference } from '../../video/types/project-export-input';
 export { isVideoExportCapabilities } from './validators.export-availability';
@@ -207,10 +203,6 @@ export function isVideoRecordingRuntimeState(value: unknown): value is VideoReco
           value['completion']['outcome'] === 'failed'))) &&
     (value['error'] === null || isString(value['error']))
   );
-}
-
-export function isVideoProject(value: unknown): value is VideoProject {
-  return isExportReadyVideoProject(value);
 }
 
 export function isVideoProjectExportSettings(value: unknown): value is VideoProjectExportSettings {

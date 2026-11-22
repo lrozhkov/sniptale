@@ -44,6 +44,18 @@ export function usePopoverEscapeClose(
     if (!isOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
+      if (
+        event
+          .composedPath()
+          .some(
+            (target) =>
+              target instanceof HTMLInputElement &&
+              target.type === 'text' &&
+              target.getAttribute('role') === 'spinbutton' &&
+              target.closest('.sniptale-inspector-numeric')
+          )
+      )
+        return;
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();

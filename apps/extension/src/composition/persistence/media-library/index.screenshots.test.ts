@@ -4,6 +4,8 @@ import type { MediaLibraryEntry } from './contracts';
 const mocks = vi.hoisted(() => ({
   createImageThumbnailBlobMock: vi.fn(),
   initDBMock: vi.fn(),
+  identityGetMock: vi.fn(),
+  identityPutMock: vi.fn(),
   measureImageBlobMock: vi.fn(),
   mediaGetMock: vi.fn(),
   mediaPutMock: vi.fn(),
@@ -51,6 +53,8 @@ function createTransaction() {
   return {
     done: Promise.resolve(),
     objectStore: vi.fn((storeName: string) => {
+      if (storeName === 'image_workspace_identities')
+        return { get: mocks.identityGetMock, put: mocks.identityPutMock };
       if (storeName === 'media_library') {
         return { get: mocks.mediaGetMock, put: mocks.mediaPutMock };
       }
@@ -96,6 +100,12 @@ describe('media-library-db.screenshots save entry', () => {
     expect(mocks.createImageThumbnailBlobMock).toHaveBeenCalledWith(blob);
     expectBasicScreenshotEntry(result, blob);
     expect(mocks.mediaPutMock).toHaveBeenCalledWith(result);
+    expect(mocks.identityPutMock).toHaveBeenCalledWith({
+      version: 1,
+      aggregateId: result.id,
+      generation: expect.any(String),
+      retired: false,
+    });
     expectBasicScreenshotThumbnail();
   });
 

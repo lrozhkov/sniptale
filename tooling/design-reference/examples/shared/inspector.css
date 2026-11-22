@@ -48,11 +48,6 @@
   align-items: center;
   margin-bottom: 4px;
 }
-.inspector-controls .property-options[data-presentation='segments'] .property-face {
-  font-size: var(--font-control-size);
-  min-height: var(--inspector-control);
-  padding: 2px 6px;
-}
 .inspector-controls .control,
 .inspector-controls .search {
   font-size: var(--font-control-size);
@@ -134,9 +129,6 @@
 }
 .inspector-controls .number-stepper {
   width: 20px;
-}
-.inspector-controls .property-options[data-presentation='segments'] {
-  padding: 0;
 }
 .inspector-controls .color-entry {
   grid-template-columns: minmax(0, 1fr) 100px 32px;

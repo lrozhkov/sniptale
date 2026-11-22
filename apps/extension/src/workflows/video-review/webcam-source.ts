@@ -27,14 +27,20 @@ export async function readReviewWebcamInformation(assetId: string, signal: Abort
 }
 
 /** Discovery is read-only and used only before the first authored camera attachment. */
-export async function findReviewWebcam(aggregateId: string, signal: AbortSignal) {
+export async function findReviewWebcam(
+  aggregateId: string,
+  signal: AbortSignal,
+  sourceMediaId?: string
+) {
   signal.throwIfAborted();
   const snapshot = await readVideoWorkspace(aggregateId);
   signal.throwIfAborted();
-  const root = await getMediaLibraryEntry(snapshot?.workspace.sourceMediaId ?? aggregateId);
+  const root = await getMediaLibraryEntry(
+    snapshot ? (snapshot.workspace.sourceMediaId ?? aggregateId) : (sourceMediaId ?? aggregateId)
+  );
   if (root?.recordingGroup?.role !== 'display') return null;
   const groupId = root.recordingGroup.groupId;
-  const siblings = await listMediaLibrary();
+  const siblings = await listMediaLibrary({ includeProjectRetained: true });
   signal.throwIfAborted();
   return (
     siblings
@@ -57,13 +63,14 @@ export async function findReviewWebcam(aggregateId: string, signal: AbortSignal)
  */
 export async function attachReviewWebcam(args: {
   aggregateId: string;
+  sourceMediaId?: string;
   mediaId: string;
   signal: AbortSignal;
   assertCurrentTarget(): void;
   attach(assetId: string, source: ReviewSource): Promise<void>;
 }): Promise<void> {
   const { signal } = args;
-  const candidate = await findReviewWebcam(args.aggregateId, signal);
+  const candidate = await findReviewWebcam(args.aggregateId, signal, args.sourceMediaId);
   if (!candidate || candidate.id !== args.mediaId) throw new Error('Review webcam is unavailable.');
   const original = await readReviewMediaOriginal(candidate.source);
   signal.throwIfAborted();

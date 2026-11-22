@@ -81,6 +81,7 @@ export function PageStyleCommentField(props: {
           aria-describedby={describedBy}
           className={[
             'sniptale-design-review-authored-text block min-h-14 max-h-40 w-full',
+            'sniptale-compact-text-scroll',
             'resize-none overflow-y-hidden rounded-t-[4px]',
             'border-0 bg-transparent px-3 pb-2 pt-3 text-xs leading-5',
             'text-[var(--sniptale-color-text-primary)] outline-none',

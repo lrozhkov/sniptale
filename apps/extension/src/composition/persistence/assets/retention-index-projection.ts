@@ -1,3 +1,4 @@
+import { imageWorkspaceAssetBindings } from '../image-workspaces/assets';
 import {
   parseEditorVectorBacking,
   EDITOR_VECTOR_OWNER_KIND,
@@ -10,7 +11,15 @@ import { RECORDING_EVENTS_SNAPSHOT_ROLE } from '../recordings/recording-events/c
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { collectSyncCaptureClaims } from '../sync-capture/claims';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
-import { parseProjectAssetEntry, parseProjectExportEntry } from '../projects/read-guards';
+import {
+  parseProjectAssetEntry,
+  parseProjectExportEntry,
+  parseVideoProjectEntry,
+} from '../projects/read-guards';
+import {
+  VIDEO_PROJECT_HISTORY_OWNER_KIND,
+  videoProjectHistoryAssetBindings,
+} from '../projects/history-contracts';
 import { parseRecordingEntry } from '../recordings/index.guards';
 import { parseScenarioAssetEntry, parseScenarioExportEntry } from '../scenario/read-guards';
 import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
@@ -53,7 +62,7 @@ function documentOwners(store: string, raw: unknown): AssetOwner[] | null {
   if (store === 'image_workspaces') {
     const entry = parseImageWorkspaceEntry(raw);
     return entry
-      ? entry.document.assets.map((asset) => ({
+      ? imageWorkspaceAssetBindings(entry).map((asset) => ({
           ownerKind: 'image-workspace',
           ownerId: entry.aggregateId,
           assetId: asset.assetId,
@@ -136,6 +145,18 @@ function sourceOwners(store: string, raw: unknown): AssetOwner[] | null {
       return bodyOwners('recording', parseRecordingEntry(raw));
     case 'project_assets':
       return bodyOwners('project-asset', parseProjectAssetEntry(raw));
+    case 'video_projects': {
+      if (!isRecord(raw)) return null;
+      if (raw['history'] === undefined && raw['historyPublicationId'] === undefined) return [];
+      const entry = parseVideoProjectEntry(raw);
+      return entry
+        ? videoProjectHistoryAssetBindings(entry.history).map((binding) => ({
+            ...binding,
+            ownerKind: VIDEO_PROJECT_HISTORY_OWNER_KIND,
+            ownerId: entry.id,
+          }))
+        : null;
+    }
     case 'project_exports':
       return bodyOwners('project-export', parseProjectExportEntry(raw));
     case 'scenario_assets':
@@ -228,6 +249,8 @@ function appendProjectDependencyKeys(store: string, raw: unknown, keys: Set<stri
         for (const ref of videoSourceReferences(source)) {
           keys.add(rowReferenceKey(ref.kind === 'library-asset' ? 'media' : ref.kind, ref.id));
         }
+      for (const ref of envelope.historySources)
+        keys.add(rowReferenceKey(ref.kind === 'library-asset' ? 'media' : ref.kind, ref.id));
     }
   }
 }
@@ -289,6 +312,17 @@ export function projectRowReferenceKeys(store: string, raw: unknown): string[] {
   appendProjectDependencyKeys(store, raw, keys);
   appendPrivateOriginKeys(store, raw, keys);
   appendScenarioOriginKeys(store, raw, keys);
+  if (store === 'image_workspaces' && isRecord(raw) && raw['sourceMediaId'] !== undefined) {
+    const sourceId = raw['sourceMediaId'];
+    keys.add(
+      typeof sourceId === 'string' &&
+        sourceId.length > 0 &&
+        sourceId.length <= 256 &&
+        sourceId !== raw['aggregateId']
+        ? rowReferenceKey('media', sourceId)
+        : UNKNOWN_MEDIA_REFERENCES
+    );
+  }
   // A head/history pair needs scoped admission in the workspace storage owner.
   if (store === 'video_workspaces' || store === 'video_workspace_history')
     keys.add(UNKNOWN_HISTORY_REFERENCES);

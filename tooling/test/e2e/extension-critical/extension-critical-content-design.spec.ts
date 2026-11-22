@@ -2,7 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import type { BrowserContext, Locator, Page, TestInfo, ViewportSize } from '@playwright/test';
 import { expect, test } from '../support/extension-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 type Locale = 'ru' | 'en';
 type Theme = 'light' | 'dark';
@@ -510,6 +510,8 @@ async function mixedRowRhythm(
             textHeight: textBox.height,
             valueTop: value.top,
             valueBottom: value.bottom,
+            valueLeft: value.left,
+            valueRight: value.right,
             layout: node.getAttribute('data-layout'),
           },
         ];
@@ -522,6 +524,15 @@ async function mixedRowRhythm(
     .toBe(3);
   if (rows.length !== 3) return;
   rows.sort((a, b) => a.top - b.top);
+  if (locale === 'en') {
+    const first = rows[0]!;
+    for (const row of rows) {
+      expect.soft(row.layout, row.label ?? undefined).toBe('inline');
+      expect.soft(row.textHeight, row.label ?? undefined).toBeLessThanOrEqual(19);
+      expect.soft(Math.abs(row.valueLeft - first.valueLeft)).toBeLessThanOrEqual(1);
+      expect.soft(Math.abs(row.valueRight - first.valueRight)).toBeLessThanOrEqual(1);
+    }
+  }
   for (const row of rows) {
     if (row.layout === 'inline' && row.textHeight <= 19)
       expect
@@ -565,7 +576,7 @@ async function reenterHighlighter(page: Page) {
   }
 }
 
-async function createAuthoredCallout(page: Page, locale: Locale) {
+async function openFrameAnnotationToolbar(page: Page) {
   await reenterHighlighter(page);
   const target = (await page.locator('#annotation-target').boundingBox())!;
   await page.mouse.click(target.x + target.width / 2, target.y + target.height / 2);
@@ -578,18 +589,20 @@ async function createAuthoredCallout(page: Page, locale: Locale) {
     })
     .toBe(true);
   await trigger.click();
-  await page
-    .getByRole('button', {
-      name: translate('content.interactiveFrame.calloutAdd', locale),
-      exact: true,
-    })
-    .first()
+  return page.locator('.sniptale-action-toolbar:visible');
+}
+
+async function createAuthoredCallout(page: Page, locale: Locale) {
+  const toolbar = await openFrameAnnotationToolbar(page);
+  await toolbar
+    .getByRole('button', { name: translate('content.callout.settingsTitle', locale), exact: true })
     .click();
+  await ui(page, 'content.interactive-frame.add-callout').click();
   const comment = page.locator('.sniptale-callout [contenteditable="true"]').last();
   const text = locale === 'ru' ? 'Авторский комментарий' : 'Authored annotation';
   await comment.fill(text);
   await comment.press('Escape');
-  await expect(page.locator('.sniptale-callout')).toContainText(text);
+  await expect(page.locator('.sniptale-callout').last()).toContainText(text);
   return page.locator('.sniptale-callout [contenteditable]').last();
 }
 
@@ -634,23 +647,12 @@ for (const locale of ['ru', 'en'] as const)
             await assertChrome(panel, theme, info, 'frame-templates');
             await screenshot(page, info, 'frame-templates');
             await assertBundledFont(context, page, fonts, info);
-            for (const [mode, key] of [
-              ['blur', 'content.interactiveFrame.effectBlur'],
-              ['focus', 'content.interactiveFrame.effectFocus'],
-            ] as const) {
-              await panel
-                .getByRole('button', { name: translate(key, locale), exact: true })
-                .click();
-              const accepted = panel.getByRole('button', {
-                name: translate(key, locale),
-                exact: true,
-              });
-              await expect.soft(accepted).toHaveAttribute('aria-pressed', 'true');
-              await expect.soft(accepted).toHaveCSS('font-size', '13px');
-              await expect.soft(accepted).toHaveCSS('line-height', '18px');
-              await expect.soft(accepted).toHaveCSS('border-radius', '4px');
-              await expect.soft(accepted).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
-              await expect.soft(accepted).toHaveCSS('box-shadow', 'none');
+            const effectSwitch = ui(page, 'content.toolbar.future-frame-effects-group');
+            for (const mode of ['blur', 'focus'] as const) {
+              const effect = effectSwitch.locator(`[data-frame-effect="${mode}"]`);
+              await effect.click();
+              await expect(effect).toHaveAttribute('aria-pressed', 'true');
+              if ((await trigger.getAttribute('aria-expanded')) === 'false') await trigger.click();
               await mixedRowRhythm(panel, locale, mode, info);
               await assertChrome(panel, theme, info, mode);
               await screenshot(page, info, `${mode}-mixed-properties`);
@@ -699,6 +701,280 @@ async function openCalloutSettings(page: Page, locale: Locale) {
   if (await fork.count()) await fork.first().click();
   await expect(ui(page, 'shared.callout-alignment')).toBeVisible();
   return panel;
+}
+
+async function stepWithAltWheel(
+  page: Page,
+  panel: Locator,
+  fieldSurface: Locator,
+  input: Locator,
+  expected: string,
+  deltaY = 120
+) {
+  await fieldSurface.hover();
+  const scrollBeforeWheel = await panel.evaluate((surface) => surface.scrollTop);
+  await page.keyboard.down('Alt');
+  try {
+    await page.mouse.wheel(0, deltaY);
+    await expect(input).toHaveValue(expected);
+    expect(await panel.evaluate((surface) => surface.scrollTop)).toBe(scrollBeforeWheel);
+  } finally {
+    await page.keyboard.up('Alt');
+  }
+}
+
+async function checkHighlighterSections(panel: Locator) {
+  const sections = await panel
+    .getByRole('navigation')
+    .getByRole('button')
+    .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')!));
+  expect(sections.length).toBeGreaterThan(3);
+  for (const section of sections) {
+    await panel.getByRole('navigation').getByRole('button', { name: section, exact: true }).click();
+    const closedSummary = panel.locator('details:not([open]) > summary:visible').first();
+    while (await closedSummary.isVisible()) await closedSummary.click();
+    const issues = await panel.evaluate((element) => {
+      const issues: string[] = [];
+      for (const range of element.querySelectorAll('input[type="range"]')) {
+        if (range.getClientRects().length && !range.closest('.opacity-field')) {
+          issues.push(range.getAttribute('aria-label') ?? 'Unlabelled range');
+        }
+      }
+      for (const row of element.querySelectorAll('.sniptale-parameter-row')) {
+        const label = row.querySelector(':scope > .sniptale-parameter-name');
+        const value = row.querySelector(':scope > .sniptale-parameter-value');
+        if (!label?.getClientRects().length || !value?.getClientRects().length) continue;
+        const rowBox = row.getBoundingClientRect();
+        const nameBox = label.getBoundingClientRect();
+        const valueBox = value.getBoundingClientRect();
+        const intersects = nameBox.right > valueBox.left + 1 && nameBox.bottom > valueBox.top + 1;
+        if (intersects || valueBox.right > rowBox.right + 1 || valueBox.bottom > rowBox.bottom + 1)
+          issues.push(label.textContent ?? 'Unlabelled field');
+      }
+      return issues;
+    });
+    expect(issues, section).toEqual([]);
+  }
+}
+
+for (const [viewport, theme] of [
+  [PRIMARY_BROWSER_VIEWPORTS[0].size, 'light'],
+  [PRIMARY_BROWSER_VIEWPORTS[1].size, 'dark'],
+] as const) {
+  test(`native content Highlighter edits CSS and exact radius at ${viewport.width}`, async ({
+    context,
+    extensionId,
+  }, info) => {
+    test.setTimeout(120_000);
+    const locale = 'en';
+    const t = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+    await withHost(context, extensionId, { locale, theme, viewport }, info, async (page) => {
+      const comment = await createAuthoredCallout(page, locale);
+      const initialTransform = await comment.evaluate(
+        (node) => getComputedStyle(node).textTransform
+      );
+      const callout = await openCalloutSettings(page, locale);
+      await callout
+        .getByRole('navigation')
+        .getByRole('button', { name: t('content.callout.manualBackground'), exact: true })
+        .click();
+      const shadow = callout.getByRole('slider', {
+        name: t('content.callout.shadowLabel'),
+        exact: true,
+      });
+      await expect(shadow.locator('xpath=ancestor::*[contains(@class,"opacity-field")]')).toHaveCSS(
+        'border-top-width',
+        '1px'
+      );
+      const pencil = callout.getByRole('button', {
+        name: t('content.callout.shadowLabel'),
+        exact: true,
+      });
+      const shadowDraft = callout.getByRole('spinbutton', {
+        name: t('content.callout.shadowLabel'),
+        exact: true,
+      });
+      await expect(shadow).toHaveCSS('cursor', 'ew-resize');
+      await expect(pencil).toHaveCSS('cursor', 'pointer');
+      await pencil.hover();
+      await page.mouse.down();
+      await expect(shadowDraft).toHaveCount(0);
+      await page.mouse.up();
+      await expect(shadowDraft).toBeFocused();
+      const exactFieldAction = callout.locator('.numeric-editor > button.field-action');
+      await shadowDraft.fill('0');
+      await stepWithAltWheel(page, callout, exactFieldAction, shadowDraft, '0');
+      await shadowDraft.fill('32');
+      await stepWithAltWheel(page, callout, exactFieldAction, shadowDraft, '32', -120);
+      await shadowDraft.fill('18');
+      await shadowDraft.press('ArrowUp');
+      await expect(shadowDraft).toHaveValue('19');
+      await stepWithAltWheel(page, callout, exactFieldAction, shadowDraft, '18');
+      await shadowDraft.press('Enter');
+      await expect(shadow).toHaveValue('18');
+      await pencil.click();
+      await shadowDraft.fill('20');
+      await shadowDraft.press('Escape');
+      await expect(shadowDraft).toHaveCount(0);
+      await expect(shadow).toHaveValue('18');
+      await expect(pencil).toBeFocused();
+      await expect(pencil).toHaveCSS('outline-width', '1px');
+      const shadowColorRow = callout.locator(
+        '.sniptale-parameter-row:has([data-shadow-color-source])'
+      );
+      await expect(shadowColorRow).toHaveAttribute('data-layout', 'inline');
+      const hex = shadowColorRow.locator('.inspector-hex-editor input');
+      const hexFit = await hex.evaluate((input: HTMLInputElement) => {
+        const context = document.createElement('canvas').getContext('2d')!;
+        context.font = getComputedStyle(input).font;
+        return input.clientWidth >= Math.ceil(context.measureText('#DDDDDD').width);
+      });
+      expect(hexFit, 'Show the complete HEX value beside alpha and the source button').toBe(true);
+      await screenshot(page, info, 'content-callout-background');
+      const alpha = callout.locator('.alpha-value');
+      const alphaButton = alpha.getByRole('button');
+      await expect(alphaButton).toHaveCSS('cursor', 'text');
+      await alphaButton.click();
+      const alphaDraft = alpha.getByRole('spinbutton');
+      await expect(alphaDraft).toHaveValue('100');
+      const alphaFrameHex = alpha.locator('..').locator('.inspector-hex-trigger');
+      await alphaDraft.fill('0');
+      await stepWithAltWheel(page, callout, alphaFrameHex, alphaDraft, '0');
+      await alphaDraft.fill('100');
+      await stepWithAltWheel(page, callout, alphaFrameHex, alphaDraft, '99');
+      await alphaDraft.press('ArrowUp');
+      await expect(alphaDraft).toHaveValue('100');
+      await alphaDraft.press('Enter');
+      await expect(alphaButton).toBeVisible();
+      await callout
+        .getByRole('navigation')
+        .getByRole('button', { name: t('content.callout.manualCss'), exact: true })
+        .click();
+      const label = t('content.callout.cssLabel');
+      const css = callout.getByRole('textbox', { name: label, exact: true });
+      const draft = '[body]\ntext-transform: uppercase;';
+      await css.fill(draft);
+      await expect(css).toHaveAttribute('aria-invalid', 'false');
+      await expect(comment).toHaveCSS('text-transform', 'uppercase');
+      await css.fill(`${draft}\n${'\n'.repeat(28)}broken`);
+      await expect(css).toHaveAttribute('aria-invalid', 'true');
+      await expect(comment).toHaveCSS('text-transform', 'uppercase');
+      await css.hover();
+      await css.evaluate((node) => {
+        node.scrollTop = 0;
+      });
+      await page.mouse.wheel(0, 120);
+      await expect.poll(() => css.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+      const corner = await css.evaluate(
+        (node) => getComputedStyle(node, '::-webkit-scrollbar-corner').backgroundColor
+      );
+      expect(corner).toBe('rgba(0, 0, 0, 0)');
+      await screenshot(page, info, 'content-css-overflow');
+      await callout
+        .getByRole('button', {
+          name: t('shared.ui.clearField').replace('{field}', label),
+          exact: true,
+        })
+        .click();
+      await expect(css).toHaveValue('');
+      await expect(css).toBeFocused();
+      await expect(css).toHaveAttribute('aria-invalid', 'false');
+      await expect(comment).toHaveCSS('text-transform', initialTransform);
+      await checkHighlighterSections(callout);
+      await callout
+        .getByRole('button', { name: t('content.callout.closeSettings'), exact: true })
+        .click();
+      await expect(callout).toHaveCount(0);
+
+      await ui(page, 'content.toolbar.future-frame-style.menu').click();
+      const frame = page.locator('.sniptale-frame-settings-popover');
+      const fork = frame
+        .getByRole('button', { name: t('content.templateFork.fork'), exact: true })
+        .first();
+      await fork.focus();
+      await fork.press('Enter');
+      await checkHighlighterSections(frame);
+      await frame
+        .getByRole('navigation')
+        .getByRole('button', { name: t('highlighter.editor.geometrySection'), exact: true })
+        .click();
+      const radius = frame.getByRole('textbox', {
+        name: t('highlighter.editor.radiusLabel'),
+        exact: true,
+      });
+      await radius.fill('24');
+      await radius.press('ArrowUp');
+      await expect(radius).toHaveValue('25');
+      await radius.press('ArrowDown');
+      await expect(radius).toHaveValue('24');
+      const stepper = radius.locator('xpath=ancestor::*[@data-stepper-placement="sides"]');
+      await expect(stepper).toHaveCSS('border-top-width', '1px');
+      await expect(stepper).toHaveCSS('height', '32px');
+      const padding = frame.locator('[data-ui="shared.linked-padding-fields"]');
+      const paddingRow = padding.locator('[data-padding-hover="all"]');
+      const radiusSlot = stepper
+        .locator('xpath=ancestor::*[contains(@class,"sniptale-parameter-value")]')
+        .first();
+      const paddingName = paddingRow.locator('.sniptale-parameter-name');
+      const paddingTextFits = await paddingName.evaluate((label) => {
+        const text = document.createRange();
+        text.selectNodeContents(label);
+        return text.getBoundingClientRect().height <= 19;
+      });
+      expect(paddingTextFits, 'Keep Element padding on one line').toBe(true);
+      const slot = paddingRow.locator('.sniptale-parameter-value');
+      const radiusBounds = (await radiusSlot.boundingBox())!;
+      const paddingBounds = (await slot.boundingBox())!;
+      expect(Math.abs(paddingBounds.x - radiusBounds.x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(paddingBounds.width - radiusBounds.width)).toBeLessThanOrEqual(1);
+      const uniformStep = paddingRow.locator('[data-stepper-placement="sides"]');
+      expect((await uniformStep.boundingBox())!.width).toBeGreaterThanOrEqual(120);
+      await frame.getByText(t('highlighter.editor.geometrySection'), { exact: true }).click();
+      await screenshot(page, info, 'content-frame-radius');
+      const link = padding.locator('[data-padding-link="all"]');
+      await link.click();
+      const expanded = padding.locator('[data-ui="shared.linked-padding-expanded"]');
+      await expect(expanded.locator('.sniptale-parameter-name')).toHaveCount(2);
+      await screenshot(page, info, 'content-frame-padding-axes');
+      for (const axis of ['vertical', 'horizontal']) {
+        await padding.locator(`[data-padding-link="${axis}"]`).click();
+      }
+      await expect(expanded.locator('.sniptale-parameter-name')).toHaveCount(4);
+      for (const value of await expanded.locator('.sniptale-parameter-value').all()) {
+        const bounds = (await value.boundingBox())!;
+        expect(Math.abs(bounds.x - radiusBounds.x)).toBeLessThanOrEqual(1);
+        expect(Math.abs(bounds.width - radiusBounds.width)).toBeLessThanOrEqual(1);
+      }
+      await screenshot(page, info, 'content-frame-padding-sides');
+      await expect(frame.locator('input[type="range"]')).toHaveCount(0);
+      await ui(page, 'content.toolbar.future-frame-style.menu').click();
+      await expect(frame).toHaveCount(0);
+
+      await ui(page, 'content.toolbar.future-frame-step-badge.menu').click();
+      const badge = ui(page, 'content.toolbar.future-step-badge-popover');
+      const badgeFork = badge
+        .getByRole('button', { name: t('content.templateFork.fork'), exact: true })
+        .first();
+      await badgeFork
+        .locator('xpath=ancestor::*[contains(@class,"sniptale-callout-preset-row")]')
+        .hover();
+      await badgeFork.click();
+      await checkHighlighterSections(badge);
+      await badge
+        .getByRole('navigation')
+        .getByRole('button', { name: t('content.stepBadge.sizeSection'), exact: true })
+        .click();
+      await badge.getByText(t('content.stepBadge.sizeCustom'), { exact: true }).click();
+      const diameter = badge.getByRole('textbox', {
+        name: t('content.stepBadge.diameter'),
+        exact: true,
+      });
+      await expect(
+        diameter.locator('xpath=ancestor::*[@data-stepper-placement="sides"]')
+      ).toHaveCSS('border-top-width', '1px');
+      await screenshot(page, info, 'content-step-badge-size');
+    });
+  });
 }
 
 test('native annotation property Undo and temporary draft recovery preserve authored text', async ({

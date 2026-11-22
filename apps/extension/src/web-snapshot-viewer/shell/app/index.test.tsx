@@ -1,4 +1,12 @@
 // @vitest-environment jsdom
+import {
+  loadViewerCatalogFixture,
+  prepareViewerBilingualTranslations,
+} from '../../catalog-fixture.test-support';
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadViewerCatalogFixture>[0]) =>
+    loadViewerCatalogFixture(locale),
+}));
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -795,4 +803,8 @@ it('does not download a completed HTML export after leaving static document mode
   expect(htmlExportButton()).toBeNull();
   expect(click).not.toHaveBeenCalled();
   click.mockRestore();
+});
+
+beforeEach(async () => {
+  await prepareViewerBilingualTranslations();
 });

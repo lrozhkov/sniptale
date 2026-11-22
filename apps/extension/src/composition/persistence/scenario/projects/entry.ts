@@ -1,10 +1,12 @@
+import { areScenarioProjectsEqual } from '../aggregate-comparison';
+import { retainScenarioEditingHistory } from '../editing-history';
 import {
   appendScenarioSavedVersion,
   retainScenarioSavedVersions,
   isScenarioHistoryActionId,
 } from '../history-model';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
-import type { ScenarioProjectEntry } from '../contracts';
+import type { ScenarioProjectEntry, ScenarioEditingHistory } from '../contracts';
 import {
   createLibraryLifecycle,
   promoteLibraryLifecycle,
@@ -26,13 +28,39 @@ export function createScenarioProjectEntry(args: {
   storageClass?: LibraryStorageClass;
   updatedAt?: number;
   historyPolicy?: 'append' | 'preserve' | 'discard';
-  /** Exclusive history is a private fresh canonical snapshot, never a caller's mutable state. */
+  /**
+   * Exclusive ownership requires private, freshly admitted saved and editing snapshots.
+   * The caller must not expose or mutate those snapshots.
+   */
   historyOwnership?: 'borrowed' | 'exclusive';
   historyActionId?: string;
+  editingHistory?: ScenarioEditingHistory;
 }): ScenarioProjectEntry {
+  const updatedAt = createScenarioProjectRevision(args.existing, args.updatedAt);
+  const project = { ...args.project, updatedAt };
+  const previousHistory = args.existing?.editingHistory;
+  const editingHistory =
+    args.editingHistory ??
+    (previousHistory !== undefined &&
+    args.existing &&
+    args.project !== args.existing.project &&
+    !areScenarioProjectsEqual(
+      { ...args.project, updatedAt: args.existing.project.updatedAt },
+      args.existing.project
+    )
+      ? retainScenarioEditingHistory(
+          project,
+          args.historyActionId !== undefined &&
+            args.historyActionId === args.existing.lastAcceptedActionId
+            ? previousHistory.past
+            : [...previousHistory.past, args.existing.project]
+        )
+      : previousHistory);
   if (args.historyActionId !== undefined && !isScenarioHistoryActionId(args.historyActionId))
     throw new Error('Invalid scenario history action identity.');
-  const updatedAt = createScenarioProjectRevision(args.existing, args.updatedAt);
+  const workspaceRevision = (args.existing?.workspaceRevision ?? 0) + 1;
+  if (!Number.isSafeInteger(workspaceRevision))
+    throw new Error('Local Scenario revisions are exhausted.');
   const history =
     args.historyPolicy === 'discard'
       ? []
@@ -44,11 +72,16 @@ export function createScenarioProjectEntry(args: {
   return {
     ...(args.historyActionId === undefined ? {} : { lastAcceptedActionId: args.historyActionId }),
     ...(history.length ? { history } : {}),
+    ...(editingHistory === undefined
+      ? {}
+      : {
+          editingHistory:
+            args.historyOwnership === 'exclusive'
+              ? editingHistory
+              : structuredClone(editingHistory),
+        }),
     id: args.project.id,
-    project: {
-      ...args.project,
-      updatedAt,
-    },
+    project,
     createdAt: args.existing?.createdAt ?? args.project.createdAt ?? updatedAt,
     updatedAt,
     lifecycle: args.existing
@@ -60,6 +93,6 @@ export function createScenarioProjectEntry(args: {
           updatedAt
         )
       : createLibraryLifecycle('library', updatedAt),
-    workspaceRevision: (args.existing?.workspaceRevision ?? 0) + 1,
+    workspaceRevision,
   };
 }

@@ -1,4 +1,15 @@
-export type CaptureRootKind = 'media' | 'video-project' | 'video-review' | 'scenario-project';
+const CAPTURE_ROOT_KINDS = [
+  'media',
+  'image-project',
+  'video-project',
+  'video-review',
+  'scenario-project',
+] as const;
+export type CaptureRootKind = (typeof CAPTURE_ROOT_KINDS)[number];
+
+export function isCaptureRootKind(value: unknown): value is CaptureRootKind {
+  return CAPTURE_ROOT_KINDS.some((kind) => kind === value);
+}
 
 /** Transient acknowledgement of one pending revision minted by an accepted native save. */
 export interface SyncCheckpointReceipt {

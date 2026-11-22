@@ -14,7 +14,7 @@ import {
 } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { createShapeClip } from '../../../../apps/extension/src/features/video/project/factories/overlay-clip';
 import { createVideoProjectMotionRegion } from '../../../../apps/extension/src/features/video/project/motion';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { readNativeVideoProject } from '../support/native-video-project';

@@ -1,7 +1,10 @@
+import type { RestoredVideoProjectHistory } from '../../../features/video/project/history-capture';
+import type { AssetRef } from '../assets/contracts';
 import type { RecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import type { VideoExportFormat, VideoProject } from '../../../features/video/project/types';
 import type { VideoProjectMetadata } from '../../../features/video/project/validation';
 import type { LibraryLifecycle } from '../library-lifecycle/contracts';
+import type { PersistedVideoProjectHistory } from './history-contracts';
 
 export interface VideoProjectEntry {
   id: string;
@@ -11,6 +14,10 @@ export interface VideoProjectEntry {
   lifecycle?: LibraryLifecycle;
   /** Missing only on legacy rows; parsed as revision 0. */
   workspaceRevision?: number;
+  /** Immutable inverse-change graph; native owners retain all referenced files and sources. */
+  history?: PersistedVideoProjectHistory;
+  /** Private journal acknowledgement, omitted from portable records and independent writes. */
+  historyPublicationId?: string;
 }
 
 /** Persisted entry metadata before retained effect asset bytes are hydrated. */
@@ -68,6 +75,19 @@ export type VideoProjectReadResult =
       workspaceRevision: number;
     }
   | Exclude<VideoProjectEntryReadResult, { status: 'ready' }>;
+
+/** One observed native opening snapshot, including independently admitted history. */
+export type VideoProjectWorkspaceReadResult =
+  | Exclude<VideoProjectReadResult, { status: 'ready' }>
+  | (Extract<VideoProjectReadResult, { status: 'ready' }> & {
+      history:
+        | { status: 'absent' }
+        | { status: 'unavailable' }
+        | {
+            status: 'ready';
+            value: RestoredVideoProjectHistory & { assetsByValue: ReadonlyMap<string, AssetRef> };
+          };
+    });
 
 export function resolveVideoProjectReadResult(result: VideoProjectReadResult): VideoProject | null {
   if (result.status === 'ready') return result.project;

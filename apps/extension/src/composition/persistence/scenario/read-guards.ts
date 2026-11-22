@@ -1,3 +1,4 @@
+import { parseScenarioEditingHistory } from './editing-history';
 import { parseScenarioSavedVersions, isScenarioHistoryActionId } from './history-model';
 import type { ScenarioProjectSummary } from '../../../features/scenario/contracts/types/project';
 import type {
@@ -237,12 +238,15 @@ export function parseScenarioProjectEntry(
     ownership
   );
   if (!history) return null;
+  const editingHistory = parseScenarioEditingHistory(value['editingHistory'], project);
+  if (editingHistory === null) return null;
   const lastAcceptedActionId = value['lastAcceptedActionId'];
   if (lastAcceptedActionId !== undefined && !isScenarioHistoryActionId(lastAcceptedActionId))
     return null;
   return {
     ...(lastAcceptedActionId === undefined ? {} : { lastAcceptedActionId }),
     ...(history.length ? { history } : {}),
+    ...(editingHistory === undefined ? {} : { editingHistory }),
     createdAt: value['createdAt'],
     id: value['id'],
     ...(lifecycle === undefined ? {} : { lifecycle }),

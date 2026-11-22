@@ -20,7 +20,7 @@ import type {
 import { build } from 'esbuild';
 import { createInlineWorkerBundlePlugin } from '../support/inline-worker-bundle';
 import type { planMp4VideoRenderSpans } from '../../../../apps/extension/src/offscreen/project-export/render-mp4/hybrid/planner';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { readNativeVideoProject } from '../support/native-video-project';
 import { startHostServer } from '../support/host-server';

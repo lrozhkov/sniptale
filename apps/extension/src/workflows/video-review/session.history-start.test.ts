@@ -1,6 +1,8 @@
 import { expect, it, vi } from 'vitest';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
+import { resolveReviewWorkspaceHistoryCursor } from '../../composition/persistence/review-workspaces/history-cursor';
+import type { ReviewHistoryMove } from '../../features/video/review/types';
 import {
   parseVideoWorkspace,
   parseVideoWorkspaceDraft,
@@ -50,11 +52,11 @@ function fixture() {
       };
       return structuredClone(durable);
     }),
-    moveVideoWorkspaceHistory: vi.fn(async (args: { direction: 'undo' | 'redo' | 'start' }) => {
-      durable.workspace.cursor =
-        args.direction === 'start'
-          ? 0
-          : durable.workspace.cursor + (args.direction === 'undo' ? -1 : 1);
+    moveVideoWorkspaceHistory: vi.fn(async (args: { direction: ReviewHistoryMove }) => {
+      durable.workspace.cursor = resolveReviewWorkspaceHistoryCursor(
+        durable.workspace,
+        args.direction
+      );
       durable.workspace.revision++;
       return structuredClone(durable);
     }),
@@ -77,16 +79,64 @@ it('returns directly to the saved baseline, retaining history, Redo and source a
     sourceAssetId: 'source',
     advanced: initial.workspace.advanced,
   });
+  await session.flush();
   await session.reload();
   await session.history('redo');
   expect(session.getSnapshot().document.annotations).toHaveLength(1);
-  expect(deps.moveVideoWorkspaceHistory).toHaveBeenCalledTimes(2);
+  expect(deps.moveVideoWorkspaceHistory).not.toHaveBeenCalled();
   await session.reset();
   expect(session.getSnapshot().document.advancedContent.audio.original).toEqual({
     muted: false,
     volume: 1,
   });
   expect(session.getSnapshot().snapshot.workspace.history).toEqual([]);
+});
+
+it('seeks directly by retained entry identity with autosave off and saves that cursor on retry', async () => {
+  const { session, deps } = fixture();
+  try {
+    session.setAutosaveEnabled(false);
+    await session.history({ entryId: 'note-1' });
+    expect(session.getSnapshot().document.annotations.map((note) => note.id)).toEqual(['note-1']);
+    expect(session.getSnapshot().snapshot.workspace.cursor).toBe(1);
+    await session.history({ entryId: 'note-2' });
+    expect(session.getSnapshot().snapshot.workspace.cursor).toBe(2);
+    await session.history({ entryId: 'note-1' });
+    expect(deps.moveVideoWorkspaceHistory).not.toHaveBeenCalled();
+    deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(new Error('Quota'));
+    session.setAutosaveEnabled(true);
+    await expect(session.flush()).rejects.toThrow('Quota');
+    expect(session.getSnapshot().snapshot.workspace.cursor).toBe(1);
+    await session.flush();
+    await session.reload();
+    expect(session.getSnapshot().snapshot.workspace.cursor).toBe(1);
+    await session.history('redo');
+    expect(session.getSnapshot().snapshot.workspace.cursor).toBe(2);
+  } finally {
+    await session.dispose();
+  }
+});
+
+it('does not retarget a queued seek after an earlier queued edit replaces its selected entry', async () => {
+  const { session } = fixture();
+  try {
+    session.setAutosaveEnabled(false);
+    await session.history('start');
+    const commit = session.commit({
+      id: 'branch',
+      at: 3,
+      target: 'annotation',
+      before: null,
+      after: { id: 'branch', text: 'Branch', anchor: { kind: 'point', time: 3 } },
+    });
+    const seek = session.history({ entryId: 'note-2' });
+    const [committed, selected] = await Promise.all([commit, seek]);
+    expect(selected).toBe(committed);
+    expect(session.getSnapshot().snapshot.workspace.cursor).toBe(1);
+    expect(session.getSnapshot().document.annotations.map((note) => note.id)).toEqual(['branch']);
+  } finally {
+    await session.dispose();
+  }
 });
 
 it('buffers start with autosave off and persists the retained history when enabled', async () => {
@@ -105,41 +155,51 @@ it('buffers start with autosave off and persists the retained history when enabl
   expect(session.getSnapshot().snapshot.workspace.cursor).toBe(0);
 });
 
-it('allows recovery only from a completed history failure, leaving normal flush strict', async () => {
+it('retains local cursor, history and Redo after failed publication and retries without another action', async () => {
   const { session, deps, initial } = fixture();
-  deps.moveVideoWorkspaceHistory.mockRejectedValueOnce(new Error('Quota'));
-  await expect(session.history('start')).rejects.toThrow('Quota');
-  expect(session.getSnapshot().snapshot).toEqual(initial);
-  await expect(session.flush()).rejects.toThrow('storage');
-  await session.flush({ retryHistory: true });
-  await session.history('start');
-  expect(session.getSnapshot()).toMatchObject({
-    error: null,
-    snapshot: { workspace: { cursor: 0 } },
-  });
-  deps.saveVideoWorkspaceAdvanced.mockRejectedValueOnce(new Error('Content failure'));
-  await expect(session.saveAdvanced(initial.workspace.advanced)).rejects.toThrow();
-  await expect(session.flush({ retryHistory: true })).rejects.toThrow('storage');
+  try {
+    deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(new Error('Quota'));
+    await session.history('start');
+    expect(session.getSnapshot().snapshot.workspace.cursor).toBe(0);
+    await expect(session.flush()).rejects.toThrow('Quota');
+    expect(session.getSnapshot()).toMatchObject({ dirty: true, error: 'storage' });
+    expect(session.getSnapshot().snapshot.workspace.history).toEqual(initial.workspace.history);
+    await session.flush();
+    expect(session.getSnapshot()).toMatchObject({ dirty: false, error: null });
+    await session.reload();
+    await session.history('redo');
+    expect(session.getSnapshot().document.annotations).toHaveLength(1);
+  } finally {
+    await session.dispose();
+  }
 });
 
-it('does not ignore a history write that fails while flush is waiting', async () => {
+it('does not ignore a history publication failure while the durable barrier is waiting', async () => {
   const { session, deps } = fixture();
   let reject!: (error: Error) => void;
   let markStarted!: () => void;
   const started = new Promise<void>((resolve) => {
     markStarted = resolve;
   });
-  deps.moveVideoWorkspaceHistory.mockImplementationOnce(
+  deps.saveVideoWorkspaceSnapshot.mockImplementationOnce(
     () =>
       new Promise((_, fail) => {
         reject = fail;
         markStarted();
       })
   );
-  const operation = session.history('start').catch(() => undefined);
-  const flushed = session.flush({ retryHistory: true });
-  await started;
-  reject(new Error('Quota'));
-  await expect(flushed).rejects.toThrow('storage');
-  await operation;
+  try {
+    await session.history('start');
+    const flushed = session.flush({ retryHistory: true });
+    await started;
+    reject(new Error('Quota'));
+    await expect(flushed).rejects.toThrow('Quota');
+    expect(session.getSnapshot()).toMatchObject({
+      dirty: true,
+      error: 'storage',
+      snapshot: { workspace: { cursor: 0 } },
+    });
+  } finally {
+    await session.dispose();
+  }
 });

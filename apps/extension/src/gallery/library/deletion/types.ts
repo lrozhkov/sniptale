@@ -7,7 +7,7 @@ export interface GalleryDeletionOpening {
 
 export interface GalleryPreparedDeletion {
   warning: string;
-  confirm: () => Promise<boolean>;
+  confirm: (() => Promise<boolean>) | null;
 }
 
 /** One disposable request; persistence owners independently revalidate every destructive commit. */

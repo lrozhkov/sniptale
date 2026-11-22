@@ -1,5 +1,5 @@
 import { normalizePaintColor } from '@sniptale/foundation/paint';
-import type { ComponentType } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import type { QuickEditBorder } from '../../features/video/project/scene/focus-appearance';
 import { FocusRoundnessField, FocusAreaFields } from './geometry';
 import {
@@ -29,11 +29,36 @@ export function BorderAppearanceFields(props: {
   onChange(patch: BorderAppearancePatch): void;
   Details: ComponentType<InspectorDisclosureProps>;
   preferenceId: string;
+  renderStroke?: (choice: ReactNode) => ReactNode;
   onPreview?: ((patch: BorderAppearancePatch | null) => void) | undefined;
 }) {
   const { value, onChange, Details } = props;
+  const strokeChoice = (
+    <SegmentedRow
+      columns={3}
+      layout={props.renderStroke ? 'stacked' : 'inline'}
+      showOptionLabels={!!props.renderStroke}
+      ariaLabel={translate('gallery.videoReview.borderStyle')}
+      label={translate('gallery.videoReview.borderStyle')}
+      value={value.style}
+      options={(['solid', 'dashed', 'dotted'] as const).map((style) => ({
+        value: style,
+        label: translate(`gallery.videoReview.borderStyle_${style}`),
+        icon: <BorderStrokeIcon style={style} />,
+      }))}
+      onChange={(style: QuickEditBorder['style']) =>
+        onChange({
+          style,
+          loop:
+            value.loop &&
+            (style !== 'solid' || value.motion === 'pulse' || value.motion === 'ripple'),
+        })
+      }
+    />
+  );
   return (
     <div className="sniptale-parameter-stack">
+      {props.renderStroke?.(strokeChoice)}
       <ColorField
         label={translate('gallery.videoReview.borderColor')}
         title={translate('gallery.videoReview.borderColor')}
@@ -55,30 +80,13 @@ export function BorderAppearanceFields(props: {
         step={1}
         precision={1}
         unit="px"
+        scrubEnabled={false}
+        stepperPlacement="sides"
         value={value.width}
         onPreview={(width) => props.onPreview?.(width === null ? null : { width })}
         onChange={(width) => onChange({ width })}
       />
-      <SegmentedRow
-        columns={3}
-        layout="stacked"
-        ariaLabel={translate('gallery.videoReview.borderStyle')}
-        label={translate('gallery.videoReview.borderStyle')}
-        value={value.style}
-        options={(['solid', 'dashed', 'dotted'] as const).map((style) => ({
-          value: style,
-          label: translate(`gallery.videoReview.borderStyle_${style}`),
-          icon: <BorderStrokeIcon style={style} />,
-        }))}
-        onChange={(style: QuickEditBorder['style']) =>
-          onChange({
-            style,
-            loop:
-              value.loop &&
-              (style !== 'solid' || value.motion === 'pulse' || value.motion === 'ripple'),
-          })
-        }
-      />
+      {props.renderStroke ? null : strokeChoice}
       {value.reveal !== 'fade' ||
       value.exitReveal !== 'fade' ||
       (value.loop &&
@@ -87,7 +95,6 @@ export function BorderAppearanceFields(props: {
         (value.motion === 'clockwise' || value.motion === 'counterclockwise')) ? (
         <SegmentedRow
           columns={5}
-          layout="stacked"
           ariaLabel={translate('gallery.videoReview.borderOrigin')}
           label={translate('gallery.videoReview.borderOrigin')}
           value={value.origin ?? 'top-center'}
@@ -134,7 +141,6 @@ export function BorderHoldFields(props: {
     <>
       <SegmentedRow<'still' | 'rotate' | 'pulse' | 'ripple'>
         columns={border.style === 'solid' ? 3 : 4}
-        layout="stacked"
         ariaLabel={translate('gallery.videoReview.focusReveal')}
         label={translate('gallery.videoReview.focusReveal')}
         value={mode}
@@ -183,6 +189,7 @@ export function BorderHoldFields(props: {
           {rotating ? (
             <PreviewNumericRow
               label={translate('gallery.videoReview.borderSegmentPercent')}
+              rangePresentation="field"
               min={1}
               max={100}
               step={1}
@@ -197,6 +204,7 @@ export function BorderHoldFields(props: {
           ) : null}
           <PreviewNumericRow
             label={translate('gallery.videoReview.borderSpeed')}
+            rangePresentation="field"
             title={translate(
               border.motion === 'ripple'
                 ? 'gallery.videoReview.borderRippleSpeedHint'
@@ -282,7 +290,6 @@ export function BorderRevealFields(props: {
     <>
       <SegmentedRow<'none' | 'fade' | 'draw' | 'both'>
         columns={4}
-        layout="stacked"
         label={translate('gallery.videoReview.focusReveal')}
         ariaLabel={translate('gallery.videoReview.focusReveal')}
         value={

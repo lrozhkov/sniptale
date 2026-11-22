@@ -1,6 +1,17 @@
 // @vitest-environment jsdom
 
-import { beforeEach, expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadContentCatalogFixture,
+  prepareContentTranslations,
+} from '../../../test-support/translations.test-support';
+
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadContentCatalogFixture>[0]) =>
+    loadContentCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareContentTranslations('ru'));
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { MAX_POPUP_EXPORT_TAB_TITLE_BYTES } from '@sniptale/runtime-contracts/export';
 import { PAGE_PACKAGE_EXTENDED_DIAGNOSTIC_ENTRY_PROFILE } from '@sniptale/runtime-contracts/page-package';

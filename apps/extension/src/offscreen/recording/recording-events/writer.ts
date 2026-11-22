@@ -1,5 +1,6 @@
 import { createRecordingHistoryIntake, waitForRecordingHistoryStop } from '../history-intake';
 import {
+  isFinalRecordingEventPackets,
   isRecordingEventObservationPacket,
   type RecordingEventObservationPacket,
 } from '../../../contracts/video/event-observations';
@@ -58,6 +59,7 @@ export async function createBrowserRecordingEventsWriter(options: {
   let recordSeq = 0;
   let lastTime = 0;
   let documentId: string | null = null;
+  let sourceInstanceId: string | undefined;
   let sourceSegment = -1;
   let sourceActive = false;
   let sourceRecordSeq = -1;
@@ -205,7 +207,8 @@ export async function createBrowserRecordingEventsWriter(options: {
     digest: string
   ) {
     if (intake.failed) throw new Error('RECORDING_EVENTS_STORAGE_UNAVAILABLE');
-    const changedDocument = documentId !== nativeDocumentId;
+    const changedDocument =
+      documentId !== nativeDocumentId || sourceInstanceId !== packet.sourceInstanceId;
     if (!changedDocument && packet.batchSequence === lastBatch) {
       if (digest !== lastDigest) throw new Error('RECORDING_EVENTS_CONFLICT');
       return;
@@ -222,6 +225,7 @@ export async function createBrowserRecordingEventsWriter(options: {
           active.clock
         );
       documentId = nativeDocumentId;
+      sourceInstanceId = packet.sourceInstanceId;
       sourceSegment = -1;
       sourceActive = false;
       sourceRecordSeq = -1;
@@ -297,12 +301,14 @@ export async function createBrowserRecordingEventsWriter(options: {
   >({
     recordingId: identity.recordingId,
     errorPrefix: 'RECORDING_EVENTS',
+    isFinalBatch: isFinalRecordingEventPackets,
     isPacket: isRecordingEventObservationPacket,
     process,
   });
 
   return {
     append: intake.append,
+    appendFinal: intake.appendFinal,
     finish(
       stop: { waitForSourceStop?: boolean; stoppedWhilePaused?: boolean } = {}
     ): Promise<RecordingEventsDescriptor> {

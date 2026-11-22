@@ -5,22 +5,23 @@ import type { RecordingTelemetrySnapshot } from '../../../../../../contracts/mes
 import { isRecordingTelemetrySnapshot } from '../../../../../../features/video/project/validation/recording-telemetry';
 import type { RouteResult } from '../shared';
 import type { RecordingObservationsMessage } from '../../../../../../contracts/video/types/messages';
-import { isRecordingEventObservationPacket } from '../../../../../../contracts/video/event-observations';
-import { isRecordingCursorObservationPacket } from '../../../../../../contracts/video/cursor-observations';
+import {
+  isFinalRecordingEventPackets,
+  isRecordingEventObservationPacket,
+} from '../../../../../../contracts/video/event-observations';
+import {
+  isFinalRecordingCursorPackets,
+  isRecordingCursorObservationPacket,
+} from '../../../../../../contracts/video/cursor-observations';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
 import { browserWebNavigation } from '@sniptale/platform/browser/web-navigation';
 import { getBackgroundRuntimeMessaging } from '../../../../../routing-contracts/runtime-messaging/services';
 
-type Forwarding = {
-  key: string;
-  documentId: string | null;
-  pending: number;
-  tail: Promise<void>;
-};
-const observationForwarding: { cursor: Forwarding | null; events: Forwarding | null } = {
-  cursor: null,
-  events: null,
+import { createRecordingObservationForwarder } from './recording-observation-forwarder';
+const observationForwarding = {
+  cursor: createRecordingObservationForwarder(),
+  events: createRecordingObservationForwarder(),
 };
 
 function forwardBlockObservations(
@@ -32,23 +33,37 @@ function forwardBlockObservations(
   const binding = lease?.surfaceBinding;
   const documentId = sender?.documentId;
   const tabId = sender?.tab?.id;
-  const kind = message.eventPacket ? 'events' : 'cursor';
-  const packet = message.eventPacket ?? message.cursorPacket;
+  const kind = message.eventPacket || message.eventPackets ? 'events' : 'cursor';
+  const packets = message.eventPackets ?? message.cursorPackets;
+  const packet = message.eventPacket ?? message.cursorPacket ?? packets?.[0];
+  const validPayload = packets
+    ? kind === 'events'
+      ? isFinalRecordingEventPackets(packets)
+      : isFinalRecordingCursorPackets(packets)
+    : kind === 'events'
+      ? isRecordingEventObservationPacket(packet)
+      : isRecordingCursorObservationPacket(packet);
+  const outgoing =
+    sender?.documentLifecycle === 'pending_deletion' || sender?.documentLifecycle === 'cached';
+  const hasSourceFrame =
+    sender?.frameId === 0 ||
+    (outgoing &&
+      typeof sender?.frameId === 'number' &&
+      Number.isInteger(sender.frameId) &&
+      sender.frameId >= 0);
   if (
     !binding ||
     !lease ||
     sender?.id !== chrome.runtime.id ||
-    sender.frameId !== 0 ||
-    sender.documentLifecycle !== 'active' ||
+    !hasSourceFrame ||
+    (sender.documentLifecycle !== 'active' && !outgoing) ||
     typeof documentId !== 'string' ||
     !documentId ||
     typeof tabId !== 'number' ||
     tabId !== getVideoRecordingTabId() ||
     tabId !== lease.recordingTabId ||
     lease.recordingId !== message.recordingId ||
-    !(kind === 'cursor'
-      ? isRecordingCursorObservationPacket(packet)
-      : isRecordingEventObservationPacket(packet)) ||
+    !validPayload ||
     !packet ||
     packet.recordingId !== message.recordingId
   ) {
@@ -61,55 +76,61 @@ function forwardBlockObservations(
     binding.streamInstanceId,
     tabId,
   ]);
-  if (observationForwarding[kind]?.key !== key)
-    observationForwarding[kind] = { key, documentId: null, pending: 0, tail: Promise.resolve() };
-  const forwarding = observationForwarding[kind];
-  if (!forwarding) throw new Error('Observation forwarding state is unavailable');
-  if (forwarding.pending >= 2) {
-    sendResponse({ success: false, error: 'RECORDING_OBSERVATIONS_BACKPRESSURE' });
+  const snapshot = structuredClone(
+    message.eventPackets
+      ? { eventPackets: message.eventPackets }
+      : message.cursorPackets
+        ? { cursorPackets: message.cursorPackets }
+        : message.eventPacket
+          ? { eventPacket: message.eventPacket }
+          : { cursorPacket: message.cursorPacket! }
+  );
+  const lastPacket = packets?.at(-1) ?? packet;
+  const lastRecord = lastPacket?.records.at(-1);
+  const queued = observationForwarding[kind]({
+    key,
+    source: JSON.stringify([documentId, packet.sourceInstanceId ?? null]),
+    outgoing,
+    closing: !!packets,
+    endsSource: !!packets || (lastRecord?.kind === 'boundary' && lastRecord.reason === 'stop'),
+    lastBatch: lastPacket?.batchSequence ?? packet.batchSequence,
+    fingerprint: JSON.stringify(snapshot),
+    verify: async () => {
+      const frames = await browserWebNavigation.getAllFrames({ tabId });
+      return !!frames?.some((frame) => frame.frameId === 0 && frame.documentId === documentId);
+    },
+    isCurrent: () => {
+      const current = getActiveVideoRecordingLeaseSnapshot();
+      return (
+        current?.recordingId === lease.recordingId &&
+        current.surfaceBinding?.generation === binding.generation &&
+        current.surfaceBinding.streamInstanceId === binding.streamInstanceId &&
+        current.recordingTabId === tabId &&
+        getVideoRecordingTabId() === tabId
+      );
+    },
+    publish: async () => {
+      const response = await getBackgroundRuntimeMessaging().sendRuntimeMessage(
+        attachOffscreenCommandCapability({
+          type: VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS,
+          recordingId: lease.recordingId,
+          generation: binding.generation,
+          streamInstanceId: binding.streamInstanceId,
+          nativeDocumentId: documentId,
+          ...snapshot,
+        })
+      );
+      if (response?.success !== true) throw new Error('Observation packet was refused');
+    },
+  });
+  if (!queued.accepted) {
+    sendResponse({ success: false, error: queued.error });
     return { handled: true, keepChannelOpen: false };
   }
-  const snapshot = structuredClone(packet);
-  forwarding.pending++;
-  const work = forwarding.tail.then(async () => {
-    if (forwarding.documentId !== documentId) {
-      const frames = await browserWebNavigation.getAllFrames({ tabId });
-      if (!frames?.some((frame) => frame.frameId === 0 && frame.documentId === documentId))
-        throw new Error('Source document is unavailable');
-      forwarding.documentId = documentId;
-    }
-    const current = getActiveVideoRecordingLeaseSnapshot();
-    if (
-      current?.recordingId !== lease.recordingId ||
-      current.surfaceBinding?.generation !== binding.generation ||
-      current.surfaceBinding.streamInstanceId !== binding.streamInstanceId ||
-      current.recordingTabId !== tabId ||
-      getVideoRecordingTabId() !== tabId
-    )
-      throw new Error('Source binding is unavailable');
-    const response = await getBackgroundRuntimeMessaging().sendRuntimeMessage(
-      attachOffscreenCommandCapability({
-        type: VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS,
-        recordingId: lease.recordingId,
-        generation: binding.generation,
-        streamInstanceId: binding.streamInstanceId,
-        nativeDocumentId: documentId,
-        ...(isRecordingCursorObservationPacket(snapshot)
-          ? { cursorPacket: snapshot }
-          : { eventPacket: snapshot }),
-      })
-    );
-    if (response?.success !== true) throw new Error('Observation packet was refused');
-  });
-  forwarding.tail = work.catch(() => undefined);
-  void work
-    .then(
-      () => sendResponse({ success: true }),
-      () => sendResponse({ success: false, error: 'RECORDING_OBSERVATIONS_UNAVAILABLE' })
-    )
-    .finally(() => {
-      forwarding.pending--;
-    });
+  void queued.completion.then(
+    () => sendResponse({ success: true }),
+    () => sendResponse({ success: false, error: 'RECORDING_OBSERVATIONS_UNAVAILABLE' })
+  );
   return { handled: true, keepChannelOpen: true };
 }
 
@@ -123,7 +144,9 @@ export function handleRecordingObservations(
 ): RouteResult {
   if (
     ('cursorPacket' in message && message.cursorPacket) ||
-    ('eventPacket' in message && message.eventPacket)
+    ('eventPacket' in message && message.eventPacket) ||
+    ('eventPackets' in message && message.eventPackets) ||
+    ('cursorPackets' in message && message.cursorPackets)
   )
     return forwardBlockObservations(message, sendResponse, sender);
   const lease = getActiveVideoRecordingLeaseSnapshot();

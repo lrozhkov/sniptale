@@ -1,7 +1,7 @@
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
 import { getGalleryPrimaryShortcut, getGalleryShortcutTitle } from '../keyboard/shortcut-labels';
 import { Search, X } from 'lucide-react';
-import { useRef, type Dispatch, type RefObject, type SetStateAction } from 'react';
+import { useContext, useRef, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import { translate } from '../../../platform/i18n';
 import type { FolderFilter } from '../types';
 
@@ -18,24 +18,25 @@ export function GalleryHeaderSearchField(props: {
   onSearchChange: Dispatch<SetStateAction<string>>;
   onSearchCommit: (value: string) => void;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const localInput = useRef<HTMLInputElement>(null);
+  const inputRef = props.searchNavigation?.inputRef ?? localInput;
+  const scoped = useContext(CommandPressScope);
+  const clear = useCommandPress({
+    enabled: scoped,
+    onPointerDown: (event) => event.preventDefault(),
+    onClick: () => {
+      props.onSearchCommit('');
+      inputRef.current?.focus();
+    },
+  });
+  const clearIcon = <X size={14} aria-hidden="true" />;
 
   return (
-    <div
-      className="flex h-8 w-36 min-w-0 shrink-0 items-center gap-1.5 rounded-[4px] border
-        border-[var(--sniptale-color-border-soft)]
-        bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_78%,transparent)]
-        px-1.5 transition-[width,border-color,background-color] duration-200 ease-out
-        focus-within:w-48 focus-within:border-[var(--sniptale-color-border-accent-strong)]
-        motion-reduce:transition-none"
-      data-ui="gallery.header.search"
-    >
-      <Search
-        className="ml-1 h-4 w-4 shrink-0 text-[var(--sniptale-color-text-muted)]"
-        aria-hidden="true"
-      />
+    <div className="sniptale-inspector-search" data-ui="gallery.header.search">
+      <Search size={14} aria-hidden="true" />
       <input
-        ref={props.searchNavigation?.inputRef ?? inputRef}
+        type="search"
+        ref={inputRef}
         aria-label={translate(
           props.trashMode ? 'gallery.app.trashSearchLabel' : 'gallery.app.searchLabel'
         )}
@@ -64,30 +65,20 @@ export function GalleryHeaderSearchField(props: {
               ? translate('gallery.app.scenarioSearchPlaceholder')
               : translate('gallery.app.searchPlaceholder')
         }
-        className="min-w-0 flex-1 bg-transparent text-[13px] leading-[18px] text-[var(--sniptale-color-text-primary)]
-          outline-none placeholder:text-[var(--sniptale-color-text-muted)]
-          focus:placeholder:text-transparent"
       />
       {props.search ? (
-        <ProductActionButton
-          tone="secondary"
-          compact
-          data-command-chrome="true"
+        <button
+          {...clear.props}
           type="button"
           data-ui="gallery.header.clearSearch"
+          data-command-press={scoped ? '' : undefined}
+          data-pressing={clear.pressed ? 'true' : undefined}
           aria-label={translate('gallery.app.clearSearch')}
           title={translate('gallery.app.clearSearch')}
-          onClick={() => {
-            props.onSearchCommit('');
-            (props.searchNavigation?.inputRef ?? inputRef).current?.focus();
-          }}
-          className="sniptale-dismiss-button flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center
-            rounded-[4px]  transition-colors
-            focus-visible:outline-none focus-visible:ring-2
-            focus-visible:ring-[var(--sniptale-color-accent)]"
+          className="sniptale-field-clear"
         >
-          <X className="h-3.5 w-3.5" aria-hidden="true" />
-        </ProductActionButton>
+          {scoped ? <span className="sniptale-command-content">{clearIcon}</span> : clearIcon}
+        </button>
       ) : null}
     </div>
   );

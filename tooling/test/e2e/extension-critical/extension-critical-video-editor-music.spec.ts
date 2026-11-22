@@ -1,5 +1,6 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { expect, test, type Locator } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { startHostServer } from '../support/host-server';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
@@ -127,11 +128,10 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         path: info.outputPath('music-audio-inspector.png'),
         fullPage: false,
       });
-      const gain = sections.getByRole('textbox', {
-        name: label('videoEditor.sidebar.volumeLabel'),
-        exact: true,
-      });
-      await gain.fill('70');
+      const gain = numericControl(sections, label('videoEditor.sidebar.volumeLabel'));
+      await (
+        await openNumericControl(sections, label('videoEditor.sidebar.volumeLabel'))
+      ).fill('70');
       await gain.press('Tab');
       await expect
         .poll(async () => {
@@ -193,10 +193,16 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
           exact: true,
         })
       );
-      const master = page
-        .locator('[data-ui="video-editor.inspector.track-audio"]')
-        .getByRole('textbox', { name: label('videoEditor.sidebar.trackVolumeLabel'), exact: true });
-      await master.fill('150');
+      const master = numericControl(
+        page.locator('[data-ui="video-editor.inspector.track-audio"]'),
+        label('videoEditor.sidebar.trackVolumeLabel')
+      );
+      await (
+        await openNumericControl(
+          page.locator('[data-ui="video-editor.inspector.track-audio"]'),
+          label('videoEditor.sidebar.trackVolumeLabel')
+        )
+      ).fill('150');
       await master.press('Tab');
       await expect
         .poll(

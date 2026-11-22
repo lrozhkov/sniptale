@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadSettingsCatalogFixture,
+  prepareSettingsTranslations,
+} from '../../../../catalog-fixture.test-support';
 import type { ContextMenuTree } from '../../../../../contracts/settings/context-menu-layout';
 import { ContextMenuTreeView } from './context-menu-tree';
 
@@ -256,3 +260,10 @@ it('explains an expanded empty user section without changing its contents', asyn
   await key(row('section:custom'), 'ArrowLeft');
   expect(container.textContent).not.toContain('No commands in this section.');
 });
+
+vi.mock('../../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadSettingsCatalogFixture>[0]) =>
+    loadSettingsCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareSettingsTranslations('en'));

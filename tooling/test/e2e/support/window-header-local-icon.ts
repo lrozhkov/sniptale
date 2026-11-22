@@ -2,7 +2,7 @@ import { readNativeReviewWorkspace } from './native-review-workspace';
 import { writeFile } from 'node:fs/promises';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { expect, type Locator, type Page } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from './catalog-fixture';
 
 /** Exercises the real native chooser and decoder shared by all three editors. Leaves a file icon selected. */
 export async function checkLocalWindowIcon(page: Page, settings: Locator, locale: 'en' | 'ru') {

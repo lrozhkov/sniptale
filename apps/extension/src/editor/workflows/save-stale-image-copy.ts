@@ -10,38 +10,43 @@ import { useEditorStore } from '../state/useEditorStore';
 type StaleImageCopyController = Pick<ImageEditorController, 'exportDocument' | 'renderForExport'>;
 
 export async function saveStaleEditorImageCopy(args: {
-  autosaveService: Pick<EditorSessionAutosaveService, 'rebindAggregate'>;
+  autosaveService: Pick<EditorSessionAutosaveService, 'rebindAggregate' | 'captureSnapshot'>;
   controller: StaleImageCopyController;
   isSourceActive: () => boolean;
   pageTitle: string;
   sourceAggregateId: string;
 }): Promise<'saved' | 'stale'> {
-  const document = args.controller.exportDocument();
+  const snapshot = args.autosaveService.captureSnapshot(() => args.controller.exportDocument());
+  const document = snapshot.document;
   const previewBlob = await dataUrlToBlob(
     await args.controller.renderForExport({ format: 'png', quality: 1 })
   );
   const targetAggregateId = createSecureRandomUuid('Secure random image copy IDs are unavailable.');
-  await saveImageAggregateCopyFromDocument({
+  const copy = await saveImageAggregateCopyFromDocument({
     document,
+    ...(snapshot.history ? { history: snapshot.history } : {}),
     previewBlob,
     sourceTitle: args.pageTitle,
     targetAggregateId,
     thumbnailBlob: await createImageThumbnailBlob(previewBlob),
   });
-  if (!args.isSourceActive()) return 'stale';
+  if (!args.isSourceActive() || !snapshot.isCurrent()) return 'stale';
 
-  replaceEditorPageAggregateId(targetAggregateId);
-  args.autosaveService.rebindAggregate({
-    aggregateId: targetAggregateId,
-    durableRevision: 1,
-    renderPresentation: (signal) =>
-      args.controller.renderForExport(
-        { format: 'png', quality: 1, ...(signal ? { signal } : {}) },
-        'committed'
-      ),
-    sourceTitle: args.pageTitle,
-    sourceUrl: null,
-  });
+  replaceEditorPageAggregateId(copy.aggregateId);
+  args.autosaveService.rebindAggregate(
+    {
+      aggregateId: copy.aggregateId,
+      durableRevision: copy.revision,
+      renderPresentation: (signal) =>
+        args.controller.renderForExport(
+          { format: 'png', quality: 1, ...(signal ? { signal } : {}) },
+          'committed'
+        ),
+      sourceTitle: args.pageTitle,
+      sourceUrl: null,
+    },
+    copy
+  );
   useEditorStore.getState().setSaveErrorMessage(null);
   useEditorStore.getState().setSaveState('saved');
   return 'saved';

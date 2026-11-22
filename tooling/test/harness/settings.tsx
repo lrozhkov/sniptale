@@ -7,6 +7,7 @@ import '@sniptale/ui/styles/glass';
 import '@sniptale/ui/styles/toolbar';
 import '@sniptale/ui/styles/overlays';
 import { initializeAppTheme } from '../../../apps/extension/src/ui/theme';
+import { prepareTranslations } from '../../../apps/extension/src/platform/i18n';
 
 initializeAppTheme();
 
@@ -14,7 +15,8 @@ function App() {
   return <SettingsPage />;
 }
 
-void harnessReady.then(() => {
+void harnessReady.then(async () => {
+  await prepareTranslations('settings');
   createRoot(document.getElementById('root')!).render(<App />);
 });
 

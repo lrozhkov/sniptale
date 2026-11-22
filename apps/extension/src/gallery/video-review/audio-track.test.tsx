@@ -1,12 +1,15 @@
 // @vitest-environment jsdom
 import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
-import { act } from 'react';
+import { act, Suspense, startTransition } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewAudioTrack } from './audio-track';
 import { reviewAudioSnapTimes } from './timeline-binding';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createTrackProjection } from './track-projection';
+import * as trackProjection from './track-projection';
+import * as timelineHints from './timeline-hints';
+import * as voiceoverTiming from '../../features/video/review/voiceover-timing';
 import { anchorReviewVoiceover } from '../../features/video/review/voiceover-edits';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { createQuickEditAudioClip } from '../../features/video/review/advanced/audio';
@@ -298,7 +301,7 @@ it('drags clip blocks with move and trim edges and commits clamped values', asyn
   await send('pointerdown', 0);
   await send('pointermove', 100);
   await send('pointerup', 100);
-  expect(onSelect).toHaveBeenCalledWith('a1');
+  expect(onSelect).not.toHaveBeenCalled();
   expect(onMoveClip).toHaveBeenCalledWith('voiceover', 'a1', 3);
   await send('pointerdown', 0);
   await send('pointermove', -300);
@@ -660,7 +663,7 @@ it('retains an audio clip move when pointerup precedes note admission', async ()
   expect(onSelect).not.toHaveBeenCalled();
   expect(onMoveClip).not.toHaveBeenCalled();
   await act(async () => admit());
-  expect(onSelect).toHaveBeenCalledExactlyOnceWith('music');
+  expect(onSelect).not.toHaveBeenCalled();
   expect(onMoveClip).toHaveBeenCalledExactlyOnceWith('music', 'music', 4);
 });
 
@@ -799,4 +802,192 @@ it('reuses music waveform samples across unchanged owner rerenders but refreshes
       .querySelector('[data-audio-id="music"] [data-ui="gallery.videoReview.waveform"] path')!
       .getAttribute('d')
   ).not.toBe(before);
+});
+
+it('retains anchored audio geometry through unrelated availability changes and invalidates clip edits', () => {
+  const segments = buildReviewTimeMap(10, []);
+  const projection = createTrackProjection(10, []);
+  const recording = anchorReviewVoiceover(clip('voice', 2, 2), segments);
+  const audio = {
+    original: { muted: false, volume: 1 },
+    voiceover: [recording],
+    music: [],
+    voiceoverSegments: segments,
+  };
+  const rows = vi.spyOn(trackProjection, 'reviewAudioClipRows');
+  const retime = vi.spyOn(voiceoverTiming, 'retimeReviewVoiceover');
+  const snapTimes: number[] = [];
+  renderTrack(audio, false, snapTimes, true, undefined, projection);
+  rows.mockClear();
+  retime.mockClear();
+  renderTrack(audio, true, snapTimes, true, undefined, projection);
+  expect(rows).not.toHaveBeenCalled();
+  expect(retime).not.toHaveBeenCalled();
+  renderTrack(
+    {
+      ...audio,
+      voiceover: [...audio.voiceover, anchorReviewVoiceover(clip('next', 4, 2), segments)],
+    },
+    true,
+    snapTimes,
+    true,
+    undefined,
+    projection
+  );
+  expect(rows).toHaveBeenCalledOnce();
+  expect(retime).toHaveBeenCalled();
+});
+
+it('keeps added audio presentation asleep for fresh seek callbacks and magnets', () => {
+  const audio = {
+    original: { muted: false, volume: 1 },
+    voiceover: [clip('stable', 1, 2)],
+    music: [],
+  };
+  const hints = vi.spyOn(timelineHints, 'reviewTimelineHint');
+  const render = (select: typeof onSelect, magnets: readonly number[]) =>
+    act(() =>
+      root.render(
+        <ReviewAudioTrack
+          lane="voiceover"
+          audio={{ ...audio }}
+          duration={10}
+          selectedId={null}
+          busy={false}
+          snapTimes={magnets}
+          onSelect={select}
+          onMoveClip={() => {}}
+          onTrimClip={() => {}}
+          onOriginal={() => {}}
+          onImportFile={() => {}}
+        />
+      )
+    );
+  render(onSelect, [0]);
+  hints.mockClear();
+  const latest = vi.fn();
+  render(latest, [3]);
+  expect(hints).not.toHaveBeenCalled();
+  const block = host.querySelector('[data-audio-id="stable"]')!;
+  act(() => block.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(latest).toHaveBeenCalledWith('stable');
+  expect(onSelect).not.toHaveBeenCalled();
+});
+
+it('does not publish added-audio callbacks from a suspended render', async () => {
+  const audio = {
+    original: { muted: false, volume: 1 },
+    voiceover: [clip('stable', 1, 2)],
+    music: [],
+  };
+  const committed = vi.fn();
+  const abandoned = vi.fn();
+  const pending = new Promise<void>(() => {});
+  function Suspend({ active }: { active: boolean }) {
+    if (active) throw pending;
+    return null;
+  }
+  const tree = (select: typeof committed, suspended: boolean) => (
+    <Suspense fallback="pending">
+      <ReviewAudioTrack
+        lane="voiceover"
+        audio={audio}
+        duration={10}
+        selectedId={null}
+        busy={false}
+        onSelect={select}
+        onMoveClip={onMoveClip}
+        onTrimClip={onTrimClip}
+        onOriginal={onOriginal}
+        onImportFile={onImportFile}
+      />
+      <Suspend active={suspended} />
+    </Suspense>
+  );
+  await act(async () => root.render(tree(committed, false)));
+  await act(async () => startTransition(() => root.render(tree(abandoned, true))));
+  const block = host.querySelector('[data-audio-id="stable"]')!;
+  act(() => block.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(committed).toHaveBeenCalledWith('stable');
+  expect(abandoned).not.toHaveBeenCalled();
+});
+
+it('refreshes added-audio presentation for visual selection, busy, density and projection changes', () => {
+  const audio = {
+    original: { muted: false, volume: 1 },
+    voiceover: [clip('stable', 1, 2)],
+    music: [],
+  };
+  type Props = Parameters<typeof ReviewAudioTrack>[0];
+  const base: Props = {
+    lane: 'voiceover',
+    audio,
+    duration: 10,
+    selectedId: null,
+    busy: false,
+    onSelect,
+    onMoveClip,
+    onTrimClip,
+    onOriginal,
+    onImportFile,
+  };
+  const render = (overrides: Partial<Props>) =>
+    act(() => root.render(<ReviewAudioTrack {...base} {...overrides} />));
+  const hints = vi.spyOn(timelineHints, 'reviewTimelineHint');
+  render({});
+  for (const overrides of [
+    { selectedId: 'stable' },
+    { busy: true },
+    { compact: true },
+    { projection: createTrackProjection(10, []) },
+    { audio: { ...audio, voiceover: [clip('stable', 2, 2)] } },
+  ]) {
+    render({});
+    hints.mockClear();
+    render(overrides);
+    expect(hints).toHaveBeenCalled();
+  }
+  expect(host.querySelector<HTMLElement>('[data-audio-id="stable"]')!.style.left).toBe('20%');
+});
+
+it('reads fresh magnets and move commands when a retained audio gesture starts', () => {
+  const audio = {
+    original: { muted: false, volume: 1 },
+    voiceover: [clip('stable', 1, 2)],
+    music: [],
+  };
+  const first = vi.fn();
+  const latest = vi.fn();
+  const render = (move: typeof first, snapTimes: readonly number[]) =>
+    act(() =>
+      root.render(
+        <ReviewAudioTrack
+          lane="voiceover"
+          audio={audio}
+          duration={10}
+          selectedId={null}
+          busy={false}
+          snapTimes={snapTimes}
+          onSelect={onSelect}
+          onMoveClip={move}
+          onTrimClip={onTrimClip}
+          onOriginal={onOriginal}
+          onImportFile={onImportFile}
+        />
+      )
+    );
+  render(first, [0]);
+  render(latest, [3.05]);
+  const block = host.querySelector<HTMLElement>('[data-audio-id="stable"]')!;
+  const lane = block.parentElement!;
+  vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 36));
+  Object.assign(block, { setPointerCapture: vi.fn(), hasPointerCapture: () => false });
+  for (const [type, clientX] of [
+    ['pointerdown', 100],
+    ['pointermove', 300],
+    ['pointerup', 300],
+  ] as const)
+    act(() => block.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX })));
+  expect(latest).toHaveBeenCalledWith('voiceover', 'stable', 3.05);
+  expect(first).not.toHaveBeenCalled();
 });

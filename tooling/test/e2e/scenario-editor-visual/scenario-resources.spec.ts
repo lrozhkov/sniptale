@@ -24,6 +24,45 @@ async function expectStableOpening(dialog: Locator) {
   }
 }
 
+for (const [theme, viewport] of [
+  ['light', { width: 1280, height: 560 }],
+  ['dark', { width: 1920, height: 900 }],
+] as const) {
+  test(`scenario resource search filters and clears in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    await openVisualHarness(page, hostOrigin, theme, 'ru', viewport);
+    await page.getByRole('button', { name: 'Ресурсы', exact: true }).click();
+    const trigger = page.locator(
+      '#guide-library-panel .guide-image-upload-compact .guide-action-menu-anchor > button'
+    );
+    await trigger.click();
+    await page
+      .locator('.guide-action-menu')
+      .getByRole('button', { name: 'Библиотека изображений', exact: true })
+      .click();
+    const drawer = page.locator('#guide-resource-drawer');
+    const search = drawer.locator('.guide-library-search input');
+    const card = drawer.getByRole('button', { name: 'Library screenshot.png', exact: true });
+    await expect(card).toBeVisible();
+    await expect(search).toHaveAttribute('spellcheck', 'false');
+    await search.fill('does-not-exist');
+    await expect(card).toHaveCount(0);
+    const clear = drawer.locator('.guide-library-search .sniptale-field-clear');
+    await expect(clear).toBeVisible();
+    await expect(search.locator('..')).toHaveCSS('height', '32px');
+    await page.screenshot({ path: info.outputPath('library-search.png'), fullPage: false });
+    await clear.click();
+    await expect(search).toHaveValue('');
+    await expect(search).toBeFocused();
+    await expect(card).toBeVisible();
+    await drawer.getByRole('button', { name: 'Закрыть', exact: true }).click();
+    await expect(drawer).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  });
+}
+
 for (const theme of SCENARIO_VISUAL_THEMES) {
   test(`compact resources preview and import actions remain usable in ${theme}`, async ({
     page,

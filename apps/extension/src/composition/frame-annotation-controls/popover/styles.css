@@ -140,6 +140,13 @@
 }
 
 /* Embedded annotation chrome opts in without changing the rendered page annotation. */
+.sniptale-content-popover.sniptale-content-appearance-surface.sniptale-compact-workspace {
+  --sniptale-parameter-row-height: var(--sniptale-parameter-control-height);
+  --sniptale-parameter-label-width: 120px;
+  --sniptale-parameter-value-width: 184px;
+  --sniptale-parameter-context-space: 0px;
+}
+
 .sniptale-content-appearance-surface.sniptale-content-popover.sniptale-content-popover--toolbar-menu {
   padding: 8px;
   border-radius: 4px;
@@ -263,6 +270,9 @@
 
 /* The popover owns the material; manual categories do not add a nested card. */
 .sniptale-content-appearance-surface [data-ui='shared.highlighter-manual-inspector-surface'] {
+  --sniptale-parameter-label-width: 100px;
+  --sniptale-parameter-value-width: 188px;
+  --sniptale-color-alpha-width: 44px;
   border: 0;
   background: transparent;
   box-shadow: none;

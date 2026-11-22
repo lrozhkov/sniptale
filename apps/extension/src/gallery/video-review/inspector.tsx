@@ -1,16 +1,23 @@
+import { ReviewInspectorActionMenu } from './inspector-action-menu';
 import { ReviewIntervalHintContext, type ReviewIntervalHintOwner } from './interval-timing';
 import type { ReviewInspectorNavigation } from './inspector-navigation';
 import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 import type { ReviewBeforeAction } from './note-transitions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { ReviewInspectorPresentation } from './inspector-sections';
+import {
+  ReviewInspectorPresentation,
+  ReviewInspectorActionTrayContext,
+  ReviewInspectorActionTray,
+} from './inspector-sections';
 import '../../ui/compact-inspector-controls/inspector-surface.css';
 import './inspector.css';
+import './field-surfaces.css';
 import {
   ArrowLeft,
-  Clapperboard,
   List,
   PanelLeft,
+  Clapperboard,
+  type LucideIcon,
   ChevronsDownUp,
   ChevronsUpDown,
   Pencil,
@@ -19,8 +26,23 @@ import {
   Plus,
   FileDown,
   X,
+  Info,
+  StickyNote,
+  Eye,
+  History,
+  Mic,
+  AudioLines,
+  Crop,
+  Type,
 } from 'lucide-react';
-import { useEffect, useRef, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnnotation } from '../../features/video/review/types';
 import {
@@ -38,6 +60,7 @@ type InspectorSection =
   | 'comments'
   | 'export'
   | 'history'
+  | 'editHistory'
   | 'preview'
   | 'speech'
   | 'text'
@@ -70,8 +93,9 @@ export function ReviewInspector(props: {
   speech?: ReactNode;
   textDocument?: ReactNode;
   actionHistory?: ReactNode;
+  editHistory?: ReactNode;
   selectionLabel?: string | undefined;
-  selectionHasSections?: boolean;
+  selectionIcon?: LucideIcon | undefined;
   selectionPreferenceScope?: string;
   onBack(): void;
   onClose?(): void;
@@ -92,8 +116,25 @@ export function ReviewInspector(props: {
   saveStatus?: 'saving' | 'saved' | 'failed';
   onRetry?(): void;
 }) {
-  const { presentation, setPresentation, shown, scroll } = props.navigation;
+  const { shown, scroll } = props.navigation;
+  const [presentation, setPresentation] = useState<'all' | 'sections'>('sections');
+  useEffect(() => {
+    if (scroll.current) scroll.current.scrollTop = 0;
+  }, [presentation, scroll]);
   const previewHost = useRef<HTMLDivElement>(null);
+  const [actionTrayHost, setActionTrayHost] = useState<HTMLDivElement | null>(null);
+  const selectionScope = props.selectionPreferenceScope ?? props.selectionLabel ?? '';
+  const [sectionCount, setSectionCount] = useState({ scope: selectionScope, count: 0 });
+  const onSectionCountChange = useCallback(
+    (count: number) => {
+      setSectionCount((current) =>
+        current.scope === selectionScope && current.count === count
+          ? current
+          : { scope: selectionScope, count }
+      );
+    },
+    [selectionScope]
+  );
   const hintOwner = useRef<ReviewIntervalHintOwner>({
     title: { current: null },
     active: null,
@@ -106,6 +147,8 @@ export function ReviewInspector(props: {
     <ReviewIntervalHintContext value={hintOwner}>
       <InspectorLayout>
         <aside
+          onKeyDownCapture={keepNumericAltInEditor}
+          onKeyUpCapture={keepNumericAltInEditor}
           onKeyDown={(event) => {
             if (shown === 'preview' && event.key === 'Escape' && !event.defaultPrevented) {
               event.preventDefault();
@@ -124,13 +167,19 @@ export function ReviewInspector(props: {
             <ReviewInspectorHeader
               {...props}
               onBack={props.onBack}
-              presentation={presentation}
+              actionMenu={
+                <ReviewInspectorActionMenu
+                  onHost={setActionTrayHost}
+                  disabled={props.busy || !!props.recording}
+                  scope={`${shown}:${props.selectionLabel ?? ''}`}
+                />
+              }
               hintOwner={hintOwner}
               section={recordingShown ? 'recording' : shown}
-              onTogglePresentation={() =>
-                (props.beforeAction ?? ((action) => action()))(() =>
-                  setPresentation((mode) => (mode === 'all' ? 'sections' : 'all'))
-                )
+              hasMultipleSections={sectionCount.scope === selectionScope && sectionCount.count > 1}
+              presentation={presentation}
+              onPresentationChange={() =>
+                setPresentation((current) => (current === 'all' ? 'sections' : 'all'))
               }
             />
             <ReviewInspectorStatus {...props} />
@@ -150,7 +199,16 @@ export function ReviewInspector(props: {
               }}
               className="flex min-h-0 flex-1 flex-col"
             >
-              {props.trackWorkspace}
+              <ReviewInspectorActionTrayContext
+                value={
+                  !recordingShown &&
+                  ['track', 'history', 'speech', 'text', 'project'].includes(shown)
+                    ? actionTrayHost
+                    : null
+                }
+              >
+                {props.trackWorkspace}
+              </ReviewInspectorActionTrayContext>
             </div>
           ) : null}
           {!props.trackWorkspace ? (
@@ -186,39 +244,54 @@ export function ReviewInspector(props: {
             ref={scroll}
             className="review-inspector-scroll min-h-0 flex-1 space-y-3 overflow-y-auto"
           >
-            <ReviewInspectorPresentation
-              value={presentation}
-              section={shown}
-              selectionScope={props.selectionPreferenceScope}
+            <ReviewInspectorActionTrayContext
+              value={
+                !recordingShown &&
+                (!props.trackWorkspace ||
+                  !['track', 'history', 'speech', 'text', 'project'].includes(shown))
+                  ? actionTrayHost
+                  : null
+              }
             >
-              {shown === 'preview' ? (
-                <div
-                  ref={previewHost}
-                  tabIndex={-1}
-                  aria-label={translate('gallery.videoReview.previewSection')}
-                  data-ui="gallery.videoReview.previewInspector"
-                >
-                  {props.preview}
-                </div>
-              ) : shown === 'project' ? (
-                props.project
-              ) : shown === 'history' ? null : shown === 'export' ? (
-                <section data-ui="gallery.videoReview.exportSection" className="space-y-3">
-                  {props.actions}
-                  <ReviewProjectActions {...props} />
-                </section>
-              ) : shown === 'text' ? (
-                props.textDocument
-              ) : shown === 'speech' ? (
-                props.speech
-              ) : shown === 'scene' ? (
-                props.scene
-              ) : shown === 'selected' ? (
-                props.children
+              {shown === 'editHistory' ? (
+                props.editHistory
               ) : (
-                <ReviewNotes {...props} />
+                <ReviewInspectorPresentation
+                  value={presentation}
+                  section={shown}
+                  selectionScope={props.selectionPreferenceScope}
+                  onSectionCountChange={shown === 'selected' ? onSectionCountChange : undefined}
+                >
+                  {shown === 'preview' ? (
+                    <div
+                      ref={previewHost}
+                      tabIndex={-1}
+                      aria-label={translate('gallery.videoReview.previewSection')}
+                      data-ui="gallery.videoReview.previewInspector"
+                    >
+                      {props.preview}
+                    </div>
+                  ) : shown === 'project' ? (
+                    props.project
+                  ) : shown === 'history' ? null : shown === 'export' ? (
+                    <section data-ui="gallery.videoReview.exportSection" className="space-y-3">
+                      {props.actions}
+                      <ReviewProjectActions {...props} />
+                    </section>
+                  ) : shown === 'text' ? (
+                    props.textDocument
+                  ) : shown === 'speech' ? (
+                    props.speech
+                  ) : shown === 'scene' ? (
+                    props.scene
+                  ) : shown === 'selected' ? (
+                    props.children
+                  ) : (
+                    <ReviewNotes {...props} />
+                  )}
+                </ReviewInspectorPresentation>
               )}
-            </ReviewInspectorPresentation>
+            </ReviewInspectorActionTrayContext>
           </div>
           {props.recording ? (
             <div
@@ -229,12 +302,32 @@ export function ReviewInspector(props: {
               {props.recording}
             </div>
           ) : (
-            <ReviewInspectorFooter {...props} showReports={shown === 'comments'} />
+            <ReviewInspectorActionTrayContext value={shown === 'comments' ? actionTrayHost : null}>
+              <ReviewInspectorFooter {...props} showReports={shown === 'comments'} />
+            </ReviewInspectorActionTrayContext>
           )}
         </aside>
       </InspectorLayout>
     </ReviewIntervalHintContext>
   );
+}
+
+// Chromium can treat an unconsumed Alt press as a request to activate its menu.
+function keepNumericAltInEditor(event: KeyboardEvent<HTMLElement>) {
+  const input = event.target;
+  if (
+    event.key === 'Alt' &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.shiftKey &&
+    input instanceof HTMLInputElement &&
+    input.type === 'text' &&
+    !input.readOnly &&
+    input.matches(':focus:enabled') &&
+    input.closest('.sniptale-numeric-value, .sniptale-inspector-numeric')
+  ) {
+    event.preventDefault();
+  }
 }
 
 /** Saved timeline comments with hover, select, and row actions. */
@@ -342,14 +435,15 @@ function ReviewProjectActions(
   );
 }
 
-/** Comment reports retain their own commands; export belongs to the inspector section. */
+/** Note reports use the same header command menu as the selected-object inspectors. */
 function ReviewInspectorFooter(
   props: Parameters<typeof ReviewInspector>[0] & { showReports: boolean }
 ) {
+  if (!props.showReports) return null;
   return (
-    <div className="min-h-0 max-h-[max(10rem,40%)] shrink-0 scroll-pt-20 space-y-2 overflow-y-auto">
+    <ReviewInspectorActionTray>
       {props.showReports ? (
-        <div className="grid grid-cols-1 gap-1" data-ui="gallery.videoReview.reportActions">
+        <div className="review-inspector-actions" data-ui="gallery.videoReview.reportActions">
           <ReviewButton
             label={translate('gallery.videoReview.copyReport')}
             disabled={props.busy}
@@ -370,7 +464,7 @@ function ReviewInspectorFooter(
           </ReviewButton>
         </div>
       ) : null}
-    </div>
+    </ReviewInspectorActionTray>
   );
 }
 
@@ -433,6 +527,7 @@ const inspectorSectionLabels = {
   comments: 'gallery.videoReview.comments',
   export: 'gallery.videoReview.exportSection',
   history: 'gallery.videoReview.telemetry',
+  editHistory: 'gallery.videoReview.editHistoryTitle',
   preview: 'gallery.videoReview.previewSection',
   speech: 'gallery.videoReview.audioOriginal',
   text: 'gallery.videoReview.textTrack',
@@ -442,12 +537,30 @@ const inspectorSectionLabels = {
 /** The header close action returns to the viewer through the existing guarded exit. */
 function ReviewInspectorHeader(
   props: Parameters<typeof ReviewInspector>[0] & {
-    presentation: 'all' | 'sections';
     hintOwner: ReviewIntervalHintOwner;
     section: InspectorSection;
-    onTogglePresentation(): void;
+    actionMenu: ReactNode;
+    hasMultipleSections: boolean;
+    presentation: 'all' | 'sections';
+    onPresentationChange(): void;
   }
 ) {
+  const SelectionIcon =
+    props.section === 'selected'
+      ? props.selectionIcon
+      : {
+          project: Info,
+          track: List,
+          scene: Crop,
+          comments: StickyNote,
+          export: FileDown,
+          history: History,
+          editHistory: History,
+          preview: Eye,
+          speech: AudioLines,
+          text: Type,
+          recording: Mic,
+        }[props.section];
   return (
     <header className="flex shrink-0 items-center gap-1">
       {!(
@@ -471,43 +584,56 @@ function ReviewInspectorHeader(
         <div className="min-w-0 flex-1">{props.trackHeader}</div>
       ) : (
         <div className="min-w-0 flex-1">
-          <h2 ref={props.hintOwner.title} className="truncate text-sm font-semibold">
-            {['track', 'speech', 'text', 'history'].includes(props.section) && props.trackTitle
-              ? props.trackTitle
-              : props.section === 'history' && props.historyTitle
-                ? props.historyTitle
-                : props.section === 'track'
-                  ? props.trackTitle
-                  : props.section === 'selected'
-                    ? props.selectionLabel
-                    : translate(inspectorSectionLabels[props.section])}
+          <h2
+            ref={props.hintOwner.title}
+            className="flex min-w-0 items-center gap-2 text-sm font-semibold"
+          >
+            {SelectionIcon ? (
+              <SelectionIcon
+                size={16}
+                aria-hidden="true"
+                className="shrink-0 text-[var(--sniptale-color-text-secondary)]"
+              />
+            ) : null}
+            <span className="truncate">
+              {['track', 'speech', 'text', 'history'].includes(props.section) && props.trackTitle
+                ? props.trackTitle
+                : props.section === 'history' && props.historyTitle
+                  ? props.historyTitle
+                  : props.section === 'track'
+                    ? props.trackTitle
+                    : props.section === 'selected'
+                      ? props.selectionLabel
+                      : translate(inspectorSectionLabels[props.section])}
+            </span>
           </h2>
         </div>
       )}
-      {props.section === 'scene' ||
-      (props.section === 'speech' && !props.trackHeader) ||
-      (props.section === 'selected' && props.selectionHasSections === true) ? (
+
+      {props.section === 'selected' && props.hasMultipleSections ? (
         <ContentToolbarButton
           type="button"
           tone="utility"
           size="compact"
+          dataUi="gallery.videoReview.inspectorPresentation"
           title={translate(
             props.presentation === 'all'
               ? 'scenario.editor.inspectorShowSections'
               : 'scenario.editor.inspectorShowAll'
           )}
-          dataUi="gallery.videoReview.inspectorPresentation"
+          aria-pressed={props.presentation === 'all'}
           disabled={!!props.recording}
-          onClick={props.onTogglePresentation}
+          onClick={() =>
+            (props.beforeAction ?? ((action) => action()))(() => props.onPresentationChange())
+          }
         >
           {props.presentation === 'all' ? (
-            <List size={16} aria-hidden="true" />
-          ) : (
             <PanelLeft size={16} aria-hidden="true" />
+          ) : (
+            <List size={16} aria-hidden="true" />
           )}
         </ContentToolbarButton>
       ) : null}
-
       <ContentToolbarButton
         type="button"
         tone="utility"
@@ -524,21 +650,23 @@ function ReviewInspectorHeader(
         {props.fullHeight ? <ChevronsDownUp size={16} /> : <ChevronsUpDown size={16} />}
       </ContentToolbarButton>
 
-      <ContentToolbarButton
-        type="button"
-        tone="close"
-        className="review-inspector-close"
-        size="compact"
-        title={translate('common.actions.close')}
-        disabled={props.busy || !!props.recording}
-        onPointerDown={(event) => {
-          // The guarded exit owns field flush; blur must not disable Close before click.
-          if (event.button === 0) event.preventDefault();
-        }}
-        onClick={props.onBack}
-      >
-        <X size={16} aria-hidden="true" />
-      </ContentToolbarButton>
+      {props.actionMenu}
+      {!props.settingsAvailable ? (
+        <ContentToolbarButton
+          type="button"
+          tone="close"
+          className="review-inspector-close"
+          size="compact"
+          title={translate('common.actions.close')}
+          disabled={props.busy || !!props.recording}
+          onPointerDown={(event) => {
+            if (event.button === 0) event.preventDefault();
+          }}
+          onClick={props.onBack}
+        >
+          <X size={16} aria-hidden="true" />
+        </ContentToolbarButton>
+      ) : null}
     </header>
   );
 }

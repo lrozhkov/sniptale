@@ -24,6 +24,7 @@ type GalleryActionContext = {
     | 'backup-export'
     | 'backup-import';
   materialType:
+    | 'image-project'
     | 'quick-edit-project'
     | 'media'
     | 'scenario-project'
@@ -135,6 +136,7 @@ function describeActionFailure(error: unknown): { code: string; message: string 
       'source-unavailable': 'gallery.app.deleteSourceUnavailable',
       'unsupported-source': 'gallery.app.deleteUnsupportedSource',
       'pending-publication': 'gallery.app.deletePendingPublication',
+      'retained-history': 'gallery.app.deleteRetainedHistory',
     } as const;
     return { code: error.reason, message: translate(messages[error.reason]) };
   }

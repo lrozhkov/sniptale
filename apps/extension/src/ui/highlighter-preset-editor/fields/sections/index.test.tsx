@@ -172,9 +172,23 @@ it('wires shadow, padding, and custom-css controls', async () => {
     container?.querySelectorAll<HTMLInputElement>('input[type="number"]') ?? []
   );
 
+  act(() => {
+    container
+      ?.querySelector<HTMLButtonElement>(
+        'button.field-action[aria-label="highlighter.editor.shadowLabel"]'
+      )
+      ?.click();
+  });
   await act(async () => {
     const shadowInput = getNumericInput('highlighter.editor.shadowLabel');
-    setNumericInputValue(shadowInput, '100');
+    setInputValue(shadowInput, '100');
+  });
+  act(() => {
+    getNumericInput('highlighter.editor.shadowLabel').dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
+    );
+  });
+  await act(async () => {
     setInputValue(numberInputs[0] as HTMLInputElement, '11');
     setInputValue(numberInputs[3] as HTMLInputElement, '14');
     setInputValue(container?.querySelector('textarea') as HTMLTextAreaElement, 'border: 1px solid');

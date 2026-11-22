@@ -4,6 +4,7 @@ import { AudioProcessingFields } from './processing-fields';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
 import { getAudioFadeLimitSeconds } from '../../features/video/audio/fades';
 import { translate } from '../../platform/i18n';
+import { SelectField } from '../compact-inspector-controls';
 import { DraftNumericRow } from '../compact-inspector-controls/numeric-preview';
 
 interface TakeFieldProps {
@@ -14,8 +15,17 @@ interface TakeFieldProps {
   onPatch(patch: Partial<Omit<QuickEditAudioClip, 'id' | 'assetId'>>): void;
 }
 
+const tempoPresets = ['0.5', '0.75', '1', '1.5', '2', '4'].map((value) => ({
+  value,
+  label: `${value}×`,
+}));
+
 /** Authored take parameters share bounds and numeric draft behavior across editors. */
-export function AudioTakeLevelFields(props: TakeFieldProps & { showTempo?: boolean }) {
+export function AudioTakeLevelFields(
+  props: TakeFieldProps & { showTempo?: boolean; tempoChoices?: boolean; showProcessing?: boolean }
+) {
+  const tempo = props.clip.tempo ?? 1;
+  const preset = tempoPresets.find((option) => option.value === String(tempo));
   return (
     <>
       {props.showTempo && (
@@ -26,13 +36,24 @@ export function AudioTakeLevelFields(props: TakeFieldProps & { showTempo?: boole
           max={4}
           step={0.05}
           precision={2}
-          value={props.clip.tempo ?? 1}
+          value={tempo}
           disabled={props.disabled}
           onChange={(tempo) => props.onPatch({ tempo })}
         />
       )}
+      {props.showTempo && props.tempoChoices ? (
+        <SelectField
+          label={translate('gallery.videoReview.voiceoverTempoPreset')}
+          value={preset?.value ?? ''}
+          placeholder={`${tempo}×`}
+          options={tempoPresets}
+          disabled={props.disabled}
+          onChange={(value) => props.onPatch({ tempo: Number(value) })}
+        />
+      ) : null}
       <DraftNumericRow
         label={translate('gallery.videoReview.audioClipVolume')}
+        rangePresentation="field"
         unit="%"
         min={0}
         max={200}
@@ -41,6 +62,15 @@ export function AudioTakeLevelFields(props: TakeFieldProps & { showTempo?: boole
         disabled={props.disabled}
         onChange={(value) => props.onPatch({ volume: value / 100 })}
       />
+      {props.showProcessing !== false ? <AudioTakeProcessingFields {...props} /> : null}
+    </>
+  );
+}
+
+/** Processing can occupy a dedicated inspector section while legacy consumers retain combined fields. */
+export function AudioTakeProcessingFields(props: TakeFieldProps) {
+  return (
+    <>
       {props.presetControls}
       <AudioProcessingFields
         key={props.clip.id}
@@ -72,7 +102,6 @@ export function AudioTakeFadeFields(props: TakeFieldProps) {
           unit="s"
           min={0}
           max={getAudioFadeLimitSeconds(props.clip.duration)}
-          scrubMax={Math.min(5, props.clip.duration)}
           step={0.1}
           precision={2}
           value={props.clip[key]}

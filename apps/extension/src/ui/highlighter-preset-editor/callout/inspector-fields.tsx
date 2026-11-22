@@ -42,7 +42,7 @@ export function ColorField(props: {
   value: string;
 }) {
   return (
-    <PropertyField label={props.label} valueMinimum={props.control ? 178 : 140}>
+    <PropertyField label={props.label}>
       <div className="flex min-w-0 items-center gap-1.5">
         <fieldset
           className={
@@ -94,7 +94,7 @@ export function BoundColorField(props: {
   const sourceLabel = translate(`content.callout.colorSource.${props.source}`);
   const sourceTitle = `${translate('content.callout.colorSourceLabel')} — ${sourceLabel}`;
   return (
-    <PropertyField label={props.label} valueMinimum={178}>
+    <PropertyField label={props.label}>
       <div className="flex min-w-0 items-center gap-1.5">
         <fieldset
           className={
@@ -132,7 +132,7 @@ export function NumericProperty(props: {
   label: string;
   min: number;
   max?: number;
-  scrubMax?: number;
+  scale?: boolean;
   step?: number;
   unit?: '' | '%' | 'deg' | 'px';
   value: number;
@@ -147,11 +147,12 @@ export function NumericProperty(props: {
       step={props.step ?? 1}
       unit={props.unit ?? 'px'}
       value={props.value}
-      scrub={{
-        min: props.min,
-        max: props.scrubMax ?? props.max ?? Math.max(800, props.value * 2),
-        step: props.step ?? 1,
-      }}
+      {...(props.scale && props.max !== undefined
+        ? {
+            rangePresentation: 'field',
+            scrub: { min: props.min, max: props.max, step: props.step ?? 1 },
+          }
+        : {})}
       onPreviewValue={props.onChange}
       onCommitValue={props.onChange}
     />

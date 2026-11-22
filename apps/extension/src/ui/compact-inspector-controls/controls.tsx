@@ -1,3 +1,4 @@
+import './inspector-select.css';
 import type React from 'react';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { CompactColorSelector, type CompactColorSelectorProps } from '../color-selector';
@@ -6,31 +7,45 @@ import { CompactSegmentedSelector } from './control-renderers';
 import { cx } from './shared';
 import { InspectorParameterRow, useInspectorLayout } from './layout';
 import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
+import { translate } from '../../platform/i18n';
 
 /** Immediate boolean parameters retain the shared name/value construction. */
 export function ToggleField(props: {
   label: string;
   value: boolean;
   disabled?: boolean | undefined;
+  showStatus?: boolean;
   onChange(value: boolean): void;
 }) {
   const trigger = useRef<HTMLButtonElement>(null);
+  const control = (
+    <ProductGlassSwitch
+      ref={trigger}
+      role="switch"
+      aria-label={props.label}
+      aria-checked={props.value}
+      on={props.value}
+      disabled={props.disabled}
+      onClick={() => props.onChange(!props.value)}
+    />
+  );
   return (
     <InspectorParameterRow
       label={props.label}
-      keepInline
-      className="sniptale-boolean-parameter"
+      className={props.showStatus ? 'sniptale-status-parameter' : 'sniptale-boolean-parameter'}
       onActivate={() => trigger.current?.click()}
     >
-      <ProductGlassSwitch
-        ref={trigger}
-        role="switch"
-        aria-label={props.label}
-        aria-checked={props.value}
-        on={props.value}
-        disabled={props.disabled}
-        onClick={() => props.onChange(!props.value)}
-      />
+      {props.showStatus ? (
+        <div className="sniptale-switch-with-status">
+          <span className="sniptale-switch-status" aria-hidden="true">
+            <span data-current={props.value}>{translate('shared.ui.switch.enabled')}</span>
+            <span data-current={!props.value}>{translate('shared.ui.switch.disabled')}</span>
+          </span>
+          {control}
+        </div>
+      ) : (
+        control
+      )}
     </InspectorParameterRow>
   );
 }
@@ -52,7 +67,6 @@ export function CheckboxField(props: {
   return (
     <InspectorParameterRow
       label={props.label}
-      keepInline
       className="sniptale-boolean-parameter"
       onActivate={() => input.current?.click()}
     >
@@ -93,9 +107,6 @@ const COLOR_TRIGGER_CLASS_NAME = [
   "[&_[data-ui='shared.ui.color-selector.trigger']]:shadow-none",
 ].join(' ');
 
-const SELECT_FIELD_TRIGGER_CLASS_NAME =
-  'h-8 min-w-0 w-full border-transparent bg-transparent px-0 shadow-none';
-
 const SELECT_FIELD_CONTAINER_CLASS_NAME = 'ml-auto min-w-0 !w-[8.75rem] max-w-[58%] shrink-0';
 
 function getNodeTitle(value: React.ReactNode): string | undefined {
@@ -119,7 +130,6 @@ export function ColorField({
     return (
       <InspectorParameterRow
         label={props.label}
-        valueMinimum={props.triggerVariant === 'swatch' ? 100 : 140}
         stacked={layout === 'stacked'}
         dataUi="shared.ui.compact-inspector.color-field"
         className={className}
@@ -174,7 +184,6 @@ export function SelectField<T extends string>(props: {
   selectClassName?: string | undefined;
 }) {
   const [open, setOpen] = useState(false);
-  const rowRef = useRef<HTMLDivElement | null>(null);
   const inspector = useInspectorLayout();
 
   const selectProps = {
@@ -192,7 +201,6 @@ export function SelectField<T extends string>(props: {
     return (
       <InspectorParameterRow
         label={props.label}
-        valueText={props.options.find((option) => option.value === props.value)?.label}
         dataUi="shared.ui.compact-inspector.select-field"
         className={props.className}
       >
@@ -202,26 +210,25 @@ export function SelectField<T extends string>(props: {
 
   return (
     <div
-      ref={rowRef}
       data-ui="shared.ui.compact-inspector.select-field"
       data-open={open ? 'true' : 'false'}
+      data-compact-select-menu-bounds="parameter"
       className={cx(
-        'flex min-h-10 w-full min-w-0 items-center justify-between gap-3 rounded-[10px] border px-3 py-1.5',
-        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
-        open
-          ? 'border-[color:var(--sniptale-color-border-accent-strong)]'
-          : 'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
+        'flex min-h-8 w-full min-w-0 items-center justify-between gap-2',
         props.className
       )}
     >
-      <span className={cx('min-w-0', FIELD_LABEL_CLASS_NAME)} title={props.label}>
+      <span
+        className={cx('min-w-0', FIELD_LABEL_CLASS_NAME)}
+        data-compact-select-menu-label=""
+        title={props.label}
+      >
         {props.label}
       </span>
       <CompactSelect
         {...selectProps}
-        className={cx(SELECT_FIELD_TRIGGER_CLASS_NAME, props.selectClassName)}
+        className={props.selectClassName}
         containerClassName={SELECT_FIELD_CONTAINER_CLASS_NAME}
-        menuAnchorRef={rowRef}
       />
     </div>
   );
@@ -232,6 +239,7 @@ export function SegmentedRow<T extends string>(props: {
   columns?: 2 | 3 | 4 | 5;
   label?: React.ReactNode | undefined;
   layout?: 'inline' | 'stacked';
+  showOptionLabels?: boolean | undefined;
   options: Array<{
     disabled?: boolean;
     description?: string;
@@ -251,6 +259,7 @@ export function SegmentedRow<T extends string>(props: {
       columns={columns}
       onChange={props.onChange}
       options={props.options}
+      showOptionLabels={props.showOptionLabels}
       value={props.value}
     />
   );
@@ -264,7 +273,6 @@ export function SegmentedRow<T extends string>(props: {
       <InspectorParameterRow
         label={typeof props.label === 'string' ? props.label : props.ariaLabel}
         stacked={stacked}
-        valueOptions={props.options.map((option) => option.label)}
         dataUi="shared.ui.compact-inspector.segmented-field"
       >
         {selector}
@@ -276,10 +284,9 @@ export function SegmentedRow<T extends string>(props: {
       data-ui="shared.ui.compact-inspector.segmented-field"
       className={cx(
         stacked
-          ? 'grid min-h-10 gap-2 rounded-[10px] border px-3 py-2'
-          : 'flex min-h-10 items-center justify-between gap-3 rounded-[10px] border px-3 py-1.5',
-        'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
-        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]'
+          ? 'grid min-h-10 gap-2 rounded-[10px] px-3 py-2'
+          : 'flex min-h-10 items-center justify-between gap-3 rounded-[10px] px-3 py-1.5',
+        'border border-transparent'
       )}
     >
       <span

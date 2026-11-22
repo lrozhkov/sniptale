@@ -28,6 +28,7 @@ import { collectReviewAssetReferences } from '../../composition/persistence/revi
 import { prepareVideoReviewRestore } from '../../composition/persistence/review-workspaces/backup-restore';
 import {
   type PreparedProjectReplicaExport,
+  type PreparedVideoProjectReplicaRoot,
   parsePreparedVideoProjectReplicaRoot,
 } from '../../composition/persistence/sync-capture/prepared-project';
 import type { ApplyPreparedVideoProjectRevisionInput } from '../../composition/persistence/sync-capture/apply-video-project';
@@ -59,6 +60,13 @@ import {
   parsePortableScenarioProjectMetadata,
   preparePortableVideoProjectAsset,
 } from '../media-hub-backup/v6/root-codecs/projects';
+import { portableVideoProjectHistoryPointers } from '../media-hub-backup/v6/root-codecs/video-project-history';
+import {
+  readPortableVideoProjectCurrent,
+  readPortableVideoProjectHistory,
+  remapPortableVideoProjectHistoryCapture,
+} from '../media-hub-backup/v6/root-publication/video-project-history';
+import { preparePersistedVideoProjectHistory } from '../../composition/persistence/projects/history-codec';
 
 const metadataOnlyReader: ArchiveReader = {
   entries: () => [],
@@ -83,7 +91,9 @@ export async function parsePortableSyncRoot(value: unknown, reviewSourceMediaId?
     envelope.descriptor.rootKind === 'media' &&
     envelope.descriptor.mediaSubtype === 'library-item'
   ) {
-    const metadata = parsePortableMediaMetadata(envelope.metadata);
+    const metadata = parsePortableMediaMetadata(envelope.metadata, {
+      allowLibraryRelationships: true,
+    });
     if (reviewSourceMediaId !== undefined) {
       const raw = envelope.metadata;
       if (!isRecord(raw)) throw new Error('Invalid portable video review metadata.');
@@ -141,13 +151,15 @@ export async function parsePortableSyncRoot(value: unknown, reviewSourceMediaId?
       exactKeys(metadata, [
         'entry',
         'originalObjectId',
+        'savedIndependently',
+        'linkedSourceMediaId',
         'workspace',
         'presentation',
         ...(metadata.entry.source.kind === 'project-asset' ? ['projectAsset'] : []),
       ]);
       if (metadata.entry.id !== envelope.descriptor.rootId)
         throw new Error('Portable image identity differs from its root.');
-      await assertArchiveRootObjectInventory(envelope, metadataOnlyReader, []);
+      await assertArchiveRootObjectInventory(envelope, null, []);
       validatePortableImageRows(envelope, metadata);
       return { kind: 'image' as const, envelope, metadata };
     }
@@ -158,6 +170,7 @@ export async function parsePortableSyncRoot(value: unknown, reviewSourceMediaId?
       'recording',
       'webSnapshot',
       'originalObjectId',
+      'savedIndependently',
     ]);
     if (
       metadata.entry.id !== envelope.descriptor.rootId ||
@@ -193,7 +206,14 @@ export async function parsePortableSyncRoot(value: unknown, reviewSourceMediaId?
   if (envelope.descriptor.rootKind !== 'video-project')
     throw new Error('Unsupported portable sync root.');
   const metadata = parsePortableVideoProjectMetadata(envelope.metadata);
-  exactKeys(metadata, ['entry', 'projectAssets', 'projectExports', 'thumbnail', 'presentation']);
+  exactKeys(metadata, [
+    'entry',
+    'projectAssets',
+    'projectExports',
+    'thumbnail',
+    'presentation',
+    'history',
+  ]);
   if (
     metadata.projectAssets.length > MAX_CAPTURE_ROWS ||
     metadata.projectExports.length > MAX_CAPTURE_ROWS
@@ -269,6 +289,7 @@ export interface PortableReplicaAdmission {
   expectedLocalGeneration: number;
   expectedWorkspaceRevision: number | null;
   dependencies: ApplyPreparedVideoProjectRevisionInput['dependencies'];
+  imageOriginal?: CapturedMediaDependency;
   rootDependencies?: ApplyPreparedVideoProjectRevisionInput['rootDependencies'];
 }
 
@@ -289,6 +310,8 @@ function editingProjectAssets(
       asset.source.kind === 'project-asset' ? [asset.source.projectAssetId] : []
     )
   );
+  for (const source of parsed.metadata.history?.sources ?? [])
+    if (source.kind === 'project-asset') needed.add(source.id);
   for (const item of parsed.metadata.projectExports) {
     if (retainedExportIds.has(item.entry.id)) continue;
     if (item.videoReview)
@@ -347,6 +370,9 @@ export function portableSyncEditingObjectIds(
           ...new Set([
             parsed.metadata.originalObjectId,
             ...(parsed.metadata.workspace?.document.assets.map((asset) => asset.objectId) ?? []),
+            ...(parsed.metadata.workspace?.history?.snapshots.map(({ objectId }) => objectId) ??
+              []),
+            ...(parsed.metadata.workspace?.history?.values.map(({ objectId }) => objectId) ?? []),
           ]),
         ]
       : parsed.envelope.objects.map((object) => object.objectId);
@@ -365,6 +391,11 @@ export function portableSyncEditingObjectIds(
     ];
   return [
     ...new Set([
+      ...(parsed.metadata.history
+        ? portableVideoProjectHistoryPointers(parsed.metadata.history).map(
+            (entry) => entry.objectId
+          )
+        : []),
       ...editingProjectAssets(parsed, retained).map((asset) => asset.objectId),
       ...parsed.metadata.projectExports.flatMap((item) =>
         !omitPresentation && !retained.has(item.entry.id) && item.thumbnail
@@ -401,8 +432,15 @@ function prepareMediaRows(
       : {}),
   });
   if (!media) throw new Error('Invalid portable media entry.');
+  const original = {
+    media,
+    ref,
+    ...(parsed.metadata.savedIndependently === undefined
+      ? {}
+      : { savedIndependently: parsed.metadata.savedIndependently }),
+  };
   if (media.source.kind === 'stored-asset') {
-    const rows = parseCapturedMediaRows({ media, ref });
+    const rows = parseCapturedMediaRows(original);
     if (!rows) throw new Error('Unsupported portable stored original.');
     return rows;
   }
@@ -411,7 +449,7 @@ function prepareMediaRows(
       ...parsed.metadata.projectExport,
       assetId: ref.assetId,
     });
-    const rows = parseCapturedMediaRows({ media, projectExport, ref });
+    const rows = parseCapturedMediaRows({ ...original, projectExport });
     if (!rows) throw new Error('Unsupported portable export original.');
     return rows;
   }
@@ -423,7 +461,7 @@ function prepareMediaRows(
       packageAssetId: ref.assetId,
       screenshotAssetId: screenshotRef.assetId,
     });
-    const rows = parseCapturedMediaRows({ media, webSnapshot, ref, screenshotRef });
+    const rows = parseCapturedMediaRows({ ...original, webSnapshot, screenshotRef });
     if (!rows || snapshot.packageObjectId !== parsed.metadata.originalObjectId)
       throw new Error('Unsupported portable web snapshot.');
     return rows;
@@ -453,8 +491,7 @@ function prepareMediaRows(
     )
       throw new Error('Portable recording events digest differs from its source.');
     const rows = parseCapturedMediaRows({
-      media,
-      ref,
+      ...original,
       recording: { ...parsed.metadata.recording.entry, assetId: ref.assetId },
       telemetry: parsed.metadata.recording.telemetry
         ? {
@@ -472,7 +509,7 @@ function prepareMediaRows(
     media,
     originalRef: ref,
   });
-  const rows = parseCapturedMediaRows({ media, projectAsset, ref });
+  const rows = parseCapturedMediaRows({ ...original, projectAsset });
   if (!rows) throw new Error('Unsupported portable media original.');
   return rows;
 }
@@ -517,7 +554,9 @@ export function portableSyncDependencyIds(
   parsed: ParsedPortableRoot,
   declaredDependencyIds?: readonly string[]
 ): string[] {
-  if (parsed.kind === 'media' || parsed.kind === 'image') return [];
+  if (parsed.kind === 'media') return [];
+  if (parsed.kind === 'image')
+    return parsed.metadata.linkedSourceMediaId ? [parsed.metadata.linkedSourceMediaId] : [];
   if (parsed.kind === 'scenario-project') {
     const required = new Set(
       parsed.metadata.assets.flatMap((asset) =>
@@ -549,6 +588,10 @@ export function portableSyncDependencyIds(
       if (asset.entry.originMediaId) needed.add(asset.entry.originMediaId);
     }
     return [...needed].sort();
+  }
+  for (const source of parsed.metadata.history?.sources ?? []) {
+    if (source.kind === 'recording') needed.add(`recording:${source.id}`);
+    if (source.kind === 'library-asset') needed.add(source.id);
   }
   for (const id of collectCapturedProjectRecordingIds(parsed.entry.project))
     needed.add(`recording:${id}`);
@@ -679,6 +722,34 @@ async function prepareVideoRoot(
     { ...Object.fromEntries(mediaRootIds), ...scenarioMaps.rootIdMap },
     scenarioMaps.childIdMap
   );
+  let history: PreparedVideoProjectReplicaRoot['history'];
+  if (parsed.metadata.history) {
+    const objectIds = new Set([
+      ...portableVideoProjectHistoryPointers(parsed.metadata.history).map((item) => item.objectId),
+      ...(parsed.metadata.entry.project.effectSnapshots ?? []).flatMap((snapshot) =>
+        snapshot.assets.map((asset) => asset.objectId)
+      ),
+    ]);
+    const staged = [...objectIds].map((objectId) => ({ objectId, ref: refFor(objectId) }));
+    const current = await readPortableVideoProjectCurrent(parsed.metadata, staged);
+    const admitted = await readPortableVideoProjectHistory({
+      metadata: parsed.metadata,
+      staged,
+      current: current.project,
+    });
+    if (!admitted) throw new Error('Project history is unavailable.');
+    const capture = remapPortableVideoProjectHistoryCapture(
+      current.project,
+      admitted.restored,
+      assetIds,
+      {
+        rootIdMap: { ...Object.fromEntries(mediaRootIds), ...scenarioMaps.rootIdMap },
+        childIdMap: scenarioMaps.childIdMap,
+      }
+    );
+    const prepared = await preparePersistedVideoProjectHistory(capture);
+    history = { head: prepared.history, refs: prepared.refs };
+  }
   const snapshotRefs = (parsed.metadata.entry.project.effectSnapshots ?? []).flatMap((snapshot) =>
     snapshot.assets.map((asset) => ({
       snapshotId: snapshot.id,
@@ -739,6 +810,7 @@ async function prepareVideoRoot(
   return parsePreparedVideoProjectReplicaRoot({
     entry: { ...parsed.entry, project },
     assets,
+    ...(history ? { history } : {}),
     ...(exports === undefined ? {} : { exports }),
     ...(snapshotRefs.length ? { snapshotRefs } : {}),
     ...(thumbnail
@@ -861,13 +933,24 @@ export async function preparePortableReplica(args: {
     const rows = prepareMediaRows(parsed, refFor);
     payload = { kind: 'media', input: { ...identity, rows } };
   } else if (parsed.kind === 'image') {
-    if (sender.length || local.dependencies.length)
+    const sourceId = parsed.metadata.linkedSourceMediaId;
+    const original = local.imageOriginal;
+    if (
+      local.dependencies.length ||
+      (sourceId
+        ? original?.mediaId !== sourceId ||
+          sender.length !== 1 ||
+          sender[0]?.mediaId !== sourceId ||
+          JSON.stringify(sender[0].basis) !== JSON.stringify(original.basis)
+        : sender.length !== 0 || original !== undefined)
+    )
       throw new Error('Unsupported image replica dependencies.');
     payload = {
       kind: 'image',
       input: {
         ...identity,
         expectedNativeRevision: local.expectedWorkspaceRevision,
+        ...(original ? { linkedOriginal: original } : {}),
         ...preparePortableImageRows(parsed.metadata, refFor, args.omitPresentation),
       },
     };

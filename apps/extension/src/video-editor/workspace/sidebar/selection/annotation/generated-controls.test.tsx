@@ -1,10 +1,25 @@
 // @vitest-environment jsdom
+
+import {
+  videoeditorFixtureMessages,
+  prepareVideoEditorTranslations,
+} from '../../../../testing/translations.test-support';
+
+vi.mock('../../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: Parameters<typeof videoeditorFixtureMessages>[0]) =>
+    videoeditorFixtureMessages(locale)
+  ),
+}));
+
+beforeAll(async () => {
+  await prepareVideoEditorTranslations('en');
+});
 import { VideoTrackKind } from '../../../../../features/video/project/types';
 
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   APPLE_GLASS_ANNOTATION_PACK,
   CURSOR_OPS_ANNOTATION_PACK,
@@ -27,7 +42,7 @@ import { AnnotationGeneratedControls } from './generated-controls';
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
-  translate: (key: string) => key,
+  translate: (key: string) => `localized:${key}`,
   useAppLocale: () => 'en',
 }));
 
@@ -346,9 +361,10 @@ it('displays timeline milliseconds as editable seconds and writes native millise
     )
   );
   const duration = container!.querySelector<HTMLInputElement>(
-    'input[aria-label="videoEditor.sidebar.annotationTemplates.controls.durationMs"]'
+    'input[aria-label="localized:videoEditor.sidebar.annotationTemplates.controls.durationMs"]'
   )!;
   expect(duration.value).toBe('2.2');
+  expect(duration.closest('[data-stepper-placement="sides"]')).not.toBeNull();
   expect(container!.textContent).toContain('s');
   act(() => {
     duration.focus();
@@ -364,7 +380,7 @@ it('displays timeline milliseconds as editable seconds and writes native millise
   );
 });
 
-it('labels known radius with pixels and leaves arbitrary imported numbers unitless', () => {
+it('uses exact pixels for radius and the in-field scale for normalized opacity', () => {
   const template = createTemplate();
   template.controls = [
     ...template.controls,
@@ -403,7 +419,7 @@ it('labels known radius with pixels and leaves arbitrary imported numbers unitle
   expect(
     radius.closest('[data-ui="shared.ui.compact-inspector.numeric-row"]')?.textContent
   ).toContain('px');
-  expect(
-    amount.closest('[data-ui="shared.ui.compact-inspector.numeric-row"]')?.textContent
-  ).not.toContain('px');
+  expect(radius.closest('[data-stepper-placement="sides"]')).not.toBeNull();
+  expect(amount.closest('.opacity-field')).not.toBeNull();
+  expect(amount.getAttribute('aria-valuetext')).toBe('50%');
 });

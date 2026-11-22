@@ -167,7 +167,9 @@ function PaddingValue(props: {
         />
       ) : (
         <NumericRow
+          className="sniptale-padding-number"
           label={props.label}
+          labelVisible={false}
           max={4096}
           min={0}
           {...draft}

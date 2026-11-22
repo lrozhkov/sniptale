@@ -198,3 +198,20 @@ describe('capture-editor bootstrap fallback', () => {
     });
   });
 });
+
+describe('native captured image routing', () => {
+  useEditorTestScope();
+  it('opens an existing captured asset without a second pixel bootstrap or tab metadata read', async () => {
+    await openEditorWithImage('data:image/png;base64,YQ==', {
+      assetId: 'native-capture',
+      tabId: 42,
+    });
+    expect(buildEditorUrlMock).toHaveBeenCalledWith({
+      assetId: 'native-capture',
+      bootstrapId: null,
+    });
+    expect(persistPendingEditorBootstrapPayloadMock).not.toHaveBeenCalled();
+    expect(browserTabsGetMock).not.toHaveBeenCalled();
+    expect(browserTabsCreateMock).toHaveBeenCalledWith({ url: 'chrome-extension://editor' });
+  });
+});

@@ -10,6 +10,8 @@ export function createQuickEditAdvancedState(): QuickEditAdvancedState {
     schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
     ui: {
       mode: 'basic',
+      liveSeekEnabled: true,
+      annotationMagnetEnabled: true,
       tracks: { actions: true, zoom: false, audio: false },
       overlaysVisible: true,
     },

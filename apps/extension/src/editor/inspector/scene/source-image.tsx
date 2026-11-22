@@ -9,9 +9,24 @@ import { EditorInspectorDetails } from '../grouped';
 import { EditorInspectorRangeField } from './shared';
 
 const DEFAULT_SOURCE_IMAGE_LINE_STYLE_OPTIONS = [
-  { label: translate('editor.compact.lineStyleSolid'), value: 'solid' },
-  { label: translate('editor.compact.lineStyleDash'), value: 'dash' },
-  { label: translate('editor.compact.lineStyleDot'), value: 'dot' },
+  {
+    get label() {
+      return translate('editor.compact.lineStyleSolid');
+    },
+    value: 'solid',
+  },
+  {
+    get label() {
+      return translate('editor.compact.lineStyleDash');
+    },
+    value: 'dash',
+  },
+  {
+    get label() {
+      return translate('editor.compact.lineStyleDot');
+    },
+    value: 'dot',
+  },
 ] satisfies CompactSelectOption<EditorImageSettings['strokeStyle']>[];
 
 function patchSourceImage(
@@ -40,6 +55,7 @@ function SourceImageRangeControl(props: {
   value: number;
   valueText: string;
   fractionalPercent?: boolean;
+  scale?: boolean;
   onChange: (value: number) => void;
   onPreview?: ((value: number) => void) | undefined;
 }) {
@@ -53,6 +69,7 @@ function SourceImageRangeControl(props: {
       label={props.label}
       value={value}
       unit={resolveSourceImageNumericUnit(props.valueText)}
+      {...(props.scale ? { scale: true } : {})}
       min={percent ? Math.round(min * 100) : min}
       max={percent ? Math.round(props.max * 100) : props.max}
       {...(step === undefined ? {} : { step })}
@@ -64,10 +81,6 @@ function SourceImageRangeControl(props: {
       onChange={(nextValue) => props.onChange(percent ? nextValue / 100 : nextValue)}
     />
   );
-}
-
-function SourceImageRangeSection(props: Parameters<typeof SourceImageRangeControl>[0]) {
-  return <SourceImageRangeControl {...props} />;
 }
 
 function resolveSourceImageNumericUnit(valueText: string): '' | '%' | 'deg' | 'px' {
@@ -104,11 +117,11 @@ export function EditorInspectorFrameSourceImageBasics(
 
   return (
     <div className="sniptale-parameter-stack" data-ui="editor.frame.source-basics">
-      <SourceImageRangeSection
+      <EditorInspectorRangeField
         label={translate('editor.compact.cornerRadius')}
         max={80}
         value={settings.radius}
-        valueText={`${settings.radius}px`}
+        unit="px"
         onPreview={
           props.previewFramePatch
             ? (radius) => patchSourceImage(props, { radius }, true)
@@ -148,6 +161,7 @@ function SourceImageShadowSection(args: {
           max={100}
           value={settings.shadow}
           valueText={`${settings.shadow}%`}
+          scale
           onPreview={
             props.previewFramePatch
               ? (shadow) => patchSourceImage(props, { shadow }, true)

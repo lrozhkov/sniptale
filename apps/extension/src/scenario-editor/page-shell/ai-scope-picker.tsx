@@ -1,7 +1,6 @@
-import { useRef, useState } from 'react';
-import { InspectorFieldClear } from '../../ui/compact-inspector-controls/text-field';
-import { FileText, Focus, Layers, ListChecks, ListFilter, Search } from 'lucide-react';
-import { ProductInput } from '@sniptale/ui/product-form-controls';
+import { useState } from 'react';
+import { SearchField } from '../../ui/compact-inspector-controls/row-controls';
+import { FileText, Focus, Layers, ListChecks, ListFilter } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { GuideProject, GuideStep } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -123,7 +122,6 @@ function GuideAiStepSelection({
   t: Translate;
 }) {
   const [query, setQuery] = useState('');
-  const search = useRef<HTMLInputElement>(null);
   const [selectedOnly, setSelectedOnly] = useState(false);
   const { stepIds, chooseStep, chooseSteps, pending } = session;
   const selected = new Set(stepIds);
@@ -156,20 +154,13 @@ function GuideAiStepSelection({
     <div className="guide-ai-step-selection">
       <div className="guide-ai-selection-tools">
         <div className="guide-ai-selection-search">
-          <Search size={14} aria-hidden="true" />
-          <ProductInput
-            ref={search}
-            type="text"
-            className="sniptale-input-compact"
-            aria-label={t('scenario.editor.guideAiSearchSteps')}
+          <SearchField
+            label={t('scenario.editor.guideAiSearchSteps')}
             placeholder={t('scenario.editor.guideAiSearchSteps')}
             value={query}
             disabled={pending}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={setQuery}
           />
-          {query && !pending ? (
-            <InspectorFieldClear label={t('scenario.editor.guideAiSearchSteps')} target={search} />
-          ) : null}
         </div>
         <ContentToolbarButton
           tone="property"

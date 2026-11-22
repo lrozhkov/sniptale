@@ -6,7 +6,7 @@ import {
   readCascadeVideoProject,
   forbidGlobalDeletionReads,
 } from './delete-cascade.test-support';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { harness, mediaId, physicalId, mediaEntry, rows } from './delete-cascade.test-support';
 import {
   deleteMediaAssetWithProjectCascade,
@@ -18,12 +18,14 @@ import { createQuickEditAdvancedContent } from '../../../features/video/review/a
 import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
 import { buildReviewTimeMap } from '../../../features/video/review/timeline';
-import { withReviewWorkspaceUsage } from './usage-index-keys';
+import { withReviewWorkspaceUsage, withVideoProjectUsage } from './usage-index-keys';
 import {
   replayReviewHistory,
   reviewAdvancedContentBaseline,
 } from '../../../features/video/review/document';
 import { workspaceStorageHead, workspaceStorageRows } from '../review-workspaces/storage-format';
+import { PrimaryMediaAssetDeleteError } from './deletion-errors';
+import { acquireAssetResourceSession } from '../assets/resource-sessions';
 
 it('atomically removes placements, library metadata and the last physical owner', async () => {
   const project = readCascadeVideoProject();
@@ -40,6 +42,52 @@ it('atomically removes placements, library metadata and the last physical owner'
   expect(harness.complete).toHaveBeenCalledTimes(1);
 });
 
+it('retains an original with an independent image project', async () => {
+  rows.set(
+    'image_workspaces',
+    new Map([['image-project', { aggregateId: 'image-project', sourceMediaId: mediaId }]])
+  );
+  const before = structuredClone(rows);
+  const project = readCascadeVideoProject();
+  await expect(
+    deleteMediaAssetWithProjectCascade(mediaId, [
+      { id: project.id, kind: 'video', name: project.project.name, primary: false },
+    ])
+  ).rejects.toBeInstanceOf(PrimaryMediaAssetDeleteError);
+  expect(rows).toEqual(before);
+  expect(harness.complete).not.toHaveBeenCalled();
+});
+
+it.each(['history-only', 'current-placement', 'recovery'])(
+  'preserves all source and project data when deleting a retained Montage %s dependency',
+  async (mode) => {
+    const original = readCascadeVideoProject();
+    const project =
+      mode === 'history-only' ? { ...original.project, assets: [], clips: [] } : original.project;
+    const entry = withVideoProjectUsage({
+      ...original,
+      project,
+      history: {
+        version: 1,
+        epoch: 'epoch',
+        past: mode === 'recovery' ? [] : [{ assetId: 'history-change' }],
+        future: [],
+        ...(mode === 'recovery' ? { recovery: { assetId: 'recovery-change' } } : {}),
+        sources: mode === 'history-only' ? [{ kind: 'project-asset', id: 'project-asset-1' }] : [],
+      },
+    });
+    rows.get('video_projects')!.set(entry.id, entry);
+    const before = structuredClone(rows);
+    await expect(
+      deleteMediaAssetWithProjectCascade(mediaId, [
+        { id: entry.id, kind: 'video', name: entry.project.name, primary: false },
+      ])
+    ).rejects.toMatchObject({ name: 'MediaAssetDeletionBlockedError', reason: 'retained-history' });
+    expect(rows).toEqual(before);
+    expect(harness.complete).not.toHaveBeenCalled();
+  }
+);
+
 it('rolls back when a new project use was not in the user warning', async () => {
   await expect(deleteMediaAssetWithProjectCascade(mediaId, [])).rejects.toBeInstanceOf(
     StaleMediaAssetDeletePreviewError
@@ -55,6 +103,65 @@ it('deletes an unreferenced library source and its final physical object', async
   expect(rows.get('media_library')?.has(mediaId)).toBe(false);
   expect(rows.get('asset_refs')?.has(physicalId)).toBe(false);
   expect(harness.complete).toHaveBeenCalledTimes(1);
+});
+
+it('retains an original saved independently after collection admission', async () => {
+  rows.get('video_projects')!.clear();
+  const source = { ...mediaEntry(), savedIndependently: false };
+  rows.get('media_library')!.set(mediaId, source);
+  const admittedOriginal = rows.get('media_library')!.get(mediaId);
+  expect(admittedOriginal).toMatchObject({ savedIndependently: false });
+
+  const saved = { ...source, savedIndependently: true };
+  rows.get('media_library')!.set(mediaId, saved);
+  await deleteMediaAssetWithProjectCascade(mediaId, [], undefined, true);
+
+  expect(rows.get('media_library')!.get(mediaId)).toEqual(saved);
+  expect(rows.get('asset_refs')?.has(physicalId)).toBe(true);
+  expect(harness.complete).not.toHaveBeenCalled();
+});
+
+it('defers automatic logical deletion when a reader opens after candidate discovery', async () => {
+  rows.get('video_projects')!.clear();
+  const original = {
+    ...mediaEntry(),
+    savedIndependently: false,
+    lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+  };
+  rows.get('media_library')!.set(mediaId, original);
+  expect(rows.get('media_library')!.get(mediaId)).toEqual(original);
+  let readers = 0;
+  vi.stubGlobal('navigator', {
+    locks: {
+      request: async (
+        _name: string,
+        options: { mode: string },
+        action: (lock: object | null) => Promise<unknown>
+      ) => {
+        if (options.mode === 'exclusive') return action(readers ? null : {});
+        readers++;
+        try {
+          return await action({});
+        } finally {
+          readers--;
+        }
+      },
+    },
+  });
+  const reader = await acquireAssetResourceSession();
+  try {
+    await deleteMediaAssetWithProjectCascade(mediaId, [], undefined, true);
+    expect(rows.get('media_library')!.get(mediaId)).toEqual(original);
+    expect(rows.get('asset_refs')?.has(physicalId)).toBe(true);
+    expect(harness.complete).not.toHaveBeenCalled();
+    await reader.release();
+    await deleteMediaAssetWithProjectCascade(mediaId, [], undefined, true);
+    expect(rows.get('media_library')?.has(mediaId)).toBe(false);
+    expect(harness.complete).toHaveBeenCalledOnce();
+  } finally {
+    await reader.release();
+    vi.unstubAllGlobals();
+  }
 });
 
 it('keeps shared physical bytes when another owner remains', async () => {

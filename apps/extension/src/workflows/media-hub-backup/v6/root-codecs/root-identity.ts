@@ -16,7 +16,7 @@ function parseDomainRootId(descriptor: ArchiveRootDescriptor, metadata: unknown)
   if (descriptor.rootKind === 'media') {
     return descriptor.mediaSubtype === 'effect-bundle'
       ? visualCatalogMetadataRootId(parseEffectBundleMetadata(metadata))
-      : parsePortableMediaMetadata(metadata).entry.id;
+      : parsePortableMediaMetadata(metadata, { allowLibraryRelationships: true }).entry.id;
   }
   throw new Error('Media backup root descriptor kind is unsupported.');
 }

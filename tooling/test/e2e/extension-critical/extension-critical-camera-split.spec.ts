@@ -1,6 +1,7 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { createVideoProjectFromMultiSourceRecording } from '../../../../apps/extension/src/features/video/project/factories/multi-source-recording';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { seedReviewWebcamBundle } from '../support/quick-editor-media-fixture';
@@ -166,11 +167,10 @@ for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
       expect(
         Math.abs(cropBox!.width / cropBox!.height - (0.49 * scene.width) / scene.height)
       ).toBeLessThan(0.01);
-      const zoom = inspector.getByRole('textbox', {
-        name: label('videoEditor.sidebar.cameraCropZoom'),
-        exact: true,
-      });
-      await zoom.fill('2');
+      const zoom = numericControl(inspector, label('videoEditor.sidebar.cameraCropZoom'));
+      await (
+        await openNumericControl(inspector, label('videoEditor.sidebar.cameraCropZoom'))
+      ).fill('2');
       await zoom.press('Enter');
       await crop.focus();
       await crop.press('ArrowLeft');
@@ -286,7 +286,9 @@ for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
             exact: true,
           })
           .click();
-        await zoom.fill('1');
+        await (
+          await openNumericControl(inspector, label('videoEditor.sidebar.cameraCropZoom'))
+        ).fill('1');
         await zoom.press('Enter');
         const pan = inspector.getByRole('textbox', {
           name: label('gallery.videoReview.webcamCropX'),
@@ -310,7 +312,9 @@ for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
           path: info.outputPath('gallery-circle-crop.png'),
           fullPage: false,
         });
-        await zoom.fill('2');
+        await (
+          await openNumericControl(inspector, label('videoEditor.sidebar.cameraCropZoom'))
+        ).fill('2');
         await zoom.press('Enter');
         await pan.fill('10');
         await pan.press('Enter');
@@ -589,11 +593,10 @@ for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
       expect(
         Math.abs(cropBox!.width / cropBox!.height - (0.49 * project.width) / project.height)
       ).toBeLessThan(0.01);
-      const zoom = page.getByRole('textbox', {
-        name: label('videoEditor.sidebar.cameraCropZoom'),
-        exact: true,
-      });
-      await zoom.fill('150');
+      const zoom = numericControl(page, label('videoEditor.sidebar.cameraCropZoom'));
+      await (
+        await openNumericControl(page, label('videoEditor.sidebar.cameraCropZoom'))
+      ).fill('150');
       await zoom.press('Enter');
       await crop.focus();
       await crop.press('ArrowLeft');

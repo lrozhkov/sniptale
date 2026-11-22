@@ -1,10 +1,10 @@
+import { collectScenarioResourceReferences } from '../scenario/resource-references';
 import { readCheckpointInTransaction } from './checkpoints';
 import { isCaptureDependencyVersion } from './guards';
 import { readAppliedCaptureReceipt } from './guards';
 import { identity, ordinal } from './guards';
 import type { IDBPTransaction } from 'idb';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
-import { getScenarioResourceReferences } from '../../../features/scenario/project/public';
 import {
   parseAssetRef,
   listReadyJournals,
@@ -398,17 +398,12 @@ async function assertScenarioPublicationAvailable(rootId: string): Promise<void>
 function assertScenarioResourceClosure(root: NativeScenarioRoot): void {
   const resources = new Set(root.assets.map((item) => item.entry.id));
   const documents = new Set(root.stepDocuments.map((item) => item.entry.stepId));
-  for (const project of [
-    root.entry.project,
-    ...(root.entry.history ?? []).map((version) => version.project),
-  ]) {
-    const refs = getScenarioResourceReferences(project);
-    if (
-      [...refs.assets].some((id) => !resources.has(id)) ||
-      [...refs.documents].some((id) => !documents.has(id))
-    )
-      refuse();
-  }
+  const refs = collectScenarioResourceReferences(root.entry);
+  if (
+    [...refs.assets].some((id) => !resources.has(id)) ||
+    [...refs.documents].some((id) => !documents.has(id))
+  )
+    refuse();
 }
 
 async function admitScenarioPredecessor(
@@ -638,7 +633,7 @@ async function publishScenarioReplica(
     rootKey: key.rootKey,
     generation,
     basis: [input.operationId],
-    nativeRevision: revision,
+    nativeRevision: native.entry.workspaceRevision,
     nativeDigest: digestCapturedScenarioRows(native),
   };
   const applied: SyncCaptureAppliedOperation = {

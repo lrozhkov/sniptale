@@ -4,6 +4,10 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
+import {
+  parseVideoWorkspace,
+  parseVideoWorkspaceDraft,
+} from '../../composition/persistence/review-workspaces/parser';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import { useReviewComposer, useReviewSnapshot } from './use-session';
@@ -35,38 +39,18 @@ function setup() {
   const checkpointRelease = vi.fn(async () => undefined);
   const deps = {
     acquireSyncCheckpointEdit: vi.fn(async () => ({ release: checkpointRelease })),
-    saveVideoWorkspaceDraft: vi.fn(async (args) => {
-      snapshot = {
-        ...snapshot,
-        draft: args.annotation
-          ? {
-              aggregateId: 'recording:r',
-              annotation: args.annotation,
-              before: args.before,
-              revision: (snapshot.draft?.revision ?? 0) + 1,
-              updatedAt: 2,
-            }
-          : null,
-      };
-      return structuredClone(snapshot);
-    }),
-    commitVideoWorkspace: vi.fn(async (args) => {
-      snapshot = {
-        ...snapshot,
-        workspace: {
-          ...snapshot.workspace,
-          history: [...snapshot.workspace.history, args.operation],
-          cursor: snapshot.workspace.cursor + 1,
-          revision: snapshot.workspace.revision + 1,
-        },
-        draft: null,
-      };
-      return structuredClone(snapshot);
-    }),
+    saveVideoWorkspaceDraft: vi.fn(),
+    commitVideoWorkspace: vi.fn(),
     readVideoWorkspace: vi.fn(async () => structuredClone(snapshot)),
     moveVideoWorkspaceHistory: vi.fn(async () => structuredClone(snapshot)),
     saveVideoWorkspaceSnapshot: vi.fn(async (args) => {
-      snapshot = { workspace: args.workspace, draft: args.draft };
+      const workspace = parseVideoWorkspace(args.workspace);
+      if (!workspace) throw new Error('Invalid fixture workspace.');
+      const draft = parseVideoWorkspaceDraft(args.draft, workspace.source.duration);
+      snapshot = {
+        workspace: { ...workspace, revision: args.expectedRevision + 1 },
+        draft: draft ? { ...draft, revision: (args.expectedDraftRevision ?? 0) + 1 } : null,
+      };
       return structuredClone(snapshot);
     }),
     saveVideoWorkspaceAdvanced: vi.fn(async () => structuredClone(snapshot)),
@@ -95,12 +79,13 @@ afterEach(async () => {
 it('keeps recovery draft acknowledgements excluded until the annotation Save acknowledgement', async () => {
   const f = setup();
   act(() => composer.change(annotation, null));
-  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
-  expect(f.deps.saveVideoWorkspaceDraft).toHaveBeenCalledOnce();
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay + 1));
+  expect(f.deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledOnce();
+  expect(f.session.getSnapshot().snapshot.draft?.annotation).toEqual(annotation);
   expect(f.checkpointRelease).not.toHaveBeenCalled();
-  const implementation = f.deps.commitVideoWorkspace.getMockImplementation()!;
+  const implementation = f.deps.saveVideoWorkspaceSnapshot.getMockImplementation()!;
   let acknowledge!: () => void;
-  f.deps.commitVideoWorkspace.mockImplementationOnce(async (args) => {
+  f.deps.saveVideoWorkspaceSnapshot.mockImplementationOnce(async (args) => {
     await new Promise<void>((done) => {
       acknowledge = done;
     });
@@ -108,7 +93,7 @@ it('keeps recovery draft acknowledgements excluded until the annotation Save ack
   });
   let saving!: Promise<void>;
   await act(async () => {
-    saving = composer.save();
+    saving = composer.save({ durable: true });
   });
   expect(f.checkpointRelease).not.toHaveBeenCalled();
   await act(async () => {
@@ -122,12 +107,12 @@ it('retains a failed completed annotation action through explicit retry', async 
   const f = setup();
   act(() => composer.change(annotation, null));
   await act(async () => composer.flush());
-  f.deps.commitVideoWorkspace.mockRejectedValueOnce(new Error('Quota'));
+  f.deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(new Error('Quota'));
   await act(async () => {
-    await expect(composer.save()).rejects.toThrow('Quota');
+    await expect(composer.save({ durable: true })).rejects.toThrow('Quota');
   });
   expect(f.checkpointRelease).not.toHaveBeenCalled();
-  await act(async () => composer.save());
+  await act(async () => composer.save({ durable: true }));
   expect(f.checkpointRelease).toHaveBeenCalledOnce();
 });
 
@@ -135,6 +120,8 @@ it('closes an acknowledged annotation recovery action when the composer unmounts
   const f = setup();
   act(() => composer.change(annotation, null));
   await act(async () => composer.flush());
+  expect(f.checkpointRelease).not.toHaveBeenCalled();
+  await act(async () => f.session.flush());
   expect(f.checkpointRelease).not.toHaveBeenCalled();
   await act(async () => root.render(null));
   expect(f.checkpointRelease).toHaveBeenCalledOnce();

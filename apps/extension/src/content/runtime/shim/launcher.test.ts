@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { catalogs } from 'sniptale:i18n/content-shim';
+import { readCatalogTranslation } from '../../../platform/i18n/catalog-reader';
+import type { AppLocale } from '@sniptale/platform/i18n/config';
 import { normalizePageLaunchPreferences } from '../../../contracts/page-launch';
 const trusted = vi.hoisted(() => vi.fn(() => false));
 vi.mock('../../platform/trusted-events', () => ({ isTrustedDomEvent: trusted }));
@@ -22,6 +25,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
+function translator(locale: AppLocale) {
+  return (key: string) => readCatalogTranslation(catalogs, locale, key);
+}
 function options(): ShimLauncherOptions {
   return {
     presentation: {
@@ -32,6 +38,7 @@ function options(): ShimLauncherOptions {
       },
       locale: 'en',
       theme: 'light',
+      translate: translator('en'),
     },
     actions: [{ id: 'action', status: true, hotkey: null, name: '<script>unsafe</script>' }],
     open: vi.fn(async () => undefined),
@@ -203,7 +210,10 @@ it('refreshes accepted actions and locale without closing and preserves logical 
     )
   ).toEqual(['Renamed second', 'Third']);
   currentShadow().querySelectorAll<HTMLButtonElement>('[role="menuitem"]')[1]!.focus();
-  launcher.update({ ...next, presentation: { ...next.presentation, locale: 'ru' } });
+  launcher.update({
+    ...next,
+    presentation: { ...next.presentation, locale: 'ru', translate: translator('ru') },
+  });
   expect(currentShadow().querySelector('[role="menu"]')).toBe(menu);
   expect(namedButton('Быстрые действия').getAttribute('aria-expanded')).toBe('true');
   expect(currentShadow().activeElement?.querySelector('span')?.textContent).toBe('Third');

@@ -4,7 +4,8 @@ import {
   getEditorBuiltInShapeEntry,
   searchEditorBuiltInShapes,
 } from './index';
-import { translate, type TranslationKey } from '../../../../platform/i18n';
+import type { TranslationKey } from '../../../../platform/i18n';
+import { translateCatalogFixture } from '../../../../platform/i18n/catalog-fixture.test-support';
 import type { EditorBuiltInShapeGeometryDefinition } from './index';
 
 export const REQUIRED_CATEGORY_IDS = [
@@ -106,7 +107,7 @@ export function getGeometryBounds(geometry: EditorBuiltInShapeGeometryDefinition
 }
 
 export function hasTranslatedLabel(labelKey: TranslationKey): boolean {
-  return translate(labelKey, 'ru') !== labelKey;
+  return translateCatalogFixture(labelKey, 'ru') !== labelKey;
 }
 
 export function isKebabShapeId(id: string): boolean {

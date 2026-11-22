@@ -17,6 +17,7 @@ import { parseSyncCaptureRecord } from '../../composition/persistence/sync-captu
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { initDB } from '../../composition/persistence/infrastructure/indexed-db/core';
 import {
+  IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   SYNC_CAPTURE_STORE,
   VIDEO_PROJECTS_STORE,
@@ -24,6 +25,7 @@ import {
   VIDEO_WORKSPACE_DRAFTS_STORE,
   SCENARIO_PROJECTS_STORE,
 } from '../../composition/persistence/infrastructure/indexed-db/core.stores';
+import { parseImageWorkspaceEntry } from '../../composition/persistence/image-workspaces/parser';
 import { loadSyncConnection } from '../../composition/persistence/remote-connection/store';
 import {
   parseSyncConnectionIdentity,
@@ -43,6 +45,7 @@ import { hashSyncText } from './wire-record';
 
 const logger = createLogger({ namespace: 'SyncRetainedLibrary' });
 const sources = [
+  { rootKind: 'image-project', store: IMAGE_WORKSPACES_STORE },
   { rootKind: 'media', store: MEDIA_LIBRARY_STORE },
   { rootKind: 'video-project', store: VIDEO_PROJECTS_STORE },
   { rootKind: 'video-review', store: VIDEO_WORKSPACES_STORE },
@@ -94,6 +97,12 @@ export async function readRetainedNativeRoots(
       : await store.getAllKeys();
     for (const key of keysForSource) {
       if (typeof key !== 'string') throw new Error('Native library identity is invalid.');
+      if (source.rootKind === 'image-project') {
+        const workspace = parseImageWorkspaceEntry(await store.get(key));
+        if (!workspace || workspace.aggregateId !== key)
+          throw new Error('Native image workspace identity is invalid.');
+        if (!workspace.sourceMediaId) continue;
+      }
       keys.set(syncCatalogRootKey(source.rootKind, key), {
         rootKind: source.rootKind,
         rootId: key,
@@ -313,10 +322,13 @@ async function eligibleCatalogRoot(
       current.operation.envelope,
       current.operation.reviewSourceMediaId
     );
-    if (
-      (parsed.kind === 'image' ? 'media' : parsed.kind) !== root.rootKind ||
-      parsed.envelope.descriptor.rootId !== root.rootId
-    )
+    const parsedKind =
+      parsed.kind === 'image'
+        ? parsed.metadata.linkedSourceMediaId
+          ? 'image-project'
+          : 'media'
+        : parsed.kind;
+    if (parsedKind !== root.rootKind || parsed.envelope.descriptor.rootId !== root.rootId)
       throw new RetainedLibraryNotReadyError('catalog-incomplete');
     if (parsed.kind === 'video-project') {
       admitted ||= isVideoProjectBackupSelected(

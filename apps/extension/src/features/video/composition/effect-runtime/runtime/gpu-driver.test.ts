@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createEffectRuntimeFailure } from '../../../../../contracts/effect-runtime/identity';
 import type {
+  EffectRuntimeErrorCode,
   EffectRuntimeRenderCommand,
   EffectRuntimeSceneResult,
 } from '../../../../../contracts/effect-runtime/types';
@@ -215,12 +216,15 @@ function controlledPreparations(capacity?: 2) {
       return response.promise;
     }),
   };
-  const complete = async (sequenceId: number, fail = false) => {
+  const complete = async (
+    sequenceId: number,
+    failure?: Exclude<EffectRuntimeErrorCode, 'cacheMiss'>
+  ) => {
     const entry = requests.find((r) => r.command.sequenceId === sequenceId);
     if (!entry) throw new Error('Missing controlled request');
-    if (fail) {
+    if (failure) {
       entry.bitmap.close();
-      entry.response.resolve(createEffectRuntimeFailure(entry.command, 'inputRejected'));
+      entry.response.resolve(createEffectRuntimeFailure(entry.command, failure));
     } else entry.response.resolve(await executor(entry.bitmap).prepareGpuFrame!(entry.command));
   };
   return { owner, requests, complete };
@@ -277,7 +281,7 @@ it.each(['failure', 'abort', 'reject'] as const)(
       const first = f.requests.find((r) => r.command.sequenceId === 0)!;
       first.bitmap.close();
       first.response.reject(new Error('Controlled transport rejection'));
-    } else await f.complete(0, outcome === 'failure');
+    } else await f.complete(0, outcome === 'failure' ? 'inputRejected' : undefined);
     expect(settled).toBe(false);
     expect(f.requests).toHaveLength(2);
     await f.complete(1);
@@ -326,4 +330,18 @@ it('drains paired over-budget replies without retaining any partial raster', asy
   expect(bitmaps).toHaveLength(18);
   for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
   expect(ledger.snapshot().liveDecodedRasterBytes).toBe(0);
+});
+
+it('retains the first GPU preparation failure when a concurrent frame returns circuitOpen', async () => {
+  const f = controlledPreparations(2);
+  const pending = prepareEffectRuntimeGpuFramePlans({
+    executor: f.owner,
+    plans: [plan('first'), plan('second')],
+    ledger: createEffectRuntimeGpuFrameLedger(),
+  });
+  const rejection = expect(pending).rejects.toMatchObject({ code: 'timeout' });
+  await vi.waitFor(() => expect(f.requests).toHaveLength(2));
+  await f.complete(1, 'circuitOpen');
+  await f.complete(0, 'timeout');
+  await rejection;
 });

@@ -356,3 +356,46 @@ it('preserves facts after an explicitly unknown source onset without manufacturi
   });
   expect(records[2]).toMatchObject({ segmentId: 1, reason: 'after-gap' });
 });
+
+it('keeps flush pending through a terminal record accepted while the previous pump completes', async () => {
+  const { source, send } = setup();
+  source.open(moment());
+  await source.flush();
+  const sent = deferred();
+  const visibilityAck = deferred();
+  const terminalSent = deferred();
+  const terminalAck = deferred();
+  send.mockImplementation(async (packet) => {
+    const boundary = packet.records.find((record) => record.kind === 'boundary');
+    if (boundary?.reason === 'visibility') {
+      sent.resolve();
+      await visibilityAck.promise;
+    } else if (boundary?.reason === 'stop') {
+      terminalSent.resolve();
+      await terminalAck.promise;
+    }
+  });
+  source.boundary(moment(1), 'visibility');
+  await sent.promise;
+  const flushing = source.flush();
+  const first = Promise.race([
+    flushing.then(() => 'flushed'),
+    terminalSent.promise.then(() => 'terminal-started'),
+  ]);
+  visibilityAck.resolve();
+  queueMicrotask(() =>
+    queueMicrotask(() =>
+      queueMicrotask(() => {
+        source.boundary(moment(2), 'stop');
+        source.close();
+      })
+    )
+  );
+  try {
+    expect(await first).toBe('terminal-started');
+  } finally {
+    terminalAck.resolve();
+    await flushing;
+    await source.flush();
+  }
+});

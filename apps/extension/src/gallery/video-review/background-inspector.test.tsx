@@ -104,7 +104,7 @@ it('selects independent background motion and commits its bounded intensity', as
   expect(change).toHaveBeenLastCalledWith({ motion: { mode: 'glow', speed: 50, intensity: 75 } });
 });
 
-it('keeps a held background slider outside authored changes until release', async () => {
+it('uses exact shadow text and keeps its draft separate until confirmation', async () => {
   const change = vi.fn();
   await act(async () =>
     root.render(
@@ -114,16 +114,29 @@ it('keeps a held background slider outside authored changes until release', asyn
       />
     )
   );
-  const range = host.querySelector<HTMLInputElement>('input[type="range"]')!;
-  act(() => range.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  act(() =>
+    host
+      .querySelector<HTMLButtonElement>(
+        'button[aria-label="gallery.videoReview.backgroundShadow"]'
+      )!
+      .click()
+  );
+  const field = host.querySelector<HTMLInputElement>(
+    'input[role="spinbutton"][aria-label="gallery.videoReview.backgroundShadow"]'
+  )!;
+  expect(field.closest('[data-stepper-placement="sides"]')).toBeNull();
+  expect(host.querySelector('input[type="range"]')).toBeNull();
   act(() => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(range, '50');
-    range.dispatchEvent(new Event('input', { bubbles: true }));
+    field.focus();
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '50');
+    field.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  expect(range.value).toBe('50');
+  expect(field.value).toBe('50');
   expect(change).not.toHaveBeenCalled();
-  act(() => range.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
-  expect(change).toHaveBeenCalledExactlyOnceWith({ layout: { ...layout, padding: 50 } });
+  act(() => field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(change).toHaveBeenCalledExactlyOnceWith({
+    layout: { ...layout, shadow: { intensity: 50, color: '#475569ff' } },
+  });
 });
 
 it('switches the background kind and commits layout values', async () => {
@@ -215,43 +228,53 @@ it('opens the image picker and forwards only a selected file', async () => {
   expect(onImportImage).toHaveBeenCalledWith(file, undefined);
 });
 
-it('uses precise layout sliders without limiting typed high-resolution values', async () => {
+it('uses exact steppers for padding and radius and previews shadow on the scale', async () => {
   const change = vi.fn();
+  const preview = vi.fn();
   act(() =>
     root.render(
       <ReviewBackgroundInspector
         background={{ enabled: true, type: 'solid', color: '#000000ff', layout }}
         onChange={change}
+        onPreview={preview}
       />
     )
   );
-  const ranges = [...host.querySelectorAll<HTMLInputElement>('input[type="range"]')];
-  expect(ranges.map((input) => input.max)).toEqual(['200', '100', '100']);
-  for (const [index, key] of ['padding', 'cornerRadius'].entries()) {
-    await act(async () => {
-      ranges[index]!.dispatchEvent(
-        new KeyboardEvent('keydown', {
-          key: 'ArrowRight',
-          bubbles: true,
-          cancelable: true,
-        })
-      );
-      ranges[index]!.dispatchEvent(
-        new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true })
-      );
-    });
-    expect(change).toHaveBeenLastCalledWith({
-      layout: { ...layout, [key]: (key === 'padding' ? layout.padding : layout.cornerRadius) + 1 },
-    });
-  }
+  const shadow = host.querySelector<HTMLInputElement>(
+    'input[type="range"][aria-label="gallery.videoReview.backgroundShadow"]'
+  )!;
+  expect(shadow.closest('[data-stepper-placement="sides"]')).toBeNull();
   await act(async () => {
-    ranges[2]!.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })
-    );
-    ranges[2]!.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true }));
+    host
+      .querySelector<HTMLButtonElement>(
+        'button[aria-label="gallery.videoReview.backgroundPadding increase"]'
+      )!
+      .click();
+  });
+  expect(change).toHaveBeenLastCalledWith({ layout: { ...layout, padding: layout.padding + 1 } });
+  await act(async () => {
+    host
+      .querySelector<HTMLButtonElement>(
+        'button[aria-label="gallery.videoReview.backgroundCornerRadius increase"]'
+      )!
+      .click();
   });
   expect(change).toHaveBeenLastCalledWith({
-    layout: { ...layout, shadow: { intensity: 1, color: '#475569ff' } },
+    layout: { ...layout, cornerRadius: layout.cornerRadius + 1 },
+  });
+  change.mockClear();
+  act(() => shadow.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(shadow, '40');
+    shadow.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(preview).toHaveBeenLastCalledWith({
+    layout: { ...layout, shadow: { intensity: 40, color: '#475569ff' } },
+  });
+  expect(change).not.toHaveBeenCalled();
+  act(() => shadow.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+  expect(change).toHaveBeenCalledExactlyOnceWith({
+    layout: { ...layout, shadow: { intensity: 40, color: '#475569ff' } },
   });
   const padding = host.querySelector<HTMLInputElement>(
     'input[type="text"][aria-label="gallery.videoReview.backgroundPadding"]'
@@ -461,6 +484,13 @@ it('adapts background motion choices while retaining speed and intensity', async
 function mockChoiceWidth() {
   let width = 2000;
   const callbacks = new Set<() => void>();
+  const frames = new Map<number, FrameRequestCallback>();
+  let nextFrame = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frames.set(++nextFrame, callback);
+    return nextFrame;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id));
   vi.spyOn(window.HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => width);
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
     font: '',
@@ -481,5 +511,10 @@ function mockChoiceWidth() {
   return (next: number) => {
     width = next;
     act(() => callbacks.forEach((callback) => callback()));
+    act(() => {
+      const pending = [...frames.values()];
+      frames.clear();
+      pending.forEach((callback) => callback(0));
+    });
   };
 }

@@ -5,6 +5,7 @@ import {
   UNKNOWN_HISTORY_REFERENCES,
 } from '../../../../composition/persistence/infrastructure/indexed-db/row-index-contract';
 import { createLibraryLifecycle } from '../../../../composition/persistence/library-lifecycle/contracts';
+import { setMediaLibraryOriginalClaim } from '../../../../composition/persistence/media-library/index.library';
 import { parseVideoWorkspace } from '../../../../composition/persistence/review-workspaces/parser';
 import {
   workspaceStorageHead,
@@ -758,6 +759,22 @@ it.each(['canonical', 'borrowed'] as const)(
     });
     expect(tables.get('scenario_assets')!.get(child.id)).not.toHaveProperty('borrowedMediaId');
     expect(tables.get('asset_refs')!.get(oldRef.assetId)).toEqual(oldRef);
+    const restored = tables.get('media_library')!.get(entry.id);
+    expect(restored).toMatchObject({ createdAt: entry.createdAt, updatedAt: entry.updatedAt });
+    await expect(
+      setMediaLibraryOriginalClaim(
+        {
+          id: entry.id,
+          createdAt: entry.createdAt,
+          lifecycleUpdatedAt: entry.lifecycle?.updatedAt ?? entry.updatedAt,
+          originalSaveId: null,
+        },
+        false
+      )
+    ).rejects.toThrow('original changed');
+    expect(tables.get('media_library')!.get(entry.id)).toMatchObject({
+      originalSaveId: expect.any(String),
+    });
   }
 );
 

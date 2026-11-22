@@ -1,3 +1,5 @@
+import { GPU_PREVIEW_LIMITS } from '../../features/video/composition/canvas/gpu-preview-plan';
+import { EFFECT_RUNTIME_RESOURCE_LIMITS } from '../../features/video/composition/effect-runtime/runtime/resource-limits';
 import { hasSceneBackgroundMotion } from '../../features/video/project/scene/background-motion';
 import { GPU_PREVIEW_UNIFORM_BYTES } from '../../features/video/composition/canvas/gpu-preview';
 import {
@@ -187,6 +189,43 @@ export function reviewGpuArtworkGeometry(scene: PreviewScene, dimensions: Dimens
   return { base, scale, background, decor };
 }
 
+function reviewGpuTextRuns(scene: PreviewScene): number {
+  const lane = scene.annotationEffects?.lane;
+  if (!lane?.enabled || !lane.textClips?.length) return 0;
+  const layers = [
+    ...lane.instances
+      .filter((item) => item.enabled && item.attachment === 'viewport')
+      .map(({ order }) => ({ order, text: false })),
+    ...lane.textClips
+      .filter((item) => item.enabled && item.text.trim())
+      .map(({ order }) => ({ order, text: true })),
+  ].sort((left, right) => left.order - right.order);
+  return layers.filter((layer, index) => layer.text && !layers[index - 1]?.text).length;
+}
+
+/** Dense mixed stacks use the ordered Canvas painter before leasing GPU text rasters. */
+export function supportsReviewGpuAnnotationText(
+  scene: PreviewScene,
+  dimensions: Dimensions,
+  maximumInFlight: 1 | 2
+) {
+  const runs = reviewGpuTextRuns(scene);
+  if (!runs) return true;
+  const packages =
+    scene.annotationEffects?.lane.instances.filter(
+      (item) => item.enabled && item.attachment === 'viewport'
+    ).length ?? 0;
+  // Leave space for the viewport comment layer, scene composition and finish passes.
+  const annotationLayerLimit = GPU_PREVIEW_LIMITS.layersPerPass - 16;
+  // Two transition endpoints can each retain a backing raster and its upload.
+  const bytes =
+    dimensions.backing.width * dimensions.backing.height * 4 * runs * 4 * maximumInFlight;
+  return (
+    packages + runs <= annotationLayerLimit &&
+    bytes <= EFFECT_RUNTIME_RESOURCE_LIMITS.maxDecodedRasterBytes
+  );
+}
+
 /** Conservative explicit raster/texture estimate, admitted before the GPU owner allocates. */
 export function reviewGpuPreviewAllocation(
   scene: PreviewScene,
@@ -201,6 +240,11 @@ export function reviewGpuPreviewAllocation(
   // Annotated dissolve endpoints retain two GPU outputs and two primitive coverage masks.
   const annotationBytes = hasAnnotations
     ? outputBytes * 2 + dimensions.canonical.width * dimensions.canonical.height * 4 * 2
+    : 0;
+  // A Canvas successor can coexist with a retained GPU front and its artwork.
+  // Only an admitted GPU title pass can add a bitmap and upload per endpoint and run.
+  const textSurfaces = supportsReviewGpuAnnotationText(scene, dimensions, maximumInFlight)
+    ? 2 * reviewGpuTextRuns(scene)
     : 0;
   const retainedRasterBytes = decor.width * decor.height * 4 + outputBytes * 2;
   // Each destination owns its painter. Static blur replacement can coexist with the old
@@ -244,9 +288,11 @@ export function reviewGpuPreviewAllocation(
       (retainedRasterBytes * 2 +
         painterBytes +
         annotationBytes +
+        textSurfaces * outputBytes * 2 +
         256 * 1024 * 1024 +
         dimensions.canonical.width * dimensions.canonical.height * 4 * 24 +
         GPU_PREVIEW_UNIFORM_BYTES * 512),
-    maximumCanvases: maximumInFlight * (48 + painterCanvases + (hasAnnotations ? 2 : 0)),
+    maximumCanvases:
+      maximumInFlight * (48 + painterCanvases + (hasAnnotations ? 2 : 0) + textSurfaces),
   };
 }

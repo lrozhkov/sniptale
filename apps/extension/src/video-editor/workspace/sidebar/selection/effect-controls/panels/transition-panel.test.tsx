@@ -18,6 +18,7 @@ import {
 } from '../../../../../../features/video/project/timeline/project-meta.test.helpers';
 import { syncProjectTransitions } from '../../../../../../features/video/project/transition/project';
 import { translate } from '../../../../../../platform/i18n';
+import { glTransitionLabel } from '../../../../../../ui/gl-transition-labels';
 import { InspectTransitionPanel } from './transition-panel';
 
 it('offers audio timing and easing without visual templates or style controls', () => {
@@ -137,8 +138,13 @@ it('selects every bundled GL family through the Native inspector and commits sha
     const choices = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')];
     expect(choices).toHaveLength(214);
     const names = new Set(choices.map((choice) => choice.textContent));
-    for (const entry of GL_TRANSITIONS) expect(names).toContain(entry.name);
-    const crossZoom = choices.find((choice) => choice.textContent === 'CrossZoom')!;
+    for (const entry of GL_TRANSITIONS) {
+      expect(names).toContain(glTransitionLabel(createGlTransitionSelection(entry.name)!));
+    }
+    const crossZoom = choices.find(
+      (choice) =>
+        choice.textContent === glTransitionLabel(createGlTransitionSelection('CrossZoom')!)
+    )!;
     await act(async () => crossZoom.click());
     const selection = createGlTransitionSelection('CrossZoom')!;
     expect(change).toHaveBeenLastCalledWith(transition.id, { selection, presetId: null });

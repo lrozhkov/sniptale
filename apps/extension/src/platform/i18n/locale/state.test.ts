@@ -14,6 +14,9 @@ const { browserStorageMocks } = vi.hoisted(() => ({
   },
 }));
 
+const { catalogLoad } = vi.hoisted(() => ({ catalogLoad: vi.fn() }));
+vi.mock('../catalog-transport', () => ({ loadCatalogMessages: catalogLoad }));
+
 vi.mock('../../../composition/persistence/infrastructure/browser-storage', () => ({
   browserStorage: {
     local: {
@@ -32,6 +35,8 @@ let browserStorageChangeListener:
   | null = null;
 
 function resetLocaleMocks() {
+  catalogLoad.mockReset();
+  catalogLoad.mockImplementation(async (locale: string) => ({ 'common.ready': locale }));
   browserStorageMocks.get.mockReset();
   browserStorageMocks.isAvailable.mockReset();
   browserStorageMocks.set.mockReset();
@@ -76,7 +81,7 @@ describe('locale-state local storage access', () => {
     expect(localeState.getStoredLocalePreference()).toBe('en');
     expect(localeState.getCurrentLocale()).toBe('en');
 
-    window.localStorage.setItem(LOCALE_STORAGE_KEY, 'fr');
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, '__unsupported__');
     const unsupportedLocaleState = await importLocaleStateModule();
 
     expect(unsupportedLocaleState.getStoredLocalePreference()).toBeNull();
@@ -126,14 +131,12 @@ describe('locale-state hydration', () => {
 
     const disposeFirst = localeState.subscribeToLocaleChanges(localeListener);
     const disposeSecond = localeState.subscribeToLocaleChanges(vi.fn());
-    await flushEffects();
-
-    expect(browserStorageMocks.get).toHaveBeenCalledWith([LOCALE_STORAGE_KEY]);
-    expect(browserStorageMocks.subscribeToChanges).toHaveBeenCalledTimes(1);
-    expect(localeState.getCurrentLocale()).toBe('en');
-    expect(localeState.getStoredLocalePreference()).toBe('en');
-    expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBe('en');
     await vi.waitFor(() => {
+      expect(browserStorageMocks.get).toHaveBeenCalledWith([LOCALE_STORAGE_KEY]);
+      expect(browserStorageMocks.subscribeToChanges).toHaveBeenCalledTimes(1);
+      expect(localeState.getCurrentLocale()).toBe('en');
+      expect(localeState.getStoredLocalePreference()).toBe('en');
+      expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBe('en');
       expect(localeListener.mock.calls.map(([locale]) => locale)).toContain('en');
     });
 
@@ -158,6 +161,64 @@ describe('locale-state hydration', () => {
     });
 
     dispose();
+  });
+});
+
+describe('prepared locale activation', () => {
+  it('prepares only the selected profile and English fallback before use', async () => {
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, 'ru');
+    const locale = await importLocaleStateModule();
+    await locale.prepareTranslations('content');
+    expect(catalogLoad.mock.calls).toEqual([
+      ['en', 'content'],
+      ['ru', 'content'],
+    ]);
+    expect(locale.getCurrentLocale()).toBe('ru');
+    expect(locale.readPreparedTranslation('ru', 'common.ready')).toBe('ru');
+  });
+
+  it('keeps the ready locale and stored preference after failed preparation', async () => {
+    const locale = await importLocaleStateModule();
+    await locale.prepareTranslations('content');
+    catalogLoad.mockRejectedValueOnce(new Error('catalog unavailable'));
+    await expect(locale.setLocalePreference('ru')).rejects.toThrow('catalog unavailable');
+    expect(locale.getCurrentLocale()).toBe('en');
+    expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).not.toBe('ru');
+    expect(locale.readPreparedTranslation('en', 'common.ready')).toBe('en');
+    await locale.setLocalePreference('ru');
+    expect(locale.getCurrentLocale()).toBe('ru');
+    expect(locale.readPreparedTranslation('ru', 'common.ready')).toBe('ru');
+  });
+
+  it('does not persist a superseded choice when its catalog completes late', async () => {
+    const locale = await importLocaleStateModule();
+    const barrier =
+      await import('../../../composition/persistence/infrastructure/mutation-barrier');
+    barrier.installPersistenceLockManagerForTests({
+      async request(_name, options, operation) {
+        expect(options.mode).toBe('shared');
+        return operation();
+      },
+    });
+    try {
+      await locale.prepareTranslations('content');
+      let complete!: (messages: unknown) => void;
+      catalogLoad.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            complete = resolve;
+          })
+      );
+      const older = locale.setLocalePreference('ru');
+      await vi.waitFor(() => expect(complete).toBeTypeOf('function'));
+      await locale.setLocalePreference('en');
+      complete({ 'common.ready': 'ru' });
+      await older;
+      expect(locale.getCurrentLocale()).toBe('en');
+      expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBe('en');
+    } finally {
+      barrier.installPersistenceLockManagerForTests(null);
+    }
   });
 });
 

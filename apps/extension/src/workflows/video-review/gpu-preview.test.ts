@@ -1,3 +1,5 @@
+import * as sceneBuilder from './gpu-preview-scene';
+import { gpuPreviewTextureBytes } from '../../features/video/composition/canvas/gpu-preview-plan';
 import { createSourceImageFilter } from '../../features/image-filters/contract';
 import { createGlTransitionSelection } from '../../features/video/project/transition/gl-catalog';
 import { REVIEW_CLICK_DEFAULT } from '../../features/video/review/advanced/click-animation';
@@ -73,6 +75,7 @@ function fixture(maximumInFlight: 1 | 2 = 1) {
     rect: vi.fn(),
     clip: vi.fn(),
     fill: vi.fn(),
+    fillRect: vi.fn(),
     clearRect: vi.fn(),
     save: vi.fn(),
     restore: vi.fn(),
@@ -252,7 +255,7 @@ it('admits authored camera, watermark and edge fades while excluding independent
       },
     },
   };
-  expect(reviewGpuPreviewConcurrency({ ...scene, captions })).toBe(1);
+  expect(reviewGpuPreviewConcurrency({ ...scene, captions })).toBe(2);
   expect(
     reviewGpuPreviewConcurrency({
       ...scene,
@@ -292,6 +295,7 @@ it('admits authored camera, watermark and edge fades while excluding independent
   ).toBe(2);
   const webcam = createQuickEditWebcam('camera', scene.source, scene.source);
   expect(reviewGpuPreviewConcurrency({ ...scene, webcam })).toBe(1);
+  expect(reviewGpuPreviewConcurrency({ ...scene, webcam }, 1, true)).toBe(2);
   expect(reviewGpuPreviewConcurrency({ ...scene, webcam: { ...webcam, enabled: false } })).toBe(2);
 });
 
@@ -430,6 +434,81 @@ it('keeps pending authored drift and zoom frames in distinct artwork destination
   f.owner.dispose();
   for (const painter of f.painters) expect(painter.dispose).toHaveBeenCalledTimes(1);
   expect(f.input.painter.dispose).not.toHaveBeenCalled();
+});
+
+it('keeps caption artwork isolated while two GPU frames complete out of order', async () => {
+  const f = fixture(2);
+  const style = {
+    position: 'bottom' as const,
+    fontSize: 0.04,
+    color: '#ffffff',
+    background: '#000000',
+  };
+  const authored = {
+    ...scene,
+    captions: { document: undefined, segments: [], settings: { enabled: true, style } },
+  };
+  const draw = vi.fn();
+  const captions = {
+    plan: {
+      conflicts: [],
+      cues: [1, 2, 3].map((time) => ({
+        id: String(time),
+        fragmentId: String(time),
+        start: time,
+        end: time + 1,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 30,
+        lines: [String(time)],
+        pixels: 16,
+        padding: 2,
+        lineHeight: 18,
+        style,
+      })),
+    },
+    draw,
+    assertExportable() {},
+  };
+  const first = Promise.withResolvers<typeof f.bitmap>();
+  const second = Promise.withResolvers<typeof f.bitmap>();
+  const firstEntered = Promise.withResolvers<void>();
+  const secondEntered = Promise.withResolvers<void>();
+  io.render
+    .mockImplementationOnce(() => {
+      firstEntered.resolve();
+      return first.promise;
+    })
+    .mockImplementationOnce(() => {
+      secondEntered.resolve();
+      return second.promise;
+    });
+  const render = (time: number) =>
+    f.owner.render({
+      ...f.input,
+      scene: authored,
+      captions,
+      sourceTime: time,
+      geometry: reviewPresentedGeometry(authored, dimensions, time),
+    });
+  const a = render(1);
+  await firstEntered.promise;
+  const b = render(2);
+  await secondEntered.promise;
+  expect(draw).toHaveBeenCalledTimes(2);
+  const firstContext = draw.mock.calls[0]![0];
+  const secondContext = draw.mock.calls[1]![0];
+  expect(firstContext).not.toBe(secondContext);
+  await expect(render(3)).rejects.toThrow('overlap');
+  second.resolve(f.bitmap);
+  await b;
+  await render(3);
+  expect(draw.mock.calls[2]![0]).toBe(secondContext);
+  expect(draw.mock.calls[0]![0]).toBe(firstContext);
+  first.resolve(f.bitmap);
+  await a;
+  f.owner.dispose();
 });
 
 it('borrows the unmodified frame through GPU completion and closes only the completed bitmap', async () => {
@@ -1279,8 +1358,8 @@ it('repaints a reused slot when the borrowed image identity changes', async () =
   f.owner.dispose();
 });
 
-function directFixture() {
-  const f = fixture();
+function directFixture(maximumInFlight: 1 | 2 = 1) {
+  const f = fixture(maximumInFlight);
   const canvas = { ...dimensions.backing } as HTMLCanvasElement;
   const present = vi
     .fn<(request: Parameters<GpuPreviewRenderer['render']>[0]) => Promise<void>>()
@@ -1320,6 +1399,70 @@ function directFixture() {
     },
   };
 }
+
+it('bounds only filtered motion exposures during live Gallery presentation', async () => {
+  const f = directFixture();
+  const region = createQuickEditZoomRegion({ id: 'moving-focus', at: 0, duration: 4 });
+  region.transform.scale = 1.4;
+  region.enter.duration = 2;
+  region.motionBlur = { enter: { enabled: true, strength: 0.5 } };
+  region.depthOfField = {
+    enabled: true,
+    mode: 'area',
+    x: 0.5,
+    y: 0.5,
+    width: 0.2,
+    softness: 0.25,
+    strength: 0.6,
+  };
+  const moving = { ...scene, zoomRegions: [region] };
+  const input = {
+    ...f.input,
+    scene: moving,
+    geometry: reviewPresentedGeometry(moving, dimensions, 1),
+  };
+  const exposures = (layers: readonly GpuPreviewLayer[]): GpuPreviewLayer[] =>
+    layers.flatMap((layer) => {
+      if (layer.depth) return [layer];
+      return 'kind' in layer.source && layer.source.kind === 'group'
+        ? exposures(layer.source.layers)
+        : [];
+    });
+  const expectRaster = (
+    layers: readonly GpuPreviewLayer[],
+    size: typeof dimensions.backing,
+    count: number
+  ) => {
+    const filtered = exposures(layers);
+    expect(filtered).toHaveLength(count);
+    expect(filtered.map((layer) => layer.source)).toEqual(
+      Array.from({ length: count }, () =>
+        expect.objectContaining({ output: size, logical: dimensions.canonical })
+      )
+    );
+    return filtered.map(({ source: _source, ...pose }) => pose);
+  };
+  const present = async (next: Parameters<typeof f.owner.renderPresentation>[0]) => {
+    const output = await f.owner.renderPresentation(next);
+    if (!output) throw new Error('Expected WebGPU presentation');
+    output.release();
+    return f.present.mock.lastCall![0];
+  };
+  const paused = await present(input);
+  const pausedPoses = expectRaster(paused.layers, dimensions.canonical, 5);
+  const live = await present({ ...input, playback: true });
+  expect(live.output).toEqual(dimensions.backing);
+  expect(expectRaster(live.layers, dimensions.backing, 5)).toEqual(pausedPoses);
+  const held = await present({
+    ...input,
+    geometry: reviewPresentedGeometry(moving, dimensions, 3),
+    playback: true,
+  });
+  expectRaster(held.layers, dimensions.canonical, 1);
+  await f.owner.render({ ...f.bitmapInput, scene: moving, geometry: input.geometry });
+  expectRaster(io.render.mock.lastCall![0].layers, dimensions.canonical, 5);
+  f.owner.dispose();
+});
 
 it('presents the complete annotated dissolve graph directly while retaining intermediate bitmap renders', async () => {
   const f = directFixture();
@@ -1515,6 +1658,51 @@ it('forwards the final full-layer graph unchanged to direct presentation', async
     completed.release();
   } finally {
     finish.mockRestore();
+    f.owner.dispose();
+  }
+});
+
+it('allows independent fade-to-black presentation slots while the first draw settles', async () => {
+  const f = directFixture(2);
+  const { reviewCutTransitionAt } = await import('../../features/video/review/cuts');
+  const plan = [
+    {
+      id: 'cut',
+      type: 'fade-black' as const,
+      seam: 2,
+      before: 0.5,
+      after: 0.5,
+      left: { start: 0, end: 2 },
+      right: { start: 4, end: 6 },
+    },
+  ];
+  const retained = { timestamp: 1.99, draw: vi.fn(), close: vi.fn() };
+  const frames = { left: retained, right: { ...retained, timestamp: 4 } };
+  Object.assign(f.frame, { timestamp: 1_800_000 });
+  const frame = (time: number) => ({
+    ...f.input,
+    geometry: reviewPresentedGeometry(scene, dimensions, time),
+    transition: { blend: reviewCutTransitionAt(time, plan)!, frames },
+  });
+  const fence = Promise.withResolvers<void>();
+  f.present.mockReturnValueOnce(fence.promise);
+  const first = f.owner.renderPresentation(frame(1.8));
+  await vi.waitFor(() => expect(f.present).toHaveBeenCalledOnce());
+  const canvas = { ...dimensions.backing } as HTMLCanvasElement;
+  f.acquireOutput.mockReturnValueOnce({
+    canvas,
+    surface: { ...f.surface, canvas },
+    release: f.releaseOutput,
+  });
+  try {
+    const second = await f.owner.renderPresentation(frame(1.9));
+    expect(second && second.canvas).toBe(canvas);
+    expect(f.present).toHaveBeenCalledTimes(2);
+    if (second) second.release();
+  } finally {
+    fence.resolve();
+    const front = await first;
+    if (front) front.release();
     f.owner.dispose();
   }
 });
@@ -1841,6 +2029,7 @@ it('prepares annotation descriptors after output and releases the marker before 
   const batch = () => ({ entries: [], release() {}, retain: () => ({ release() {} }) });
   const annotations: NonNullable<Parameters<typeof f.owner.render>[0]['annotations']> = {
     describe: () => [],
+    createFrameScope: vi.fn(),
     prepareGpu: async () => ({
       entries: [],
       release() {},
@@ -2253,4 +2442,94 @@ it('uses the original source filter axes before a Gallery quarter-turn', async (
   visit(captured.request.layers);
   expect(found?.imageFilters?.logical).toEqual({ width: 640, height: 360 });
   f.owner.dispose();
+});
+
+it.each([
+  ['dissolve', false],
+  ['gl', false],
+  ['dissolve', true],
+] as const)(
+  'isolates %s endpoint caches and preserves internal conflict refusal (%s)',
+  async (type, invalidWithinEndpoint) => {
+    const f = fixture();
+    const input = await dissolveInput(f);
+    const first = { width: 8, height: 8, close: vi.fn() } as unknown as ImageBitmap;
+    const second = { width: 8, height: 8, close: vi.fn() } as unknown as ImageBitmap;
+    let side = 0;
+    const build = vi.spyOn(sceneBuilder, 'buildReviewGpuScene').mockImplementation(async () => {
+      const endpointIndex = side++;
+      const source = endpointIndex === 0 ? first : second;
+      const layer: GpuPreviewLayer = {
+        source,
+        rect: { x: 0, y: 0, width: 8, height: 8 },
+        inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+        cache: { key: 'effect-content:annotation', revision: source },
+        alphaMask: {
+          source,
+          rect: { x: 0, y: 0, width: 1, height: 1 },
+          cache: { key: 'local-mask', revision: source },
+        },
+        operationClip: { source, cache: { key: 'local-coverage', revision: source } },
+      };
+      return {
+        kind: 'group',
+        output: dimensions.backing,
+        logical: dimensions.canonical,
+        layers:
+          invalidWithinEndpoint && endpointIndex === 0
+            ? [layer, { ...layer, source: second }]
+            : [layer],
+      };
+    });
+    io.render.mockImplementationOnce(async (request) => {
+      expect(gpuPreviewTextureBytes(request.layers)).toBeGreaterThan(0);
+      return f.bitmap;
+    });
+    try {
+      const { color: _color, ...timing } = input.transition.blend.plan;
+      const blend =
+        type === 'gl'
+          ? {
+              ...input.transition.blend,
+              plan: {
+                ...timing,
+                type,
+                selection: createGlTransitionSelection('BowTie')!,
+                easing: 'LINEAR' as const,
+              },
+            }
+          : input.transition.blend;
+      const pending = f.owner.render({ ...input, transition: { ...input.transition, blend } });
+      if (invalidWithinEndpoint)
+        await expect(pending).rejects.toThrow('cache key has conflicting sources');
+      else await expect(pending).resolves.toBe(true);
+      expect(build).toHaveBeenCalledTimes(2);
+      expect(first.close).not.toHaveBeenCalled();
+      expect(second.close).not.toHaveBeenCalled();
+    } finally {
+      build.mockRestore();
+      f.owner.dispose();
+    }
+  }
+);
+
+it('validates and starts boundary pipeline preparation without rendering an output', async () => {
+  const f = fixture();
+  const preparePipelines = vi.fn<NonNullable<GpuPreviewRenderer['preparePipelines']>>(
+    () => new Promise(() => {})
+  );
+  io.create.mockResolvedValue({
+    render: io.render,
+    dispose: io.dispose,
+    allocatedBytes: 0,
+    preparePipelines,
+  });
+  try {
+    await f.owner.prepareBoundaryPipelines(f.input);
+    expect(preparePipelines).toHaveBeenCalledOnce();
+    expect(io.render).not.toHaveBeenCalled();
+    expect(f.context.drawImage).not.toHaveBeenCalled();
+  } finally {
+    f.owner.dispose();
+  }
 });

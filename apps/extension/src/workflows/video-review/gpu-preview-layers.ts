@@ -49,6 +49,8 @@ import {
 } from '../../features/video/composition/draw/pointer-feedback';
 import { drawReviewKeys } from './render-key-animation';
 import { type createReviewAnnotationRenderer } from './annotation-renderer';
+import { drawReviewAnnotationText, reviewViewportAnnotationLayers } from './draw-annotation-text';
+import type { ReviewAnnotationTextClip } from '../../features/video/review/annotation-effects/types';
 import {
   reviewGpuAnnotationLayer,
   reviewGpuAnnotationGroup,
@@ -169,6 +171,8 @@ export async function reviewGpuContentLayers(args: {
   dimensions: PreviewSceneDimensions;
   base: ReviewPresentedGeometry['layout'];
   geometry: ReviewPresentedGeometry;
+  annotationTextTime?: number;
+  includeAnnotationText?: boolean;
   sourceTime: number;
   fps: number;
   original: GpuPreviewGroup;
@@ -430,9 +434,41 @@ export async function reviewGpuContentLayers(args: {
       });
       viewportLayers.push(texture(raster, full));
     }
-    viewportLayers.push(
-      ...viewport.map((entry) => reviewGpuAnnotationLayer(entry, full, entry.source))
+    const lane = scene.annotationEffects?.lane;
+    const annotationTextTime = args.annotationTextTime ?? geometry.resultTime;
+    const viewportAnnotations = reviewViewportAnnotationLayers(
+      viewport,
+      lane?.enabled && args.includeAnnotationText !== false ? (lane.textClips ?? []) : [],
+      annotationTextTime
     );
+    const textRun: ReviewAnnotationTextClip[] = [];
+    const flushText = () => {
+      if (!textRun.length) return;
+      const raster = primitives.raster(
+        'preview-gpu-annotation-text',
+        dimensions.backing,
+        (context) => {
+          for (const clip of textRun)
+            drawReviewAnnotationText(
+              context,
+              clip,
+              annotationTextTime,
+              dimensions.canonical,
+              dimensions.backing
+            );
+        }
+      );
+      viewportLayers.push(texture(raster, full));
+      textRun.length = 0;
+    };
+    for (const layer of viewportAnnotations) {
+      if (layer.kind === 'text') textRun.push(layer.clip);
+      else {
+        flushText();
+        viewportLayers.push(reviewGpuAnnotationLayer(layer.frame, full, layer.frame.source));
+      }
+    }
+    flushText();
     const sourceClip = args.sourceClip;
     return {
       contentLayers: sourceClip
@@ -452,6 +488,7 @@ function webcamLayers(
   scene: PreviewScene,
   dimensions: PreviewSceneDimensions,
   sourceTime: number,
+  resultTime: number,
   camera: ReviewGpuCamera | undefined,
   primitives: ReviewGpuPrimitives
 ): GpuPreviewLayer[] {
@@ -459,7 +496,7 @@ function webcamLayers(
   if (!camera || !original) return [];
   const frame = camera.drawable.videoFrame?.();
   if (!frame) throw new Error('Camera GPU pixels are unavailable.');
-  const screen = reviewSplitScreenAt(original, sourceTime, true);
+  const screen = reviewSplitScreenAt(original, sourceTime, true, resultTime);
   const webcam = reviewSplitCameraStyle(original, screen);
   const output = dimensions.canonical;
   const placement = quickEditWebcamBounds(camera.placement, output, webcam.appearance.shape);
@@ -478,21 +515,25 @@ function webcamLayers(
     appearance
   );
   const full = { x: 0, y: 0, ...output };
-  const shadow = primitives.raster('preview-gpu-camera-shadow', output, (context) => {
-    if (!webcam.shadow?.intensity) return;
-    drawMediaFrameShadow(
-      context,
-      webcam.shadow.intensity,
-      undefined,
-      rect,
-      Math.min(output.width, output.height) / 720,
-      appearance,
-      true,
-      webcam.shadow.color,
-      0,
-      resolveCameraShadowVector(webcam.shadowDirection, rect, output)
+  const layers: GpuPreviewLayer[] = [];
+  const shadow = webcam.shadow;
+  if (shadow?.intensity) {
+    const artwork = primitives.raster('preview-gpu-camera-shadow', output, (context) =>
+      drawMediaFrameShadow(
+        context,
+        shadow.intensity,
+        undefined,
+        rect,
+        Math.min(output.width, output.height) / 720,
+        appearance,
+        true,
+        shadow.color,
+        0,
+        resolveCameraShadowVector(webcam.shadowDirection, rect, output)
+      )
     );
-  });
+    layers.push(texture(artwork, full));
+  }
   const mask = primitives.raster('preview-gpu-camera-mask', output, (context) => {
     context.fillStyle = '#ffffff';
     traceCameraShape(context, rect, appearance);
@@ -507,8 +548,12 @@ function webcamLayers(
     rect: { x: rect.x + crop.x, y: rect.y + crop.y, width: crop.width, height: crop.height },
     inverse,
   };
-  const masked = group([video, { ...texture(mask, full), blend: 'mask' }], dimensions);
-  return [texture(shadow, full), { source: masked, rect: full, inverse: identity }];
+  if (webcam.mirrored) {
+    // Mirroring affects video coordinates; the silhouette stays in the destination plane.
+    const masked = group([video, { ...texture(mask, full), blend: 'mask' }], dimensions);
+    layers.push({ source: masked, rect: full, inverse: identity });
+  } else layers.push({ ...video, alphaMask: { source: mask, rect: full } });
+  return layers;
 }
 
 /** Screen-pane composition precedes camera, keys, watermark, captions and the final fades. */
@@ -521,13 +566,14 @@ export function reviewGpuFinishLayers(args: {
   resultTime: number;
   primitives: ReviewGpuPrimitives;
   caption?: GpuPreviewLayer;
+  finalAnnotationText?: readonly ReviewAnnotationTextClip[];
   watermark: Awaited<ReturnType<typeof createWatermarkRenderer>> | null;
   blackout?: { opacity: number; color: string };
 }) {
   const { scene, dimensions, primitives } = args;
   const output = dimensions.canonical;
   const full = { x: 0, y: 0, ...output };
-  const screen = reviewSplitScreenAt(scene.webcam, args.sourceTime, !!args.camera);
+  const screen = reviewSplitScreenAt(scene.webcam, args.sourceTime, !!args.camera, args.resultTime);
   const split = screen && (screen.width < 1 || screen.height < 1 || screen.clip);
   const layers: GpuPreviewLayer[] = [];
   if (split) {
@@ -565,7 +611,21 @@ export function reviewGpuFinishLayers(args: {
       });
     } else layers.push(pane);
   } else layers.push({ source: args.main, rect: full, inverse: identity });
-  layers.push(...webcamLayers(scene, dimensions, args.sourceTime, args.camera, primitives));
+  const finalText = args.finalAnnotationText;
+  if (finalText?.length) {
+    const raster = primitives.raster(
+      'preview-gpu-annotation-text',
+      dimensions.backing,
+      (context) => {
+        for (const clip of finalText)
+          drawReviewAnnotationText(context, clip, args.resultTime, output, dimensions.backing);
+      }
+    );
+    layers.push(texture(raster, full));
+  }
+  layers.push(
+    ...webcamLayers(scene, dimensions, args.sourceTime, args.resultTime, args.camera, primitives)
+  );
   if (scene.keys.length || (args.watermark && scene.watermark?.mode !== 'none')) {
     const overlay = primitives.raster('preview-gpu-keys-watermark', output, (context) => {
       drawReviewKeys(context, scene.keys, args.resultTime, output);

@@ -5,6 +5,10 @@ import { parseCapturedMediaRows } from '../sync-capture/media-snapshot';
 import { parsePreparedVideoReviewReplicaRoot } from '../sync-capture/prepared-review-parser';
 import type { MediaDependencyTarget } from '../media-library/dependencies';
 import type { AssetReadyJournal } from './contracts';
+import {
+  VIDEO_PROJECT_WORKSPACE_PUBLICATION_DOMAIN,
+  collectVideoProjectWorkspaceSources,
+} from '../projects/history-contracts';
 
 type MediaSource = MediaDependencyTarget['source'];
 interface ReadyMediaTarget {
@@ -106,6 +110,8 @@ function unknownPublicationKeys(domain: string): string[] {
       return ['unknown:web-snapshot'];
     case 'image-workspace':
       return [UNKNOWN_READY_MEDIA];
+    case VIDEO_PROJECT_WORKSPACE_PUBLICATION_DOMAIN:
+      return [UNKNOWN_READY_MEDIA, 'unknown:project-export-owner'];
     default:
       return [];
   }
@@ -119,8 +125,16 @@ export function collectReadyJournalMediaKeys(
   if (journal.domain === 'sync-replica') return replicaMediaKeys(payload);
   if (!isRecord(payload)) return unknownPublicationKeys(journal.domain);
   switch (journal.domain) {
-    case 'image-workspace':
-      return [identityKey('media', recordIdentity(payload, 'aggregateId'))];
+    case VIDEO_PROJECT_WORKSPACE_PUBLICATION_DOMAIN:
+      return workspacePublicationKeys(payload);
+    case 'image-workspace': {
+      const keys = [identityKey('media', recordIdentity(payload, 'aggregateId'))];
+      for (const original of [payload['original'], payload['newOriginal']]) {
+        if (original !== undefined)
+          keys.push(identityKey('media', recordIdentity(original, 'mediaId')));
+      }
+      return [...new Set(keys)];
+    }
     case 'project-assets':
     case 'project-exports':
       return projectPublicationKeys(journal.domain, payload);
@@ -131,6 +145,26 @@ export function collectReadyJournalMediaKeys(
     default:
       return [];
   }
+}
+
+function workspacePublicationKeys(payload: Record<string, unknown>): string[] {
+  const project = payload['project'];
+  if (!isRecord(project)) return [UNKNOWN_READY_MEDIA, 'unknown:project-export-owner'];
+  const entry = parseVideoProjectMetadataEntry({
+    id: project['id'],
+    project,
+    history: payload['history'],
+    createdAt: project['createdAt'],
+    updatedAt: project['updatedAt'],
+  });
+  if (!entry?.history) return [UNKNOWN_READY_MEDIA, 'unknown:project-export-owner'];
+  const keys = new Set([reference('project-export-owner', entry.id)]);
+  for (const source of collectVideoProjectWorkspaceSources(entry)) {
+    keys.add(reference(source.kind === 'library-asset' ? 'media' : source.kind, source.id));
+    if (source.kind === 'project-asset' || source.kind === 'scenario-asset')
+      keys.add(reference('media', `${source.kind}:${source.id}`));
+  }
+  return [...keys];
 }
 
 /** The predicate and durable locators share one policy for pending source and sidecar publication. */
@@ -146,10 +180,12 @@ function replicaMediaKeys(payload: unknown): string[] {
   if (!isRecord(payload) || !isRecord(payload['input'])) return [UNKNOWN_READY_MEDIA];
   const input = payload['input'];
   if (payload['kind'] === 'image') {
-    const media = input['media'];
-    return isRecord(media) && typeof media['id'] === 'string' && media['id']
-      ? [reference('media', media['id'])]
-      : [UNKNOWN_READY_MEDIA];
+    const mediaId = recordIdentity(input['media'], 'id');
+    if (!mediaId) return [UNKNOWN_READY_MEDIA];
+    const keys = [reference('media', mediaId)];
+    if (input['linkedOriginal'] !== undefined)
+      keys.push(identityKey('media', recordIdentity(input['workspace'], 'aggregateId')));
+    return keys;
   }
   if (payload['kind'] === 'media') {
     const rows = parseCapturedMediaRows(input['rows']);

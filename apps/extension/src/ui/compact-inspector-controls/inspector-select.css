@@ -1,0 +1,107 @@
+button.sniptale-inspector-select[aria-haspopup='listbox'] {
+  min-height: 32px;
+  height: 32px;
+  gap: 6px;
+  padding: 0 0 0 8px;
+  border: 1px solid var(--sniptale-color-field-border);
+  border-radius: 4px;
+  background: var(--sniptale-color-field);
+  box-shadow: none;
+  text-align: start;
+  font: var(--sniptale-font-weight-interface, 400) 13px/18px
+    var(--font-ui, var(--sniptale-font-sans));
+}
+
+button.sniptale-inspector-select
+  :is(.truncate, .sniptale-select-value-label-trigger, .sniptale-select-placeholder) {
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.sniptale-inspector-select
+  :is(.sniptale-compact-select-description, .sniptale-select-option-description) {
+  display: none;
+}
+
+button.sniptale-inspector-select[aria-haspopup='listbox']:hover:not(:disabled),
+button.sniptale-inspector-select[aria-haspopup='listbox']:is(
+    [aria-expanded='true'],
+    :focus-visible
+  ):not(:disabled) {
+  background: var(--sniptale-color-field-hover);
+}
+
+button.sniptale-inspector-select[aria-haspopup='listbox']:focus-visible:not(
+    :disabled,
+    [aria-expanded='true']
+  ) {
+  border-color: var(--sniptale-color-field-focus);
+}
+
+button.sniptale-inspector-select[aria-haspopup='listbox'][aria-expanded='true']:enabled {
+  outline: none;
+}
+
+.inspector-hex-trigger:disabled,
+button.sniptale-inspector-select[aria-haspopup='listbox'][aria-expanded='true']:enabled
+  > span:first-child {
+  opacity: 0.4;
+}
+
+button.sniptale-inspector-select[aria-haspopup='listbox'] > svg:last-child {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  margin-inline: 8px;
+  color: var(--sniptale-color-text-muted-strong);
+  stroke-width: 1.4;
+}
+
+.sniptale-inspector-select-menu[role='listbox'] {
+  border-radius: 4px;
+  font: var(--sniptale-font-weight-interface, 400) 13px/18px
+    var(--font-ui, var(--sniptale-font-sans));
+}
+.sniptale-inspector-select-menu [role='option'][aria-selected='true'] svg.lucide-check {
+  color: var(--sniptale-color-text-muted-strong);
+}
+
+.sniptale-framed-segments {
+  display: grid;
+}
+
+.sniptale-framed-segments > button {
+  min-height: 32px;
+  padding: 2px 5px;
+  font: var(--sniptale-font-weight-interface, 400) 13px/18px
+    var(--font-ui, var(--sniptale-font-sans));
+}
+
+.sniptale-framed-segments:not([data-icon-only]) > button {
+  min-inline-size: 32px;
+}
+
+.sniptale-framed-segments[data-visible-icons] > button {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 3px;
+  min-height: 52px;
+}
+
+.sniptale-framed-segments > button:enabled {
+  cursor: pointer;
+}
+
+.sniptale-framed-segments > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.sniptale-property-choice {
+  font: var(--sniptale-font-weight-interface, 400) 13px/18px
+    var(--font-ui, var(--sniptale-font-sans));
+}

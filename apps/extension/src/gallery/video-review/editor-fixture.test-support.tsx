@@ -1,6 +1,11 @@
 import { moveReviewWorkspaceCursor } from '../../composition/persistence/review-workspaces/history-cursor';
-import { parseVideoWorkspace } from '../../composition/persistence/review-workspaces/parser';
+import {
+  parseVideoWorkspace,
+  parseVideoWorkspaceDraft,
+} from '../../composition/persistence/review-workspaces/parser';
 import { act } from 'react';
+import * as reviewSessions from '../../workflows/video-review/session';
+import { reviewSessionPersistence } from '../../workflows/video-review/session-durable-access';
 import { createRoot } from 'react-dom/client';
 import { replayReviewHistory, reviewDocumentBaseline } from '../../features/video/review/document';
 import { vi } from 'vitest';
@@ -14,10 +19,106 @@ import type { VideoWorkspaceSnapshot } from '../../composition/persistence/revie
 import type {
   saveVideoWorkspaceAdvanced,
   saveVideoWorkspaceDraft,
+  saveVideoWorkspaceSnapshot,
   commitVideoWorkspace,
   moveVideoWorkspaceHistory,
 } from '../../composition/persistence/review-workspaces/store';
 import type { ReviewOperation } from '../../features/video/review/types';
+import type {
+  ReviewAnchor,
+  ReviewDocument,
+  ReviewSelection,
+} from '../../features/video/review/types';
+import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
+import type { ReviewPlaybackRange } from './playback-range';
+import { createReviewCommandPort } from './command-context';
+import { reviewAdvancedContentBaseline } from '../../features/video/review/document';
+import { buildReviewTimeMap, sourceToReviewResult } from '../../features/video/review/timeline';
+
+/** Unit controllers use the same atomic command admission as the mounted editor. */
+export function createReviewCommandFixture(
+  read: () => {
+    duration: number;
+    time: number;
+    resultTime?: number | null;
+    document?: ReviewDocument;
+    advanced?: QuickEditAdvancedState;
+    selection?: ReviewSelection;
+    timelineSelection?: ReviewAnchor;
+    range?: ReviewPlaybackRange | null;
+    session?: object;
+    sourceAssetId?: string;
+    resource?: Blob;
+  },
+  options: { pause?(): void; beforeAction?(action: () => void): void } = {}
+) {
+  const session = {};
+  const resource = new Blob(['command-source']);
+  const advanced = createQuickEditAdvancedState();
+  const sourceUrl = 'blob:command-source';
+  const document: ReviewDocument = {
+    annotations: [],
+    edits: [],
+    canvasComments: [],
+    advancedContent: reviewAdvancedContentBaseline(advanced),
+  };
+  return createReviewCommandPort({
+    read: () => {
+      const current = read();
+      return {
+        scope: {
+          session: current.session ?? session,
+          resource: current.resource ?? resource,
+          sourceAssetId: current.sourceAssetId ?? 'command-source',
+          sourceUrl,
+          sourceDuration: current.duration,
+        },
+        document: current.document ?? document,
+        advanced: current.advanced ?? advanced,
+        selection: current.selection ?? { kind: 'none' },
+        timelineSelection: current.timelineSelection ?? { kind: 'point', time: current.time },
+        playbackRange: current.range ?? null,
+      };
+    },
+    readPosition: () => {
+      const current = read();
+      const segments = buildReviewTimeMap(current.duration, current.document?.edits ?? []);
+      const resultTime =
+        current.resultTime === undefined
+          ? sourceToReviewResult(current.time, segments)
+          : current.resultTime;
+      const segment =
+        resultTime === null
+          ? undefined
+          : segments.find(
+              (part) =>
+                resultTime >= part.resultStart && resultTime < part.resultEnd && part.kind !== 'cut'
+            );
+      const mediaTime =
+        segment?.kind === 'freeze' ? (segment.frameTime ?? current.time) : current.time;
+      return {
+        epoch: 0,
+        mapRevision: 0,
+        resultTime,
+        source:
+          resultTime === null
+            ? null
+            : {
+                kind: segment?.kind === 'freeze' ? 'freeze' : 'video',
+                sourceTime: current.time,
+                mediaTime,
+                segmentId: segment?.freezeId ?? 'source',
+              },
+        media: { sourceId: sourceUrl, time: mediaTime },
+      };
+    },
+    beforeAction: options.beforeAction ?? ((action) => action()),
+    pauseAt: () => {
+      options.pause?.();
+      return true;
+    },
+  });
+}
 
 /** Mirrors the committed-projection adapter using the fixture's accepted history. */
 export function committedEditorFixtureProjection(snapshot: VideoWorkspaceSnapshot) {
@@ -40,7 +141,7 @@ interface EditorFixtureIntegration {
   history: ReturnType<typeof vi.fn>;
   read: ReturnType<typeof vi.fn>;
   advanced: ReturnType<typeof vi.fn>;
-  snapshot?: ReturnType<typeof vi.fn>;
+  snapshot?: ReturnType<typeof vi.fn<typeof saveVideoWorkspaceSnapshot>>;
   download: ReturnType<typeof vi.fn>;
   export: ReturnType<typeof vi.fn>;
 }
@@ -51,6 +152,7 @@ function stubReviewDom(inspectorWidth: number) {
     'ResizeObserver',
     class {
       observe() {}
+      unobserve() {}
       disconnect() {}
     }
   );
@@ -80,11 +182,13 @@ function stubReviewDom(inspectorWidth: number) {
   vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(function (
     this: HTMLMediaElement
   ) {
+    Object.defineProperty(this, 'paused', { configurable: true, value: true });
     this.dispatchEvent(new Event('pause'));
   });
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(async function (
     this: HTMLMediaElement
   ) {
+    Object.defineProperty(this, 'paused', { configurable: true, value: false });
     this.dispatchEvent(new Event('play'));
   });
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (
@@ -103,7 +207,7 @@ function stubReviewDom(inspectorWidth: number) {
   return { show, close, createUrl, revokeUrl, clipboard };
 }
 
-function stubReviewSession(integration: EditorFixtureIntegration, history: ReviewOperation[]) {
+function stubReviewPersistence(integration: EditorFixtureIntegration, history: ReviewOperation[]) {
   let snapshot: VideoWorkspaceSnapshot = {
     workspace: {
       aggregateId: 'recording:r',
@@ -175,17 +279,19 @@ function stubReviewSession(integration: EditorFixtureIntegration, history: Revie
       return structuredClone(snapshot);
     }
   );
-  integration.snapshot?.mockImplementation(
-    async (args: { workspace: unknown; draft: VideoWorkspaceSnapshot['draft'] }) => {
-      const workspace = parseVideoWorkspace(args.workspace);
-      if (!workspace) throw new Error('Invalid fixture workspace.');
-      snapshot = {
-        workspace: { ...workspace, revision: snapshot.workspace.revision + 1 },
-        draft: args.draft,
-      };
-      return structuredClone(snapshot);
-    }
-  );
+  const saveSnapshot = integration.snapshot ?? vi.fn<typeof saveVideoWorkspaceSnapshot>();
+  saveSnapshot.mockImplementation(async (args) => {
+    const workspace = parseVideoWorkspace(args.workspace);
+    if (!workspace) throw new Error('Invalid fixture workspace.');
+    const draft =
+      args.draft === null ? null : parseVideoWorkspaceDraft(args.draft, workspace.source.duration);
+    if (args.draft !== null && !draft) throw new Error('Invalid fixture draft.');
+    snapshot = {
+      workspace: { ...workspace, revision: snapshot.workspace.revision + 1 },
+      draft,
+    };
+    return structuredClone(snapshot);
+  });
   integration.commit.mockImplementation(
     async (args: Parameters<typeof commitVideoWorkspace>[0]) => {
       snapshot = {
@@ -238,6 +344,7 @@ function stubReviewSession(integration: EditorFixtureIntegration, history: Revie
     }
   );
   return {
+    saveSnapshot,
     get snapshot() {
       return structuredClone(snapshot);
     },
@@ -256,7 +363,16 @@ export function createEditorFixture(
   const { show, close, createUrl, revokeUrl, clipboard } = stubReviewDom(
     options?.inspectorWidth ?? 640
   );
-  const session = stubReviewSession(integration, [...(options?.history ?? [])]);
+  const persistence = stubReviewPersistence(integration, [...(options?.history ?? [])]);
+  let liveSession: ReturnType<typeof reviewSessions.createVideoReviewSession> | undefined;
+  const createSession = reviewSessions.createVideoReviewSession;
+  vi.spyOn(reviewSessions, 'createVideoReviewSession').mockImplementation((initial, deps) => {
+    liveSession = createSession(initial, {
+      ...(deps ?? reviewSessionPersistence),
+      saveVideoWorkspaceSnapshot: persistence.saveSnapshot,
+    });
+    return liveSession;
+  });
   const host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
@@ -265,14 +381,76 @@ export function createEditorFixture(
     const scope =
       key === 'zoomRegionLabel'
         ? host.querySelector('[data-ui="gallery.videoReview.focusTools"]')
-        : host;
-    const node = scope?.querySelector<HTMLButtonElement>(
-      `[aria-label="${key.includes('.') ? key : `gallery.videoReview.${key}`}"]`
-    );
+        : ['cutMode', 'speedMode'].includes(key)
+          ? host.querySelector('[data-ui="gallery.videoReview.editingTools"]')
+          : host;
+    const selector = `button[aria-label="${key.includes('.') ? key : `gallery.videoReview.${key}`}"]`;
+    const node = scope?.querySelector<HTMLButtonElement>(selector);
     if (!node) throw new Error(`Missing ${key}`);
     return node;
   };
+  const section = async (id: string) => {
+    const tab = host.querySelector<HTMLButtonElement>(`[role="tab"][id$="-${id}-tab"]`);
+    if (!tab) throw new Error(`Missing inspector section ${id}`);
+    await act(async () => tab.click());
+  };
   const click = async (key: string) => {
+    if (
+      key === 'common.actions.close' &&
+      !host.querySelector('header button[aria-label="common.actions.close"]')
+    ) {
+      await act(async () => button('moreActions').click());
+      const close = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(
+        (item) => item.textContent === 'common.actions.close'
+      );
+      if (!close) throw new Error('Missing Close menu action');
+      await act(async () => close.click());
+      return;
+    }
+    if (
+      key === 'exportVideo' &&
+      !host.querySelector('button[aria-label="gallery.videoReview.exportVideo"]')
+    )
+      await click('exportSection');
+    const commandLabel = key.includes('.') ? key : `gallery.videoReview.${key}`;
+    const command = host.querySelector<HTMLButtonElement>(
+      `[data-ui="gallery.videoReview.inspectorActionMenu"] button[aria-label="${commandLabel}"]`
+    );
+    const menuTrigger = host.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.videoReview.inspectorActionMenuTrigger"]'
+    );
+    if (command && menuTrigger?.getAttribute('aria-expanded') !== 'true')
+      await act(async () => menuTrigger?.click());
+    if (
+      key === 'addComment' &&
+      !host.querySelector('[aria-label="gallery.videoReview.addComment"]')
+    ) {
+      const surface = host.querySelector<HTMLElement>(
+        '[data-ui="gallery.videoReview.previewFrame"]'
+      )!;
+      surface.tabIndex = -1;
+      surface.focus();
+      await act(async () =>
+        window.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'm', code: 'KeyM', bubbles: true })
+        )
+      );
+      return;
+    }
+    if (
+      ['cutMode', 'speedMode'].includes(key) &&
+      !host.querySelector(
+        `[data-ui="gallery.videoReview.editingTools"] button[aria-label="gallery.videoReview.${key}"]`
+      )
+    ) {
+      await act(async () =>
+        host
+          .querySelector<HTMLButtonElement>(
+            '[data-review-header-track="source"] [data-review-track-select]'
+          )!
+          .click()
+      );
+    }
     if (
       key === 'advancedEditing' &&
       !host.querySelector('[aria-label="gallery.videoReview.advancedEditing"]')
@@ -293,9 +471,7 @@ export function createEditorFixture(
           )!
           .click()
       );
-      const settings = host.querySelector<HTMLButtonElement>('[data-lane-tab="settings"]');
-      if (!settings) throw new Error('Missing source settings after track navigation');
-      await act(async () => settings.click());
+      await section('canvas');
       return;
     }
     if (key === 'telemetry') {
@@ -329,6 +505,7 @@ export function createEditorFixture(
     back,
     button,
     click,
+    section,
     key(event: KeyboardEvent) {
       const surface = host.querySelector<HTMLElement>(
         '[data-ui="gallery.videoReview.previewFrame"]'
@@ -371,38 +548,30 @@ export function createEditorFixture(
           )!
           .click()
       );
-      const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
-      const at = start ?? Number(plane.getAttribute('aria-valuenow'));
-      const until = end ?? Math.min(Number(plane.getAttribute('aria-valuemax')), at + 2);
-      if (button('zoomRegionLabel').getAttribute('aria-pressed') !== 'true')
-        await click('zoomRegionLabel');
-      const gutter = Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
-      const duration = Number(plane.getAttribute('aria-valuemax'));
-      Object.assign(plane, {
-        getBoundingClientRect: () => new DOMRect(-gutter, 0, gutter + 400, 80),
-        setPointerCapture: vi.fn(),
-        releasePointerCapture: vi.fn(),
-        hasPointerCapture: () => true,
-      });
-      for (const [type, time] of [
-        ['pointerdown', at],
-        ['pointermove', until],
-        ['pointerup', until],
-      ] as const) {
-        const event = new MouseEvent(type, {
-          bubbles: true,
-          button: 0,
-          clientX: (time / duration) * 400,
+      if (start !== undefined && end !== undefined) {
+        const ruler = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.ruler"]')!;
+        const duration = Number(ruler.getAttribute('aria-valuemax'));
+        Object.assign(ruler, {
+          getBoundingClientRect: () => new DOMRect(0, 0, 400, 28),
+          setPointerCapture: vi.fn(),
+          releasePointerCapture: vi.fn(),
+          hasPointerCapture: () => true,
         });
-        Object.defineProperty(event, 'pointerId', { value: 1 });
-        const target =
-          type === 'pointerdown'
-            ? host.querySelector('[data-ui="gallery.videoReview.zoomLane"]')!
-            : plane;
-        await act(async () => {
-          target.dispatchEvent(event);
-        });
+        for (const [type, time] of [
+          ['pointerdown', start],
+          ['pointermove', end],
+          ['pointerup', end],
+        ] as const) {
+          const event = new MouseEvent(type, {
+            bubbles: true,
+            button: 0,
+            clientX: (time / duration) * 400,
+          });
+          Object.defineProperty(event, 'pointerId', { value: 1 });
+          await act(async () => ruler.dispatchEvent(event));
+        }
       }
+      await click('zoomRegionLabel');
     },
     fill,
     show,
@@ -410,8 +579,24 @@ export function createEditorFixture(
     createUrl,
     revokeUrl,
     clipboard,
+    publication: persistence.saveSnapshot,
+    get persistedSnapshot() {
+      return persistence.snapshot;
+    },
+    get liveSession() {
+      if (!liveSession) throw new Error('The editor session has not opened.');
+      return liveSession;
+    },
     get snapshot() {
-      return session.snapshot;
+      if (!liveSession) throw new Error('The editor session has not opened.');
+      return structuredClone(liveSession.getSnapshot().snapshot);
+    },
+    async flush() {
+      const current = liveSession;
+      if (!current) throw new Error('The editor session has not opened.');
+      await act(async () => {
+        await current.flush();
+      });
     },
     async cleanup() {
       await act(async () => root.unmount());

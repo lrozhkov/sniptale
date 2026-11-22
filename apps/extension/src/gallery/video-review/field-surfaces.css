@@ -1,0 +1,74 @@
+[data-ui='gallery.videoReview.inspector'] {
+  --review-field-name-column: 120px;
+  --review-field-column-max: 206px;
+  --review-field-control-height: 32px;
+  --review-inspector-form-width: calc(
+    var(--review-field-name-column) + var(--review-field-column-max) + 24px
+  );
+  --sniptale-parameter-label-width: var(--review-field-name-column);
+  --sniptale-parameter-value-width: var(--review-field-column-max);
+}
+
+.review-composer-actions {
+  padding-inline: 8px;
+}
+
+.review-webcam-crop-preview {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  margin-inline: 8px;
+  padding-block: 4px 8px;
+  border-block-end: 1px solid var(--sniptale-color-field-border);
+}
+
+.review-webcam-timing-divider {
+  margin-inline: 8px;
+  border: 0;
+  border-block-start: 1px solid var(--sniptale-color-field-border);
+}
+
+.review-project-info {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  padding-inline: 8px;
+}
+
+@layer utilities {
+  .sniptale-compact-workspace
+    [data-ui='gallery.videoReview.inspector']
+    .sniptale-parameter-row[data-layout='inline']:has(
+      > .sniptale-parameter-value
+        :is(
+          .sniptale-paint-value,
+          .sniptale-framed-color-value,
+          .sniptale-text-value,
+          [data-ui='shared.ui.compact-select'],
+          [data-ui='shared.ui.compact-inspector.segmented-row']
+        )
+    ),
+  .sniptale-compact-workspace
+    [data-ui='gallery.videoReview.inspector']
+    [data-ui='shared.ui.compact-inspector.numeric-row'][data-appearance='plain'].sniptale-parameter-row,
+  .sniptale-compact-workspace
+    [data-ui='gallery.videoReview.inspector']
+    .sniptale-parameter-row.sniptale-status-parameter {
+    --sniptale-parameter-context-space: 0px;
+    min-height: var(--review-field-control-height) !important;
+    padding-block: 0;
+  }
+
+  .sniptale-compact-workspace
+    [data-ui='gallery.videoReview.inspector']
+    .sniptale-parameter-row.sniptale-boolean-parameter {
+    grid-template-columns:
+      minmax(
+        0,
+        min(var(--sniptale-parameter-label-width), var(--sniptale-parameter-label-share, 45%))
+      )
+      max-content !important;
+    min-height: var(--review-field-control-height) !important;
+    padding-block: 0 !important;
+  }
+}

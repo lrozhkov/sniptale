@@ -43,6 +43,8 @@ import {
   isSharedBackupLayout,
   assertReviewProjectLayout,
   assertCursorAttachmentLayout,
+  assertImageHistoryLayout,
+  assertLinkedLibraryLayout,
 } from './layout';
 import { decodeBackupMetadata } from './metadata-transport';
 import { assertArchiveRootObjectInventory } from './root-codecs/object-inventory';
@@ -58,6 +60,7 @@ export interface ArchiveRootPublisher {
   prepareStaged?(args: {
     envelope: MediaHubBackupRootEnvelope;
     staged: StagedArchiveObject[];
+    session?: ArchiveRestoreSession;
   }): Promise<{ envelope: MediaHubBackupRootEnvelope; staged: StagedArchiveObject[] }>;
   checkpointSkipIfExisting?(args: {
     envelope: MediaHubBackupRootEnvelope;
@@ -139,6 +142,8 @@ async function loadEnvelope(
   assertArchiveRootMetadataIdentity(descriptor, decoded.metadata);
   assertReviewProjectLayout(decoded.metadata, manifest.layout);
   assertCursorAttachmentLayout(decoded.metadata, manifest.layout);
+  assertImageHistoryLayout(decoded.metadata, manifest.layout);
+  assertLinkedLibraryLayout(decoded.metadata, manifest.layout);
   if (isSharedBackupLayout(manifest.layout))
     await assertArchiveRootObjectInventory(decoded, reader, manifest.sharedObjects ?? []);
   return decoded;
@@ -186,7 +191,7 @@ async function restoreArchiveRoot(args: {
       ...(args.signal ? { signal: args.signal } : {}),
     });
     if (args.publisher.prepareStaged) {
-      const prepared = await args.publisher.prepareStaged({ envelope, staged });
+      const prepared = await args.publisher.prepareStaged({ envelope, staged, session });
       envelope = prepared.envelope;
       staged = prepared.staged;
     }
@@ -279,12 +284,16 @@ export async function restoreMediaHubBackupV6(args: {
       }
       const descriptors = await orderLibraryRestoreRoots(allDescriptors, async (descriptor) => {
         const envelope = await loadEnvelope(reader, descriptor, inspection.manifest, args.signal);
-        const metadata = parsePortableMediaMetadata(envelope.metadata);
-        return (metadata.reviewAssets ?? []).flatMap((asset) =>
+        const metadata = parsePortableMediaMetadata(envelope.metadata, {
+          allowLibraryRelationships: true,
+        });
+        const dependencies = (metadata.reviewAssets ?? []).flatMap((asset) =>
           [asset.libraryMediaId, asset.entry.originMediaId].filter(
             (id): id is string => Boolean(id) && id !== descriptor.rootId
           )
         );
+        if (metadata.linkedSourceMediaId) dependencies.push(metadata.linkedSourceMediaId);
+        return dependencies;
       });
       for (const descriptor of descriptors) {
         if (args.signal?.aborted) {

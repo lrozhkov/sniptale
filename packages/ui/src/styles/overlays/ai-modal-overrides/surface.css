@@ -8,8 +8,7 @@
   letter-spacing: 0.08em;
 }
 
-.sniptale-ai-modal-root .sniptale-textarea,
-.sniptale-ai-modal-root .sniptale-input,
+.sniptale-ai-modal-root :is(.sniptale-textarea, .sniptale-input):not(.sniptale-modal *),
 .sniptale-ai-modal-root .sniptale-json-preview,
 .sniptale-ai-modal-root .sniptale-data-container {
   background:
@@ -58,15 +57,6 @@
 .sniptale-ai-modal-template-select {
   width: 146px;
   max-width: calc(100% - 34px);
-}
-
-.sniptale-ai-modal-template-select .sniptale-select-sm {
-  --sniptale-field-height: 30px;
-  --sniptale-field-padding-block: 4px;
-  --sniptale-field-padding-inline-start: 8px;
-  --sniptale-field-padding-inline-end: 28px;
-  --sniptale-field-radius: 7px;
-  --sniptale-field-font-size: 12px;
 }
 
 .sniptale-ai-modal-template-menu {
@@ -158,13 +148,11 @@
   line-height: 16px;
 }
 
-.sniptale-ai-modal-root .sniptale-textarea,
-.sniptale-ai-modal-root .sniptale-input {
+.sniptale-ai-modal-root :is(.sniptale-textarea, .sniptale-input):not(.sniptale-modal *) {
   border-radius: 10px;
 }
 
-.sniptale-ai-modal-root .sniptale-textarea:focus,
-.sniptale-ai-modal-root .sniptale-input:focus {
+.sniptale-ai-modal-root :is(.sniptale-textarea, .sniptale-input):not(.sniptale-modal *):focus {
   border-color: color-mix(
     in srgb,
     var(--sniptale-color-accent) 36%,
@@ -230,64 +218,10 @@
   gap: 6px;
 }
 
-.sniptale-ai-data-search {
-  display: flex;
+.sniptale-ai-spoiler-header-tools > .sniptale-ai-data-search {
   width: 156px;
-  height: 28px;
-  align-items: center;
-  gap: 6px;
-  padding: 0 8px;
-  border: 1px solid color-mix(in srgb, var(--sniptale-color-border-soft) 76%, transparent);
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--sniptale-color-surface-input) 54%, transparent);
-  color: var(--sniptale-color-text-dim);
-}
-
-.sniptale-ai-data-search:focus-within {
-  border-color: color-mix(in srgb, var(--sniptale-color-accent) 42%, transparent);
-}
-
-.sniptale-ai-data-search input {
-  min-width: 0;
-  flex: 1;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--sniptale-color-text-primary);
-  font-family: inherit;
-  font-size: 11px;
-}
-
-.sniptale-ai-data-search input::placeholder {
-  color: var(--sniptale-color-text-dim);
-  font-size: 10px;
-  font-style: italic;
-  opacity: 0.72;
-}
-
-.sniptale-ai-data-search input:focus::placeholder {
-  color: transparent;
-  opacity: 0;
-}
-
-.sniptale-ai-data-search-clear {
-  display: inline-flex;
-  width: 20px;
-  height: 20px;
-  flex: 0 0 20px;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--sniptale-color-text-dim);
-  cursor: pointer;
-}
-
-.sniptale-ai-data-search-clear:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 72%, transparent);
-  color: var(--sniptale-color-text-primary);
+  max-width: 100%;
+  flex-shrink: 1;
 }
 
 .sniptale-ai-data-selected-filter {
@@ -389,12 +323,6 @@
   inset-inline-start: 8px;
   bottom: 8px;
   max-width: calc(100% - 88px);
-}
-
-.sniptale-ai-modal-adopted .sniptale-ai-modal-template-select .sniptale-select-sm {
-  --sniptale-field-height: 32px;
-  --sniptale-field-radius: 4px;
-  --sniptale-field-font-size: 13px;
 }
 
 .sniptale-ai-modal-adopted .sniptale-ai-modal-template-select {

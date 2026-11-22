@@ -223,6 +223,7 @@ function findRecordingPreviewItem(items: GalleryItem[], recordingId: string): Ga
     items.find(
       (item) =>
         isGalleryMediaItem(item) &&
+        item.lifecycle?.trashedAt === undefined &&
         item.source.kind === 'recording' &&
         item.source.recordingId === recordingId
     ) ?? null
@@ -251,6 +252,7 @@ function useInitialRecordingPreview({
     const item = mediaId
       ? (allItems.find(
           (entry) =>
+            entry.lifecycle?.trashedAt === undefined &&
             (isGalleryMediaItem(entry) ||
               (quickEditRef.current && entry.type === 'quick-edit-project')) &&
             (entry.entityId ?? entry.id) === mediaId
@@ -289,7 +291,7 @@ export function useGalleryAppState(viewMode: GalleryViewMode): GalleryAppStateCo
   });
   const selectionAnchorRef = useRef<string | null>(null);
   useInitialRecordingPreview({
-    allItems: derived.allItems,
+    allItems: storage.library.items,
     setPreview: preview.actions.setPreview,
   });
   const state = buildGalleryAppState({

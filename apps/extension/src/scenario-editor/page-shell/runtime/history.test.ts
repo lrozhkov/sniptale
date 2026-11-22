@@ -9,6 +9,7 @@ import {
   applyGuideStructureOperation,
 } from '../../../features/scenario/project/public';
 import { createGuideHistoryReducer, reduceGuideHistory, type GuideHistory } from './history';
+import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
 
 function initial(): GuideHistory {
   return { present: createGuideProject('Original', 'guide', 1), past: [], future: [], group: null };
@@ -44,7 +45,7 @@ it('captures final X before Y when X already published a technical maxWait inter
     group: 'tags',
     actionId: Y,
   });
-  expect(state).toHaveProperty('closedCaptures', [{ project: finalX, actionId: X }]);
+  expect(state.past.at(-1)).toBe(finalX);
   expect(state).toHaveProperty('actionId', Y);
   state = reduceGuideHistory(state, {
     kind: 'undo',
@@ -54,7 +55,7 @@ it('captures final X before Y when X already published a technical maxWait inter
   expect(state.present?.tags).toEqual([]);
 });
 
-it('keeps a newer closed Redo capture when an older acknowledgement shares its project object', () => {
+it('keeps the Redo cursor when an older acknowledgement shares its project object', () => {
   const X = '00000000-0000-4000-8000-000000000001';
   const U = '00000000-0000-4000-8000-000000000002';
   const R = '00000000-0000-4000-8000-000000000003';
@@ -75,7 +76,9 @@ it('keeps a newer closed Redo capture when an older acknowledgement shares its p
     project: { ...source, updatedAt: 2 },
     actionId: X,
   });
-  expect(state.closedCaptures?.some((capture) => capture.actionId === R)).toBe(true);
+  expect(state.actionId).toBe(R);
+  expect(state.future).toEqual([]);
+  expect(state.past.map((project) => project.name)).toEqual(['Original']);
 });
 
 it('retains unchanged canonical item references when publishing the current autosave source', () => {
@@ -205,18 +208,21 @@ it('resets history across project lifecycle and ignores a foreign commit', () =>
 });
 
 it('bounds retained undo entries and does not mutate previous history values', () => {
-  const original = initial();
-  let state = original;
-  for (let index = 1; index <= 60; index += 1) {
-    state = reduceGuideHistory(state, {
-      kind: 'edit',
-      project: { ...state.present!, name: String(index) },
-      group: null,
-    });
-  }
-  expect(state.past).toHaveLength(50);
-  expect(state.past[0]?.name).toBe('10');
-  expect(original.past).toHaveLength(0);
+  const project = initial().present!;
+  const past = Array.from({ length: EDITOR_HISTORY_LIMITS.maxActions }, (_, index) => ({
+    ...project,
+    name: String(index),
+  }));
+  const original = { ...initial(), past };
+  const state = reduceGuideHistory(original, {
+    kind: 'edit',
+    project: { ...project, name: 'Newest' },
+    group: null,
+  });
+  expect(state.past).toHaveLength(EDITOR_HISTORY_LIMITS.maxActions);
+  expect(state.past[0]?.name).toBe('1');
+  expect(original.past[0]?.name).toBe('0');
+  expect(original.past).toHaveLength(EDITOR_HISTORY_LIMITS.maxActions);
   expect(original.present?.name).toBe('Original');
 });
 
@@ -244,16 +250,17 @@ it('acknowledges an older autosave without replacing later text or splitting its
 
 it('hydrates bounded project history in chronological order and resets redo', () => {
   const project = createGuideProject('Current', 'guide', 100);
-  const past = Array.from({ length: 55 }, (_, index) => ({ ...project, name: String(index) }));
+  const length = EDITOR_HISTORY_LIMITS.maxActions + 5;
+  const past = Array.from({ length }, (_, index) => ({ ...project, name: String(index) }));
   let state = reduceGuideHistory(initial(), {
     kind: 'reset',
     project,
     past: [...past, createGuideProject('Other', 'other', 1)],
   });
-  expect(state.past).toHaveLength(50);
+  expect(state.past).toHaveLength(EDITOR_HISTORY_LIMITS.maxActions);
   expect(state.past[0]?.name).toBe('5');
   state = reduceGuideHistory(state, { kind: 'undo' });
-  expect(state.present?.name).toBe('54');
+  expect(state.present?.name).toBe(String(length - 1));
   state = reduceGuideHistory(state, { kind: 'redo' });
   expect(state.present).toBe(project);
   expect(reduceGuideHistory(state, { kind: 'reset', project: null }).past).toEqual([]);
@@ -300,6 +307,8 @@ it('undoes and redoes frameless title and body together in one history entry', (
 it('does not repeatedly serialize retained snapshots when editing another snapshot', () => {
   const reduce = createGuideHistoryReducer();
   const project = createGuideProject('Original', 'measure', 1);
+  const shared = createGuideStep('Shared', 'shared');
+  project.items = [shared];
   const stringify = vi.spyOn(JSON, 'stringify');
   try {
     let state: GuideHistory = { present: null, past: [], future: [], group: null };
@@ -312,7 +321,7 @@ it('does not repeatedly serialize retained snapshots when editing another snapsh
       });
     }
     expect(state.past).toHaveLength(8);
-    expect(stringify.mock.calls.filter(([value]) => value === project)).toHaveLength(1);
+    expect(stringify.mock.calls.filter(([value]) => value === shared)).toHaveLength(1);
     state = reduce(state, { kind: 'undo' });
     expect(state.present?.name).toBe('Edit 6');
     state = reduce(state, { kind: 'redo' });
@@ -320,4 +329,163 @@ it('does not repeatedly serialize retained snapshots when editing another snapsh
   } finally {
     stringify.mockRestore();
   }
+});
+
+it('restores the current cursor and both navigation branches without creating another action', () => {
+  const current = createGuideProject('Current', 'guide', 100);
+  const before = { ...current, name: 'Before' };
+  const after = { ...current, name: 'After' };
+  const last = { ...current, name: 'Last' };
+  const past = [before];
+  const future = [after, last];
+  const restore = { kind: 'reset' as const, project: current, past, future };
+  let state = reduceGuideHistory(
+    {
+      ...initial(),
+      group: 'old-group',
+      actionId: 'old-action',
+    },
+    restore
+  );
+  expect(state.present).toBe(current);
+  expect(state.future).toEqual([after, last]);
+  expect(state.group).toBeNull();
+  expect(state.actionId).toBeUndefined();
+  state = reduceGuideHistory(state, { kind: 'redo' });
+  expect(state.present?.name).toBe('After');
+  state = reduceGuideHistory(state, { kind: 'redo' });
+  expect(state.present?.name).toBe('Last');
+  for (const name of ['After', 'Current', 'Before']) {
+    state = reduceGuideHistory(state, { kind: 'undo' });
+    expect(state.present?.name).toBe(name);
+  }
+  expect(past).toEqual([before]);
+  expect(future).toEqual([after, last]);
+});
+
+it('admits only this project in both restored branches and clears them when the project closes', () => {
+  const project = createGuideProject('Current', 'guide', 100);
+  const before = { ...project, name: 'Before' };
+  const after = { ...project, name: 'After' };
+  const foreign = createGuideProject('Foreign', 'other', 100);
+  const state = reduceGuideHistory(initial(), {
+    kind: 'reset',
+    project,
+    past: [foreign, before],
+    future: [after, foreign],
+  });
+  expect(state.past).toEqual([before]);
+  expect(state.future).toEqual([after]);
+  expect(
+    reduceGuideHistory(state, { kind: 'reset', project: null, past: [before], future: [after] })
+  ).toEqual({ present: null, past: [], future: [], group: null });
+});
+
+it('bounds a restored timeline around the current cursor and branches on the next edit', () => {
+  const project = createGuideProject('Current', 'guide', 100);
+  const half = EDITOR_HISTORY_LIMITS.maxActions / 2;
+  const length = half + 35;
+  const past = Array.from({ length }, (_, index) => ({ ...project, name: `Past ${index}` }));
+  const future = Array.from({ length }, (_, index) => ({
+    ...project,
+    name: `Future ${index}`,
+  }));
+  let state = reduceGuideHistory(initial(), { kind: 'reset', project, past, future });
+  expect(state.present).toBe(project);
+  expect(state.past).toHaveLength(half);
+  expect(state.future).toHaveLength(half);
+  expect(state.past.at(-1)?.name).toBe(`Past ${length - 1}`);
+  expect(state.future[0]?.name).toBe('Future 0');
+  expect(past).toHaveLength(length);
+  expect(future).toHaveLength(length);
+  state = reduceGuideHistory(state, {
+    kind: 'edit',
+    project: { ...project, name: 'Branch' },
+    group: null,
+  });
+  expect(state.future).toEqual([]);
+  state = reduceGuideHistory(state, { kind: 'undo' });
+  expect(state.present).toBe(project);
+});
+
+it('preserves fifty native transitions sharing one large item on hydration and navigation', () => {
+  const current = createGuideProject('Current', 'pooled-runtime', 100);
+  const item = createGuideStep('Shared', 'shared');
+  item.blocks.push({
+    kind: 'text',
+    id: 'text',
+    paragraphs: Array.from({ length: 30 }, () => ({
+      runs: [{ text: 'x'.repeat(10000), bold: false, italic: false, href: null }],
+    })),
+  });
+  current.items = [item];
+  const past = Array.from({ length: 25 }, (_, index) => ({ ...current, name: `Past ${index}` }));
+  const future = Array.from({ length: 25 }, (_, index) => ({
+    ...current,
+    name: `Future ${index}`,
+  }));
+  const reduce = createGuideHistoryReducer();
+  let state = reduce(initial(), { kind: 'reset', project: current, past, future });
+  expect(state.past).toHaveLength(25);
+  expect(state.future).toHaveLength(25);
+  state = reduce(state, { kind: 'redo' });
+  expect(state.past).toHaveLength(26);
+  expect(state.future).toHaveLength(24);
+  expect(state.present?.name).toBe('Future 0');
+});
+
+it('removes a no-op field group and restores its original Redo even after an intermediate ACK', () => {
+  const current = initial().present!;
+  const before = { ...current, name: 'Before' };
+  const future = { ...current, name: 'Original Redo' };
+  let state = reduceGuideHistory(initial(), {
+    kind: 'reset',
+    project: current,
+    past: [before],
+    future: [future],
+  });
+  state = reduceGuideHistory(state, {
+    kind: 'edit',
+    project: { ...current, name: 'Intermediate' },
+    group: 'name',
+    actionId: 'X',
+  });
+  const intermediate = state.present!;
+  state = reduceGuideHistory(state, {
+    kind: 'publish',
+    project: { ...intermediate, updatedAt: 2 },
+    source: intermediate,
+    actionId: 'X',
+  });
+  state = reduceGuideHistory(state, {
+    kind: 'edit',
+    project: { ...state.present!, name: current.name },
+    group: 'name',
+    actionId: 'ignored',
+  });
+  expect(state.present).toMatchObject({ name: 'Original', updatedAt: 2 });
+  expect(state.past).toEqual([before]);
+  expect(state.future).toEqual([future]);
+  state = reduceGuideHistory(state, { kind: 'redo', actionId: 'R' });
+  expect(state.present?.name).toBe('Original Redo');
+});
+
+it('keeps both branches when a reversible command acknowledges unchanged content', () => {
+  const current = initial().present!;
+  const before = { ...current, name: 'Before' };
+  const after = { ...current, name: 'Redo' };
+  let state = reduceGuideHistory(initial(), {
+    kind: 'reset',
+    project: current,
+    past: [before],
+    future: [after],
+  });
+  state = reduceGuideHistory(state, {
+    kind: 'commit',
+    project: { ...current, updatedAt: 2 },
+    reversible: true,
+  });
+  expect(state.past).toEqual([before]);
+  expect(state.future).toEqual([after]);
+  expect(state.present).toMatchObject({ name: current.name, updatedAt: 2 });
 });

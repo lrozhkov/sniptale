@@ -1,7 +1,17 @@
 // @vitest-environment jsdom
+import {
+  loadScenarioCatalogFixture,
+  prepareScenarioTranslations,
+} from './test-support/translations.test-support';
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadScenarioCatalogFixture>[0]) =>
+    loadScenarioCatalogFixture(locale),
+}));
+beforeAll(prepareScenarioTranslations);
+
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createGuideImageBlock } from '../../features/scenario/project/public';
 import { createTranslator } from '../../platform/i18n';
 import { GuideImageFramingProvider } from './image-framing-session';
@@ -129,22 +139,20 @@ it('edits bounded zoom/frame fields and keeps caption and alternative text as pl
   expect(host.querySelector('script')).toBeNull();
 });
 
-it('uses one contextual range per exact image dimension without clamping off-scale values', async () => {
+it('keeps exact image dimensions and one contextual zoom range', async () => {
   await render('blob:image', false, { ...block, frame: { width: 3500, height: 600 } }, true);
   await act(async () => decoded[0]?.dispatchEvent(new Event('load')));
   const ranges = [...host.querySelectorAll<HTMLInputElement>('input[type="range"]')];
-  expect(ranges.map((range) => range.getAttribute('aria-label'))).toEqual([
-    'Zoom range',
-    'Frame width range',
-    'Frame height range',
-  ]);
-  expect(host.querySelector('input[aria-label="Frame width"]')?.getAttribute('value')).toBe('3500');
-  expect(ranges[1]?.max).toBe('2000');
-  for (const range of ranges) {
-    expect(range.closest('[data-ui="shared.ui.compact-inspector.numeric-row"]')).not.toBeNull();
-  }
-  await act(async () => ranges[1]?.focus());
-  await act(async () => ranges[1]?.blur());
+  expect(ranges.map((range) => range.getAttribute('aria-label'))).toEqual(['Zoom range']);
+  expect(ranges[0]?.max).toBe('400');
+  expect(ranges[0]?.closest('[data-ui="shared.ui.compact-inspector.numeric-row"]')).not.toBeNull();
+  const width = host.querySelector<HTMLInputElement>('input[aria-label="Frame width"]')!;
+  expect(width.value).toBe('3500');
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Frame height"]')?.value).toBe(
+    '600'
+  );
+  await act(async () => width.focus());
+  await act(async () => width.blur());
   expect(change).not.toHaveBeenCalled();
   await render('blob:image', false, block, true);
   const zoom = host.querySelector<HTMLInputElement>('input[aria-label="Zoom range"]')!;

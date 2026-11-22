@@ -77,11 +77,6 @@ export function KeyboardFeedbackFields(props: KeyboardFeedbackFieldsProps) {
               value={common(props.values.map((value) => value[key] * 1000)) ?? null}
               min={key === 'offset' ? -2000 : key === 'after' ? 50 : 0}
               max={key === 'after' ? 5000 : 2000}
-              scrub={{
-                min: key === 'offset' ? -250 : 0,
-                max: key === 'after' ? 2000 : 500,
-                step: 10,
-              }}
               step={10}
               precision={0}
               unit=""
@@ -104,7 +99,6 @@ export function KeyboardFeedbackFields(props: KeyboardFeedbackFieldsProps) {
             value={style('margin') ?? null}
             min={0}
             max={160}
-            scrub={{ min: 0, max: 80, step: 1 }}
             unit="px"
             step={1}
             precision={0}
@@ -137,7 +131,6 @@ function KeyAppearance({
           value={style(key) ?? null}
           min={key === 'fontSize' ? 12 : 0}
           max={key === 'fontSize' ? 96 : 32}
-          scrub={{ min: key === 'fontSize' ? 12 : 0, max: key === 'fontSize' ? 48 : 32, step: 1 }}
           unit="px"
           step={1}
           precision={0}
@@ -165,7 +158,8 @@ function KeyAppearance({
         value={style('opacity') === undefined ? null : style('opacity')! * 100}
         min={0}
         max={100}
-        scrub={{ min: 0, max: 100, step: 1 }}
+        scrub={style('opacity') === undefined ? undefined : { min: 0, max: 100, step: 1 }}
+        rangePresentation="field"
         unit="%"
         step={1}
         precision={0}
@@ -203,10 +197,7 @@ function KeyChoice<T extends string>(props: {
 }) {
   return (
     <>
-      <InspectorParameterRow
-        label={props.label}
-        valueOptions={props.options.map((option) => option.label)}
-      >
+      <InspectorParameterRow label={props.label}>
         <CompactSegmentedSelector
           ariaLabel={props.label}
           value={props.value}
@@ -241,9 +232,9 @@ function KeyNumber(props: Omit<NumericRowProps, 'onPreviewValue'>) {
         appearance="plain"
         focusAppearance="accent-box"
         enterBehavior="blur"
-        className="min-h-8! w-full grid-cols-[minmax(0,1fr)_auto]! py-0!"
         value={draft ?? props.value}
         onPreviewValue={setDraft}
+        onCancelValue={() => setDraft(undefined)}
         onCommitValue={(value) => {
           setDraft(undefined);
           props.onCommitValue(value);

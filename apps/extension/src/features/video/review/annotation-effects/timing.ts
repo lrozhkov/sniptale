@@ -1,3 +1,4 @@
+import { projectReviewVisualAnchor } from '../visual-anchor';
 import type { ReviewTimeSegment } from '../time-segment';
 import type { ReviewAnnotationEffect } from './types';
 
@@ -8,19 +9,32 @@ interface ReviewAnnotationEffectSlice {
   start: number;
   end: number;
   offset: number;
+  rate?: number;
 }
 
 /** Projects a source interval without changing its authored anchor or restarting animation after cuts. */
 export function projectReviewAnnotationEffect(
-  annotation: Pick<ReviewAnnotationEffect, 'start' | 'end'>,
+  annotation: Pick<ReviewAnnotationEffect, 'start' | 'end' | 'timeDomain' | 'visualAnchor'>,
   segments: readonly ReviewTimeSegment[]
 ) {
+  if (annotation.visualAnchor)
+    return {
+      slices: projectReviewVisualAnchor(annotation.visualAnchor, segments),
+      duration: annotation.end - annotation.start,
+    };
+  if (annotation.timeDomain === 'result')
+    return {
+      slices: [
+        { sourceStart: 0, sourceEnd: 0, start: annotation.start, end: annotation.end, offset: 0 },
+      ],
+      duration: annotation.end - annotation.start,
+    };
   const slices: ReviewAnnotationEffectSlice[] = [];
   let duration = 0;
   for (const segment of segments) {
     if (segment.kind === 'cut') continue;
     if (segment.kind === 'freeze') {
-      const source = segment.frameTime ?? segment.sourceStart;
+      const source = segment.sourceStart;
       if (annotation.start <= source && source < annotation.end) {
         slices.push({
           sourceStart: source,
@@ -57,17 +71,21 @@ export function sampleReviewAnnotationEffect(
     (part) => globalResultTime >= part.start && globalResultTime < part.end
   );
   if (!slice) return null;
-  const progress = (slice.offset + globalResultTime - slice.start) / projection.duration;
+  const rate = slice.rate ?? 1;
+  const progress = (slice.offset + (globalResultTime - slice.start) * rate) / projection.duration;
   return {
     time: progress * documentDuration,
     progress,
-    playbackRate: documentDuration / projection.duration,
+    playbackRate: (rate * documentDuration) / projection.duration,
   };
 }
 
 /** Select one future result slice without evaluating a graph or reading media. */
 export function resolveUpcomingReviewAnnotationEffectSlice<
-  T extends Pick<ReviewAnnotationEffect, 'id' | 'enabled' | 'order' | 'start' | 'end'>,
+  T extends Pick<
+    ReviewAnnotationEffect,
+    'id' | 'enabled' | 'order' | 'start' | 'end' | 'timeDomain' | 'visualAnchor'
+  >,
 >(
   instances: readonly T[],
   segments: readonly ReviewTimeSegment[],

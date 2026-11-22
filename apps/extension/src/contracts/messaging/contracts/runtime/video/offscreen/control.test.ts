@@ -250,3 +250,46 @@ it('admits exactly one bounded observation format and binds its recording identi
     parse({ ...request, eventPacket: { ...packet, claimedDocumentId: 'foreign' } })
   ).toThrow();
 });
+
+it('accepts a bounded final cursor batch and refuses mixed or foreign payloads', () => {
+  const packet = {
+    version: 1,
+    recordingId: 'r',
+    sourceClockId: 'clock',
+    batchSequence: 0,
+    clockRevision: 0,
+    clock: {
+      source: 'dom-event-time',
+      timestampQuantumUs: null,
+      resolutionBoundUs: null,
+      mappingUncertaintyUs: null,
+    },
+    viewport: {
+      width: 640,
+      height: 400,
+      devicePixelRatio: 1,
+      visualViewportScale: 1,
+      visualViewportOffsetX: 0,
+      visualViewportOffsetY: 0,
+    },
+    records: [{ kind: 'boundary', reason: 'stop', activeTimeUs: 1 }],
+  };
+  const contract =
+    runtimeVideoOffscreenControlMessageContracts[VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS];
+  const request = {
+    type: VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS,
+    recordingId: 'r',
+    generation: 1,
+    streamInstanceId: 's',
+    capabilityToken: 'private',
+    nativeDocumentId: 'document',
+    cursorPackets: [packet],
+  };
+  expect(contract.parseRequest(request)).toEqual(request);
+  expect(() => contract.parseRequest({ ...request, cursorPacket: packet })).toThrow();
+  expect(() => contract.parseRequest({ ...request, recordingId: 'other' })).toThrow();
+  expect(() => contract.parseRequest({ ...request, cursorPackets: [] })).toThrow();
+  expect(() =>
+    contract.parseResponse({ success: true, result: 'accepted', capabilityToken: 'private' })
+  ).toThrow();
+});

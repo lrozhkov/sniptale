@@ -3,6 +3,7 @@ import type { FolderFilter, GalleryViewMode } from './types';
 
 export const SIDEBAR_FOLDERS: FolderFilter[] = [
   'all',
+  'image-project',
   'video-project',
   'scenario',
   'screenshot',
@@ -13,7 +14,7 @@ export const SIDEBAR_FOLDERS: FolderFilter[] = [
 ];
 
 export const FOLDER_FILTER_KIND_MAP: Record<
-  Exclude<FolderFilter, 'all' | 'scenario'>,
+  Exclude<FolderFilter, 'all' | 'scenario' | 'image-project'>,
   GalleryItemKind[]
 > = {
   audio: ['audio'],

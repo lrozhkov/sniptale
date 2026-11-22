@@ -46,7 +46,6 @@ export function ReviewBackgroundInspector(props: {
         <div className="review-background-kinds">
           <SegmentedRow
             label={translate('gallery.videoReview.backgroundType')}
-            layout="stacked"
             columns={3}
             ariaLabel={translate('gallery.videoReview.background')}
             options={kinds.map((kind) => ({ value: kind.key, label: translate(kind.label) }))}
@@ -129,7 +128,7 @@ function ReviewBackgroundMotionControls(props: {
   if (!props.background.enabled) return null;
   if (props.background.type === 'solid')
     return (
-      <p className="text-xs text-[var(--sniptale-color-text-muted)]">
+      <p className="px-2 text-xs text-[var(--sniptale-color-text-muted)]">
         {translate('editor.scene.backgroundMotionSolidHint')}
       </p>
     );
@@ -153,6 +152,7 @@ function ReviewBackgroundMotionControls(props: {
             <ReviewPreviewNumberRow
               key={key}
               enterBehavior="blur"
+              rangePresentation="field"
               label={translate(
                 key === 'speed'
                   ? 'editor.scene.backgroundMotionSpeed'
@@ -198,7 +198,8 @@ function ReviewBackgroundLayoutControls({
       unit="px"
       min={0}
       max={4096}
-      scrubMax={key === 'padding' ? 200 : 100}
+      scrubEnabled={false}
+      stepperPlacement="sides"
       step={1}
       value={background.layout[key]}
       onPreview={(value) =>
@@ -213,6 +214,7 @@ function ReviewBackgroundLayoutControls({
         <ReviewPreviewNumberRow
           enterBehavior="blur"
           label={translate('editor.scene.backgroundBlurAmount')}
+          rangePresentation="field"
           unit="px"
           min={0}
           max={25}
@@ -229,6 +231,7 @@ function ReviewBackgroundLayoutControls({
       <ReviewPreviewNumberRow
         enterBehavior="blur"
         label={translate('gallery.videoReview.backgroundShadow')}
+        rangePresentation="field"
         unit="%"
         min={0}
         max={100}
@@ -290,7 +293,6 @@ function ReviewZoomObject(props: {
         columns={2}
         ariaLabel={translate('gallery.videoReview.backgroundZoom')}
         label={translate('gallery.videoReview.backgroundZoom')}
-        layout="stacked"
         value={value}
         options={modes}
         onChange={(zoomBehavior) => props.onChange({ zoomBehavior })}

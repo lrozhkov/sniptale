@@ -1,4 +1,12 @@
 // @vitest-environment jsdom
+import {
+  loadViewerCatalogFixture,
+  prepareViewerTranslations,
+} from '../../catalog-fixture.test-support';
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadViewerCatalogFixture>[0]) =>
+    loadViewerCatalogFixture(locale),
+}));
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -392,4 +400,8 @@ it('names a failed preview download as an extraction failure', async () => {
   expect(
     container.querySelector('[data-testid="snapshot-asset-preview"] [role="status"]')?.textContent
   ).toContain('Could not extract');
+});
+
+beforeEach(async () => {
+  await prepareViewerTranslations();
 });

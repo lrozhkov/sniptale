@@ -97,6 +97,9 @@ function NumericFieldInput(props: NumericFieldProps) {
         className={`${PAGE_STYLE_CONTROL_CLASS_NAME} ${showUnit ? '!pr-14' : '!pr-7'}`}
         disabled={props.disabled}
         inputMode="decimal"
+        onNumericStep={(direction) =>
+          props.onChange(stepCssLength(props.value, props.defaultValue, direction))
+        }
         value={inputValue}
         onChange={(event) => {
           const rawValue = event.currentTarget.value;

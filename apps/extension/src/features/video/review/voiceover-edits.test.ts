@@ -503,7 +503,7 @@ it('keeps exact source boundaries when a text-sized take ends one ULP after a Sp
   );
 });
 
-it('inserts silence without losing crossing voiceover samples and restores them on removal', () => {
+it('retains source-policy silence while continuous playback preserves all crossing samples', () => {
   const recording = anchorReviewVoiceover(clip, original);
   const before = structuredClone(recording);
   const hold: ReviewEdit = {
@@ -519,18 +519,18 @@ it('inserts silence without losing crossing voiceover samples and restores them 
   };
   const map = buildReviewTimeMap(12, [hold]);
   expect(parseVoiceoverSegments(map)).toEqual(map);
-  expect(projectReviewVoiceover([recording], map)).toMatchObject([
+  expect(projectReviewVoiceover([recording], map, 'source')).toMatchObject([
     { timelineStart: 3, duration: 1, sourceOffset: 2 },
     { timelineStart: 6, duration: 3, sourceOffset: 3 },
   ]);
-  expect(reviewVoiceoverNativeTime(recording, 5, map)).toBeNull();
-  expect(reviewVoiceoverNativeTime(recording, 6, map)).toBe(3);
+  expect(reviewVoiceoverNativeTime(recording, 5, map)).toBe(4);
+  expect(reviewVoiceoverNativeTime(recording, 6, map)).toBe(5);
   expect(projectReviewVoiceover([recording], original)).toMatchObject([clip]);
   expect(recording).toEqual(before);
   for (const change of [
     { rate: 1 },
     { sourceEnd: 4.1 },
-    { frameTime: 5 },
+    { frameTime: -1 },
     { frameDuration: 0 },
     { freezeId: '' },
     { resultEnd: 4 },
@@ -539,4 +539,64 @@ it('inserts silence without losing crossing voiceover samples and restores them 
     Object.assign(invalid[1]!, change);
     expect(parseVoiceoverSegments(invalid)).toBeNull();
   }
+});
+
+it('continues intact music across a freeze even when retiming splits an anchor at that boundary', () => {
+  const recording = anchorReviewVoiceover(clip, original);
+  const map = buildReviewTimeMap(12, [
+    {
+      id: 'hold',
+      kind: 'freeze',
+      start: 4,
+      end: 4,
+      requestedStart: 4,
+      requestedEnd: 4,
+      duration: 2,
+      frameTime: 3.98,
+      frameDuration: 0.04,
+    },
+  ]);
+  const before = structuredClone(recording);
+  expect(projectReviewVoiceover([recording], map, 'continue')).toMatchObject([
+    { id: clip.id, timelineStart: 3, duration: 4, sourceOffset: 2 },
+  ]);
+  expect(projectReviewVoiceover([recording], map, 'source')).toMatchObject([
+    { timelineStart: 3, duration: 1, sourceOffset: 2 },
+    { timelineStart: 6, duration: 3, sourceOffset: 3 },
+  ]);
+  expect(recording).toEqual(before);
+});
+
+it('fills music holds with subsequent asset samples while retaining timeline placement and fades', () => {
+  const recording = anchorReviewVoiceover({ ...clip, fadeOut: 1 }, original);
+  const hold = (start: number, duration: number): ReviewEdit => ({
+    id: `hold:${start}`,
+    kind: 'freeze',
+    start,
+    end: start,
+    requestedStart: start,
+    requestedEnd: start,
+    duration,
+    frameTime: start,
+    frameDuration: 1 / 30,
+  });
+  const map = buildReviewTimeMap(12, [hold(4, 2), hold(5, 1)]);
+  expect(projectReviewVoiceover([recording], map, 'fill')).toMatchObject([
+    {
+      id: clip.id,
+      timelineStart: 3,
+      sourceOffset: 2,
+      duration: 7,
+      fadePhase: { offset: 0, duration: 7 },
+    },
+  ]);
+  expect(
+    projectReviewVoiceover([recording], buildReviewTimeMap(12, [hold(2, 2)]), 'fill')
+  ).toMatchObject([{ timelineStart: 5, sourceOffset: 2, duration: 4 }]);
+  expect(
+    projectReviewVoiceover([recording], buildReviewTimeMap(12, [hold(8, 2)]), 'fill')
+  ).toMatchObject([{ timelineStart: 3, sourceOffset: 2, duration: 4 }]);
+  const resultClip = { ...clip, timeDomain: 'result' as const };
+  expect(projectReviewVoiceover([resultClip], map, 'fill')).toEqual([resultClip]);
+  expect(recording.duration).toBe(4);
 });

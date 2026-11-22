@@ -9,7 +9,11 @@ import {
 } from '../../features/video/review/telemetry';
 import type { ReviewSelection } from '../../features/video/review/types';
 import type { LoadedReview } from './use-session';
-import { cursorTrajectoryProjectHasPreparedPosition } from '../../features/video/project/cursor-trajectory/project-window';
+import type { ReviewPlaybackPresentationClock } from './playback-presentation-clock';
+import {
+  cursorTrajectoryProjectCoversTime,
+  cursorTrajectoryProjectHasPreparedPosition,
+} from '../../features/video/project/cursor-trajectory/project-window';
 
 type Resource = Pick<LoadedReview, 'historyProject' | 'telemetry' | 'source'>;
 type Range = { start: number; end: number };
@@ -43,9 +47,24 @@ function covers(view: View | null, owner: Owner, request: Request): boolean {
       view.request.range.end < request.range.end)
   )
     return false;
+  if (view.request.reach < request.reach) return false;
+  if (request.explicit) return true;
+  const range = view.request.range;
   return (
-    view.request.reach >= request.reach &&
-    (request.reach <= 1 || Math.abs(view.request.time - request.time) <= 1)
+    !!range &&
+    range.start <= Math.max(0, request.time - request.reach) &&
+    range.end >= Math.min(owner.project!.duration, request.time + request.reach)
+  );
+}
+
+/** Refresh before the proved window runs out; the current view remains usable during prefetch. */
+function needsPrefetch(view: View | null, owner: Owner, request: Request): boolean {
+  if (request.explicit || !view?.request.range) return false;
+  const reserve = Math.max(1, request.reach);
+  return (
+    view.request.range.start > Math.max(0, request.time - request.reach - reserve) ||
+    view.request.range.end <
+      Math.min(owner.project!.duration, request.time + request.reach + reserve)
   );
 }
 /** Each preview or viewport owns one active read and one latest request. */
@@ -58,29 +77,32 @@ export function useReviewRecordingHistory(
     includeCursor?: boolean;
     reach?: number;
     interactionTimeline?: ReviewInteractionTimeline | undefined;
+    clock?: ReviewPlaybackPresentationClock | undefined;
   } = {}
 ) {
+  const clock = options.range ? undefined : options.clock;
+  const sampleTime = clock ? Math.max(0, Math.min(resource.source.duration, clock.read())) : time;
   const includeCursor = options.includeCursor !== false;
   const interactionTimeline = options.interactionTimeline;
   const reach = Math.max(1, options.reach ?? 1);
-  const range =
-    options.range ??
-    (reach > 1
-      ? { start: Math.max(0, time - reach), end: Math.min(resource.source.duration, time + reach) }
-      : undefined);
+  const range = options.range ?? {
+    // Bounded lookahead absorbs archive latency instead of chasing each moving frame.
+    start: Math.max(0, sampleTime - reach - Math.max(2, reach * 2)),
+    end: Math.min(resource.source.duration, sampleTime + reach + Math.max(2, reach * 2)),
+  };
   const explicit = options.range !== undefined;
   const rangeStart = range?.start;
   const rangeEnd = range?.end;
   const request = useMemo<Request>(
     () => ({
-      time,
+      time: sampleTime,
       ...(rangeStart !== undefined && rangeEnd !== undefined
         ? { range: { start: rangeStart, end: rangeEnd } }
         : {}),
       explicit,
       reach,
     }),
-    [time, rangeStart, rangeEnd, explicit, reach]
+    [sampleTime, rangeStart, rangeEnd, explicit, reach]
   );
   const [current, setCurrent] = useState<Owner | null>(null);
   const owner =
@@ -120,15 +142,16 @@ export function useReviewRecordingHistory(
     };
   }, [resource.historyProject, resource.telemetry, includeCursor, interactionTimeline]);
   const [view, setView] = useState<View | null>(null);
+  const viewRef = useRef(view);
+  viewRef.current = view;
   const [retryGeneration, setRetryGeneration] = useState(0);
   useEffect(() => {
     if (!owner || owner.disposed || owner.failed) return;
-    owner.latest = request;
-    if (covers(view, owner, request)) return;
-    owner.requested = true;
-    if (owner.running) return;
-    owner.running = true;
-    void (async () => {
+    const publish = (next: View) => {
+      viewRef.current = next;
+      setView(next);
+    };
+    const load = async () => {
       try {
         while (owner.requested && !owner.disposed) {
           owner.requested = false;
@@ -140,21 +163,56 @@ export function useReviewRecordingHistory(
           const candidate: View = { owner, prepared, request: active, failed: false };
           if (covers(candidate, owner, owner.latest)) {
             owner.requested = false;
-            setView(candidate);
+            publish(candidate);
           } else owner.requested = true;
         }
       } catch {
         if (!owner.disposed) {
           owner.failed = true;
-          setView({ owner, request: owner.latest, failed: true });
+          publish({ owner, request: owner.latest, failed: true });
         }
       } finally {
         owner.running = false;
       }
-    })();
-  }, [owner, request, retryGeneration, view]);
+    };
+    const update = () => {
+      if (owner.disposed || owner.failed) return;
+      const time = clock
+        ? Math.max(0, Math.min(resource.source.duration, clock.read()))
+        : request.time;
+      const next: Request = clock
+        ? {
+            time,
+            explicit: false,
+            reach: request.reach,
+            range: {
+              start: Math.max(0, time - request.reach - Math.max(2, request.reach * 2)),
+              end: Math.min(
+                resource.source.duration,
+                time + request.reach + Math.max(2, request.reach * 2)
+              ),
+            },
+          }
+        : request;
+      const previous = viewRef.current;
+      const wasCovered = covers(previous, owner, owner.latest);
+      owner.latest = next;
+      const covered = covers(previous, owner, next);
+      // Clock samples stay outside React until the usable archive window changes.
+      if (previous && wasCovered !== covered) publish({ ...previous });
+      if (covered && !needsPrefetch(previous, owner, next)) return;
+      owner.requested = true;
+      if (owner.running) return;
+      owner.running = true;
+      void load();
+    };
+    update();
+    return clock?.subscribe(() => {
+      if (clock.read() !== owner.latest.time) update();
+    });
+  }, [owner, request, retryGeneration, view, clock, resource.source.duration]);
   const prepared = owner && covers(view, owner, request) ? view?.prepared : undefined;
-  // Retain proved native positions during refresh without extending the active read window.
+  // Retain known gaps for camera holds; adjacent facts still require a proved native position.
   const retainedCursor =
     owner &&
     !prepared &&
@@ -163,7 +221,8 @@ export function useReviewRecordingHistory(
     resource.telemetry?.cursorTrajectory &&
     view?.owner === owner &&
     view.prepared &&
-    cursorTrajectoryProjectHasPreparedPosition(view.prepared.project, request.time)
+    (cursorTrajectoryProjectCoversTime(view.prepared.project, request.time) ||
+      cursorTrajectoryProjectHasPreparedPosition(view.prepared.project, request.time))
       ? view.prepared.telemetry
       : undefined;
   const pinned = useRef<{ owner: Owner; marker: ReviewTelemetryMarker } | null>(null);

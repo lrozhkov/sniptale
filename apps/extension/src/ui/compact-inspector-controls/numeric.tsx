@@ -1,12 +1,19 @@
-import { useId, useState } from 'react';
-import { translate } from '../../platform/i18n';
 import {
-  COMPACT_INLINE_VALUE_SURFACE_CLASS_NAME,
-  COMPACT_INLINE_VALUE_FOCUS_CLASS_NAME,
-  COMPACT_INLINE_VALUE_INPUT_CLASS_NAME,
-} from './interactive-control-style';
+  memo,
+  useEffect,
+  useEffectEvent,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
+import { NumberInput } from '@sniptale/ui/number-input';
+import { translate } from '../../platform/i18n';
+import { COMPACT_INLINE_VALUE_INPUT_CLASS_NAME } from './interactive-control-style';
 import { cx, type CompactInspectorNumericScrub, type CompactInspectorUnit } from './shared';
 import { NumericRangeScrub } from './numeric-range-scrub';
+import { OpacityField } from './inspector-numeric-fields';
 import { NumericStepper } from './stepper';
 import { useNumericValueFieldState } from './numeric-value-state';
 import { TextWithOverflowHint } from './overflow-hint';
@@ -20,6 +27,9 @@ export interface NumericValueFieldProps {
   /** Focus presentation: 'accent-box' draws an accent border box, 'quiet' a thin accent line. */
   focusAppearance?: 'accent-box' | 'quiet' | undefined;
   invalid?: boolean | undefined;
+  /** Let unmodified Up and Down apply the field's existing exact step. */
+  keyboardStep?: boolean | undefined;
+  stepperPlacement?: 'sides' | 'none' | undefined;
   label: string;
   max?: number | undefined;
   min?: number | undefined;
@@ -28,6 +38,8 @@ export interface NumericValueFieldProps {
   getStepValue?: ((value: number, direction: 1 | -1) => number) | undefined;
   onCommitValue: (value: number) => void;
   onPreviewValue: (value: number) => void;
+  /** Release a consumer-owned preview after a canceled or unchanged stepper hold. */
+  onCancelValue?: ((origin: number | null) => void) | undefined;
   precision?: number | undefined;
   scrub?: CompactInspectorNumericScrub | undefined;
   step?: number | undefined;
@@ -46,6 +58,7 @@ export function NumericValueField(props: NumericValueFieldProps) {
     getStepValue: props.getStepValue,
     onCommitValue: props.onCommitValue,
     onPreviewValue: props.onPreviewValue,
+    onCancelValue: props.onCancelValue,
     precision: props.precision,
     step,
     unit,
@@ -62,14 +75,46 @@ function NumericValueFieldView({
   props: NumericValueFieldProps;
   state: ReturnType<typeof useNumericValueFieldState>;
 }) {
-  const quietFocus = props.focusAppearance === 'quiet';
-  const inspector = useInspectorLayout();
   const [pointerFocus, setPointerFocus] = useState(false);
+  const frame = useRef<HTMLDivElement>(null);
+  const committedState = useRef(state);
+  useLayoutEffect(() => {
+    committedState.current = state;
+  }, [state]);
+  const showStepper = props.stepperPlacement !== 'none';
+  const stepWithWheel = useEffectEvent((event: WheelEvent) => {
+    if (
+      props.disabled ||
+      !state.inputRef.current?.matches(':focus') ||
+      event.defaultPrevented ||
+      !event.cancelable ||
+      !event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      Math.abs(event.deltaY) <= Math.abs(event.deltaX)
+    )
+      return;
+    event.preventDefault();
+    event.stopPropagation();
+    state.applyStep(event.deltaY < 0 ? 1 : -1);
+  });
+  useEffect(() => {
+    const element = frame.current;
+    if (!element) return;
+    const handleWheel = (event: WheelEvent) => stepWithWheel(event);
+    element.addEventListener('wheel', handleWheel, { passive: false });
+    return () => element.removeEventListener('wheel', handleWheel);
+  }, []);
   const value = (
     <>
       <NumericValueInput
-        props={props}
-        state={state}
+        label={props.label}
+        draft={state.draft}
+        mixed={props.value === null}
+        disabled={props.disabled === true}
+        keyboardStep={props.keyboardStep !== false}
+        stateRef={committedState}
         pointerFocus={pointerFocus}
         setPointerFocus={setPointerFocus}
       />
@@ -78,107 +123,118 @@ function NumericValueFieldView({
   );
   return (
     <div
+      ref={frame}
       data-ui="shared.ui.compact-inspector.numeric-value-field"
+      data-stepper-placement={showStepper ? 'sides' : undefined}
       data-focus-appearance={props.focusAppearance ?? 'accent-box'}
       className={cx(
         'group/compact-numeric relative flex',
         'w-[6.25rem] shrink-0 items-center',
         'gap-0',
-        inspector ? 'sniptale-numeric-value' : COMPACT_INLINE_VALUE_SURFACE_CLASS_NAME,
-        !inspector && !quietFocus && COMPACT_INLINE_VALUE_FOCUS_CLASS_NAME,
+        'sniptale-numeric-value',
+        showStepper && 'sniptale-framed-stepper',
         props.invalid &&
           'border-[color:var(--sniptale-color-danger)] text-[color:var(--sniptale-color-danger)]',
         props.disabled && 'cursor-not-allowed opacity-55',
         props.className
       )}
     >
-      {inspector ? (
-        <span
-          className="sniptale-numeric-entry"
-          onPointerDown={(event) => {
-            if (event.button !== 0 || props.disabled || event.target === state.inputRef.current)
-              return;
-            event.preventDefault();
-            setPointerFocus(true);
-            state.inputRef.current?.focus();
-          }}
-        >
-          {value}
-        </span>
-      ) : (
-        value
-      )}
-      <NumericStepper disabled={props.disabled} label={props.label} onStep={state.applyStep} />
-      {quietFocus && !inspector && (
-        <span
-          aria-hidden="true"
-          className={[
-            'pointer-events-none absolute inset-x-1 bottom-0 h-px',
-            'bg-[color:var(--sniptale-color-accent)] opacity-0 transition-opacity',
-            'group-focus-within/compact-numeric:opacity-60',
-          ].join(' ')}
+      <span
+        className="sniptale-numeric-entry"
+        onPointerDown={(event) => {
+          if (event.button !== 0 || props.disabled || event.target === state.inputRef.current)
+            return;
+          event.preventDefault();
+          setPointerFocus(true);
+          state.inputRef.current?.focus();
+        }}
+      >
+        {value}
+      </span>
+      {showStepper ? (
+        <NumericStepper
+          disabled={props.disabled}
+          label={props.label}
+          onStep={state.previewStep}
+          onFinish={state.finishStep}
+          onCancel={state.cancelStep}
         />
-      )}
+      ) : null}
     </div>
   );
 }
 
-function NumericValueInput({
-  props,
-  state,
+const NumericValueInput = memo(function NumericValueInput({
+  label,
+  draft,
+  mixed,
+  disabled,
+  keyboardStep,
+  stateRef,
   pointerFocus,
   setPointerFocus,
 }: {
-  props: NumericValueFieldProps;
-  state: ReturnType<typeof useNumericValueFieldState>;
+  label: string;
+  draft: string;
+  mixed: boolean;
+  disabled: boolean;
+  keyboardStep: boolean;
+  stateRef: RefObject<ReturnType<typeof useNumericValueFieldState>>;
   pointerFocus: boolean;
   setPointerFocus(value: boolean): void;
 }) {
   return (
-    <input
-      ref={state.inputRef}
+    <NumberInput
+      ref={stateRef.current.inputRef}
       data-pointer-focus={pointerFocus || undefined}
-      aria-label={props.label}
-      disabled={props.disabled}
+      aria-label={label}
+      disabled={disabled}
       inputMode="decimal"
-      size={Math.max(1, state.draft.length)}
+      size={Math.max(1, draft.length)}
       type="text"
-      value={state.draft}
-      placeholder={props.value === null ? '—' : undefined}
-      onFocus={(event) => state.handleFocus(event, props.disabled === true)}
-      onChange={state.handleChange}
+      value={draft}
+      placeholder={mixed ? '—' : undefined}
+      onFocus={(event) => stateRef.current.handleFocus(event, disabled)}
+      onChange={(event) => stateRef.current.handleChange(event)}
       onBlur={() => {
         setPointerFocus(false);
-        state.commitDraft();
+        stateRef.current.commitDraft();
       }}
       onKeyDown={(event) => {
         setPointerFocus(false);
-        state.handleKeyDown(event);
+        if (
+          keyboardStep &&
+          !disabled &&
+          !event.defaultPrevented &&
+          !event.nativeEvent.isComposing &&
+          !event.altKey &&
+          !event.ctrlKey &&
+          !event.metaKey &&
+          !event.shiftKey &&
+          (event.key === 'ArrowUp' || event.key === 'ArrowDown')
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+          stateRef.current.applyStep(event.key === 'ArrowUp' ? 1 : -1);
+          return;
+        }
+        stateRef.current.handleKeyDown(event);
       }}
       onPointerDown={(event) => {
         setPointerFocus(true);
-        state.handlePointerDown(event);
+        stateRef.current.handlePointerDown(event);
       }}
       className={COMPACT_INLINE_VALUE_INPUT_CLASS_NAME}
     />
   );
-}
+});
 
 function NumericUnitLabel({ state }: { state: ReturnType<typeof useNumericValueFieldState> }) {
   if (!state.unitLabel) {
     return null;
   }
 
-  return (
-    <span
-      className={[
-        'shrink-0 text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
-        'text-[color:var(--sniptale-color-text-primary)]',
-      ].join(' ')}
-    >
-      {state.unitLabel}
-    </span>
-  );
+  return <span className="sniptale-numeric-unit">{state.unitLabel}</span>;
 }
 
 /** Hosts may inherit compact font/height CSS variables; unset values retain shared defaults. */
@@ -187,6 +243,7 @@ export interface NumericRowProps extends NumericValueFieldProps {
   className?: string;
   labelVisible?: boolean;
   revealScrub?: boolean;
+  rangePresentation?: 'field' | undefined;
 }
 
 export function NumericRow({
@@ -195,11 +252,25 @@ export function NumericRow({
   label,
   labelVisible = true,
   revealScrub = false,
-  scrub,
+  rangePresentation,
+  scrub: requestedScrub,
   ...props
 }: NumericRowProps) {
-  const range = useNumericRowRangeState(scrub, props.disabled, revealScrub);
   const inspector = useInspectorLayout();
+  const value = props.value;
+  const inlineRange =
+    appearance === 'plain' &&
+    rangePresentation === 'field' &&
+    requestedScrub &&
+    requestedScrub.min < requestedScrub.max &&
+    requestedScrub.toValue === undefined &&
+    requestedScrub.value === undefined &&
+    (props.min === undefined || props.min === requestedScrub.min) &&
+    (props.max === undefined || props.max === requestedScrub.max) &&
+    value !== null &&
+    props.getStepValue === undefined;
+  const scrub = inlineRange ? undefined : requestedScrub;
+  const range = useNumericRowRangeState(scrub, props.disabled, revealScrub);
   const scaleNoteId = useId();
   const scrubValue = scrub?.value ?? props.value;
   const outOfScale = Boolean(
@@ -208,6 +279,22 @@ export function NumericRow({
     scrubValue !== undefined &&
     (scrubValue < scrub.min || scrubValue > scrub.max)
   );
+  const rangeControl = scrub ? (
+    <NumericRangeScrub
+      active={range.active}
+      outOfScale={outOfScale}
+      descriptionId={outOfScale ? scaleNoteId : undefined}
+      disabled={props.disabled}
+      label={label}
+      onActiveChange={range.setActive}
+      onCommitValue={props.onCommitValue}
+      onPreviewValue={props.onPreviewValue}
+      scrub={scrub}
+      step={props.step}
+      value={props.value}
+      visible={range.visible}
+    />
+  ) : null;
 
   return (
     <div
@@ -228,13 +315,8 @@ export function NumericRow({
           range.setTextFocused(false);
       }}
       className={cx(
-        'group/compact-numeric-row relative min-h-10 items-center gap-2',
-        appearance === 'surface' &&
-          [
-            'flex justify-between gap-3 rounded-[10px] border px-3 py-1.5',
-            'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
-            'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
-          ].join(' '),
+        'group/compact-numeric-row relative min-h-8 items-center gap-2',
+        appearance === 'surface' && 'flex justify-between',
         appearance === 'plain' && 'grid grid-cols-[7.5rem_minmax(0,1fr)] py-0.5',
         className,
         inspector && 'sniptale-parameter-row'
@@ -242,28 +324,54 @@ export function NumericRow({
     >
       {labelVisible ? <NumericRowLabel appearance={appearance} label={label} /> : null}
       {appearance === 'plain' ? (
-        <div className={cx('min-w-0 justify-self-end', !labelVisible && 'col-start-2')}>
-          <NumericValueField label={label} {...props} />
+        <div
+          className={cx(
+            'min-w-0 justify-self-end',
+            inspector && 'sniptale-parameter-value',
+            inlineRange && !inspector && 'w-full max-w-40',
+            !labelVisible && 'col-start-2'
+          )}
+        >
+          {inlineRange ? (
+            <OpacityField
+              label={label}
+              value={value}
+              unit={props.unit ?? ''}
+              min={requestedScrub.min}
+              max={requestedScrub.max}
+              step={props.step}
+              scrubStep={requestedScrub.step}
+              precision={props.precision}
+              fractional
+              disabled={props.disabled === true}
+              copy={{
+                apply: translate('common.actions.save'),
+                editOpacity: label,
+                invalid: (max, min) => `${label} (${min}–${max})`,
+              }}
+              onChange={(value) => props.onCommitValue(props.normalizeValue?.(value) ?? value)}
+              onPreview={props.onPreviewValue}
+              onCancel={(start) => {
+                if (props.onCancelValue) props.onCancelValue(start);
+                else props.onPreviewValue(start);
+              }}
+            />
+          ) : (
+            <NumericValueField
+              label={label}
+              {...props}
+              stepperPlacement={props.stepperPlacement ?? (scrub ? 'none' : undefined)}
+            />
+          )}
         </div>
       ) : (
-        <NumericValueField label={label} {...props} />
-      )}
-      {scrub ? (
-        <NumericRangeScrub
-          active={range.active}
-          outOfScale={outOfScale}
-          descriptionId={outOfScale ? scaleNoteId : undefined}
-          disabled={props.disabled}
+        <NumericValueField
           label={label}
-          onActiveChange={range.setActive}
-          onCommitValue={props.onCommitValue}
-          onPreviewValue={props.onPreviewValue}
-          scrub={scrub}
-          step={props.step}
-          value={props.value}
-          visible={range.visible}
+          {...props}
+          stepperPlacement={props.stepperPlacement ?? (scrub ? 'none' : undefined)}
         />
-      ) : null}
+      )}
+      {rangeControl}
       {outOfScale ? (
         <p id={scaleNoteId} className="sniptale-numeric-scale-note">
           {translate('shared.ui.numericOutsideSliderRange')}

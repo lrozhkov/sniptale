@@ -9,7 +9,7 @@ import {
   type ReviewMediaFixtureWriter,
 } from '../support/quick-editor-media-fixture';
 import { speechModelResponse } from '../support/voiceover-speech-fixture';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
 

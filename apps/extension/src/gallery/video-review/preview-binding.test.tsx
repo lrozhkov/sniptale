@@ -4,10 +4,14 @@ import { readFileSync } from 'node:fs';
 import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { DEFAULT_QUICK_PREVIEW_PREFERENCES } from '../../features/video/preview/quick-preferences';
 import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
-import { act, type ComponentProps } from 'react';
+import { act, Suspense, useState, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { ReviewPreviewBinding } from './preview-binding';
+import {
+  ReviewPreviewBinding as PreviewBinding,
+  type ReviewPreviewInputs,
+} from './preview-binding';
+import { useReviewPreviewInputs } from './index';
 import type { ReviewStageBinding } from './stage-binding';
 import type { ReviewPreviewFrame } from './preview-frame';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
@@ -37,6 +41,7 @@ const FRAME_SNAPSHOT = {
   assets: [],
 };
 const io = vi.hoisted(() => ({
+  inputs: vi.fn(),
   stage: vi.fn(),
   frame: vi.fn(),
   feedback: vi.fn(),
@@ -61,12 +66,26 @@ vi.mock('./feedback', () => ({
     return null;
   },
 }));
+function ReviewPreviewBinding({
+  state,
+  resource,
+  ...props
+}: {
+  state: Parameters<typeof useReviewPreviewInputs>[1];
+  resource: Parameters<typeof useReviewPreviewInputs>[0];
+} & Omit<ComponentProps<typeof PreviewBinding>, keyof ReviewPreviewInputs>) {
+  const inputs = useReviewPreviewInputs(resource, state);
+  io.inputs(inputs);
+  return <PreviewBinding {...inputs} {...props} />;
+}
+
 let root: Root;
 let host: HTMLDivElement;
 let state: ComponentProps<typeof ReviewPreviewBinding>['state'];
 let active: import('../../features/video/review/types').ReviewSelection;
 let selection: import('../../features/video/review/types').ReviewAnchor;
 let session: LoadedReview['session'];
+let mediaFile: File;
 const region = createQuickEditZoomRegion({ id: 'focus', at: 0, duration: 2, endMax: 4 });
 const source: ReviewSource = {
   duration: 14,
@@ -87,7 +106,7 @@ async function render(
         state={state}
         sceneActive={sceneActive}
         previewPreferences={previewPreferences}
-        resource={{ file: new File(['video'], 'clip.webm'), url: 'blob:video', session }}
+        resource={{ file: mediaFile, url: 'blob:video', session }}
       />
     )
   );
@@ -141,6 +160,25 @@ it('forwards immutable session annotation sources and full clocks, reading local
   expect(stage().annotationEffects).toBeUndefined();
 });
 
+it('keeps scene, request and command ports stable across selection and feedback changes', async () => {
+  await render();
+  const first = io.inputs.mock.lastCall![0] as ReviewPreviewInputs;
+  state = {
+    ...state,
+    activeSelection: { kind: 'annotation-effect', id: 'chosen' },
+    message: 'changed',
+    busy: true,
+  };
+  await render();
+  const next = io.inputs.mock.lastCall![0] as ReviewPreviewInputs;
+  expect(next.scene).toBe(first.scene);
+  expect(next.request).toBe(first.request);
+  expect(next.commands).toBe(first.commands);
+  expect(next.overlays.selection).toEqual({ kind: 'annotation-effect', id: 'chosen' });
+  expect(next.status.message).toBe('changed');
+  expect(next.status.busy).toBe(true);
+});
+
 it('forwards caption clocks and guards conflict navigation', async () => {
   const fragment = {
     id: 'caption',
@@ -175,6 +213,7 @@ beforeEach(() => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
+  mediaFile = new File(['video'], 'clip.webm');
   active = { kind: 'annotation', id: 'note' };
   selection = { kind: 'point', time: 0 };
   session = createVideoReviewSession({
@@ -193,11 +232,33 @@ beforeEach(() => {
     draft: null,
   });
   state = {
+    readPosition: () => ({
+      epoch: state.seekRevision,
+      mapRevision: 0,
+      resultTime:
+        state.playheadClock.readResult?.() ??
+        state.timeline.readOutputTime?.(state.playheadClock.read()) ??
+        state.timeline.timeMap.sourceToTimeline(state.playheadClock.read()),
+      source: {
+        kind: 'video',
+        sourceTime: state.playheadClock.read(),
+        mediaTime: state.playheadClock.read(),
+        segmentId: 'source',
+      },
+      media: { sourceId: 'blob:video', time: state.playheadClock.read() },
+    }),
     text: { jump: vi.fn() },
     busy: false,
     playing: false,
     voiceoverSilent: false,
     time: 0,
+    seekRevision: 0,
+    playheadClock: {
+      read: () => state.time,
+      readResult: () => state.timeline.sceneOutputTime,
+      isPlaying: () => state.playing,
+      subscribe: () => () => {},
+    },
     message: 'notice',
     clickCues: [],
     keyCues: [],
@@ -231,6 +292,7 @@ beforeEach(() => {
       resourceAttempt: 0,
       selection: { kind: 'none' },
       time: 0,
+      sourceTime: 0,
       place: vi.fn(),
       selectVisible: vi.fn(),
     },
@@ -298,10 +360,8 @@ beforeEach(() => {
       change: vi.fn(),
       setSelection: vi.fn(),
     },
-    onTime: (time: number) => time + 1,
-    setPlaying: vi.fn(),
-    setPresentationActive: vi.fn(),
-    onPresentedTime: vi.fn(),
+    onTime: () => 3,
+    onMediaPlayback: vi.fn(),
     onEnded: vi.fn(),
     onMediaError: vi.fn(),
     recovering: false,
@@ -346,7 +406,7 @@ it('maps transport seeks and playback events while preserving non-point selectio
   stage().onPlaying(true);
   expect(active.kind).toBe('none');
   stage().onPlaying(false);
-  expect(state.setPlaying).toHaveBeenLastCalledWith(false);
+  expect(state.onMediaPlayback).toHaveBeenLastCalledWith(false);
   stage().onEnded?.();
   expect(state.onEnded).toHaveBeenCalledOnce();
   stage().onError();
@@ -357,13 +417,55 @@ it('maps transport seeks and playback events while preserving non-point selectio
   expect(state.seek).not.toHaveBeenCalled();
 });
 
+it('retains the point selection when native playback reports the same time again', async () => {
+  selection = { kind: 'point', time: 3 };
+  const previous = selection;
+  await render();
+  stage().onTime(2);
+  expect(selection).toBe(previous);
+});
+
+it('keeps the displayed timeline available while a native playback observation prepares its next view', async () => {
+  const pending = new Promise<void>(() => {});
+  function TimelinePoint({ time }: { time: number }) {
+    if (time > 0) throw pending;
+    return <span>Displayed point</span>;
+  }
+  function Harness() {
+    const [anchor, setAnchor] = useState<typeof selection>({ kind: 'point', time: 0 });
+    const [observedTime, setObservedTime] = useState(0);
+    return (
+      <Suspense fallback={<span>Preparing timeline</span>}>
+        <ReviewPreviewBinding
+          state={{
+            ...state,
+            setSelection: setAnchor,
+            onTime: () => {
+              setObservedTime(1);
+              return 1;
+            },
+          }}
+          sceneActive
+          resource={{ file: new File(['video'], 'clip.webm'), url: 'blob:video', session }}
+        />
+        <TimelinePoint time={Math.max(observedTime, anchor.kind === 'point' ? anchor.time : 0)} />
+      </Suspense>
+    );
+  }
+  await act(async () => root.render(<Harness />));
+  expect(host.textContent).toContain('Displayed point');
+  await act(async () => stage().onTime(1));
+  expect(host.textContent).not.toContain('Preparing timeline');
+  expect(host.querySelector('span')?.style.display).not.toBe('none');
+});
+
 it('keeps the authored text inspector mounted during recording playback', async () => {
   active = { kind: 'text', id: 'script' };
   state.voiceoverSilent = true;
   await render();
   stage().onPlaying(true);
   expect(active).toEqual({ kind: 'text', id: 'script' });
-  expect(state.setPlaying).toHaveBeenCalledWith(true);
+  expect(state.onMediaPlayback).toHaveBeenCalledWith(true);
   stage().onPlaying(false);
   expect(active).toEqual({ kind: 'text', id: 'script' });
   state.voiceoverSilent = false;
@@ -414,10 +516,11 @@ it('selects fullscreen focus through the cut map and commits its overlay gesture
 
 it('shows webcam recovery and dismisses both feedback owners', async () => {
   state.webcam.pending = true;
-  await render();
-  expect(host.querySelector('[role="status"]')).not.toBeNull();
+  await render(true, DEFAULT_QUICK_PREVIEW_PREFERENCES);
+  expect(host.querySelector('[role="status"]')).toBeNull();
+  expect(stage().preview?.waitingReason).toContain('webcam');
   state.webcam.failed = true;
-  await render();
+  await render(true, DEFAULT_QUICK_PREVIEW_PREFERENCES);
   act(() => host.querySelector<HTMLButtonElement>('button')!.click());
   expect(state.webcam.retry).toHaveBeenCalledOnce();
   (io.feedback.mock.lastCall![0] as { onDismiss(): void }).onDismiss();
@@ -477,8 +580,8 @@ it('routes local preview preferences and inspector entry without changing editin
   );
   expect(stage().preview?.preferences).toBe(preferences);
   expect(stage().preview?.playing).toBe(state.playing);
-  expect(stage().preview?.onPresentationActive).toBe(state.setPresentationActive);
-  expect(stage().preview?.onPresentedTime).toBe(state.onPresentedTime);
+  expect(stage().preview?.onPresentationActive).toBeUndefined();
+  expect(stage().preview?.onPresentedTime).toBeUndefined();
   expect(stage().preview?.sourceToResult(1)).toBe(state.timeline.timeMap.sourceToTimeline(1));
   stage().preview?.onRaster?.({ width: 1280, height: 720 });
   expect(raster).toHaveBeenCalledWith({ width: 1280, height: 720 });
@@ -540,12 +643,15 @@ it('uses effective preview controls and retains geometry while overlays are hidd
   state.annotationEffects = {
     lane,
     previewLane,
-    geometry: null,
+    geometry: { read: () => null, subscribe: () => () => undefined },
     gestureId: instance.id,
+    placementGestureActive: true,
     setGeometry: vi.fn(),
     pending: false,
     failure: null,
     add: vi.fn(),
+    addText: vi.fn(),
+    changeText: vi.fn(),
     change: vi.fn(),
     enabled: vi.fn(),
     remove: vi.fn(),
@@ -577,6 +683,19 @@ it('uses effective preview controls and retains geometry while overlays are hidd
   state.annotationEffects.pending = false;
 
   expect(stage().onAnnotationGeometry).toBe(state.annotationEffects?.setGeometry);
+  const workspace = session.getSnapshot();
+  vi.spyOn(session, 'getSnapshot').mockReturnValue({
+    ...workspace,
+    snapshot: {
+      ...workspace.snapshot,
+      workspace: { ...workspace.snapshot.workspace, effectSnapshots: [FRAME_SNAPSHOT] },
+    },
+  });
+  state.features.annotationEffects = undefined;
+  await render();
+  expect(stage().annotationEffects).toBeUndefined();
+  expect(stage().annotationEditing?.snapshots).toEqual([FRAME_SNAPSHOT]);
+  state.features.annotationEffects = lane;
   state.features.overlaysVisible = false;
   await render();
   expect(stage().annotationEditing).toBeUndefined();
@@ -661,7 +780,7 @@ it('shows a retryable history failure while keeping the existing video transport
     incomplete: false,
     retry,
   };
-  await render();
+  await render(true, DEFAULT_QUICK_PREVIEW_PREFERENCES);
   expect(host.querySelector('[role="alert"]')?.textContent).toContain(
     'gallery.videoReview.recordingHistoryFailed'
   );
@@ -671,12 +790,15 @@ it('shows a retryable history failure while keeping the existing video transport
   expect(button).toBeDefined();
   await act(async () => button!.click());
   expect(retry).toHaveBeenCalledOnce();
+  const notices = host.querySelector('[data-ui="gallery.videoReview.previewNotices"]');
+  expect(notices?.classList.contains('absolute')).toBe(true);
+  expect(notices?.classList.contains('inset-x-0')).toBe(true);
+  expect(notices?.contains(host.querySelector('[role="alert"]'))).toBe(true);
   expect(frame().disabled).toBe(false);
   state.history = { ...state.history, failed: false, pending: true, initialLoading: true };
-  await render();
-  expect(host.querySelector('[role="status"]')?.textContent).toContain(
-    'gallery.videoReview.recordingHistoryLoading'
-  );
+  await render(true, DEFAULT_QUICK_PREVIEW_PREFERENCES);
+  expect(stage().preview?.waitingReason).toContain('gallery.videoReview.recordingHistoryLoading');
+  expect(host.querySelector('[role="status"]')).toBeNull();
   expect(host.querySelector('[role="alert"]')).toBeNull();
 });
 
@@ -694,26 +816,21 @@ it('keeps background history refresh out of the stage layout', async () => {
   expect(frame().disabled).toBe(false);
 });
 
-it(
-  'reports incomplete retained history after loading without blocking video or inventing ' +
-    'a retry failure',
-  async () => {
-    state.history = {
-      telemetry: null,
-      failed: false,
-      pending: false,
-      initialLoading: false,
-      incomplete: true,
-      retry: vi.fn(),
-    };
-    await render();
-    expect(host.querySelector('[role="status"]')?.textContent).toContain(
-      'gallery.videoReview.recordingHistoryIncomplete'
-    );
-    expect(host.querySelector('[role="alert"]')).toBeNull();
-    expect(frame().disabled).toBe(false);
-  }
-);
+it('keeps incomplete retained history silent without blocking video', async () => {
+  state.history = {
+    telemetry: null,
+    failed: false,
+    pending: false,
+    initialLoading: false,
+    incomplete: true,
+    retry: vi.fn(),
+  };
+  await render();
+  expect(host.textContent).not.toContain('gallery.videoReview.recordingHistoryIncomplete');
+  expect(host.querySelector('[role="status"]')).toBeNull();
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+  expect(frame().disabled).toBe(false);
+});
 
 it.each([
   { local: true, inherited: false, suspended: true },
@@ -769,3 +886,141 @@ it.each([
     expect(state.zoom.change).not.toHaveBeenCalled();
   }
 );
+
+it('routes audio preparation to the FPS waiting reason without disabling cancellation', async () => {
+  state = { ...state, preparingPlayback: true };
+  await render(true, DEFAULT_QUICK_PREVIEW_PREFERENCES);
+  expect(stage().preview?.waitingReason).toContain('gallery.videoReview.audioPreparing');
+  expect(frame().disabled).toBe(false);
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+  state = { ...state, preparingPlayback: false };
+  await render(true, DEFAULT_QUICK_PREVIEW_PREFERENCES);
+  expect(stage().preview?.waitingReason).toBeUndefined();
+});
+
+function controlledPreviewClock(sourceTime: number, resultTime: number, playing: boolean) {
+  const listeners = new Set<() => void>();
+  return {
+    read: () => sourceTime,
+    readResult: () => resultTime,
+    isPlaying: () => playing,
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    publish(source: number, result: number, running: boolean) {
+      sourceTime = source;
+      resultTime = result;
+      playing = running;
+      for (const listener of listeners) listener();
+    },
+  };
+}
+
+it('keeps sampled updates outside PreviewBinding and the stage during a freeze', async () => {
+  vi.useFakeTimers();
+  try {
+    const clock = controlledPreviewClock(1, 1.2, true);
+    const freeze = {
+      id: 'hold',
+      kind: 'freeze' as const,
+      start: 1,
+      end: 1,
+      requestedStart: 1,
+      requestedEnd: 1,
+      duration: 2,
+      frameTime: 0.98,
+      frameDuration: 0.04,
+    };
+    state = Object.assign(state, {
+      playheadClock: clock,
+      playing: true,
+      time: 1,
+      timeline: {
+        ...state.timeline,
+        sceneOutputTime: 1.2,
+        timeMap: createReviewTimeMap(14, [freeze]),
+      },
+    });
+    io.fullscreen = true;
+    await render(true, { ...DEFAULT_QUICK_PREVIEW_PREFERENCES, renderer: 'legacy' });
+    const initialRenders = io.stage.mock.calls.length;
+    await act(async () => {
+      for (let index = 0; index < 10; index++) clock.publish(1, 1.8, true);
+    });
+    expect(io.stage).toHaveBeenCalledTimes(initialRenders);
+    await act(async () => vi.advanceTimersByTime(100));
+    expect(io.stage).toHaveBeenCalledTimes(initialRenders);
+    expect(stage().outputTime).toBe(1.2);
+    expect(stage().time).toBe(freeze.frameTime);
+    expect(stage().cutPreview?.time).toBe(1.2);
+    expect(frame().time).toBe(1.2);
+    expect(frame().clock).toBe(clock);
+    expect(frame().readPosition?.().resultTime).toBe(1.8);
+    expect(state.time).toBe(1);
+    expect(state.timeline.sceneOutputTime).toBe(1.2);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('publishes paused seeks immediately and cancels an older pending playback sample', async () => {
+  vi.useFakeTimers();
+  try {
+    const clock = controlledPreviewClock(10, 0, true);
+    state = Object.assign(state, {
+      playheadClock: { read: clock.read, isPlaying: clock.isPlaying, subscribe: clock.subscribe },
+      playing: true,
+    });
+    await render();
+    await act(async () => clock.publish(11, 1, true));
+    await act(async () => clock.publish(12, 2, false));
+    state = { ...state, playing: false };
+    await render();
+    expect(frame().time).toBe(2);
+    expect(stage().time).toBe(12);
+    const renders = io.stage.mock.calls.length;
+    await act(async () => vi.advanceTimersByTime(100));
+    expect(io.stage).toHaveBeenCalledTimes(renders);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('keeps transport observations live without changing the root point during playback', async () => {
+  const setSelection = vi.fn(state.setSelection);
+  const onTime = vi.fn(state.onTime);
+  state = { ...state, playing: true, setSelection, onTime };
+  await render();
+  act(() => stage().onTime(2));
+  expect(onTime).toHaveBeenCalledExactlyOnceWith();
+  expect(setSelection).not.toHaveBeenCalled();
+  state = { ...state, playing: false };
+  await render();
+  act(() => stage().onTime(2));
+  expect(selection).toEqual({ kind: 'point', time: 3 });
+});
+
+it('leaves clock subscription to the fullscreen rail and admits explicit seeks immediately', async () => {
+  vi.useFakeTimers();
+  try {
+    const clock = controlledPreviewClock(10, 0, true);
+    const subscribe = vi.fn(clock.subscribe);
+    clock.subscribe = subscribe;
+    state = { ...state, playheadClock: clock, playing: true };
+    Object.defineProperty(state, 'time', { get: clock.read });
+    Object.defineProperty(state.timeline, 'sceneOutputTime', { get: clock.readResult });
+    await render();
+    await act(async () => clock.publish(11, 1, true));
+    await act(async () => vi.advanceTimersByTime(100));
+    expect(frame().time).toBe(0);
+    expect(frame().readPosition?.().resultTime).toBe(1);
+    expect(subscribe).not.toHaveBeenCalled();
+    await act(async () => clock.publish(12, 2, true));
+    state = Object.assign({}, state, { seekRevision: 1 });
+    await render();
+    expect(frame().time).toBe(2);
+  } finally {
+    vi.useRealTimers();
+  }
+});

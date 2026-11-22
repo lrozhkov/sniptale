@@ -30,7 +30,10 @@ export function useBackgroundCatalog() {
   const reload = useCallback(async () => {
     const current = ++generation.current;
     try {
-      const [catalog, media] = await Promise.all([store.load(), listMediaLibrary()]);
+      const [catalog, media] = await Promise.all([
+        store.load(),
+        listMediaLibrary({ includeProjectRetained: true }),
+      ]);
       if (current !== generation.current) return;
       setPresets(catalog.presets);
       setAvailable(

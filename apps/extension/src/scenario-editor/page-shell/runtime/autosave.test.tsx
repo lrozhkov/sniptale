@@ -7,7 +7,10 @@ import { act, StrictMode, useEffect, useState } from 'react';
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import { reduceGuideHistory, useGuideHistory } from './history';
 import { createScenarioProjectEntry } from '../../../composition/persistence/scenario/projects/entry';
-import type { ScenarioProjectEntry } from '../../../composition/persistence/scenario/contracts';
+import type {
+  ScenarioProjectEntry,
+  ScenarioEditingHistory,
+} from '../../../composition/persistence/scenario/contracts';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createGuideProject, createGuideStep } from '../../../features/scenario/project/public';
@@ -43,13 +46,17 @@ function GroupHarness() {
   });
   const { reset } = groupHistory;
   useEffect(() => {
-    reset(input.saved.current!.project);
+    reset(
+      input.saved.current!.project,
+      [...(input.saved.current!.editingHistory?.past ?? [])],
+      [...(input.saved.current!.editingHistory?.future ?? [])]
+    );
   }, [reset]);
   groupAutosave = useGuideAutosave({
     ...input,
     project: groupHistory.project,
     actionId: groupHistory.actionId,
-    closedCaptures: groupHistory.closedCaptures,
+    editingHistory: groupHistory.editingHistory,
     onSealEdit: groupHistory.sealEdit,
     dirty: status === 'dirty',
     conflict: status === 'conflict',
@@ -65,22 +72,34 @@ function groupedStore() {
     id: project.id,
     project,
     workspaceRevision: 1,
+    ...(input.saved.current!.editingHistory
+      ? { editingHistory: input.saved.current!.editingHistory }
+      : {}),
     createdAt: 1,
     updatedAt: project.updatedAt,
   };
   save.mockImplementation(
     async (
       source: typeof project,
-      options: { expectedRevision: number; historyActionId?: string }
+      options: {
+        expectedRevision: number;
+        historyActionId?: string;
+        editingHistory?: ScenarioEditingHistory;
+      }
     ) => {
       expect(options.expectedRevision).toBe(entry.workspaceRevision);
       entry = createScenarioProjectEntry({
         existing: entry,
         project: source,
+        ...(options.editingHistory === undefined ? {} : { editingHistory: options.editingHistory }),
         ...(options.historyActionId ? { historyActionId: options.historyActionId } : {}),
         updatedAt: entry.updatedAt + 1,
       });
-      return { project: entry.project, workspaceRevision: entry.workspaceRevision };
+      return {
+        project: entry.project,
+        workspaceRevision: entry.workspaceRevision,
+        editingHistory: entry.editingHistory,
+      };
     }
   );
   return () => entry;
@@ -112,18 +131,20 @@ it('saves final X before Y after a real maxWait intermediate and restores exact 
   await act(async () => {
     expect(await groupAutosave.save()).toBe(true);
   });
-  expect(stored().history?.map((version) => version.project.name)).toEqual(['Guide', 'Final X']);
-  expect(stored().history?.at(-1)?.project.tags).toEqual([]);
+  expect(stored().editingHistory?.past.map((project) => project.name)).toEqual([
+    'Guide',
+    'Final X',
+  ]);
+  expect(stored().editingHistory?.past.at(-1)?.tags).toEqual([]);
   expect(stored().project.tags).toEqual(['Y']);
   expect(save.mock.calls.map((call) => call[1].historyActionId)).toEqual([
     firstAction,
-    firstAction,
     expect.any(String),
   ]);
-  expect(save.mock.calls[2]![1].historyActionId).not.toBe(firstAction);
+  expect(save.mock.calls[1]![1].historyActionId).not.toBe(firstAction);
 });
 
-it('keeps two closed groups page-local with autosave OFF and serves them in order on explicit Save', async () => {
+it('keeps two actions local with autosave OFF and publishes one complete checkpoint on Save', async () => {
   input = { ...input, enabled: false };
   const stored = groupedStore();
   await act(async () => root.render(<GroupHarness />));
@@ -138,7 +159,10 @@ it('keeps two closed groups page-local with autosave OFF and serves them in orde
   await act(async () => {
     expect(await groupAutosave.save()).toBe(true);
   });
-  expect(stored().history?.map((version) => version.project.name)).toEqual(['Guide', 'Final X']);
+  expect(stored().editingHistory?.past.map((project) => project.name)).toEqual([
+    'Guide',
+    'Final X',
+  ]);
   expect(stored().project.tags).toEqual(['Y']);
 });
 
@@ -723,26 +747,22 @@ it('preserves array ordering as a real edit when flushing', async () => {
   expect(save).toHaveBeenCalledOnce();
 });
 
-it('acknowledges closed captures before React publishes the next render', async () => {
+it('publishes all finished actions in one latest checkpoint before another React render', async () => {
   const base = input.saved.current!.project;
-  const x = { ...base, name: 'Closed X' };
+  const x = { ...base, name: 'Finished X' };
   const y = { ...x, tags: ['Y'] };
-  let writes = 0;
-  save.mockImplementation(async (project) => {
-    if (++writes > 2) throw new Error('Closed capture repeated');
-    return { project: { ...project, updatedAt: 100 + writes }, workspaceRevision: 1 + writes };
-  });
-  input = {
-    ...input,
-    project: y,
-    actionId: '22222222-2222-4222-8222-222222222222',
-    dirty: true,
-    closedCaptures: [{ project: x, actionId: '11111111-1111-4111-8111-111111111111' }],
-    onPublish: vi.fn(),
-  };
+  const editingHistory = { version: 1 as const, past: [base, x], future: [] };
+  save.mockImplementation(async (project, options) => ({
+    project,
+    workspaceRevision: 2,
+    editingHistory: options.editingHistory,
+  }));
+  input = { ...input, project: y, editingHistory, dirty: true, onPublish: vi.fn() };
   act(() => root.render(<Harness />));
-  await expect(autosave.flushLatest()).resolves.toMatchObject({ name: 'Closed X', tags: ['Y'] });
-  expect(save).toHaveBeenCalledTimes(2);
+  await expect(autosave.flushLatest()).resolves.toMatchObject({ name: 'Finished X', tags: ['Y'] });
+  expect(save).toHaveBeenCalledOnce();
+  expect(save).toHaveBeenCalledWith(y, { expectedRevision: 1, editingHistory });
+  expect(input.saved.current?.editingHistory?.past).toEqual([base, x]);
 });
 
 it('keeps intermediate native saves protected until held pointer ends and latest ACK arrives', async () => {
@@ -1125,7 +1145,7 @@ it.each([
   'rebind',
   'dispose',
   'pointer-cycle',
-  'closed-action',
+  'checkpoint',
   'source-content',
   'saved-revision',
 ] as const)(
@@ -1155,10 +1175,10 @@ it.each([
         autosave.endInteraction(74);
         await vi.advanceTimersByTimeAsync(0);
       }
-      if (change === 'closed-action') {
+      if (change === 'checkpoint') {
         input = {
           ...input,
-          closedCaptures: [{ project: input.project!, actionId: crypto.randomUUID() }],
+          editingHistory: { version: 1, past: [input.project!], future: [] },
         };
         root.render(<Harness />);
       }
@@ -1283,22 +1303,18 @@ it('refuses a new Scenario keyboard edit during the post-dispatch exit task', as
   expect(save).not.toHaveBeenCalled();
 });
 
-it('prepares a Scenario exit after all retained closed captures are natively acknowledged', async () => {
-  const first = { ...input.project!, name: 'Closed first' };
-  const final = { ...first, name: 'Closed final' };
-  const firstAction = crypto.randomUUID();
-  const finalAction = crypto.randomUUID();
-  input = {
-    ...input,
-    project: final,
-    actionId: finalAction,
-    closedCaptures: [
-      { project: first, actionId: firstAction },
-      { project: final, actionId: finalAction },
-    ],
+it('prepares a Scenario exit after its complete editing checkpoint is acknowledged', async () => {
+  const first = { ...input.project!, name: 'Finished first' };
+  const final = { ...first, name: 'Finished final' };
+  const editingHistory = {
+    version: 1 as const,
+    past: [input.saved.current!.project, first],
+    future: [],
   };
-  save.mockImplementation(async (project) => ({
+  input = { ...input, project: final, editingHistory, actionId: crypto.randomUUID() };
+  save.mockImplementation(async (project, options) => ({
     project,
+    editingHistory: options.editingHistory,
     workspaceRevision: input.saved.current!.workspaceRevision + 1,
     checkpointReceipt: nativeExitReceipt(project.id),
   }));
@@ -1306,8 +1322,134 @@ it('prepares a Scenario exit after all retained closed captures are natively ack
   const witness = await prepareExitAfterDispatch();
   expect(witness?.isCurrent()).toBe(true);
   expect(witness?.receipt).toEqual(input.saved.current?.checkpointReceipt);
-  expect(save.mock.calls.map(([project]) => project.name)).toEqual([
-    'Closed first',
-    'Closed final',
-  ]);
+  expect(save).toHaveBeenCalledOnce();
+  expect(input.saved.current?.editingHistory).toEqual(editingHistory);
+});
+
+it('persists cursor-only changes and protects them even when document content is already saved', async () => {
+  const project = input.saved.current!.project;
+  const editingHistory = { version: 1 as const, past: [], future: [{ ...project, name: 'Redo' }] };
+  input = {
+    ...input,
+    project,
+    enabled: false,
+    editingHistory,
+    saved: {
+      current: {
+        project,
+        workspaceRevision: 1,
+        editingHistory: { version: 1, past: [], future: [] },
+      },
+    },
+  };
+  save.mockImplementation(async (source, options) => ({
+    project: source,
+    workspaceRevision: 2,
+    editingHistory: options.editingHistory,
+  }));
+  await act(async () => root.render(<Harness />));
+  const before = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(before);
+  expect(before.defaultPrevented).toBe(true);
+  await expect(autosave.save()).resolves.toBe(true);
+  expect(save).toHaveBeenCalledWith(project, { expectedRevision: 1, editingHistory });
+  const after = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(after);
+  expect(after.defaultPrevented).toBe(false);
+});
+
+it('keeps a newer checkpoint dirty when an older native ACK has the same current document', async () => {
+  const base = input.saved.current!.project;
+  const source = { ...base, name: 'Same current' };
+  const first = { version: 1 as const, past: [base], future: [] };
+  const later = { version: 1 as const, past: [], future: [base] };
+  let release: (snapshot: NonNullable<typeof input.saved.current>) => void = () => {};
+  save.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = resolve;
+      })
+  );
+  input = { ...input, project: source, editingHistory: first, enabled: false };
+  await act(async () => root.render(<Harness />));
+  let saving: Promise<boolean> | undefined;
+  await act(async () => {
+    saving = autosave.save();
+  });
+  input = { ...input, editingHistory: later };
+  await act(async () => root.render(<Harness />));
+  await act(async () => {
+    release({ project: { ...source, updatedAt: 2 }, workspaceRevision: 2, editingHistory: first });
+    expect(await saving).toBe(true);
+  });
+  expect(input.onStatus).toHaveBeenLastCalledWith('dirty');
+  expect(input.saved.current?.editingHistory).toEqual(first);
+  save.mockImplementationOnce(async (project, options) => ({
+    project,
+    workspaceRevision: 3,
+    editingHistory: options.editingHistory,
+  }));
+  await expect(autosave.flushLatest()).resolves.toMatchObject({ name: 'Same current' });
+  expect(save).toHaveBeenLastCalledWith(source, { expectedRevision: 2, editingHistory: later });
+  expect(input.saved.current?.editingHistory).toEqual(later);
+});
+
+it('persists return-to-origin without an empty action and restores the original Redo', async () => {
+  const base = input.saved.current!.project;
+  const future = { ...base, name: 'Original Redo' };
+  input = {
+    ...input,
+    enabled: false,
+    saved: {
+      current: {
+        project: base,
+        workspaceRevision: 1,
+        editingHistory: { version: 1, past: [], future: [future] },
+      },
+    },
+  };
+  const stored = groupedStore();
+  await act(async () => root.render(<GroupHarness />));
+  await act(async () =>
+    groupHistory.update({ ...groupHistory.project!, name: 'Intermediate' }, 'name')
+  );
+  // An automatic-style flush must not seal the field's transaction.
+  await act(async () => {
+    expect(await groupAutosave.flushLatest()).not.toBeNull();
+  });
+  await act(async () => groupHistory.update({ ...groupHistory.project!, name: base.name }, 'name'));
+  await act(async () => {
+    expect(await groupAutosave.save()).toBe(true);
+  });
+  expect(stored().project.name).toBe(base.name);
+  expect(stored().editingHistory).toEqual({ version: 1, past: [], future: [future] });
+  expect(groupHistory.canUndo).toBe(false);
+  expect(groupHistory.canRedo).toBe(true);
+  await act(async () => groupHistory.redo());
+  expect(groupHistory.project?.name).toBe('Original Redo');
+});
+
+it('does not write an equivalent restored checkpoint after a no-op field group', async () => {
+  input = { ...input, enabled: false };
+  const stored = groupedStore();
+  await act(async () => root.render(<GroupHarness />));
+  await act(async () =>
+    groupHistory.update({ ...groupHistory.project!, name: 'Accepted' }, 'name')
+  );
+  await act(async () => {
+    expect(await groupAutosave.save()).toBe(true);
+  });
+  const accepted = stored();
+  await act(async () =>
+    groupHistory.update({ ...groupHistory.project!, name: 'Temporary' }, 'name')
+  );
+  await act(async () =>
+    groupHistory.update({ ...groupHistory.project!, name: 'Accepted' }, 'name')
+  );
+  await act(async () => {
+    expect(await groupAutosave.save()).toBe(true);
+  });
+  expect(save).toHaveBeenCalledOnce();
+  expect(stored()).toBe(accepted);
+  expect(groupHistory.editingHistory.past.map((project) => project.name)).toEqual(['Guide']);
 });

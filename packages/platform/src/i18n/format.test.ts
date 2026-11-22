@@ -1,7 +1,19 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { formatDateTime, formatNumber } from './format';
+import { getIntlLocale, SUPPORTED_LOCALES } from './config';
+import { LOCALE_REGISTRY } from '@sniptale/runtime-contracts/i18n';
 
 afterEach(() => vi.restoreAllMocks());
+
+it.each(SUPPORTED_LOCALES)(
+  'formats registered locale %s through its canonical Intl tag',
+  (locale) => {
+    expect(getIntlLocale(locale)).toBe(LOCALE_REGISTRY[locale].intlLocale);
+    expect(formatNumber(1234.5, undefined, locale)).toBe(
+      new Intl.NumberFormat(LOCALE_REGISTRY[locale].intlLocale).format(1234.5)
+    );
+  }
+);
 
 it('reuses equivalent date and number formatters without changing localized output', () => {
   const date = new Date('2026-10-03T10:00:00Z');

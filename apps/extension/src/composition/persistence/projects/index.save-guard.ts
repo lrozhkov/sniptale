@@ -1,8 +1,9 @@
 import type { LibraryProjectBinding } from './known-library-source';
-import type { VideoWorkspace } from '../review-workspaces/contracts';
+import type { VideoReviewOriginalIdentity, VideoWorkspace } from '../review-workspaces/contracts';
 import type { VideoProject } from '../../../features/video/project/types';
 import type { VideoProjectEntry } from './contracts';
 import type { LibraryStorageClass } from '../library-lifecycle/contracts';
+import { createVideoProjectHistoryChange } from '../../../features/video/project/history-change';
 
 export interface SaveVideoProjectOptions {
   baseUpdatedAt?: number | null;
@@ -11,12 +12,14 @@ export interface SaveVideoProjectOptions {
   expectedProject?: VideoProject | null;
   /** Exact selected Gallery predecessor; checked in the destination transaction. */
   expectedReviewWorkspace?: VideoWorkspace;
+  /** Source for an explicit transfer before a Quick Edit project exists. */
+  expectedReviewOriginal?: VideoReviewOriginalIdentity & { assetId: string };
   /** Private existing-source bindings committed atomically with a new review destination. */
   libraryBindings?: readonly LibraryProjectBinding[];
   storageClass?: LibraryStorageClass;
 }
 
-class StaleVideoProjectSaveError extends Error {
+export class StaleVideoProjectSaveError extends Error {
   constructor(projectId: string) {
     super(`Video project ${projectId} was changed before this save completed`);
     this.name = 'StaleVideoProjectSaveError';
@@ -98,10 +101,18 @@ export function guardStaleVideoProjectSave(args: {
   existing: VideoProjectEntry | undefined;
   options: SaveVideoProjectOptions;
   project: VideoProject;
+  replacesHistory?: boolean;
 }): { preservePersistedAssets: boolean; project: VideoProject } {
   if (hasBaseRevisionConflict(args)) {
     throw new StaleVideoProjectSaveError(args.project.id);
   }
+
+  if (
+    args.existing?.history &&
+    !args.replacesHistory &&
+    createVideoProjectHistoryChange(args.existing.project, args.project)
+  )
+    throw new Error('Changing a video project with history requires an owned history capture.');
 
   const preservePersistedAssets = shouldPreservePersistedProjectAssets(args);
   return {

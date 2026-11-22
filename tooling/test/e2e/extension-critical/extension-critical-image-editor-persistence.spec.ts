@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { test } from '../support/extension-fixture';
 import {
   applyHarnessBootstrap,
@@ -691,7 +691,7 @@ for (const theme of ['light', 'dark'] as const) {
     const fields = page.locator('[data-ui="editor.frame.padding-fields"]');
     const row = fields.locator('[data-ui="shared.linked-padding-fields"] > div').first();
     const input = row.locator('input');
-    const label = row.locator('span.truncate').first();
+    const label = row.locator('.sniptale-parameter-name');
     await row.scrollIntoViewIfNeeded();
     const labelBox = (await label.boundingBox())!;
     const inputBox = (await input.boundingBox())!;

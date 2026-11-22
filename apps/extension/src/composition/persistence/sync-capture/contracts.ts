@@ -7,6 +7,7 @@ export {
   type SyncCheckpointReceipt,
 } from './checkpoint-contracts';
 import { MAX_MEDIA_ARCHIVE_ENTRIES } from '../../archive-transfer/contracts';
+import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
 import type {
   ScenarioAssetEntry,
   ScenarioProjectEntry,
@@ -29,7 +30,7 @@ import type {
 
 /** One native writer snapshot; large retained versions remain immutable inline bytes until preparation. */
 export interface CapturedScenarioRows {
-  entry: Omit<ScenarioProjectEntry, 'history'>;
+  entry: Omit<ScenarioProjectEntry, 'history' | 'editingHistory'>;
   history?: { blob: Blob; sha256: string };
   assets: ScenarioAssetEntry[];
   documents: StoredScenarioStepEditorDocumentEntry[];
@@ -106,6 +107,7 @@ export interface CapturedVideoProjectRows {
 /** One immutable native screenshot aggregate, including inline source and presentation bytes. */
 export interface CapturedImageRows {
   media: MediaLibraryEntry;
+  savedIndependently?: boolean;
   projectAsset?: StoredProjectAssetEntry;
   originalRef?: AssetRef;
   workspace: StoredImageWorkspaceEntry | null;
@@ -113,7 +115,7 @@ export interface CapturedImageRows {
   refs: AssetRef[];
 }
 
-export type CapturedMediaRows =
+export type CapturedMediaRows = { savedIndependently?: boolean } & (
   | { media: Omit<MediaLibraryEntry, 'blob'>; ref: AssetRef }
   | {
       media: Omit<MediaLibraryEntry, 'blob'>;
@@ -136,7 +138,8 @@ export type CapturedMediaRows =
       recording: StoredRecordingEntry;
       ref: AssetRef;
       telemetry: RecordingTelemetryEntry | null;
-    };
+    }
+);
 
 /** A review owns its authored state; its real Library original remains a separate dependency. */
 export interface CapturedVideoReviewRows {
@@ -231,7 +234,7 @@ export interface CapturedChange extends CaptureOperationHeader {
         mediaDependencies: CapturedMediaDependency[];
       }
     | { kind: 'media'; rows: CapturedMediaRows }
-    | { kind: 'image'; rows: CapturedImageRows }
+    | { kind: 'image'; rows: CapturedImageRows; mediaDependencies?: CapturedMediaDependency[] }
     | { kind: 'tombstone' };
 }
 
@@ -298,7 +301,7 @@ export function captureRootKey(spaceId: string, kind: CaptureRootKind, rootId: s
   return JSON.stringify([spaceId, kind, rootId]);
 }
 
-/** Scenario uses the admitted archive profile; existing pilot families retain their original limits. */
+/** History files add object capacity without expanding material or metadata budgets. */
 export function captureProfileBounds(rootKind: unknown) {
   return rootKind === 'scenario-project'
     ? {
@@ -308,7 +311,9 @@ export function captureProfileBounds(rootKind: unknown) {
       }
     : {
         rows: MAX_CAPTURE_ROWS,
-        objects: MAX_CAPTURE_ROWS * 2,
+        objects:
+          MAX_CAPTURE_ROWS * 2 +
+          (rootKind === 'video-project' ? EDITOR_HISTORY_LIMITS.maxActions : 0),
         metadataBytes: MAX_CAPTURE_METADATA_BYTES,
       };
 }

@@ -1,4 +1,13 @@
 // @vitest-environment jsdom
+import {
+  loadCompositionCatalogFixture,
+  prepareCompositionTranslations,
+} from '../catalog-fixture.test-support';
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadCompositionCatalogFixture>[0]) =>
+    loadCompositionCatalogFixture(locale),
+}));
+
 import { getBorderPresetPreviewStyle } from './frame/helpers';
 import { DEFAULT_BORDER_PRESET } from '../../features/highlighter/style/defaults';
 import { act } from 'react';
@@ -435,4 +444,8 @@ it('shows linked source state and toggles it off through the existing callback',
   expect(button.textContent).toBe('');
   act(() => button.click());
   expect(onChange).toHaveBeenCalledExactlyOnceWith('forced');
+});
+
+beforeEach(async () => {
+  await prepareCompositionTranslations('content', 'ru');
 });

@@ -104,6 +104,17 @@ export async function publishPagePackageJobStatus(job: ActivePopupExportJob): Pr
   return queueStatusPublication(job, () => initial);
 }
 
+function mergeJobProgress(
+  current: PagePackageJobStatusV1['progress'],
+  patch: NonNullable<PagePackageJobStatusPatch['progress']> = {}
+): PagePackageJobStatusV1['progress'] {
+  const next = { ...current, ...patch };
+  if (patch.message !== undefined && patch.collectingPageTitle === undefined) {
+    delete next.collectingPageTitle;
+  }
+  return next;
+}
+
 export async function updatePagePackageJobStatus(
   job: ActivePopupExportJob,
   patch: PagePackageJobStatusPatch
@@ -114,9 +125,7 @@ export async function updatePagePackageJobStatus(
     return {
       ...current,
       ...immutablePatch,
-      ...(immutablePatch.progress
-        ? { progress: { ...current.progress, ...immutablePatch.progress } }
-        : {}),
+      progress: mergeJobProgress(current.progress, immutablePatch.progress),
       revision: current.revision + 1,
     };
   });
@@ -132,10 +141,9 @@ export function admitPopupExportJobCancellation(job: ActivePopupExportJob): Prom
       await commitStatusPublication(job, {
         ...current,
         phase: 'cancelling',
-        progress: {
-          ...current.progress,
+        progress: mergeJobProgress(current.progress, {
           message: translatePopupExportJob(job, 'popup.export.cancellingMessage'),
-        },
+        }),
         revision: current.revision + 1,
       });
     }
@@ -154,7 +162,7 @@ export function completePagePackageJobStatus(
     await commitStatusPublication(job, {
       ...current,
       ...immutablePatch,
-      progress: { ...current.progress, ...immutablePatch.progress },
+      progress: mergeJobProgress(current.progress, immutablePatch.progress),
       revision: current.revision + 1,
     });
     return true;

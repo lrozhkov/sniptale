@@ -1,9 +1,17 @@
 // @vitest-environment jsdom
+import {
+  loadFeatureCatalogFixture,
+  prepareFeatureTranslations,
+} from '../../../catalog-fixture.test-support';
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadFeatureCatalogFixture>[0]) =>
+    loadFeatureCatalogFixture(locale),
+}));
 
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { renderCalloutInteractionHandles, type CalloutInteractionHandleProps } from './handles';
 
 function createProps(
@@ -231,4 +239,8 @@ it('deletes from the adjacent action without activating the underlying comment',
   expect(onDelete).toHaveBeenCalledOnce();
   expect(onUnderlyingClick).not.toHaveBeenCalled();
   act(() => root.unmount());
+});
+
+beforeEach(async () => {
+  await prepareFeatureTranslations('content', 'en');
 });

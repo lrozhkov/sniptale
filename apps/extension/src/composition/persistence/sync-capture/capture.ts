@@ -1,3 +1,4 @@
+import { readRetainedScenarioRevision } from '../scenario/revisions';
 import { queueOperationKey, parseSyncQueueOperation } from './queue-model';
 import {
   deferCheckpointInTransaction,
@@ -13,10 +14,12 @@ import {
 } from './project-snapshot';
 import { parseVideoProjectEntry } from '../projects/read-guards';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
+import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
 import {
   freezeImageInTransaction,
   isImageCaptureSource,
   digestCapturedImageRows,
+  imageCaptureIdentity,
 } from './image-snapshot';
 import type { IDBPTransaction } from 'idb';
 import {
@@ -218,13 +221,14 @@ export async function captureScenarioProjectInTransaction(
   );
 }
 
-/** Preserve the enrolled Scenario clock across deletion and recreation of one identity. */
+/** Preserve the local and enrolled Scenario clocks across deletion and recreation of one identity. */
 export async function readScenarioRevisionFence(
-  tx: CaptureTransaction,
+  tx: Pick<IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>, 'objectStore'>,
   projectId: string
 ): Promise<number | null> {
+  const retained = await readRetainedScenarioRevision(tx, projectId);
   const profile = await readEnabledCaptureProfile(tx);
-  if (!profile) return null;
+  if (!profile) return retained;
   const rootKey = captureRootKey(profile.spaceId, 'scenario-project', projectId);
   const state = await readCaptureRootState(
     tx,
@@ -234,10 +238,10 @@ export async function readScenarioRevisionFence(
     },
     false
   );
-  if (!state) return null;
+  if (!state) return retained;
   if (state.nativeRevision === undefined)
     throw new Error('Scenario revision fence is unavailable.');
-  return state.nativeRevision;
+  return Math.max(state.nativeRevision, retained ?? 0);
 }
 
 /** Capture the native Library publication before the caller commits its source transaction. */
@@ -407,9 +411,13 @@ export async function captureImageInTransaction(
   const profile = await readEnabledCaptureProfile(tx);
   if (!profile) return null;
   const media = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId));
-  if (!media) throw new Error('Unsupported screenshot aggregate snapshot.');
-  if (media.lifecycle?.storageClass === 'temporary') return null;
-  const replay = await readPublicationReplay(tx, profile, 'media', mediaId, options.publicationId);
+  const workspace = media
+    ? null
+    : parseImageWorkspaceEntry(await tx.objectStore(IMAGE_WORKSPACES_STORE).get(mediaId));
+  if (!media && !workspace?.sourceMediaId) throw new UnsupportedSyncCaptureGraphError();
+  if (media?.lifecycle?.storageClass === 'temporary') return null;
+  const rootKind = workspace ? 'image-project' : 'media';
+  const replay = await readPublicationReplay(tx, profile, rootKind, mediaId, options.publicationId);
   if (replay) return replay;
   if (
     (options.checkpoint === 'defer' ||
@@ -418,24 +426,30 @@ export async function captureImageInTransaction(
         profile.checkpointIntervalMs !== undefined)) &&
     options.origin !== 'local-restore'
   ) {
-    await deferCheckpointInTransaction(tx, { rootKind: 'media', rootId: mediaId });
+    await deferCheckpointInTransaction(tx, { rootKind, rootId: mediaId });
     return null;
   }
   const rows = await freezeImageInTransaction(tx, mediaId);
+  if (imageCaptureIdentity(rows).rootKind !== rootKind)
+    throw new UnsupportedSyncCaptureGraphError();
   const nativeDigest = digestCapturedImageRows(rows);
   const checkpointRows =
     (options.checkpoint === 'freeze' || options.checkpoint === 'lifecycle') &&
     rows.presentation &&
-    rows.presentation.presentationRevision !== (rows.media.workspaceRevision ?? 0)
+    rows.presentation.presentationRevision !== imageCaptureIdentity(rows).revision
       ? { ...rows, presentation: null }
       : rows;
   // Native admission includes the retained render; the checkpoint omits an obsolete preview.
+  const mediaDependencies =
+    rootKind === 'image-project'
+      ? [await captureMediaDependency(tx, profile, rows.media.id, options.checkpoint)]
+      : undefined;
   return appendCapture(
     tx,
     profile,
-    'media',
+    rootKind,
     mediaId,
-    { kind: 'image', rows: checkpointRows },
+    { kind: 'image', rows: checkpointRows, ...(mediaDependencies ? { mediaDependencies } : {}) },
     { ...options, nativeDigest }
   );
 }
@@ -505,13 +519,15 @@ export async function captureRootCheckpointInTransaction(
   const captured =
     expected.rootKind === 'media'
       ? await captureMediaInTransaction(tx, expected.rootId, { checkpoint })
-      : expected.rootKind === 'video-project'
-        ? await captureVideoProjectInTransaction(tx, expected.rootId, { checkpoint })
-        : expected.rootKind === 'video-review'
-          ? await captureVideoReviewInTransaction(tx, expected.rootId, { checkpoint })
-          : await captureScenarioProjectInTransaction(tx, expected.rootId, {
-              checkpoint,
-            });
+      : expected.rootKind === 'image-project'
+        ? await captureImageInTransaction(tx, expected.rootId, { checkpoint })
+        : expected.rootKind === 'video-project'
+          ? await captureVideoProjectInTransaction(tx, expected.rootId, { checkpoint })
+          : expected.rootKind === 'video-review'
+            ? await captureVideoReviewInTransaction(tx, expected.rootId, { checkpoint })
+            : await captureScenarioProjectInTransaction(tx, expected.rootId, {
+                checkpoint,
+              });
   // An unchanged review has no new snapshot. The consumed native work is already represented.
   report('acknowledged');
   return captured;
@@ -579,11 +595,12 @@ async function checkpointPredecessorPublished(
 export async function readImageRevisionFence(
   tx: CaptureTransaction,
   mediaId: string,
-  allowLivePredecessor = false
+  allowLivePredecessor = false,
+  rootKind: 'media' | 'image-project' = 'media'
 ): Promise<number | null> {
   const profile = await readEnabledCaptureProfile(tx);
   if (!profile) return null;
-  const rootKey = captureRootKey(profile.spaceId, 'media', mediaId);
+  const rootKey = captureRootKey(profile.spaceId, rootKind, mediaId);
   const state = await readCaptureRootState(
     tx,
     rootKey,
@@ -605,10 +622,16 @@ export async function readImageRevisionFence(
 export async function allocateRestoredImageRevision(
   tx: CaptureTransaction,
   mediaId: string,
-  currentRevision: number
+  currentRevision: number,
+  rootKind: 'media' | 'image-project'
 ): Promise<number | null> {
-  if (!(await readEnabledCaptureProfile(tx))) return null;
-  const fence = await readImageRevisionFence(tx, mediaId, true);
+  const fence = await readImageRevisionFence(tx, mediaId, true, rootKind);
+  if (
+    fence === null &&
+    (rootKind === 'media' || currentRevision === 0) &&
+    !(await readEnabledCaptureProfile(tx))
+  )
+    return null;
   const revision = Math.max(currentRevision, fence ?? 0) + 1;
   if (!Number.isSafeInteger(revision)) throw new Error('Restored image revision exhausted.');
   return revision;
@@ -868,7 +891,7 @@ async function appendCapture(
           nativeDigest: options.nativeDigest ?? digestCapturedImageRows(change.rows),
           nativeRevision: Math.max(
             previous?.nativeRevision ?? 0,
-            change.rows.media.workspaceRevision ?? 0
+            imageCaptureIdentity(change.rows).revision
           ),
         }
       : {}),

@@ -183,7 +183,7 @@ export function buildProjectActionAudioPlan(
         identity: [group.recordingId, group.sourceInstanceId],
         markers: projectMarkers ? projectMarkers(facts, group) : facts,
         settings: group.settings,
-        runs: getVideoProjectFeedbackRuns(project, group),
+        binding: group,
       };
     }),
     ...(project.sourceInteractionDocuments ?? []).flatMap((document) =>
@@ -196,25 +196,35 @@ export function buildProjectActionAudioPlan(
                 mouse: document.mouseEnabled,
               }),
               settings: document.feedback.settings,
-              runs: getVideoProjectFeedbackRuns(project, document.binding),
+              binding: document.binding,
             },
           ]
         : []
     ),
   ];
   for (const input of inputs) {
-    for (const { clips, segments } of input.runs) {
-      const plan = buildReviewActionAudioPlan({
-        markers: input.markers,
-        settings: input.settings,
-        segments,
-        applied: true,
-      });
-      for (const descriptor of plan.descriptors)
-        descriptors.push({
-          ...descriptor,
-          id: JSON.stringify([...input.identity, clips[0]!.id, descriptor.id]),
+    for (const timeDomain of [undefined, 'result'] as const) {
+      const markers = input.markers
+        .filter((marker) => marker.timeDomain === timeDomain)
+        .map(({ timeDomain: _domain, ...marker }) => marker);
+      if (!markers.length) continue;
+      for (const { clips, segments } of getVideoProjectFeedbackRuns(
+        project,
+        input.binding,
+        timeDomain
+      )) {
+        const plan = buildReviewActionAudioPlan({
+          markers,
+          settings: input.settings,
+          segments,
+          applied: true,
         });
+        for (const descriptor of plan.descriptors)
+          descriptors.push({
+            ...descriptor,
+            id: JSON.stringify([...input.identity, clips[0]!.id, descriptor.id]),
+          });
+      }
     }
   }
   return { duration: project.duration, descriptors };
@@ -286,13 +296,16 @@ export function evaluateProjectGestureFeedback(project: VideoProject, time: numb
     plan = prepareProjectGestureFeedback(project);
     gesturePlans.set(project, plan);
   }
-  return plan.flatMap(({ clips, cues }) => {
+  return plan.flatMap(({ clips, cues, resultClock }) => {
     const clip = clips.find(
       (item) => time >= item.startTime && time < item.startTime + item.duration
     );
     if (!clip) return [];
     return cues.flatMap((cue) =>
-      evaluateReviewClicks([cue], getVideoClipPresentationTime(clip, time)).map((frame) => ({
+      evaluateReviewClicks(
+        [cue],
+        resultClock ? time : getVideoClipPresentationTime(clip, time)
+      ).map((frame) => ({
         frame,
         clipId: clip.id,
         eventId: cue.id!,
@@ -330,10 +343,18 @@ function prepareProjectGestureFeedback(project: VideoProject) {
         },
       ];
     });
-    return getVideoProjectFeedbackRuns(project, group).map(({ clips, visualSegments }) => ({
-      clips,
-      cues: scheduleReviewClicks(facts, styles, visualSegments),
-    }));
+    return [undefined, 'result' as const].flatMap((timeDomain) => {
+      const markers = facts
+        .filter((marker) => marker.timeDomain === timeDomain)
+        .map(({ timeDomain: _domain, ...marker }) => marker);
+      return getVideoProjectFeedbackRuns(project, group, timeDomain).map(
+        ({ clips, visualSegments }) => ({
+          clips,
+          resultClock: timeDomain === 'result',
+          cues: scheduleReviewClicks(markers, styles, visualSegments),
+        })
+      );
+    });
   });
   const authored = (project.sourceInteractionDocuments ?? []).flatMap((document) => {
     if (!document.feedback) return [];
@@ -341,12 +362,22 @@ function prepareProjectGestureFeedback(project: VideoProject) {
       keyboard: document.keyboardEnabled,
       mouse: document.mouseEnabled,
     });
-    return getVideoProjectFeedbackRuns(project, document.binding).map(
-      ({ clips, visualSegments }) => ({
-        clips,
-        cues: scheduleReviewClicks(facts, document.feedback?.gestureStyles ?? [], visualSegments),
-      })
-    );
+    return [undefined, 'result' as const].flatMap((timeDomain) => {
+      const markers = facts
+        .filter((marker) => marker.timeDomain === timeDomain)
+        .map(({ timeDomain: _domain, ...marker }) => marker);
+      return getVideoProjectFeedbackRuns(project, document.binding, timeDomain).map(
+        ({ clips, visualSegments }) => ({
+          clips,
+          resultClock: timeDomain === 'result',
+          cues: scheduleReviewClicks(
+            markers,
+            document.feedback?.gestureStyles ?? [],
+            visualSegments
+          ),
+        })
+      );
+    });
   });
   return [...recorded, ...authored];
 }

@@ -10,7 +10,7 @@ import {
   readEncodedAudioWindows,
 } from '../support/native-video-export-proof';
 import { createVideoProjectFromRecording } from '../../../../apps/extension/src/features/video/project/factories/creation';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import {
   configureGpuPreviewProofBrowser,

@@ -83,6 +83,28 @@ function LinkToggle(props: {
   );
 }
 
+function FullPaddingRow({
+  label,
+  hoverSide,
+  field,
+  action,
+}: {
+  label: string;
+  hoverSide: PaddingSide | 'all';
+  field?: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="sniptale-parameter-row" data-padding-hover={hoverSide} data-layout="inline">
+      <span className="sniptale-parameter-name">{label}</span>
+      <div className="sniptale-parameter-value grid min-w-0 grid-cols-[minmax(0,1fr)_32px] items-center gap-1.5">
+        <div className="min-w-0">{field}</div>
+        <div className="justify-self-end">{action}</div>
+      </div>
+    </div>
+  );
+}
+
 function ExpandedAxisGroup(props: {
   axis: PaddingAxis;
   linked: boolean;
@@ -95,11 +117,47 @@ function ExpandedAxisGroup(props: {
   const sides = AXIS_SIDES[props.axis];
   const visibleSides = props.linked ? [sides[0]] : sides;
   const fullRow = props.shared.fieldLayout === 'full-row';
+  const sideLabel = (side: PaddingSide) =>
+    props.linked
+      ? sides.map((linkedSide) => props.shared.labels[linkedSide]).join(' / ')
+      : props.shared.labels[side];
+  const renderSide = (side: PaddingSide) =>
+    props.shared.renderValueField({
+      compact: false,
+      label: fullRow ? sideLabel(side) : props.shared.labels[side],
+      onChange: (value) => props.onSideChange(side, value),
+      onPreview: props.onSidePreview ? (value) => props.onSidePreview?.(side, value) : undefined,
+      side,
+      value: props.padding[side],
+    });
+  const action = (
+    <LinkToggle
+      labels={props.shared.labels}
+      linked={props.linked}
+      name={props.axis}
+      onClick={props.onLinkToggle}
+    />
+  );
+  if (fullRow)
+    return (
+      <div className="sniptale-parameter-stack" data-padding-axis={props.axis}>
+        {visibleSides.map((side, index) => (
+          <FullPaddingRow
+            key={side}
+            label={sideLabel(side)}
+            hoverSide={side}
+            field={renderSide(side)}
+            action={index === 0 ? action : undefined}
+          />
+        ))}
+      </div>
+    );
+
   return (
     <div
       className={[
-        'grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded-[9px]',
-        fullRow ? 'py-0.5' : 'border border-[var(--sniptale-color-border-soft)] px-2 py-1',
+        'grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5',
+        'rounded-[9px] border border-[var(--sniptale-color-border-soft)] px-2 py-1',
       ].join(' ')}
       data-padding-axis={props.axis}
     >
@@ -107,44 +165,23 @@ function ExpandedAxisGroup(props: {
         {visibleSides.map((side) => (
           <div
             className={
-              fullRow || props.shared.fieldLayout === 'stacked'
+              props.shared.fieldLayout === 'stacked'
                 ? 'grid min-w-0 grid-cols-1 gap-1'
                 : 'grid grid-cols-[minmax(5rem,0.7fr)_minmax(0,1fr)] items-center gap-2'
             }
             key={side}
           >
-            {fullRow ? null : (
-              <span
-                data-padding-hover={side}
-                className="truncate text-[11px] text-[var(--sniptale-color-text-secondary)]"
-              >
-                {props.linked
-                  ? sides.map((linkedSide) => props.shared.labels[linkedSide]).join(' / ')
-                  : props.shared.labels[side]}
-              </span>
-            )}
-            {props.shared.renderValueField({
-              compact: false,
-              label:
-                fullRow && props.linked
-                  ? sides.map((linkedSide) => props.shared.labels[linkedSide]).join(' / ')
-                  : props.shared.labels[side],
-              onChange: (value) => props.onSideChange(side, value),
-              onPreview: props.onSidePreview
-                ? (value) => props.onSidePreview?.(side, value)
-                : undefined,
-              side,
-              value: props.padding[side],
-            })}
+            <span
+              data-padding-hover={side}
+              className="truncate text-[11px] text-[var(--sniptale-color-text-secondary)]"
+            >
+              {sideLabel(side)}
+            </span>
+            {renderSide(side)}
           </div>
         ))}
       </div>
-      <LinkToggle
-        labels={props.shared.labels}
-        linked={props.linked}
-        name={props.axis}
-        onClick={props.onLinkToggle}
-      />
+      {action}
     </div>
   );
 }
@@ -219,49 +256,46 @@ export function ProductGlassLinkedPaddingFields(props: ProductGlassLinkedPadding
     setAxisLinked((current) => ({ ...current, [axis]: !linked }));
   };
 
+  const fullRow = props.fieldLayout === 'full-row';
+  const uniformValue =
+    !expanded && (!props.renderUniformField || fullRow)
+      ? props.renderValueField({
+          compact: true,
+          label: props.labels.top,
+          onChange: (value) => updateSide('top', value),
+          onPreview: props.onPreviewChange ? (value) => updateSide('top', value, true) : undefined,
+          side: 'top',
+          value: props.padding.top,
+        })
+      : null;
+  const link = (
+    <LinkToggle labels={props.labels} linked={allLinked} name="all" onClick={toggleAll} />
+  );
   return (
-    <div className="grid gap-1.5" data-ui="shared.linked-padding-fields">
-      <div
-        className={[
-          'flex min-w-0 items-center gap-1.5',
-          props.fieldLayout === 'full-row'
-            ? 'min-h-[var(--sniptale-parameter-row-height,40px)] px-2 pb-[var(--sniptale-parameter-context-space,8px)]'
-            : '',
-        ].join(' ')}
-        data-padding-hover="all"
-      >
-        <div
-          className={[
-            'min-w-0 flex-1 text-[var(--sniptale-color-text-secondary)]',
-            props.fieldLayout === 'full-row'
-              ? 'text-[13px] font-normal leading-[18px]'
-              : 'text-[11px] font-semibold',
-          ].join(' ')}
-        >
-          <span className="truncate">{props.labels.padding}</span>
-        </div>
-        {!expanded && (!props.renderUniformField || props.fieldLayout === 'full-row') ? (
-          <div
-            className={
-              props.fieldLayout === 'full-row'
-                ? 'w-[4.75rem]'
-                : 'w-[4.75rem] rounded-[9px] border border-[var(--sniptale-color-border-soft)] p-0.5'
-            }
-          >
-            {props.renderValueField({
-              compact: true,
-              label: props.labels.top,
-              onChange: (value) => updateSide('top', value),
-              onPreview: props.onPreviewChange
-                ? (value) => updateSide('top', value, true)
-                : undefined,
-              side: 'top',
-              value: props.padding.top,
-            })}
+    <div
+      className={fullRow ? 'sniptale-parameter-stack' : 'grid gap-1.5'}
+      data-ui="shared.linked-padding-fields"
+    >
+      {fullRow ? (
+        <FullPaddingRow
+          label={props.labels.padding}
+          hoverSide="all"
+          field={uniformValue}
+          action={link}
+        />
+      ) : (
+        <div className="flex min-w-0 items-center gap-1.5" data-padding-hover="all">
+          <div className="min-w-0 flex-1 text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
+            <span className="truncate">{props.labels.padding}</span>
           </div>
-        ) : null}
-        <LinkToggle labels={props.labels} linked={allLinked} name="all" onClick={toggleAll} />
-      </div>
+          {uniformValue ? (
+            <div className="w-[4.75rem] rounded-[9px] border border-[var(--sniptale-color-border-soft)] p-0.5">
+              {uniformValue}
+            </div>
+          ) : null}
+          {link}
+        </div>
+      )}
       {!expanded && props.renderUniformField
         ? props.renderUniformField({
             onChange: (value) => updateSide('top', value),
@@ -272,7 +306,10 @@ export function ProductGlassLinkedPaddingFields(props: ProductGlassLinkedPadding
           })
         : null}
       {expanded ? (
-        <div className="grid w-full gap-1.5" data-ui="shared.linked-padding-expanded">
+        <div
+          className={fullRow ? 'sniptale-parameter-stack' : 'grid w-full gap-1.5'}
+          data-ui="shared.linked-padding-expanded"
+        >
           {(['vertical', 'horizontal'] as const).map((axis) => (
             <ExpandedAxisGroup
               key={axis}

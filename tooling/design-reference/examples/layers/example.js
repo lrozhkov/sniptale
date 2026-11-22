@@ -14,6 +14,15 @@ async function loadPickers() {
   return pickerModule;
 }
 
+async function renderInspector(inspectorStage, { theme, locale, mountPickerReferences }) {
+  await mountPickerReferences(inspectorStage, {
+    theme,
+    locale,
+    kind: 'inspector',
+    controls: [],
+  });
+}
+
 export async function render(root, { manifest, theme }) {
   const add = (key) => {
     const stage = el('div', { class: 'case-stage' });
@@ -25,6 +34,9 @@ export async function render(root, { manifest, theme }) {
     );
     return stage;
   };
+  const { mountPickerReferences } = await loadPickers();
+  const locale = new URLSearchParams(location.search).get('lang') === 'en' ? 'en' : 'ru';
+  await renderInspector(add('inspector-fields'), { theme, locale, mountPickerReferences });
   const menuStage = add('commands'),
     status = el('p', { class: 'layer-feedback', role: 'status', text: 'Команда не выбрана' }),
     menu = CommandMenu({
@@ -133,8 +145,6 @@ export async function render(root, { manifest, theme }) {
     onCancel: () => inner.cancel(),
   });
   innerOpen.addEventListener('click', () => innerModal.open(innerOpen));
-  const { mountPickerReferences } = await loadPickers();
-  const locale = new URLSearchParams(location.search).get('lang') === 'en' ? 'en' : 'ru';
   await mountPickerReferences(add('color'), { theme, locale, kind: 'color' });
   await mountPickerReferences(add('paint'), { theme, locale, kind: 'paint' });
   const tooltipStage = add('tooltip'),

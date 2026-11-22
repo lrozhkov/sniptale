@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createMediaLibraryEntry,
+  createVideoProjectEntry,
   createVideoProjectEntryWithMediaClip,
 } from '../../../../composition/persistence/projects/index.test-support';
 
@@ -24,6 +25,83 @@ import { assertPortableJson, parseRootEnvelope } from '../codec';
 import { parsePortableVideoProjectMetadata } from '../root-codecs/projects';
 import { createMediaHubBackupExportOptions } from '../options';
 import { buildVideoProjectRootInventory } from './video-projects';
+import { createVideoProjectHistoryChange } from '../../../../features/video/project/history-change';
+import { createSha256Digest } from '@sniptale/platform/security/digest';
+
+it('exports compact Montage branches and recovery without native history identities', async () => {
+  const entry = createVideoProjectEntry({ name: 'Draft' });
+  const anchor = { ...entry.project, name: 'Anchor' };
+  const values = new Map([
+    [
+      'past-inverse',
+      JSON.stringify(createVideoProjectHistoryChange({ ...anchor, name: 'Before' }, anchor)),
+    ],
+    [
+      'future-inverse',
+      JSON.stringify(createVideoProjectHistoryChange({ ...anchor, name: 'After' }, anchor)),
+    ],
+    ['recovery-inverse', JSON.stringify(createVideoProjectHistoryChange(anchor, entry.project))],
+  ]);
+  entry.history = {
+    version: 1,
+    epoch: 'private-epoch',
+    past: [{ assetId: 'past-inverse' }],
+    future: [{ assetId: 'future-inverse' }],
+    recovery: { assetId: 'recovery-inverse' },
+    sources: [],
+  };
+  entry.historyPublicationId = 'private-native-receipt';
+  const refs = new Map(
+    await Promise.all(
+      [...values].map(
+        async ([id, value]) =>
+          [
+            id,
+            {
+              ...ref(id, 'application/json', new TextEncoder().encode(value).byteLength),
+              sha256: (await createSha256Digest(value)).slice('sha256:'.length),
+            },
+          ] as const
+      )
+    )
+  );
+  const base = database([], new Map(), [entry]);
+  const db = {
+    ...base,
+    get: async (store: string, key: unknown) => {
+      if (store === 'asset_refs' && typeof key === 'string') return refs.get(key);
+      if (store === 'asset_owners' && Array.isArray(key) && typeof key[2] === 'string')
+        return {
+          ownerKind: 'video-project-history',
+          ownerId: entry.id,
+          role: key[2],
+          assetId: key[2].slice('history:change:'.length),
+        };
+      return base.get(store, key);
+    },
+  };
+  mocks.readInventoryAssetFile.mockImplementation(
+    async (_db, id: string, filename: string) =>
+      new File([values.get(id)!], filename, { type: 'application/json' })
+  );
+  const [root] = await buildVideoProjectRootInventory({
+    db,
+    paths,
+    options: createMediaHubBackupExportOptions(),
+  });
+  if (!root) throw new Error('Missing project root.');
+  const payload = await root.load();
+  const metadata = parsePortableVideoProjectMetadata(payload.metadata);
+  expect(metadata.entry).not.toHaveProperty('history');
+  expect(metadata.entry).not.toHaveProperty('historyPublicationId');
+  expect(metadata).toHaveProperty('history');
+  expect(payload.objects).toHaveLength(3);
+  expect(JSON.stringify(metadata)).not.toContain('private-epoch');
+  expect(JSON.stringify(metadata)).not.toContain('private-native-receipt');
+  expect(payload.objects.reduce((bytes, object) => bytes + object.ref.size, 0)).toBe(
+    [...refs.values()].reduce((bytes, object) => bytes + object.size, 0)
+  );
+});
 
 function assetEntry(id: string, assetId: string, mimeType: string, size: number) {
   return { id, assetId, mimeType, createdAt: 1, size };

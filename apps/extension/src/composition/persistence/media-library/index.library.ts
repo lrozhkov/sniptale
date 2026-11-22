@@ -1,4 +1,5 @@
 import { captureMediaInTransaction } from '../sync-capture/capture';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   STORE_NAME,
   RECORDING_TELEMETRY_STORE,
@@ -27,9 +28,17 @@ import { getRecording } from '../recordings/index';
 import { getWebSnapshotPackageFile } from '../web-snapshots';
 import type { MediaLibraryEntry, MediaLibraryItem, MediaThumbnailEntry } from './contracts';
 import { parseDbEntries } from '../infrastructure/indexed-db/read-primitives';
-import { parseMediaLibraryEntry, parseMediaThumbnailEntry } from './read-guards';
+import {
+  isCollectableProjectOriginal,
+  parseMediaLibraryEntry,
+  parseMediaThumbnailEntry,
+} from './read-guards';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
-import { listMediaAssetProjectUsage } from './usage';
+import {
+  listMediaAssetProjectUsage,
+  MEDIA_PROJECT_USAGE_STORES,
+  readMediaProjectUsageInTransaction,
+} from './usage';
 import type { MediaAssetProjectUsage } from './usage';
 import { deleteMediaAssetWithProjectCascade } from './delete-cascade';
 import { mediaHasPendingPublication } from './delete-cascade.sources';
@@ -41,6 +50,24 @@ import {
 } from '../infrastructure/mutation-barrier';
 
 export { syncLegacyMediaLibrary } from './index.legacy-sync.ts';
+
+const MEDIA_CAPTURE_STORES = [
+  MEDIA_LIBRARY_STORE,
+  STORE_NAME,
+  RECORDING_TELEMETRY_STORE,
+  ASSET_OWNERS_STORE,
+  IMAGE_WORKSPACES_STORE,
+  AGGREGATE_PRESENTATIONS_STORE,
+  ASSET_REFS_STORE,
+  SYNC_CAPTURE_STORE,
+  PROJECT_ASSETS_STORE,
+  PROJECT_EXPORTS_STORE,
+  WEB_SNAPSHOTS_STORE,
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
+  THUMBNAILS_STORE,
+] as const;
 
 type MediaLibraryDeleteFailureStage = 'linked-source-cleanup' | 'media-library-transaction';
 
@@ -55,7 +82,9 @@ export class MediaLibraryDeleteError extends Error {
   }
 }
 
-export async function listMediaLibrary(): Promise<MediaLibraryItem[]> {
+export async function listMediaLibrary(
+  options: { includeProjectRetained?: boolean } = {}
+): Promise<MediaLibraryItem[]> {
   const db = await initDB();
   const [rawEntries, thumbnails] = await Promise.all([
     db.getAll(MEDIA_LIBRARY_STORE),
@@ -65,11 +94,37 @@ export async function listMediaLibrary(): Promise<MediaLibraryItem[]> {
   const thumbnailIds = new Set(thumbnails);
 
   return entries
+    .filter((entry) => options.includeProjectRetained || entry.savedIndependently !== false)
     .map(({ blob: _blob, ...entry }) => ({
       ...entry,
       hasThumbnail: thumbnailIds.has(entry.id),
     }))
     .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/** Discover recovery candidates without loading thumbnails or project documents. */
+export async function listCollectableProjectOriginalIds(signal: AbortSignal): Promise<string[]> {
+  const db = await initDB();
+  const pageSize = 64;
+  const ids: string[] = [];
+  let range: IDBKeyRange | undefined;
+  while (!signal.aborted) {
+    const tx = db.transaction(MEDIA_LIBRARY_STORE, 'readonly');
+    const [rows, keys]: [unknown[], IDBValidKey[]] = await Promise.all([
+      tx.store.getAll(range, pageSize),
+      tx.store.getAllKeys(range, pageSize),
+    ]);
+    await tx.done;
+    for (const row of rows) {
+      const entry = parseMediaLibraryEntry(row);
+      if (entry && isCollectableProjectOriginal(entry)) ids.push(entry.id);
+    }
+    const lastKey = keys.at(-1);
+    if (keys.length < pageSize || lastKey === undefined) break;
+    // Later pages and removals can interleave with ordinary library mutations.
+    range = IDBKeyRange.lowerBound(lastKey, true);
+  }
+  return ids;
 }
 
 export async function listMediaThumbnailIds(): Promise<string[]> {
@@ -139,26 +194,7 @@ async function mutateMediaLibraryEntry(
   mutate: (entry: MediaLibraryEntry) => MediaLibraryEntry
 ): Promise<MediaLibraryEntry> {
   return runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction(
-      [
-        MEDIA_LIBRARY_STORE,
-        STORE_NAME,
-        RECORDING_TELEMETRY_STORE,
-        ASSET_OWNERS_STORE,
-        IMAGE_WORKSPACES_STORE,
-        AGGREGATE_PRESENTATIONS_STORE,
-        ASSET_REFS_STORE,
-        SYNC_CAPTURE_STORE,
-        PROJECT_ASSETS_STORE,
-        PROJECT_EXPORTS_STORE,
-        WEB_SNAPSHOTS_STORE,
-        VIDEO_WORKSPACES_STORE,
-        VIDEO_WORKSPACE_HISTORY_STORE,
-        VIDEO_WORKSPACE_DRAFTS_STORE,
-        THUMBNAILS_STORE,
-      ],
-      'readwrite'
-    );
+    const tx = db.transaction([...MEDIA_CAPTURE_STORES], 'readwrite');
     try {
       const store = tx.objectStore(MEDIA_LIBRARY_STORE);
       const existing = parseMediaLibraryEntry(await store.get(assetId));
@@ -205,15 +241,74 @@ export async function addMediaLibraryEntryTags(
   });
 }
 
+/** Change visibility on the accepted original without opening or saving a project. */
+export async function setMediaLibraryOriginalClaim(
+  expected: {
+    id: string;
+    createdAt: number;
+    lifecycleUpdatedAt: number;
+    originalSaveId: string | null;
+  },
+  savedIndependently: boolean
+): Promise<boolean> {
+  return runWithIndexedDbMutation(async (db) => {
+    const tx = db.transaction(
+      [...new Set([...MEDIA_PROJECT_USAGE_STORES, ...MEDIA_CAPTURE_STORES])],
+      'readwrite'
+    );
+    try {
+      const store = tx.objectStore(MEDIA_LIBRARY_STORE);
+      const raw: unknown = await store.get(expected.id);
+      const original = parseMediaLibraryEntry(raw);
+      if (
+        !isRecord(raw) ||
+        !original ||
+        original.id !== expected.id ||
+        original.createdAt !== expected.createdAt ||
+        (original.lifecycle?.updatedAt ?? original.updatedAt) !== expected.lifecycleUpdatedAt
+      )
+        throw new Error('The original changed.');
+      if (!isCollectableProjectOriginal({ ...original, savedIndependently: false }))
+        throw new Error('The original is unavailable.');
+      const changed = (original.savedIndependently !== false) !== savedIndependently;
+      if (
+        (!savedIndependently || changed) &&
+        (original.originalSaveId ?? null) !== expected.originalSaveId
+      )
+        throw new Error('The original changed.');
+      if (!changed) {
+        await tx.done;
+        return false;
+      }
+      if (
+        !savedIndependently &&
+        !(await readMediaProjectUsageInTransaction(tx, original, { includeHistory: true })).length
+      )
+        throw new Error('No project retains this original.');
+      await store.put({
+        ...raw,
+        savedIndependently,
+        ...(savedIndependently ? { originalSaveId: crypto.randomUUID() } : {}),
+      });
+      await captureMediaInTransaction(tx, original.id, { checkpoint: 'freeze' });
+      await tx.done;
+      return true;
+    } catch (error) {
+      return abortIndexedDbMutation(tx, error);
+    }
+  });
+}
+
 export async function deleteMediaLibraryAsset(
   assetId: string,
-  options: { expectedUsage?: readonly MediaAssetProjectUsage[] } = {}
+  options: { expectedUsage?: readonly MediaAssetProjectUsage[]; projectRetainedOnly?: boolean } = {}
 ): Promise<void> {
   const db = await initDB();
   try {
     await runWithPersistenceMutationTransition(() =>
       runWithDurableAssetLifecycleLock(async (permit) => {
         const entry = parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, assetId));
+        if (options.projectRetainedOnly && !isCollectableProjectOriginal(entry)) return;
         // Missing roots still have pending image/sync media-ID claims that can publish later.
         const target = entry ?? { id: assetId };
         const claims = await readAssetReadyPublicationClaims(target, permit);
@@ -225,9 +320,14 @@ export async function deleteMediaLibraryAsset(
           throw new MediaAssetDeletionBlockedError('pending-publication');
         if (!entry) return;
         const consumers = await listMediaAssetProjectUsage(assetId);
+        if (options.projectRetainedOnly && consumers.length > 0) return;
         if (consumers.length > 0 && !options.expectedUsage)
           throw new Error('The media asset is still used by projects.');
-        await deleteMediaAssetWithProjectCascade(assetId, options.expectedUsage ?? [], permit);
+        if (options.projectRetainedOnly) {
+          await deleteMediaAssetWithProjectCascade(assetId, [], permit, true);
+        } else {
+          await deleteMediaAssetWithProjectCascade(assetId, options.expectedUsage ?? [], permit);
+        }
       })
     );
   } catch (error) {

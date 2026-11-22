@@ -5,11 +5,14 @@ import { createEditorDocumentFixture } from '../page-session/document.test-suppo
 import { createEditorSessionAutosaveService } from './';
 import { createEditorControllerPublicApiMethods } from '../../controller/public-api/bindings/methods';
 import { useEditorStore } from '../../state/useEditorStore';
+import type { CommitImageWorkspaceInput } from '../../../composition/persistence/image-aggregates';
 
 const { commitWorkspaceMock } = vi.hoisted(() => ({ commitWorkspaceMock: vi.fn() }));
 vi.mock('../../../composition/persistence/image-aggregates', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/image-aggregates')>()),
   commitImageWorkspace: commitWorkspaceMock,
+  createImageWorkspaceCommit: (input: CommitImageWorkspaceInput) => () =>
+    commitWorkspaceMock(input),
 }));
 
 beforeEach(() => {

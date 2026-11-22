@@ -21,7 +21,10 @@ import { recordingEventsProjectCoversTime } from '../../features/video/project/r
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
-import { deriveReviewCursorFocusPath } from '../../features/video/review/advanced/cursor-focus-path';
+import {
+  deriveReviewCursorFocusPath,
+  evaluateReviewCursorFocus,
+} from '../../features/video/review/advanced/cursor-focus-path';
 import { reviewRecordingWindow } from '../../features/video/review/telemetry';
 import { useReviewRecordingHistory } from './use-recording-history';
 
@@ -269,7 +272,7 @@ async function archive(time = 10) {
   io.create.mockReturnValue({ ...reader, read });
   return { input: { historyProject, telemetry, source }, prepared, reader, read };
 }
-function pose(facts: RecordingTelemetryEntry, time = 11.1) {
+function pose(facts: RecordingTelemetryEntry, time = 11.1, end = 17) {
   const advanced = createQuickEditAdvancedState();
   advanced.ui.mode = 'advanced';
   advanced.ui.tracks.zoom = true;
@@ -279,7 +282,7 @@ function pose(facts: RecordingTelemetryEntry, time = 11.1) {
       {
         id: 'zoom',
         start: 8,
-        end: 17,
+        end,
         followCursor: true,
         transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
         cursorComposition: { mode: 'orbit', amount: 0.5, smoothness: 0.6 },
@@ -355,19 +358,38 @@ it('retains adjacent canonical cursor facts while the active cursor window refre
   expect(pose(current.telemetry!, 9.1)).toEqual(expected);
 });
 
-it('drops the retained cursor inside a real unknown gap during a pending event read', async () => {
+it('retains the camera across a covered cursor gap while the event read is pending', async () => {
   const fixture = await archive();
+  const time = 17.05;
   const refresh = Promise.withResolvers<typeof fixture.prepared>();
   fixture.read.mockReturnValueOnce(refresh.promise);
   await act(async () => root.render(<Probe input={fixture.input} />));
-  await act(async () => root.render(<Probe input={fixture.input} time={11.1} />));
-  expect(current.telemetry!.cursorTrack?.samples.length).toBeGreaterThan(0);
-  expect(cursorTrajectoryProjectCoversTime(fixture.prepared.project, 17)).toBe(true);
-  expect(cursorTrajectoryProjectHasPreparedPosition(fixture.prepared.project, 17)).toBe(false);
-  await act(async () => root.render(<Probe input={fixture.input} time={17} />));
+  const expected = pose(current.telemetry!, time, 19);
+  const retained = current.telemetry!.cursorTrack!.samples;
+  const end = reviewRecordingWindow(current.telemetry!)?.cursorEndSeconds;
+  expect(expected).not.toEqual(
+    pose({ ...current.telemetry!, cursorTrack: null, actionEvents: [], signals: [] }, time, 19)
+  );
+  expect(cursorTrajectoryProjectCoversTime(fixture.prepared.project, time)).toBe(true);
+  expect(cursorTrajectoryProjectHasPreparedPosition(fixture.prepared.project, time)).toBe(false);
+  expect(
+    evaluateReviewCursorFocus(deriveReviewCursorFocusPath(current.telemetry!, source, true), time)
+  ).toBeNull();
+  await act(async () => root.render(<Probe input={fixture.input} time={time} />));
   expect(current.pending).toBe(true);
-  expect(current.telemetry!.cursorTrack?.samples ?? []).toEqual([]);
-  expect(reviewRecordingWindow(current.telemetry!)?.cursorEndSeconds).toBeUndefined();
+  expect(current.telemetry!.cursorTrack?.samples).toEqual(retained);
+  expect(reviewRecordingWindow(current.telemetry!)?.cursorEndSeconds).toBe(end);
+  expect(pose(current.telemetry!, time, 19)).toEqual(expected);
+  expect(
+    evaluateReviewCursorFocus(deriveReviewCursorFocusPath(current.telemetry!, source, true), time)
+  ).toBeNull();
+  const completed = await fixture.reader.read(time);
+  await act(async () => refresh.resolve(completed));
+  expect(current.pending).toBe(false);
+  expect(pose(current.telemetry!, time, 19)).toEqual(expected);
+  expect(
+    evaluateReviewCursorFocus(deriveReviewCursorFocusPath(current.telemetry!, source, true), time)
+  ).toBeNull();
 });
 
 it.each(['source', 'includeCursor'] as const)(

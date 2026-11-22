@@ -144,7 +144,7 @@ async function readAnnotationResource(reference: string, prepared: ReviewReadySo
 
 /** New source bytes are sampled under lifecycle exclusion, never inside a write transaction. */
 export async function verifyReviewAnnotationEffectSources(
-  previous: VideoWorkspace,
+  previous: Pick<VideoWorkspace, 'effectSnapshots'>,
   snapshots: readonly ReviewAnnotationEffectSnapshot[],
   prepared: ReviewReadySources
 ): Promise<ReviewReadySources> {
@@ -362,6 +362,7 @@ export async function promoteReviewPrimarySourceLifecycles(
     mediaStore: stores.media,
     recordingStore: stores.recordings,
     now,
+    preserveOriginalVisibility: true,
   });
 }
 

@@ -4,7 +4,11 @@ import { parseDbEntries } from '../../infrastructure/indexed-db/read-primitives'
 import { parseScenarioProjectEntry, parseScenarioProjectSummary } from '../read-guards';
 import type { ScenarioProjectSummary } from '../../../../features/scenario/contracts/types/project';
 import { initDB } from '../../infrastructure/indexed-db/core';
-import type { ScenarioProjectEntry, ScenarioProjectSnapshot } from '../contracts';
+import type {
+  ScenarioProjectEntry,
+  ScenarioProjectSnapshot,
+  ScenarioEditingHistory,
+} from '../contracts';
 import {
   commitScenarioAggregateMutation,
   recoverScenarioAssetPublications,
@@ -19,6 +23,8 @@ export interface SaveScenarioProjectOptions {
   storageClass?: import('../../library-lifecycle/contracts').LibraryStorageClass;
   /** A captured page action may coalesce only under the accompanying exact owner revision. */
   historyActionId?: string;
+  /** Exact editing branches published atomically under expectedRevision. */
+  editingHistory?: ScenarioEditingHistory;
 }
 
 /** Returns the aggregate owner ACK, including an optional transient checkpoint receipt. */
@@ -33,6 +39,7 @@ export async function saveScenarioProject(
       : { expectedRevision: options.expectedRevision }),
     ...(options.storageClass === undefined ? {} : { storageClass: options.storageClass }),
     ...(options.historyActionId === undefined ? {} : { historyActionId: options.historyActionId }),
+    ...(options.editingHistory === undefined ? {} : { editingHistory: options.editingHistory }),
   });
   return result;
 }
@@ -71,6 +78,6 @@ export async function listScenarioProjectEntries(): Promise<ScenarioProjectEntry
   );
 }
 
-export async function deleteScenarioProject(id: string): Promise<void> {
-  await deleteScenarioAggregate(id);
+export function deleteScenarioProject(id: string): Promise<string[]> {
+  return deleteScenarioAggregate(id);
 }

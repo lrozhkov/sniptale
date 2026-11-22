@@ -123,6 +123,54 @@ function stagedObject(objectId: string, assetId: string, mimeType: string, size:
   };
 }
 
+it.each([
+  { history: { version: 1, epoch: 'foreign', past: [], future: [], sources: [] } },
+  {
+    history: {
+      version: 1,
+      epoch: 'foreign',
+      past: [{ assetId: 'unowned-native-file' }],
+      future: [],
+      sources: [],
+    },
+  },
+  {
+    history: { version: 1, epoch: 'foreign', past: [], future: [], sources: [] },
+    historyPublicationId: 'foreign-publication',
+  },
+  { historyPublicationId: 'foreign-publication' },
+])('refuses private native history fields before archive replacement: %j', async (fields) => {
+  const original = createVideoProjectEntry({ id: 'p' }, { id: 'p' });
+  const values = new Map<string, unknown[]>([['video_projects', [original]]]);
+  const before = structuredClone(values);
+  mocks.mutate.mockImplementation(async (callback) => callback(publisherDatabase(values)));
+  const metadata = {
+    entry: {
+      ...original,
+      project: encodePortableVideoProjectAssetRefs({ ...original.project, name: 'Replacement' }),
+      ...fields,
+    },
+    projectAssets: [],
+    projectExports: [],
+  };
+  if (fields.history?.past.length) {
+    expect(() => assertPortableJson(metadata)).toThrow('local asset ID');
+    expect(mocks.mutate).not.toHaveBeenCalled();
+    expect(mocks.checkpoint).not.toHaveBeenCalled();
+    expect(values).toEqual(before);
+    return;
+  }
+  assertPortableJson(metadata);
+  const args = publishArgs(metadata);
+  args.session = { ...args.session, strategy: 'replace' };
+  await expect(videoProjectRootPublisher.publish(args)).rejects.toThrow(
+    'Portable video project children are invalid.'
+  );
+  expect(mocks.mutate).not.toHaveBeenCalled();
+  expect(mocks.checkpoint).not.toHaveBeenCalled();
+  expect(values).toEqual(before);
+});
+
 function portableReviewAdvanced(options: { assetRef?: string; recoveryV1?: string } = {}) {
   return {
     schemaVersion: 2,

@@ -128,7 +128,8 @@ async function verifyMultiScreenCaptureRollbackOnCancellation() {
     })
   );
   expect(deps.notifyStartFailed).toHaveBeenCalledWith(
-    'background.runtime.sourceSelectionCancelled'
+    'background.runtime.sourceSelectionCancelled',
+    { diagnosticCode: 'cancelled' }
   );
 }
 

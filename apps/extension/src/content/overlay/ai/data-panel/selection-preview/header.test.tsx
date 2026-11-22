@@ -142,14 +142,26 @@ describe('DataSelectionPreviewHeader', () => {
       />
     );
 
-    container?.querySelector<HTMLButtonElement>('.sniptale-ai-data-search-clear')?.focus();
+    const search = container?.querySelector('input[type="search"]');
+    expect(search?.closest('.sniptale-inspector-search')).toBeTruthy();
+    const clear = container?.querySelector<HTMLButtonElement>(
+      '[aria-label="aiModal.clearSearchLabel"]'
+    );
+    const nativeInput = vi.fn();
+    search?.addEventListener('input', nativeInput);
+    clear?.focus();
+    expect(clear?.matches('.sniptale-field-clear')).toBe(true);
     act(() =>
       container
         ?.querySelector<HTMLButtonElement>('[aria-label="aiModal.clearSearchLabel"]')
         ?.click()
     );
     expect(setFilterQuery).toHaveBeenCalledWith('');
-    expect(document.activeElement).toBe(container?.querySelector('input'));
+    expect(nativeInput).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(search);
+    expect(
+      container?.querySelector('.sniptale-ai-spoiler-toggle')?.getAttribute('aria-expanded')
+    ).toBe('true');
   });
 });
 

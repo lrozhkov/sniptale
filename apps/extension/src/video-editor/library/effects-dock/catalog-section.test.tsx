@@ -1,9 +1,23 @@
+import {
+  videoeditorFixtureMessages,
+  prepareVideoEditorTranslations,
+} from '../../testing/translations.test-support';
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: Parameters<typeof videoeditorFixtureMessages>[0]) =>
+    videoeditorFixtureMessages(locale)
+  ),
+}));
+
+beforeAll(async () => {
+  await prepareVideoEditorTranslations('en');
+});
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import type { EffectBundleCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { expect, it, vi } from 'vitest';
+import { beforeAll, expect, it, vi } from 'vitest';
 import { CatalogSection } from './catalog-section';
 import type { VideoEditorEffectsLibraryDockProps } from './types';
 const accepted = parseAnimationTemplateSource(
@@ -69,5 +83,5 @@ it('shows enabled documents with apply actions and no pack management or phantom
   expect(html).not.toContain('role="switch"');
   expect(html).not.toContain('Светлая');
   expect(html).not.toContain('Тёмная');
-  expect(html).toContain('Добавить');
+  expect(html).toContain('Add');
 });

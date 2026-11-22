@@ -49,10 +49,6 @@
   width: 100%;
   min-height: 32px;
 }
-.parameter-row .control:hover:not(:disabled) {
-  background: var(--hover, var(--surface-hover));
-  border-color: var(--hover-border, var(--divider));
-}
 .parameter-row .property-group {
   padding: 0;
   margin: 0;

@@ -1,6 +1,17 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadContentCatalogFixture,
+  prepareContentTranslations,
+} from '../../../test-support/translations.test-support';
+
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadContentCatalogFixture>[0]) =>
+    loadContentCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareContentTranslations('ru'));
 
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
 import { getMoscowFilenameTimestamp } from '@sniptale/foundation/utils/export-timestamp';

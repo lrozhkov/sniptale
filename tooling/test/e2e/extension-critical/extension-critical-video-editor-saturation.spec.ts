@@ -1,7 +1,7 @@
 import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { test, expect, type Page } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import {
   createVideoProjectFromRecording,
   createVideoProjectTrack,

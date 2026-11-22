@@ -12,7 +12,7 @@ import type { VideoEditorPlacementMode } from '../../contracts/placement';
 import type { VideoEditorSelection } from '../../contracts/selection';
 import type { VideoEditorPlaybackRange } from '../../interaction/playback/range';
 
-export type ApplyLoadedProject = (project: VideoProject, recordingId: string | null) => void;
+export type ApplyLoadedProject = VideoEditorSessionActions['setProject'];
 
 export interface UseVideoEditorRuntimeParams {
   project: VideoProject | null;

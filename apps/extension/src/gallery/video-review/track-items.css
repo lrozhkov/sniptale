@@ -14,25 +14,6 @@
   flex: none;
   gap: 8px;
 }
-.review-track-items-search {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  padding: 6px 8px;
-  border: 1px solid var(--sniptale-color-border-soft);
-  border-radius: var(--sniptale-radius-sm);
-  color: var(--sniptale-color-text-secondary);
-}
-.review-track-items-search input {
-  width: 100%;
-  min-width: 0;
-  background: transparent;
-  font-size: 12px;
-}
-.review-track-items-search:focus-within {
-  border-color: var(--sniptale-color-accent);
-}
 .review-track-items-results {
   display: grid;
   min-width: 0;

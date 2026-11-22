@@ -18,6 +18,7 @@ export function GalleryDeletionMenu({
 }) {
   const warningId = useId();
   const menu = useDeletionMenu(request, contextKey, onClose);
+  const permanentDisabled = menu.pending || menu.prepared?.confirm === null;
   const trashPress = useCommandPress({
     disabled: menu.pending,
     onClick: () => {
@@ -25,7 +26,7 @@ export function GalleryDeletionMenu({
     },
   });
   const permanentPress = useCommandPress({
-    disabled: menu.pending,
+    disabled: permanentDisabled,
     onClick: (event) => {
       if (event.detail <= 1) void menu.activatePermanent();
     },
@@ -43,7 +44,7 @@ export function GalleryDeletionMenu({
           message={menu.prepared?.warning ?? translate('gallery.app.deleteChecking')}
           confirmText={translate('gallery.app.permanentDelete')}
           cancelText={translate('common.actions.cancel')}
-          confirmDisabled={!menu.prepared || menu.pending}
+          confirmDisabled={!menu.prepared?.confirm || menu.pending}
           isLoading={menu.committing}
           onCancel={menu.dismiss}
           onConfirm={menu.activatePermanent}
@@ -86,7 +87,7 @@ export function GalleryDeletionMenu({
           type="button"
           role="menuitem"
           className={`${itemLayout} text-[var(--sniptale-color-danger)]`}
-          aria-disabled={menu.pending}
+          aria-disabled={permanentDisabled}
           aria-describedby={menu.prepared || menu.pending ? warningId : undefined}
           data-command-press=""
           data-pressing={permanentPress.pressed ? 'true' : undefined}
@@ -95,7 +96,9 @@ export function GalleryDeletionMenu({
           <span className="sniptale-command-content">
             <Trash2 aria-hidden="true" className="h-4 w-4" />
             {translate(
-              menu.prepared ? 'gallery.app.confirmPermanentDelete' : 'gallery.app.permanentDelete'
+              menu.prepared?.confirm
+                ? 'gallery.app.confirmPermanentDelete'
+                : 'gallery.app.permanentDelete'
             )}
           </span>
         </button>

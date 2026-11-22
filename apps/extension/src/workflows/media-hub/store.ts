@@ -3,6 +3,7 @@ import type { ProjectAssetPublicationOptions } from '../../composition/persisten
 import {
   addMediaLibraryEntryTags,
   deleteMediaLibraryAsset,
+  setMediaLibraryOriginalClaim,
   saveScreenshotMediaAsset,
   updateMediaLibraryEntry,
 } from '../../composition/persistence/media-library/index';
@@ -179,6 +180,20 @@ export async function addMediaLibraryEntryTagsSafely(
     )
   );
   publishMediaHubLibraryChanged('update', [assetId]);
+}
+
+export async function setMediaOriginalClaim(
+  expected: Parameters<typeof setMediaLibraryOriginalClaim>[0],
+  savedIndependently: boolean
+): Promise<void> {
+  const changed = await withMediaHubWriteGuard(
+    translate('shared.mediaHub.updateMediaMetadataAction'),
+    () =>
+      runWithNativePublicationResources([{ rootKind: 'media', rootId: expected.id }], () =>
+        setMediaLibraryOriginalClaim(expected, savedIndependently)
+      )
+  );
+  if (changed) publishMediaHubLibraryChanged('update', [expected.id]);
 }
 
 export async function deleteMediaLibraryAssetsBatchSafely(

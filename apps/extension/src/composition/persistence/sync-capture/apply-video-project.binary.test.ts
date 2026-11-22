@@ -5,6 +5,12 @@ import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../features/vid
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import { parseVideoProjectEntry } from '../projects/read-guards';
 import type { AssetRef } from '../assets';
+import { createSha256Digest } from '@sniptale/platform/security/digest';
+import {
+  createVideoProjectHistoryChange,
+  applyVideoProjectHistoryChangeValues,
+} from '../../../features/video/project/history-change';
+import { getVideoProjectWorkspace } from '../projects';
 import type { PreparedVideoProjectReplicaRoot } from './prepared-project';
 import {
   applyPreparedVideoProjectRevision,
@@ -172,6 +178,79 @@ it('rolls staged publication and receipt back on failure and applies one exact r
     generation: 1,
   });
   expect(fixture.rows).toEqual(after);
+});
+
+it('publishes complete history atomically and reopens it after a late receipt refusal and retry', async () => {
+  const fixture = await setup(false);
+  const current = fixture.input.root.entry.project;
+  const anchor = { ...current, name: 'Anchor' };
+  const refs: AssetRef[] = [];
+  const inverse = async (before: typeof current, after: typeof current, assetId: string) => {
+    const value = JSON.stringify(createVideoProjectHistoryChange(before, after));
+    const file = new File([value], assetId, { type: 'application/json' });
+    fixture.files.set(assetId, file);
+    refs.push({
+      assetId,
+      createdAt: 1,
+      size: file.size,
+      mimeType: file.type,
+      location: { kind: 'opfs', objectKey: `objects/${assetId}` },
+      sha256: (await createSha256Digest(value)).slice('sha256:'.length),
+    });
+    return { assetId };
+  };
+  fixture.input.root.history = {
+    head: {
+      version: 1,
+      epoch: 'received-history',
+      sources: [],
+      past: [await inverse({ ...current, name: 'Before' }, anchor, 'history-past')],
+      future: [await inverse({ ...current, name: 'After' }, anchor, 'history-future')],
+      recovery: await inverse(anchor, current, 'history-recovery'),
+    },
+    refs,
+  };
+  const before = structuredClone(fixture.rows);
+  fixture.failReceipt();
+  await expect(applyPreparedVideoProjectRevision(fixture.input)).rejects.toThrow('No space');
+  expect(fixture.rows).toEqual(before);
+  expect(io.cleanup).not.toHaveBeenCalled();
+  fixture.allowWrites();
+  await expect(applyPreparedVideoProjectRevision(fixture.input)).resolves.toMatchObject({
+    status: 'applied',
+  });
+  for (const ref of refs) {
+    expect(fixture.table('asset_refs').get(ref.assetId)).toEqual(ref);
+    expect([...fixture.table('asset_owners').values()]).toContainEqual({
+      assetId: ref.assetId,
+      ownerKind: 'video-project-history',
+      ownerId: projectId,
+      role: `history:change:${ref.assetId}`,
+    });
+  }
+  const opened = await getVideoProjectWorkspace(projectId);
+  if (opened.status !== 'ready' || opened.history.status !== 'ready')
+    throw new Error('Expected canonical native history');
+  const recoveredAnchor = applyVideoProjectHistoryChangeValues(
+    opened.project,
+    opened.history.value.recovery!.change
+  );
+  expect(recoveredAnchor.name).toBe('Anchor');
+  expect(
+    applyVideoProjectHistoryChangeValues(recoveredAnchor, opened.history.value.past[0]!.change).name
+  ).toBe('Before');
+  expect(
+    applyVideoProjectHistoryChangeValues(recoveredAnchor, opened.history.value.future[0]!.change)
+      .name
+  ).toBe('After');
+  const published = structuredClone(fixture.rows);
+  io.read.mockClear();
+  fixture.files.clear();
+  await expect(applyPreparedVideoProjectRevision(fixture.input)).resolves.toMatchObject({
+    status: 'duplicate',
+  });
+  expect(fixture.rows).toEqual(published);
+  expect(io.read).not.toHaveBeenCalled();
 });
 
 it('publishes effect and sidecar Blobs independently of staging and replays receipts without byte IO', async () => {

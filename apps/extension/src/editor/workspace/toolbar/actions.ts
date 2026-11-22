@@ -97,7 +97,9 @@ export function createEditorToolbarActions(args: ToolbarActionArgs) {
       args.setActiveTool(tool);
       args.controller.setActiveTool(tool);
       args.setInspector(
-        args.inspector === 'ai' || args.inspector === 'elements' ? args.inspector : 'tool'
+        args.inspector === 'ai' || args.inspector === 'elements' || args.inspector === 'history'
+          ? args.inspector
+          : 'tool'
       );
     },
 

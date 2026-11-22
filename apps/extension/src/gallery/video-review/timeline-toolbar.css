@@ -11,7 +11,18 @@
     justify-content: center;
   }
 
+  .review-result-duration {
+    display: inline-flex;
+    align-items: center;
+    height: var(--review-toolbar-size);
+    font-size: 12px;
+    line-height: 18px;
+    font-variant-numeric: tabular-nums;
+    color: var(--sniptale-color-text-muted);
+  }
+
   .review-timeline-toolbar {
+    container: review-toolbar / inline-size;
     --review-toolbar-size: 32px;
     --review-toolbar-icon: 14px;
     --review-toolbar-font: 12px;
@@ -88,23 +99,52 @@
   .review-timeline-toolbar[data-layout='compact'] {
     grid-template-columns: auto auto minmax(0, 1fr);
   }
+  /* Automatic height must leave space for the ruler and a track below the stacked toolbar. */
+  [data-ui='gallery.videoReview.timeline']:has(> .review-timeline-toolbar[data-layout='stacked']) {
+    --review-stacked-timeline-floor: 232px;
+  }
   .review-timeline-toolbar[data-layout='stacked'] {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
   .review-timeline-toolbar[data-layout='stacked'] [data-toolbar-side='leading'] {
-    grid-column: 1 / -1;
-    grid-row: 2;
+    grid-column: 1;
+    grid-row: 1;
     overflow-x: auto;
   }
   .review-timeline-toolbar[data-layout='stacked'] [data-toolbar-transport] {
     grid-column: 1;
-    grid-row: 1;
+    grid-row: 2;
+    min-width: 0;
+    overflow-x: auto;
   }
   .review-timeline-toolbar[data-layout='stacked'] [data-toolbar-side='trailing'] {
+    grid-column: 1;
+    grid-row: 3;
+    display: grid;
+    grid-template-columns: minmax(360px, 1fr) minmax(144px, 1fr);
+    justify-items: center;
+    gap: 4px 8px;
+  }
+  .review-timeline-toolbar[data-layout='stacked'] [data-toolbar-viewport] {
+    grid-column: 1;
+  }
+  .review-timeline-toolbar[data-layout='stacked'] [data-toolbar-utilities] {
     grid-column: 2;
-    grid-row: 1;
-    justify-content: flex-start;
-    overflow-x: auto;
+  }
+  @container review-toolbar (max-width: 540px) {
+    .review-timeline-toolbar[data-layout='stacked'] [data-toolbar-side='trailing'] {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .review-timeline-toolbar[data-layout='stacked'] [data-toolbar-viewport],
+    .review-timeline-toolbar[data-layout='stacked'] [data-toolbar-utilities] {
+      grid-column: 1;
+      max-width: 100%;
+      overflow-x: auto;
+    }
+    .review-timeline-toolbar[data-layout='stacked'] .review-timeline-selection-actions {
+      --review-selection-width: min(360px, 100%);
+      --review-selection-min-width: 0;
+    }
   }
 }
 

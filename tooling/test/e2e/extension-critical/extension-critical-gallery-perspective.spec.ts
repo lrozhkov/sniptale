@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { chooseInspectorValue } from '../support/inspector-utilities';
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
@@ -9,7 +10,7 @@ import {
   clickReviewExport,
 } from '../support/quick-editor-media-fixture';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 test('quick zoom perspective survives reopening and matches encoded output', async ({
   page,
@@ -400,11 +401,8 @@ test('projected click near the window edge retains its raster before tilt', asyn
     await padding.fill('12');
     await padding.press('Enter');
     await addReviewFocus(page);
-    const scale = dialog.getByRole('textbox', {
-      name: label('gallery.videoReview.zoomScale'),
-      exact: true,
-    });
-    await scale.fill('2.3');
+    const scale = numericControl(dialog, label('gallery.videoReview.zoomScale'));
+    await (await openNumericControl(dialog, label('gallery.videoReview.zoomScale'))).fill('2.3');
     await scale.press('Enter');
     await button('gallery.videoReview.spatialToolTilt').click();
     const tilt = dialog.getByRole('textbox', {

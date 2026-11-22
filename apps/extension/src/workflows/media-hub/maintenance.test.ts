@@ -3,6 +3,7 @@ const {
   usageIndex,
   publish,
   collect,
+  collectOriginals,
   provenance,
   backfill,
   drafts,
@@ -17,6 +18,7 @@ const {
   usageIndex: vi.fn(),
   publish: vi.fn(),
   collect: vi.fn(),
+  collectOriginals: vi.fn(),
   provenance: vi.fn(),
   backfill: vi.fn(),
   drafts: vi.fn(async () => ({ movedCount: 0, retainedCount: 0, movedIds: [] })),
@@ -49,7 +51,10 @@ vi.mock('../../composition/persistence/settings', () => ({ loadSettings: setting
 vi.mock('../../composition/persistence/asset-publication-recovery', () => ({
   recoverPendingAssetPublications: recover,
 }));
-vi.mock('./trash', () => ({ cleanupLibraryTrash: trash }));
+vi.mock('./trash', () => ({
+  cleanupLibraryTrash: trash,
+  cleanupProjectOriginals: collectOriginals,
+}));
 vi.mock('../../composition/persistence/asset-publication-recovery/audit', () => ({
   collectOrphanAssetObjectsDuringIdle: collect,
 }));
@@ -79,8 +84,21 @@ it('defers optional housekeeping for an open reader but still recovers publicati
   expect(backfill).not.toHaveBeenCalled();
   expect(drafts).not.toHaveBeenCalled();
   expect(trash).not.toHaveBeenCalled();
+  expect(collectOriginals).not.toHaveBeenCalled();
   expect(collect).not.toHaveBeenCalled();
   expect(recover).toHaveBeenCalledOnce();
+});
+
+it('retries unreleased project originals after publication recovery regardless of Trash policy', async () => {
+  const signal = new AbortController().signal;
+  const policy = { trashCleanupEnabled: false };
+  settings.mockResolvedValue({ localStoragePolicy: policy });
+  await maintainLibraryAssets(signal);
+  expect(trash).toHaveBeenCalledWith(policy, expect.any(Number), signal);
+  expect(collectOriginals).toHaveBeenCalledExactlyOnceWith(signal);
+  expect(recover.mock.invocationCallOrder[0]).toBeLessThan(
+    collectOriginals.mock.invocationCallOrder[0]!
+  );
 });
 
 it('does not queue a second Gallery pass behind the active executor', async () => {

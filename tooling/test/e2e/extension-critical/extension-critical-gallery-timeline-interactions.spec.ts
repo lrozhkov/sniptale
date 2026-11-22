@@ -16,7 +16,7 @@ import { createQuickEditZoomRegion } from '../../../../apps/extension/src/featur
 
 import { readReviewAnnotationEffectDocument } from '../../../../apps/extension/src/features/video/review/annotation-effects/validation';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { startHostServer } from '../support/host-server';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
@@ -224,6 +224,292 @@ async function inspectTrackControls(
     })
     .click();
   await expect(source).toHaveAttribute('data-review-track-locked', 'false');
+}
+
+async function inspectPinnedTracks(
+  page: Page,
+  dialog: Locator,
+  locale: 'ru' | 'en',
+  screenshotPath: string
+) {
+  const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+  const command = (key: Parameters<typeof translate>[0]) =>
+    dialog.getByRole('button', { name: label(key), exact: true });
+  const rows = dialog.locator('[data-review-header-track]');
+  const first = async () =>
+    (
+      await rows.evaluateAll((nodes) =>
+        nodes.map((node) => node.getAttribute('data-review-header-track'))
+      )
+    ).slice(0, 2);
+  const source = dialog.locator('[data-review-header-track="source"]');
+  const text = dialog.locator('[data-review-header-track="text"]');
+  const sourcePin = source.getByRole('button', {
+    name: `${label('gallery.videoReview.trackPinned')}: ${label('gallery.videoReview.sourceVideo')}`,
+    exact: true,
+  });
+  const textPin = text.locator('.review-track-pin');
+  const tooltip = dialog.getByRole('tooltip');
+  await expect(sourcePin).toHaveAttribute('aria-pressed', 'true');
+  await expect(sourcePin).toHaveAttribute(
+    'data-review-hint',
+    label('gallery.videoReview.unpinTrack')
+  );
+  await expect(textPin).toHaveAttribute('data-review-hint', label('gallery.videoReview.pinTrack'));
+  await source.getByRole('switch').hover();
+  await expect(tooltip).toHaveText(label('gallery.videoReview.sourceTrackAlwaysEnabled'));
+  await expect(text.getByRole('switch')).toHaveAttribute(
+    'data-review-hint',
+    label('gallery.videoReview.disableTrack')
+  );
+  await expect(rows.first()).toHaveAttribute('data-review-header-track', 'source');
+  await textPin.press('Enter');
+  await expect(textPin).toHaveAttribute('aria-pressed', 'true');
+  await expect(textPin).toHaveAttribute(
+    'data-review-hint',
+    label('gallery.videoReview.unpinTrack')
+  );
+  await expect(textPin).toBeFocused();
+  await expect.poll(first).toEqual(['source', 'text']);
+  const labels = dialog.locator('[data-ui="gallery.videoReview.trackListViewport"]');
+  const time = dialog.locator('[data-ui="gallery.videoReview.timelineViewport"]');
+  await labels.evaluate((node) => {
+    node.scrollTop = 0;
+  });
+  await expect.poll(() => time.evaluate((node) => node.scrollTop)).toBe(0);
+  await page.mouse.move(0, 0);
+  await textPin.hover();
+  await expect(tooltip).toHaveText(label('gallery.videoReview.unpinTrack'));
+  const captions = text.getByRole('button', { name: label('gallery.videoReview.captionsEnabled') });
+  const captionsOn = (await captions.getAttribute('aria-pressed')) === 'true';
+  await captions.hover();
+  await expect(tooltip).toHaveText(
+    label(
+      captionsOn ? 'gallery.videoReview.hideVideoCaptions' : 'gallery.videoReview.showVideoCaptions'
+    )
+  );
+  const textReorder = text.locator('.review-track-reorder');
+  await textReorder.press('Home');
+  await expect.poll(first).toEqual(['text', 'source']);
+  await expect(textReorder).toBeFocused();
+  await textReorder.dragTo(source.locator('.review-track-reorder'));
+  await expect.poll(first).toEqual(['source', 'text']);
+  await dialog.locator('[data-review-header-track="keyboard"] .review-track-reorder').press('Home');
+  await expect.poll(first).toEqual(['source', 'text']);
+  await inspectTimelinePanes(dialog);
+  await page.screenshot({ path: screenshotPath, fullPage: false, animations: 'disabled' });
+  const settings = command('gallery.videoReview.trackSettings');
+  await settings.click();
+  await inspectPinnedScroll(page, dialog, screenshotPath.replace('.png', '-scrolled.png'));
+  await inspectOverflowingPins(dialog);
+
+  await settings.click();
+  const collapse = command('gallery.videoReview.collapseTracks');
+  await expect(collapse.locator('.lucide-chevrons-down')).toBeVisible();
+  await collapse.click();
+  const expand = command('gallery.videoReview.expandTracks');
+  await expect(expand).toHaveAttribute('aria-expanded', 'false');
+  await expect(expand.locator('.lucide-chevrons-up')).toBeVisible();
+  await expect(command('gallery.videoReview.trackSettings')).toBeDisabled();
+  await expect(rows).toHaveCount(2);
+  await expect.poll(first).toEqual(['source', 'text']);
+  await expect(dialog.locator('[data-review-track="keyboard"]')).toHaveCount(0);
+  await inspectTimelinePanes(dialog);
+  await page.screenshot({
+    path: screenshotPath.replace('.png', '-collapsed.png'),
+    fullPage: false,
+    animations: 'disabled',
+  });
+  await expand.click();
+  await expect(command('gallery.videoReview.trackSettings')).toBeEnabled();
+  await expect(rows).not.toHaveCount(2);
+  await command('gallery.videoReview.trackSettings').click();
+  await textPin.click();
+  await expect(textPin).toHaveAttribute('aria-pressed', 'false');
+  await expect(rows.first()).toHaveAttribute('data-review-header-track', 'source');
+}
+
+async function inspectTimelineSelectionColor(
+  page: Page,
+  dialog: Locator,
+  speed: Locator,
+  color: string,
+  screenshotPath: string
+) {
+  const source = dialog.locator('[data-ui="gallery.videoReview.sourceLane"]');
+  const edits = source.locator('[data-ui="gallery.videoReview.editBlock"]');
+  for (const [index, start] of [0.15, 0.55].entries()) {
+    if ((await speed.getAttribute('aria-pressed')) !== 'true') await speed.click();
+    await gesture(page, source, start, start + 0.18);
+    await expect(edits).toHaveCount(index + 1);
+  }
+  await edits.first().locator('button[aria-pressed]').press('Enter');
+  await expect(edits.first()).toHaveCSS('border-top-color', color);
+  await expect(edits.first()).toHaveCSS('border-top-width', '1px');
+  await edits
+    .last()
+    .locator('button[aria-pressed]')
+    .click({ modifiers: ['Control'] });
+  await expect(source.locator('[data-review-multi-selected="true"]')).toHaveCount(2);
+  for (const edit of await edits.all()) {
+    await expect(edit).toHaveCSS('border-top-color', color);
+    await expect(edit).toHaveCSS('border-top-width', '1px');
+  }
+  await page.screenshot({ path: screenshotPath, fullPage: false, animations: 'disabled' });
+}
+
+async function inspectPinnedScroll(page: Page, dialog: Locator, screenshotPath: string) {
+  const time = dialog.locator('[data-ui="gallery.videoReview.timelineViewport"]');
+  const labels = dialog.locator('[data-ui="gallery.videoReview.trackListViewport"]');
+  const resize = dialog.locator('[data-review-panel-resize="timeline"]');
+  const scrollRange = () => time.evaluate((node) => node.scrollHeight - node.clientHeight);
+  for (let index = 0; index < 8 && (await scrollRange()) < 40; index++)
+    await resize.press('ArrowDown');
+  expect(await scrollRange()).toBeGreaterThanOrEqual(40);
+  await time.evaluate((node) => {
+    node.scrollTop = 0;
+  });
+  await expect.poll(() => labels.evaluate((node) => node.scrollTop)).toBe(0);
+  const position = () =>
+    dialog
+      .locator('[data-review-header-track],[data-review-track]')
+      .evaluateAll((nodes) =>
+        nodes
+          .filter((node) =>
+            ['source', 'text', 'keyboard'].includes(
+              node.getAttribute('data-review-header-track') ??
+                node.getAttribute('data-review-track') ??
+                ''
+            )
+          )
+          .map((node) => node.getBoundingClientRect().top)
+      );
+  const before = await position();
+  expect(before).toHaveLength(6);
+  for (const [surface, other, top] of [
+    [labels, time, 32],
+    [time, labels, 16],
+  ] as const) {
+    await surface.evaluate((node, value) => {
+      node.scrollTop = value;
+    }, top);
+    await expect.poll(() => other.evaluate((node) => node.scrollTop)).toBe(top);
+    const after = await position();
+    for (const [index, y] of after.entries()) {
+      const expected = before[index]! - (index % 3 === 2 ? top : 0);
+      expect(Math.abs(y - expected)).toBeLessThanOrEqual(1);
+    }
+    const hitTrack = await labels.locator('[data-review-header-track="text"]').evaluate((node) => {
+      const rect = node.getBoundingClientRect();
+      return document
+        .elementFromPoint(rect.left + rect.width / 2, rect.bottom - 2)
+        ?.closest('[data-review-header-track]')
+        ?.getAttribute('data-review-header-track');
+    });
+    expect(hitTrack).toBe('text');
+  }
+  await page.screenshot({ path: screenshotPath, fullPage: false, animations: 'disabled' });
+  await time.evaluate((node) => {
+    node.scrollTop = 0;
+  });
+}
+
+async function inspectOverflowingPins(dialog: Locator) {
+  const resize = dialog.locator('[data-review-panel-resize="timeline"]');
+  const labels = dialog.locator('[data-ui="gallery.videoReview.trackListViewport"]');
+  const time = dialog.locator('[data-ui="gallery.videoReview.timelineViewport"]');
+  await resize.press('Home');
+  await labels.evaluate((node) => {
+    node.scrollTop = node.scrollHeight;
+  });
+  const visibleTail = () =>
+    labels.evaluate((node) => {
+      const stack = node
+        .querySelector('[data-review-track-group="pinned"]')!
+        .getBoundingClientRect();
+      const tail = node
+        .querySelector('[data-review-header-track="music"]')!
+        .getBoundingClientRect();
+      return (
+        Math.min(node.getBoundingClientRect().bottom, tail.bottom) -
+        Math.max(tail.top, stack.bottom)
+      );
+    });
+  await expect.poll(visibleTail).toBeGreaterThan(0);
+  await inspectTimelinePanes(dialog);
+  await resize.press('End');
+  await time.evaluate((node) => {
+    node.scrollTop = 0;
+  });
+}
+
+for (const variant of [
+  { width: 1280, height: 560, locale: 'ru', theme: 'light' },
+  { width: 1920, height: 900, locale: 'en', theme: 'dark' },
+  { width: 1200, height: 560, locale: 'en', theme: 'light' },
+] as const) {
+  test(`Gallery pinned tracks ${variant.width}`, async ({ page }, info) => {
+    await page.setViewportSize({ width: variant.width, height: variant.height });
+    const host = await startHostServer();
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const command = (key: Parameters<typeof translate>[0]) =>
+        dialog.getByRole('button', { name: translate(key, variant.locale), exact: true });
+      const advanced = command('gallery.videoReview.advancedEditing');
+      if ((await advanced.getAttribute('aria-pressed')) !== 'true') await advanced.click();
+      await command('gallery.videoReview.trackSettings').click();
+      const textToggle = dialog.locator('[data-review-header-track="text"] [role="switch"]');
+      await textToggle.check();
+      const resize = dialog.locator('[data-review-panel-resize="timeline"]');
+      for (let index = 0; index < 5; index++) await resize.press('ArrowUp');
+      await inspectPinnedTracks(page, dialog, variant.locale, info.outputPath('track-pins.png'));
+      await command('gallery.videoReview.trackSettings').click();
+      await inspectTimelineSelectionColor(
+        page,
+        dialog,
+        command('gallery.videoReview.speedMode'),
+        variant.theme === 'dark' ? 'rgb(118, 118, 118)' : 'rgb(150, 150, 150)',
+        info.outputPath('timeline-selection.png')
+      );
+      if (variant.width < 1280) {
+        const zoom = dialog.getByRole('slider', {
+          name: translate('videoEditor.timeline.zoom', variant.locale),
+          exact: true,
+        });
+        await zoom.press('End');
+        const viewport = dialog.locator('[data-ui="gallery.videoReview.timelineViewport"]');
+        const header = dialog.locator('[data-review-header-track="source"]');
+        const headerX = async () => (await header.boundingBox())?.x;
+        const before = await headerX();
+        expect(before).toBeDefined();
+        await expect
+          .poll(() => viewport.evaluate((node) => node.scrollWidth - node.clientWidth))
+          .toBeGreaterThan(0);
+        await viewport.evaluate((node) => {
+          node.scrollLeft = node.scrollWidth;
+        });
+        await expect.poll(() => viewport.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0);
+        await expect.poll(headerX).toBe(before);
+      }
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
 }
 
 async function inspectNotes(page: Page, dialog: Locator, locale: 'ru' | 'en', basic: boolean) {

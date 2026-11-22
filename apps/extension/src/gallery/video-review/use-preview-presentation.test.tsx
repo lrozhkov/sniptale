@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createGlTransitionSelection } from '../../features/video/project/transition/gl-catalog';
 import {
   resolvePresentationDescription,
   canCoalescePresentationInteraction,
@@ -14,6 +15,12 @@ import {
 } from './use-preview-presentation';
 import { DEFAULT_QUICK_PREVIEW_PREFERENCES } from '../../features/video/preview/quick-preferences';
 import { createCanvasComment } from '../../features/video/review/comments';
+import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
+import { REVIEW_KEY_DEFAULT } from '../../features/video/project/action-feedback/key-animation';
+import { REVIEW_CLICK_DEFAULT } from '../../features/video/review/advanced/click-animation';
+import { createNeutralPresentationSettings } from '../../features/video/review/advanced/presentation';
+import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
+import { ReviewStagePresentationFeedback } from './stage-presentation';
 
 const io = vi.hoisted(() => ({
   factory: vi.fn(),
@@ -61,6 +68,8 @@ let ticks: Map<number, FrameRequestCallback>;
 let closed: ReturnType<typeof vi.fn>;
 let preparedRelease: ReturnType<typeof vi.fn>;
 let releases: ReturnType<typeof vi.fn>[];
+let hookRenders: number;
+let showReadout: boolean;
 const assets = {
   headerBitmap: null,
   backgroundBitmap: null,
@@ -75,6 +84,8 @@ beforeEach(() => {
   nextTick = 0;
   ticks = new Map();
   releases = [];
+  hookRenders = 0;
+  showReadout = false;
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
     ticks.set(++nextTick, callback);
     return nextTick;
@@ -161,8 +172,14 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 function Harness() {
+  hookRenders++;
   result = useReviewPreviewPresentation(props);
-  return null;
+  return showReadout ? (
+    <ReviewStagePresentationFeedback
+      presentation={result}
+      showFrameRate={props.preferences.showFrameRate}
+    />
+  ) : null;
 }
 const render = async () => {
   await act(async () => root.render(<Harness />));
@@ -193,6 +210,53 @@ it('preserves Current mode and allocates no manual renderer for an FPS readout',
     false
   );
 });
+
+it.each(['zoom', 'key', 'click', 'fade'] as const)(
+  'composes Current-mode %s animation at the existing legacy frame cadence without React time samples',
+  async (effect) => {
+    props.preferences = { ...DEFAULT_QUICK_PREVIEW_PREFERENCES, renderer: 'legacy' };
+    props.sourceFrameRate = 60;
+    props.playing = true;
+    if (effect === 'zoom')
+      props.scene.zoomRegions = [
+        createQuickEditZoomRegion({ id: 'focus', at: 0, duration: 4, endMax: 4 }),
+      ];
+    if (effect === 'key')
+      props.scene.keys = [{ label: 'A', settings: REVIEW_KEY_DEFAULT, start: 0, end: 4 }];
+    if (effect === 'click')
+      props.scene.clicks = [
+        { settings: REVIEW_CLICK_DEFAULT, point: { x: 0.5, y: 0.5 }, anchor: 0, start: 0, end: 4 },
+      ];
+    if (effect === 'fade') {
+      const result = planReviewPresentationSequence({
+        settings: {
+          ...createNeutralPresentationSettings(),
+          fadeIn: { enabled: true, duration: 1 },
+        },
+        mainDuration: 4,
+        fragmentOffset: 0,
+        includeBookends: true,
+        rate: { numerator: 60, denominator: 1 },
+      });
+      if (!result.ok) throw new Error('Fade fixture was not admitted');
+      props.scene.outerFadePlan = result.plan;
+    }
+    await render();
+    expect(result.active).toBe(true);
+    await step(0);
+    await step(20);
+    const before = hookRenders;
+    for (const now of [40, 60, 80]) {
+      props.video.current!.currentTime = 1.234567 + now / 1000;
+      await step(now);
+    }
+    expect(io.factory).toHaveBeenCalledOnce();
+    expect(io.factory.mock.lastCall![0].renderer).toBe('legacy');
+    expect(io.render.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(io.render.mock.lastCall![1].resultTime).toBeCloseTo(1.064567, 6);
+    expect(hookRenders).toBe(before);
+  }
+);
 
 it('uses the manual owner at source cadence and releases disabled annotations', async () => {
   props.preferences = { ...DEFAULT_QUICK_PREVIEW_PREFERENCES };
@@ -265,7 +329,70 @@ it('publishes a complete manual frame at exact paused clocks and retains only it
   await step(50);
   expect(releases[0]).toHaveBeenCalledOnce();
   expect(releases[1]).not.toHaveBeenCalled();
-  expect(result.status.presentedFPS).toBeNull();
+  expect(result.frameStatistics.read().presentedFPS).toBeNull();
+});
+
+it.each(['epoch', 'mapRevision'] as const)(
+  'retains the last valid frame when transport %s changes before a pending composition publishes',
+  async (field) => {
+    let identity = { epoch: 1, mapRevision: 1 };
+    props.readPosition = () => ({
+      ...identity,
+      resultTime: props.pausedResultTime,
+      source: {
+        kind: 'video',
+        sourceTime: props.pausedSourceTime,
+        mediaTime: props.pausedSourceTime,
+        segmentId: 'source',
+      },
+      media: { sourceId: props.sourceIdentity, time: props.pausedSourceTime },
+    });
+    await render();
+    await step(0);
+    const front = props.host.current!.querySelector('[data-preview-front="true"]');
+    expect(front).not.toBeNull();
+    const gate = Promise.withResolvers<void>();
+    const compose = io.render.getMockImplementation()!;
+    io.render.mockImplementationOnce(async (...args) => {
+      const completed = compose(...args);
+      await gate.promise;
+      return completed;
+    });
+    props.pausedResultTime = 2;
+    props.pausedSourceTime = 2.25;
+    await render();
+    await step(40);
+    const pendingRelease = releases.at(-1)!;
+    identity = { ...identity, [field]: 2 };
+    await act(async () => {
+      gate.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(props.host.current!.querySelector('[data-preview-front="true"]')).toBe(front);
+    expect(pendingRelease).toHaveBeenCalledOnce();
+    expect(releases[0]).not.toHaveBeenCalled();
+    await render();
+    await step(80);
+    expect(props.host.current!.querySelector('[data-preview-front="true"]')).not.toBe(front);
+    expect(releases[0]).toHaveBeenCalledOnce();
+  }
+);
+
+it('captures the atomic result and raster sample instead of mixing native and mapped observations', async () => {
+  props.playing = true;
+  props.sourceToResult = vi.fn(() => 99);
+  props.readPosition = () => ({
+    epoch: 3,
+    mapRevision: 2,
+    resultTime: 6.25,
+    source: { kind: 'freeze', sourceTime: 4, mediaTime: 3.98, segmentId: 'hold' },
+    media: { sourceId: props.sourceIdentity, time: 3.98 },
+  });
+  await render();
+  await step(0);
+  expect(io.render.mock.lastCall![1]).toMatchObject({ sourceTime: 3.98, resultTime: 6.25 });
+  expect(props.sourceToResult).not.toHaveBeenCalled();
 });
 
 it.each(['commit', 'cancel'] as const)(
@@ -430,6 +557,67 @@ it('disposes expensive presentation when hidden and forwards comment drafts only
   expect(props.host.current!.querySelector('canvas[data-preview-front="true"]')).toBeNull();
 });
 
+it('updates native FPS output without rendering the presentation owner', async () => {
+  showReadout = true;
+  props.preferences = { ...DEFAULT_QUICK_PREVIEW_PREFERENCES, showFrameRate: true };
+  props.playing = true;
+  const statistics = vi.fn();
+  props.onStatistics = statistics;
+  const callbacks: VideoFrameRequestCallback[] = [];
+  props.video.current!.requestVideoFrameCallback = vi.fn((callback) => {
+    callbacks.push(callback);
+    return callbacks.length;
+  });
+  props.video.current!.cancelVideoFrameCallback = vi.fn();
+  const emit = (at: number, frames: number) => {
+    time = at;
+    act(() =>
+      callbacks.at(-1)!(at, {
+        expectedDisplayTime: at,
+        presentedFrames: frames,
+      } as VideoFrameCallbackMetadata)
+    );
+  };
+  await render();
+  emit(0, 1);
+  const count = hookRenders;
+  emit(500, 16);
+  expect(host.querySelector('output')?.textContent).toBe('30.0 FPS');
+  emit(1000, 26);
+  expect(host.querySelector('output')?.textContent).toBe('20.0 FPS');
+  expect(hookRenders).toBe(count);
+  expect(statistics.mock.calls.map(([value]) => value.nativeVideoFPS)).toEqual([
+    null,
+    null,
+    30,
+    20,
+  ]);
+  const source = result.frameStatistics;
+  const accepted = source.read();
+  emit(1500, 36);
+  expect(source.read()).toBe(accepted);
+  expect(hookRenders).toBe(count);
+  act(() => props.video.current!.dispatchEvent(new Event('seeking')));
+  expect(source.read().nativeVideoFPS).toBeNull();
+  expect(host.querySelector('output')?.textContent).toBe('— FPS');
+  expect(hookRenders).toBe(count);
+  const late = callbacks.at(-1)!;
+  props.preferences = { ...props.preferences, showFrameRate: false };
+  await render();
+  expect(host.querySelector('output')).toBeNull();
+  const hiddenRenders = hookRenders;
+  act(() =>
+    late(2000, { expectedDisplayTime: 2000, presentedFrames: 51 } as VideoFrameCallbackMetadata)
+  );
+  expect(hookRenders).toBe(hiddenRenders);
+  props = { ...props, sourceIdentity: 'replacement' };
+  props.preferences = { ...props.preferences, showFrameRate: true };
+  await render();
+  expect(result.frameStatistics).not.toBe(source);
+  expect(source.read().nativeVideoFPS).toBeNull();
+  expect(host.querySelector('output')?.textContent).toBe('— FPS');
+});
+
 it('reports native video cadence separately without a compositor when only the readout is enabled', async () => {
   props.preferences = { ...DEFAULT_QUICK_PREVIEW_PREFERENCES, showFrameRate: true };
   const callbacks: VideoFrameRequestCallback[] = [];
@@ -454,15 +642,15 @@ it('reports native video cadence separately without a compositor when only the r
       presentedFrames: 16,
     } as VideoFrameCallbackMetadata)
   );
-  expect(result.status.nativeVideoFPS).toBe(30);
+  expect(result.frameStatistics.read().nativeVideoFPS).toBe(30);
   const late = callbacks.at(-1)!;
   props = { ...props, playing: false };
   await render();
   act(() =>
     late(1000, { expectedDisplayTime: 1000, presentedFrames: 31 } as VideoFrameCallbackMetadata)
   );
-  expect(result.status.nativeVideoFPS).toBeNull();
-  expect(result.status.presentedFPS).toBeNull();
+  expect(result.frameStatistics.read().nativeVideoFPS).toBeNull();
+  expect(result.frameStatistics.read().presentedFPS).toBeNull();
   expect(io.factory).not.toHaveBeenCalled();
 });
 
@@ -599,11 +787,25 @@ it('rolls back source and endpoint admission refusal before an explicit retry', 
   });
   expect(() => admit([100, 200])).toThrow('No endpoint capacity');
   const pair = admit([100, 200]);
-  expect(() => admit([100, 200])).toThrow('Preview endpoint admission unavailable');
-  pair.release();
+  io.bytes.mockImplementationOnce(() => {
+    throw new Error('No replacement endpoint capacity');
+  });
+  expect(() => admit([300, 400])).toThrow('No replacement endpoint capacity');
   act(() => result.retry());
   await step(50);
   expect(result.status.phase).toBe('ready');
+  expect(io.graph.mock.lastCall![0].transitionBytes).toEqual([100, 200]);
+
+  const replacement = admit([300, 400]);
+  props = { ...props, pausedResultTime: 1.1 };
+  await render();
+  await step(100);
+  expect(io.graph.mock.lastCall![0].transitionBytes).toEqual([400, 600]);
+  pair.release();
+  replacement.release();
+  props = { ...props, pausedResultTime: 1.2 };
+  await render();
+  await step(150);
   expect(io.graph.mock.lastCall![0].transitionBytes).toBeNull();
 });
 
@@ -639,33 +841,45 @@ it('requires explicit retry after context loss and ignores loss after disposal',
   expect(result.status.phase).toBe('inactive');
 });
 
-it('keeps the composed owner for dissolve projects even at Current quality outside the seam', async () => {
-  props.preferences = { ...DEFAULT_QUICK_PREVIEW_PREFERENCES };
-  props.cut = {
-    file: new File(['source'], 'source.webm'),
-    duration: 10,
-    time: 0,
-    edits: [
-      {
-        id: 'cut',
-        kind: 'cut',
-        start: 2,
-        end: 4,
-        requestedStart: 2,
-        requestedEnd: 4,
-        transition: { type: 'dissolve', before: 0.5, after: 0.5 },
-      },
-    ],
-  };
-  await render();
-  expect(result.active).toBe(true);
-  expect(io.factory).toHaveBeenCalledOnce();
-  props = { ...props, playing: true, cut: { ...props.cut, time: 5 } };
-  await render();
-  expect(result.active).toBe(true);
-  expect(io.factory).toHaveBeenCalledOnce();
-  expect(io.dispose).not.toHaveBeenCalled();
-});
+it.each(['dissolve', 'fade-black', 'gl'] as const)(
+  'keeps the composed owner for %s projects at Current quality outside the seam',
+  async (type) => {
+    props.preferences = { ...DEFAULT_QUICK_PREVIEW_PREFERENCES };
+    props.cut = {
+      file: new File(['source'], 'source.webm'),
+      duration: 10,
+      time: 0,
+      edits: [
+        {
+          id: 'cut',
+          kind: 'cut',
+          start: 2,
+          end: 4,
+          requestedStart: 2,
+          requestedEnd: 4,
+          transition:
+            type === 'gl'
+              ? {
+                  type,
+                  before: 0.5,
+                  after: 0.5,
+                  selection: createGlTransitionSelection('BowTie')!,
+                  easing: 'LINEAR',
+                }
+              : { type, before: 0.5, after: 0.5 },
+        },
+      ],
+    };
+    await render();
+    expect(result.active).toBe(true);
+    expect(io.factory).toHaveBeenCalledOnce();
+    props = { ...props, playing: true, cut: { ...props.cut, time: 5 } };
+    await render();
+    expect(result.active).toBe(true);
+    expect(io.factory).toHaveBeenCalledOnce();
+    expect(io.dispose).not.toHaveBeenCalled();
+  }
+);
 
 it('waits for attached background publication and resumes the same paused frame automatically', async () => {
   await render();

@@ -112,7 +112,6 @@ export function MotionTransitionTypeField(props: {
   return (
     <OptionButtonsField<CameraTransitionType>
       label={translate('gallery.videoReview.zoomTransitionType')}
-      layout="stacked"
       value={setting.type}
       options={(['none', 'linear', 'ease-in-out', 'ease-out', 'instant'] as const).map((type) => ({
         value: type,
@@ -155,6 +154,7 @@ export function MotionBlurField(props: {
       {setting.enabled ? (
         <SliderField
           label={translate('gallery.videoReview.motionBlurStrength')}
+          rangePresentation="field"
           value={setting.strength * 100}
           min={0}
           max={100}
@@ -176,7 +176,6 @@ export function MotionOverlayZoomField(props: {
   return (
     <OptionButtonsField
       label={translate('videoEditor.sidebar.motionOverlayZoomLabel')}
-      layout="stacked"
       value={props.value ?? VideoMotionOverlayZoomMode.LOCK_OVERLAYS}
       onChange={(value) =>
         props.panel.onUpdateMotionRegion(props.motionRegionId, { overlayZoomMode: value })

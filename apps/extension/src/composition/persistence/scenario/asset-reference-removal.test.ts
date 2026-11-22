@@ -28,6 +28,7 @@ function fixture() {
     source: { kind: 'import', filename: 'remove.png' },
   });
   removed.caption = 'Keep caption';
+  removed.editDocumentId = 'removed-document';
   removed.width = 'half';
   step.blocks.push(
     removed,
@@ -141,51 +142,84 @@ function fixture() {
   return entry;
 }
 
-it('removes selected image and audio references from current and saved history', () => {
-  const entry = fixture();
-  const original = structuredClone(entry);
-  const next = removeScenarioAssetReferences(entry, new Set(['image-remove', 'audio-remove']), 30);
-  expect(entry).toEqual(original);
-  expect(next.workspaceRevision).toBe(entry.workspaceRevision + 1);
-  expect(next.history?.[0]?.savedAt).toBe(entry.history?.[0]?.savedAt);
-  for (const project of [next.project, ...(next.history ?? []).map((version) => version.project)]) {
-    expect(project.tour?.backgroundMusic).toBeNull();
-    expect(project.tour?.stage.image).toBeNull();
-    expect(project.tour?.stage.imageFit).toBe('contain');
-    const refs = getScenarioResourceReferences(project);
-    expect(refs.assets.has('image-remove')).toBe(false);
-    expect(refs.assets.has('audio-remove')).toBe(false);
-    expect(refs.assets.has('image-keep')).toBe(true);
-    expect(refs.assets.has('audio-keep')).toBe(true);
-    const step = project.items[0];
-    expect(step?.kind === 'step' ? step.blocks[0] : null).toMatchObject({
-      kind: 'image-slot',
-      id: 'removed-block',
-      caption: 'Keep caption',
-      width: 'half',
-    });
-    expect(step?.kind === 'step' ? step.blocks[1] : null).toMatchObject({
-      kind: 'image',
-      id: 'keep-block',
-    });
-    const slide = project.tour?.slides[0];
-    const navigation = project.tour?.slides[1];
-    expect(slide?.kind === 'image' ? slide.image : undefined).toBeNull();
-    expect(navigation?.kind === 'navigation' ? navigation.background.image : undefined).toBeNull();
-    expect(slide?.narration).toBeNull();
-    expect(navigation?.narration).toBeNull();
-    if (slide?.kind === 'image') {
-      expect(getTourHotspots(slide)[0]?.narration).toBeNull();
-      expect(getTourAnnotations(slide)[0]?.narration).toBeNull();
-      expect(slide.masks[0]?.narration).toBeNull();
+it.each([false, true])(
+  'removes selected references from all retained states (editing=%s)',
+  (editing) => {
+    const source = fixture();
+    const entry = {
+      ...source,
+      ...(editing
+        ? {
+            editingHistory: {
+              version: 1 as const,
+              past: [{ ...source.project, name: 'Past' }],
+              future: [{ ...source.project, name: 'Future' }],
+            },
+          }
+        : {}),
+    };
+    const original = structuredClone(entry);
+    const next = removeScenarioAssetReferences(
+      entry,
+      new Set(['image-remove', 'audio-remove']),
+      30
+    );
+    expect(entry).toEqual(original);
+    expect(next.workspaceRevision).toBe(entry.workspaceRevision + 1);
+    expect(next.history?.[0]?.savedAt).toBe(entry.history?.[0]?.savedAt);
+    for (const project of [
+      next.project,
+      ...(next.history ?? []).map((version) => version.project),
+      ...(next.editingHistory?.past ?? []),
+      ...(next.editingHistory?.future ?? []),
+    ]) {
+      expect(project.tour?.backgroundMusic).toBeNull();
+      expect(project.tour?.stage.image).toBeNull();
+      expect(project.tour?.stage.imageFit).toBe('contain');
+      const refs = getScenarioResourceReferences(project);
+      expect(refs.assets.has('image-remove')).toBe(false);
+      expect(refs.assets.has('audio-remove')).toBe(false);
+      expect(refs.documents.has('removed-document')).toBe(false);
+      expect(refs.assets.has('image-keep')).toBe(true);
+      expect(refs.assets.has('audio-keep')).toBe(true);
+      const step = project.items[0];
+      expect(step?.kind === 'step' ? step.blocks[0] : null).toMatchObject({
+        kind: 'image-slot',
+        id: 'removed-block',
+        caption: 'Keep caption',
+        width: 'half',
+      });
+      expect(step?.kind === 'step' ? step.blocks[1] : null).toMatchObject({
+        kind: 'image',
+        id: 'keep-block',
+      });
+      const slide = project.tour?.slides[0];
+      const navigation = project.tour?.slides[1];
+      expect(slide?.kind === 'image' ? slide.image : undefined).toBeNull();
+      expect(
+        navigation?.kind === 'navigation' ? navigation.background.image : undefined
+      ).toBeNull();
+      expect(slide?.narration).toBeNull();
+      expect(navigation?.narration).toBeNull();
+      if (slide?.kind === 'image') {
+        expect(getTourHotspots(slide)[0]?.narration).toBeNull();
+        expect(getTourAnnotations(slide)[0]?.narration).toBeNull();
+        expect(slide.masks[0]?.narration).toBeNull();
+      }
+      if (navigation?.kind === 'navigation') expect(navigation.buttons[0]?.narration).toBeNull();
+      expect(project.tour?.audioResources).toEqual([
+        { assetId: 'audio-keep', duration: 3, name: 'Keep' },
+      ]);
     }
-    if (navigation?.kind === 'navigation') expect(navigation.buttons[0]?.narration).toBeNull();
-    expect(project.tour?.audioResources).toEqual([
-      { assetId: 'audio-keep', duration: 3, name: 'Keep' },
-    ]);
+    expect(next.editingHistory?.past.map((project) => project.name)).toEqual(
+      entry.editingHistory?.past.map((project) => project.name)
+    );
+    expect(next.editingHistory?.future.map((project) => project.name)).toEqual(
+      entry.editingHistory?.future.map((project) => project.name)
+    );
+    expect(parseScenarioProjectEntry(next)).not.toBeNull();
   }
-  expect(parseScenarioProjectEntry(next)).not.toBeNull();
-});
+);
 
 it('keeps a valid entry and revision when none of the selected assets are referenced', () => {
   const entry = fixture();
@@ -230,5 +264,45 @@ it.each([undefined, 'start', 'center', 'end'] as const)(
     }
     expect(entry).toEqual(original);
     expect(parseScenarioProjectEntry(removed)).not.toBeNull();
+  }
+);
+
+it.each(['past', 'future'] as const)(
+  'removes a resource referenced only by the %s branch without adding an action',
+  (branch) => {
+    const source = fixture();
+    const { tour: _tour, ...current } = source.project;
+    const { history: _history, ...base } = source;
+    const entry = {
+      ...base,
+      project: { ...current, items: [] },
+      editingHistory: {
+        version: 1 as const,
+        past: branch === 'past' ? [source.project] : [],
+        future: branch === 'future' ? [source.project] : [],
+      },
+    };
+    const before = structuredClone(entry);
+    const next = removeScenarioAssetReferences(
+      entry,
+      new Set(['image-remove', 'audio-remove']),
+      30
+    );
+    expect(next.workspaceRevision).toBe(entry.workspaceRevision + 1);
+    expect(next.project.items).toEqual([]);
+    expect(next.editingHistory?.past).toHaveLength(entry.editingHistory.past.length);
+    expect(next.editingHistory?.future).toHaveLength(entry.editingHistory.future.length);
+    const retained = next.editingHistory?.[branch][0];
+    if (!retained) throw new Error('Missing retained state');
+    const references = getScenarioResourceReferences(retained);
+    expect(references.assets.has('image-remove')).toBe(false);
+    expect(references.assets.has('audio-remove')).toBe(false);
+    expect(references.documents.has('removed-document')).toBe(false);
+    expect(references.assets.has('image-keep')).toBe(true);
+    expect(retained.updatedAt).toBe(source.project.updatedAt);
+    expect(entry).toEqual(before);
+    expect(
+      removeScenarioAssetReferences(next, new Set(['image-remove', 'audio-remove']), 40)
+    ).toEqual(next);
   }
 );

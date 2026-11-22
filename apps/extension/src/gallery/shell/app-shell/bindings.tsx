@@ -3,7 +3,7 @@ import type { GalleryPreviewPresentation } from '../../library/types';
 import type { Dispatch, SetStateAction } from 'react';
 import type { ScenarioProjectSummary } from '../../../features/scenario/contracts/types/project';
 import type { GalleryAppStateController, GalleryViewMode } from '../../state/types';
-import type { GalleryItem } from '../../library/items';
+import type { GalleryItem, GalleryMediaItem } from '../../library/items';
 import type { UseGalleryAppActionsResult } from '../../library/actions/useGalleryAppActions.types';
 import { GalleryAppLayout } from './layout';
 import type { RuntimeMessagingTransport } from '../../../platform/runtime-messaging';
@@ -19,6 +19,16 @@ import {
 import type { GallerySavedView } from '../../../composition/persistence/gallery-saved-views';
 import { translate } from '../../../platform/i18n';
 import { openGalleryConfirmDialog } from '../../library/actions/shared';
+import { setMediaOriginalClaim } from '../../../workflows/media-hub/store';
+
+function getOriginalClaimWitness(item: GalleryMediaItem) {
+  return {
+    id: item.entityId ?? item.id,
+    createdAt: item.createdAt,
+    lifecycleUpdatedAt: item.lifecycle?.updatedAt ?? item.updatedAt,
+    originalSaveId: item.originalSaveId ?? null,
+  };
+}
 
 function resolvePromotionTarget(item: GalleryItem) {
   if (isGalleryMediaItem(item)) return { kind: 'image' as const, id: item.entityId ?? item.id };
@@ -121,6 +131,13 @@ function buildGalleryPreviewHandlers(
         : actions.preview.downloadOriginal(),
     onPreviewCopy: () =>
       isReadOnlyTrashPreview(controller) ? Promise.resolve(false) : actions.preview.copy(),
+    onImageProjectPickerRequested: (request: string) => {
+      controller.actions.preview.setPreview((current) =>
+        current.imageProjectPickerRequest === request
+          ? { ...current, imageProjectPickerRequest: undefined }
+          : current
+      );
+    },
     onPreviewEdit: (item: GalleryItem) => {
       if (isGalleryRemoteItem(item)) {
         if (!isReadOnlyTrashPreview(controller)) openRemotePreview(actions, controller, item);
@@ -162,6 +179,11 @@ function buildGalleryPreviewHandlers(
     },
     onPreviewPromote: async (item: GalleryItem) => {
       if (isReadOnlyTrashPreview(controller) || item.lifecycle?.trashedAt !== undefined) return;
+      if (isGalleryMediaItem(item) && item.savedIndependently === false) {
+        await setMediaOriginalClaim(getOriginalClaimWitness(item), true);
+        await controller.actions.storage.refresh();
+        return;
+      }
       const target = resolvePromotionTarget(item);
       if (!target) return;
       const response = await messaging.sendRuntimeMessage({
@@ -169,6 +191,11 @@ function buildGalleryPreviewHandlers(
         type: MessageType.PROMOTE_AGGREGATE_TO_LIBRARY,
       });
       if (!response.success) throw new Error(response.error ?? 'Could not save to the library.');
+      await controller.actions.storage.refresh();
+    },
+    onPreviewRemoveFromOriginals: async (item: GalleryItem) => {
+      if (isReadOnlyTrashPreview(controller) || !isGalleryMediaItem(item)) return;
+      await setMediaOriginalClaim(getOriginalClaimWitness(item), false);
       await controller.actions.storage.refresh();
     },
     onPreviewOpen: (item: GalleryItem, options?: { inspectorCollapsed?: boolean }) =>

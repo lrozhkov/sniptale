@@ -7,6 +7,7 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { useVideoEditorStore } from '../../state/store';
 import {
   getCurrentVideoEditorCurrentTime,
+  getCurrentVideoEditorWorkspaceSnapshot,
   subscribeVideoEditorProjectHistory,
   subscribeVideoEditorPlaybackTime,
   getCurrentVideoEditorExportStateSnapshot,
@@ -362,4 +363,23 @@ it('notifies live time consumers only for changed snapshots and stops after unsu
   unsubscribe();
   useVideoEditorStore.setState({ currentTime: before + 3 });
   expect(observed).toHaveLength(2);
+});
+
+it('reads project, history and native opening authority from one store snapshot', () => {
+  const project = createEmptyVideoProject('Native opening');
+  const workspace = {
+    status: 'ready' as const,
+    project,
+    workspaceRevision: 12,
+    history: { status: 'absent' as const },
+  };
+  useVideoEditorStore.getState().setProject(project, null, workspace);
+  const state = useVideoEditorStore.getState();
+  expect(getCurrentVideoEditorWorkspaceSnapshot()).toEqual({
+    project: state.project,
+    projectHistory: state.projectHistory,
+    nativeWorkspace: state.nativeWorkspace,
+    syncNativeWorkspace: state.syncNativeWorkspace,
+    projectSessionId: state.projectSessionId,
+  });
 });

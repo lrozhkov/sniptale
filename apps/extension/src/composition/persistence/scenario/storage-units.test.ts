@@ -243,3 +243,170 @@ it('keeps global canonical identity, template, Tour navigation and hostile-input
     )
   ).toBeNull();
 });
+
+it('stores both editing branches through shared native units rather than inline project copies', () => {
+  const source = entry();
+  const future = {
+    ...source.project,
+    name: 'Future',
+    items: [{ ...source.project.items[0]!, title: 'Future-only step' }, source.project.items[1]!],
+  };
+  const logical = {
+    ...source,
+    editingHistory: {
+      version: 1 as const,
+      past: [{ ...source.project, name: 'Before' }],
+      future: [future],
+    },
+  };
+  const native = encodeScenarioUnitStorage(logical, []);
+  expect(native.head.historyFormatVersion).toBe(3);
+  expect(native.units).toHaveLength(5);
+  expect(JSON.stringify(native.head)).not.toContain('Future-only step');
+  expect(
+    parseScenarioProjectEntry(
+      materializeScenarioUnitStorage(native.head, native.rows, native.units)
+    )
+  ).toEqual(logical);
+  const branched = encodeScenarioUnitStorage(
+    { ...logical, editingHistory: { ...logical.editingHistory, future: [] } },
+    native.units
+  );
+  expect(branched.units).toHaveLength(4);
+  expect(branched.units.some((row) => row.value === future.items[0])).toBe(false);
+  expect(
+    parseScenarioProjectEntry(
+      materializeScenarioUnitStorage(branched.head, branched.rows, branched.units)
+    )
+  ).toEqual({ ...logical, editingHistory: { ...logical.editingHistory, future: [] } });
+});
+
+it('refuses incomplete or mismatched editing branch graphs without changing their physical evidence', () => {
+  const source = entry();
+  const editingHistory = {
+    version: 1 as const,
+    past: [],
+    future: [{ ...source.project, name: 'Future' }],
+  };
+  const native = encodeScenarioUnitStorage({ ...source, editingHistory }, []);
+  const branch = native.head.project;
+  const heads = [
+    { ...native.head, historyFormatVersion: 2 },
+    { ...native.head, editingHistory: undefined },
+    { ...native.head, editingHistory: { ...native.head.editingHistory, version: 2 } },
+    {
+      ...native.head,
+      editingHistory: { version: 1, past: [], future: [{ ...branch, id: 'foreign' }] },
+    },
+    {
+      ...native.head,
+      editingHistory: {
+        version: 1,
+        past: [],
+        future: [{ ...branch, items: [{ unitId: 'guide:missing', revision: 1 }] }],
+      },
+    },
+    { ...native.head, editingHistory: { version: 1, past: [], future: Array(1001).fill(branch) } },
+  ];
+  const original = structuredClone(native);
+  for (const head of heads)
+    expect(
+      parseScenarioProjectEntry(materializeScenarioUnitStorage(head, native.rows, native.units))
+    ).toBeNull();
+  expect(native).toEqual(original);
+  expect(
+    parseScenarioProjectEntry(
+      materializeScenarioUnitStorage(native.head, native.rows, native.units)
+    )
+  ).toMatchObject({ editingHistory });
+});
+
+it.each(['guide', 'tour'] as const)(
+  'shares equal %s reference lists through native structured clone',
+  (kind) => {
+    const source = entry();
+    const logical = {
+      ...source,
+      editingHistory: {
+        version: 1 as const,
+        past: Array.from({ length: 30 }, (_, index) => ({
+          ...source.project,
+          name: `Before ${index}`,
+          items: [...source.project.items],
+          tour: { ...source.project.tour!, slides: [...source.project.tour!.slides] },
+        })),
+        future: [],
+      },
+    };
+    const encoded = encodeScenarioUnitStorage(logical, []);
+    const clone = structuredClone(encoded.head);
+    const past = clone.editingHistory!.past;
+    const values = (value: typeof clone.project) => {
+      if (kind === 'guide') return value.items;
+      if (!('tour' in value)) throw new Error('Expected native tour.');
+      return value.tour.slides;
+    };
+    expect(past.every((value) => values(value) === values(clone.project))).toBe(true);
+    expect(
+      parseScenarioProjectEntry(materializeScenarioUnitStorage(clone, encoded.rows, encoded.units))
+    ).toEqual(logical);
+  }
+);
+
+it.each(['guide', 'tour'] as const)(
+  'validates one shared %s reference list once in one materialization',
+  (kind) => {
+    const source = entry();
+    const encoded = encodeScenarioUnitStorage(
+      { ...source, editingHistory: { version: 1, past: [], future: [] } },
+      []
+    );
+    const root = encoded.head.project;
+    encoded.head.editingHistory!.past = Array.from({ length: 30 }, (_, index) => ({
+      ...root,
+      name: `Before ${index}`,
+    }));
+    if (!('tour' in root)) throw new Error('Expected native tour.');
+    const ref = kind === 'guide' ? root.items[0]! : root.tour.slides[0]!;
+    const id = ref.unitId;
+    let reads = 0;
+    Object.defineProperty(ref, 'unitId', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        reads++;
+        return id;
+      },
+    });
+    const parsed = parseScenarioProjectEntry(
+      materializeScenarioUnitStorage(encoded.head, encoded.rows, encoded.units)
+    );
+    expect(parsed?.editingHistory?.past).toHaveLength(30);
+    expect(reads).toBeLessThanOrEqual(12);
+    if (!parsed) throw new Error('Expected admitted Scenario.');
+    const current = kind === 'guide' ? parsed.project.items[0]! : parsed.project.tour!.slides[0]!;
+    const previous =
+      kind === 'guide'
+        ? parsed.editingHistory!.past[0]!.items[0]!
+        : parsed.editingHistory!.past[0]!.tour!.slides[0]!;
+    const before = previous.title;
+    current.title = 'Live edit';
+    expect(previous.title).toBe(before);
+  }
+);
+
+it('does not reuse guide admission for a shared array in tour slots', () => {
+  const source = entry();
+  const encoded = encodeScenarioUnitStorage(source, []);
+  if (!('tour' in encoded.head.project)) throw new Error('Expected native tour.');
+  const invalid = {
+    ...encoded.head,
+    project: {
+      ...encoded.head.project,
+      tour: { ...encoded.head.project.tour, slides: encoded.head.project.items },
+    },
+  };
+  expect(
+    parseScenarioProjectEntry(materializeScenarioUnitStorage(invalid, encoded.rows, encoded.units))
+  ).toBeNull();
+});

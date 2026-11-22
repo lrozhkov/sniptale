@@ -122,6 +122,32 @@ function bind(recordingId: string) {
   });
 }
 
+it('forwards the closed document batch through the background route', async () => {
+  bind('final-route');
+  const header = raw('final-route').cursorPacket;
+  const message = {
+    type: VideoMessageType.RECORDING_OBSERVATIONS,
+    recordingId: 'final-route',
+    cursorPackets: [
+      {
+        ...header,
+        records: [{ kind: 'boundary' as const, reason: 'stop' as const, activeTimeUs: 12345 }],
+      },
+    ],
+  };
+  const parse =
+    runtimeVideoSessionMessageContracts[VideoMessageType.RECORDING_OBSERVATIONS].parseRequest;
+  expect(parse(message)).toEqual(message);
+  expect(() => parse({ ...message, cursorPacket: header })).toThrow();
+  expect(() => parse({ ...message, recordingId: 'other' })).toThrow();
+  const response = vi.fn();
+  handleRecordingObservations(message, response, sender);
+  await vi.waitFor(() => expect(response).toHaveBeenCalledWith({ success: true }));
+  expect(owner.send).toHaveBeenCalledWith(
+    expect.objectContaining({ cursorPackets: message.cursorPackets, nativeDocumentId: 'document' })
+  );
+});
+
 it('forwards bounded raw packets with native source identity and current recording capability', async () => {
   bind('raw-forward');
   const message = raw('raw-forward');
@@ -171,20 +197,33 @@ it('rechecks recording authority after native document admission completes', asy
   expect(owner.send).not.toHaveBeenCalled();
 });
 
-it('refuses a raw sender outside the top active document before forwarding', () => {
-  bind('raw-denied');
-  const response = vi.fn();
-  handleRecordingObservations(raw('raw-denied'), response, {
-    ...sender,
-    documentLifecycle: 'pending_deletion',
-  });
-  expect(response).toHaveBeenCalledWith({
-    success: false,
-    error: 'RECORDING_OBSERVATIONS_SOURCE_UNAVAILABLE',
-  });
-  expect(owner.frames).not.toHaveBeenCalled();
-  expect(owner.send).not.toHaveBeenCalled();
-});
+const outgoingSources = (['cursor', 'events'] as const).flatMap((kind) =>
+  (['pending_deletion', 'cached'] as const).map((documentLifecycle) => ({
+    kind,
+    documentLifecycle,
+    frameId: documentLifecycle === 'cached' ? 5 : 0,
+  }))
+);
+
+it.each(outgoingSources)(
+  'refuses an unadmitted outgoing $kind ($documentLifecycle) document before forwarding',
+  ({ kind, documentLifecycle, frameId }) => {
+    bind('raw-denied');
+    const response = vi.fn();
+    const message = kind === 'cursor' ? raw('raw-denied') : rawEvents('raw-denied');
+    handleRecordingObservations(message, response, {
+      ...sender,
+      documentLifecycle,
+      frameId,
+    });
+    expect(response).toHaveBeenCalledWith({
+      success: false,
+      error: 'RECORDING_OBSERVATIONS_SOURCE_UNAVAILABLE',
+    });
+    expect(owner.frames).not.toHaveBeenCalled();
+    expect(owner.send).not.toHaveBeenCalled();
+  }
+);
 
 it('requires exactly one observation payload and matching recording identity', () => {
   const parse =
@@ -311,6 +350,144 @@ function rawEvents(recordingId: string) {
   };
 }
 
+it.each(outgoingSources)(
+  'retains the admitted outgoing $kind ($documentLifecycle) document while its final packet drains',
+  async ({ kind, documentLifecycle, frameId }) => {
+    const recordingId = `outgoing-${kind}-${documentLifecycle}`;
+    bind(recordingId);
+    const message = kind === 'cursor' ? raw(recordingId) : rawEvents(recordingId);
+    const initial = vi.fn();
+    handleRecordingObservations(message, initial, sender);
+    await vi.waitFor(() => expect(initial).toHaveBeenCalledWith({ success: true }));
+    owner.frames.mockResolvedValue([{ frameId: 0, documentId: 'successor' }]);
+    const outgoing = vi.fn();
+    const header = raw(recordingId).cursorPacket;
+    const terminal =
+      kind === 'cursor'
+        ? {
+            ...raw(recordingId),
+            cursorPacket: {
+              ...header,
+              batchSequence: 1,
+              records: [
+                {
+                  kind: 'boundary' as const,
+                  activeTimeUs: 23456,
+                  reason: 'observation' as const,
+                },
+              ],
+            },
+          }
+        : {
+            ...rawEvents(recordingId),
+            eventPacket: {
+              ...header,
+              batchSequence: 1,
+              records: [
+                {
+                  kind: 'boundary' as const,
+                  recordSeq: 1,
+                  segmentId: 0,
+                  activeTimeUs: 23456,
+                  reason: 'visibility' as const,
+                },
+              ],
+            },
+          };
+    handleRecordingObservations(terminal, outgoing, {
+      ...sender,
+      documentLifecycle,
+      frameId,
+    });
+    await vi.waitFor(() => expect(outgoing).toHaveBeenCalledWith({ success: true }));
+    expect(owner.frames).toHaveBeenCalledTimes(1);
+    expect(owner.send).toHaveBeenCalledTimes(2);
+  }
+);
+
+it.each(outgoingSources)(
+  'drains an outgoing $kind ($documentLifecycle) packet while successor admission waits',
+  async ({ kind, documentLifecycle, frameId }) => {
+    const recordingId = `outgoing-queued-${kind}-${documentLifecycle}`;
+    bind(recordingId);
+    const message = kind === 'cursor' ? raw(recordingId) : rawEvents(recordingId);
+    const initial = vi.fn();
+    handleRecordingObservations(message, initial, sender);
+    await vi.waitFor(() => expect(initial).toHaveBeenCalledWith({ success: true }));
+    owner.frames.mockResolvedValue([{ frameId: 0, documentId: 'successor' }]);
+    const successor = vi.fn();
+    handleRecordingObservations(message, successor, { ...sender, documentId: 'successor' });
+    const outgoing = vi.fn();
+    handleRecordingObservations(message, outgoing, {
+      ...sender,
+      documentLifecycle,
+      frameId,
+    });
+    await vi.waitFor(() => expect(outgoing).toHaveBeenCalledWith({ success: true }));
+    await vi.waitFor(() => expect(successor).toHaveBeenCalledWith({ success: true }), {
+      timeout: 3000,
+    });
+    expect(owner.send).toHaveBeenCalledTimes(3);
+  }
+);
+
+it.each(outgoingSources)(
+  'refuses the outgoing $kind ($documentLifecycle) document after the recording binding changes',
+  async ({ kind, documentLifecycle, frameId }) => {
+    const recordingId = `outgoing-binding-${kind}-${documentLifecycle}`;
+    bind(recordingId);
+    const message = kind === 'cursor' ? raw(recordingId) : rawEvents(recordingId);
+    const initial = vi.fn();
+    handleRecordingObservations(message, initial, sender);
+    await vi.waitFor(() => expect(initial).toHaveBeenCalledWith({ success: true }));
+    owner.lease.mockReturnValue({
+      recordingId,
+      recordingTabId: 7,
+      surfaceBinding: { generation: 5, streamInstanceId: 'stream-5' },
+    });
+    const outgoing = vi.fn();
+    handleRecordingObservations(message, outgoing, {
+      ...sender,
+      documentLifecycle,
+      frameId,
+    });
+    expect(outgoing).toHaveBeenCalledWith({
+      success: false,
+      error: 'RECORDING_OBSERVATIONS_SOURCE_UNAVAILABLE',
+    });
+    expect(owner.send).toHaveBeenCalledTimes(1);
+  }
+);
+
+it.each(outgoingSources)(
+  'refuses the outgoing $kind ($documentLifecycle) document after its successor is admitted',
+  async ({ kind, documentLifecycle, frameId }) => {
+    const recordingId = `outgoing-replaced-${kind}-${documentLifecycle}`;
+    bind(recordingId);
+    const message = kind === 'cursor' ? raw(recordingId) : rawEvents(recordingId);
+    const initial = vi.fn();
+    handleRecordingObservations(message, initial, sender);
+    await vi.waitFor(() => expect(initial).toHaveBeenCalledWith({ success: true }));
+    owner.frames.mockResolvedValue([{ frameId: 0, documentId: 'successor' }]);
+    const successor = vi.fn();
+    handleRecordingObservations(message, successor, { ...sender, documentId: 'successor' });
+    await vi.waitFor(() => expect(successor).toHaveBeenCalledWith({ success: true }), {
+      timeout: 3000,
+    });
+    const outgoing = vi.fn();
+    handleRecordingObservations(message, outgoing, {
+      ...sender,
+      documentLifecycle,
+      frameId,
+    });
+    expect(outgoing).toHaveBeenCalledWith({
+      success: false,
+      error: 'RECORDING_OBSERVATIONS_SOURCE_UNAVAILABLE',
+    });
+    expect(owner.send).toHaveBeenCalledTimes(2);
+  }
+);
+
 it('forwards event packets with the same native document and capability authority', async () => {
   bind('events-forward');
   const message = rawEvents('events-forward');
@@ -408,3 +585,22 @@ it('rechecks event recording authority after asynchronous document admission', a
   });
   expect(owner.send).not.toHaveBeenCalled();
 });
+
+it.each(['cursor', 'events'] as const)(
+  'refuses an active non-top-level %s sender even for the admitted document identity',
+  async (kind) => {
+    const recordingId = `active-frame-${kind}`;
+    bind(recordingId);
+    const message = kind === 'cursor' ? raw(recordingId) : rawEvents(recordingId);
+    const initial = vi.fn();
+    handleRecordingObservations(message, initial, sender);
+    await vi.waitFor(() => expect(initial).toHaveBeenCalledWith({ success: true }));
+    const refused = vi.fn();
+    handleRecordingObservations(message, refused, { ...sender, frameId: 5 });
+    expect(refused).toHaveBeenCalledWith({
+      success: false,
+      error: 'RECORDING_OBSERVATIONS_SOURCE_UNAVAILABLE',
+    });
+    expect(owner.send).toHaveBeenCalledTimes(1);
+  }
+);

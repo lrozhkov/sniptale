@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { WORKSPACE_BACKGROUND_PALETTE } from '../../../../apps/extension/src/editor/inspector/sidebar-shared/data';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { applyHarnessBootstrap, EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
 import { startHostServer } from '../support/host-server';
 
@@ -210,8 +210,7 @@ for (const variant of [
       }
       const group = ui('shared.linked-padding-fields');
       const slider = ui('editor.frame.padding-slider');
-      const paddingHeader = group.locator('[data-padding-link="all"]').locator('..');
-      await expect(paddingHeader).toHaveAttribute('data-padding-hover', 'all');
+      const paddingHeader = group.locator('[data-padding-hover="all"]').first();
       await paddingHeader.hover();
       await expect(slider.locator('input')).toBeVisible();
       expect(

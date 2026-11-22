@@ -29,13 +29,17 @@ export function createPresentationAdmission(
   description: () => Description | null,
   time: () => number,
   front: () => Front | null,
-  maximumInFlight: (scene: Description['scene']) => 1 | 2 = reviewGpuPreviewConcurrency
+  maximumInFlight: (scene: Description['scene']) => 1 | 2 | 3 | 4 = reviewGpuPreviewConcurrency
 ) {
-  const resources = createPreviewRenderResources({ maximumManagedBytes: 1, maximumCanvases: 1 });
+  const resources = createPreviewRenderResources({
+    maximumManagedBytes: 1,
+    maximumCanvases: 1,
+    maximumPresentationSurfaces: 5,
+  });
   const sourceFrames = new Map<symbol, number>();
   let retainedCameraBytes: number | null = null;
-  let activeCameraBytes: number | null = null;
-  let transitionBytes: readonly [number, number] | null = null;
+  const activeCameraFrames = new Map<symbol, number>();
+  const transitionPairs = new Map<symbol, readonly [number, number]>();
   let assets = emptyAssets();
   const graph = () => {
     const current = description();
@@ -43,6 +47,12 @@ export function createPresentationAdmission(
     const previousFront = front();
     const { playing, video } = transport();
     if (!current) throw new Error('Preview description unavailable');
+    const transitionBytes = transitionPairs.size
+      ? [...transitionPairs.values()].reduce(
+          ([left, right], [nextLeft, nextRight]) => [left + nextLeft, right + nextRight] as const,
+          [0, 0] as readonly [number, number]
+        )
+      : null;
     return resolvePreviewRenderAllocation({
       scene: current.scene,
       dimensions: current.dimensions,
@@ -54,7 +64,12 @@ export function createPresentationAdmission(
         : null,
       sourceTime: playing && video ? video.currentTime : current.sourceTime,
       sourceBacking: previewTransitionBacking(current, resultTime),
-      camera: { retainedBytes: retainedCameraBytes, activeBytes: activeCameraBytes },
+      camera: {
+        retainedBytes: retainedCameraBytes,
+        activeBytes: activeCameraFrames.size
+          ? [...activeCameraFrames.values()].reduce((sum, bytes) => sum + bytes, 0)
+          : null,
+      },
       transitionBytes,
       previousFront: previousFront
         ? { width: previousFront.canvas.width, height: previousFront.canvas.height }
@@ -91,9 +106,9 @@ export function createPresentationAdmission(
     canvas: (role, size, options) => resources.canvas(role, size, options),
     bytes(role, count) {
       const previousRetained = retainedCameraBytes;
-      const previousActive = activeCameraBytes;
+      const identity = Symbol();
       if (role === 'webcam.retained') retainedCameraBytes = count;
-      if (role === 'webcam.active') activeCameraBytes = count;
+      if (role === 'webcam.active') activeCameraFrames.set(identity, count);
       try {
         admit();
         const lease = resources.bytes(role, count);
@@ -101,12 +116,12 @@ export function createPresentationAdmission(
           release() {
             lease.release();
             if (role === 'webcam.retained') retainedCameraBytes = null;
-            if (role === 'webcam.active') activeCameraBytes = null;
+            activeCameraFrames.delete(identity);
           },
         };
       } catch (error) {
         retainedCameraBytes = previousRetained;
-        activeCameraBytes = previousActive;
+        activeCameraFrames.delete(identity);
         throw error;
       }
     },
@@ -140,21 +155,21 @@ export function createPresentationAdmission(
       }
     },
     retainEndpoints(bytes: readonly [number, number]) {
-      if (!description() || transitionBytes)
-        throw new Error('Preview endpoint admission unavailable');
-      transitionBytes = bytes;
+      if (!description()) throw new Error('Preview endpoint admission unavailable');
+      const identity = Symbol();
+      transitionPairs.set(identity, bytes);
       let reservation: { release(): void };
       try {
         admit();
         reservation = resources.bytes('preview-transition-endpoints', bytes[0] + bytes[1]);
       } catch (error) {
-        transitionBytes = null;
+        transitionPairs.delete(identity);
         throw error;
       }
       return {
         release() {
           reservation.release();
-          if (transitionBytes === bytes) transitionBytes = null;
+          transitionPairs.delete(identity);
         },
       };
     },

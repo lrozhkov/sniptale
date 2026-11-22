@@ -1,12 +1,89 @@
+// @vitest-environment jsdom
+import { act, useState } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 
 import {
   HeaderValueToggleSection,
   PanelSection,
   primaryPanelButtonClassName,
   secondaryPanelButtonClassName,
+  EditorInspectorRangeField,
 } from './shared';
+
+it('accepts the old numeric origin after cancellation and an external value change', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const commit = vi.fn();
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  function Field() {
+    const [value, setValue] = useState(10);
+    const [accepted, setAccepted] = useState(10);
+    return (
+      <>
+        <output>{accepted}</output>
+        <button
+          onClick={() => {
+            setValue(20);
+            setAccepted(20);
+          }}
+        >
+          External value
+        </button>
+        <EditorInspectorRangeField
+          label="Radius"
+          value={value}
+          min={0}
+          max={100}
+          unit="px"
+          onPreview={setValue}
+          onChange={(next) => {
+            commit(next);
+            setValue(next);
+            setAccepted(next);
+          }}
+        />
+      </>
+    );
+  }
+  try {
+    act(() => root.render(<Field />));
+    const field = host.querySelector<HTMLInputElement>('input[type="text"]')!;
+    const increase = host.querySelector<HTMLButtonElement>('button[aria-label="Radius increase"]')!;
+    act(() => {
+      field.focus();
+      increase.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    });
+    expect(field.value).toBe('11');
+    act(() =>
+      field.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'z',
+          ctrlKey: true,
+          bubbles: true,
+          cancelable: true,
+        })
+      )
+    );
+    act(() => window.dispatchEvent(new MouseEvent('pointerup')));
+    expect(commit).not.toHaveBeenCalled();
+    act(() => host.querySelector('button')!.click());
+    expect(field.value).toBe('20');
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '10');
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    act(() => field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    expect(commit).toHaveBeenCalledExactlyOnceWith(10);
+    expect(host.querySelector('output')!.textContent).toBe('10');
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});
 
 function MockLabeledRow(props: { label: string; children: React.ReactNode }) {
   return <div>{props.children}</div>;

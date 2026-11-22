@@ -26,6 +26,7 @@ const FAILURE_KEYS = [
   'snapshotId',
 ] as const;
 const CACHE_MISS_KEYS = [...FAILURE_KEYS, 'missingRef'] as const;
+const STARTUP_FAILURE_KEYS = [...FAILURE_KEYS, 'startupFailureCode'] as const;
 const SUCCESS_KEYS = [
   'acknowledged',
   'bitmap',
@@ -52,6 +53,17 @@ function parseEffectRuntimeErrorResult(
   value: Record<string, unknown>,
   identity: NonNullable<ReturnType<typeof parseEffectRuntimeIdentity>>
 ): EffectRuntimeFrameResult | null {
+  if ('startupFailureCode' in value) {
+    const startupFailureCode = value['startupFailureCode'];
+    if (
+      value['code'] !== 'circuitOpen' ||
+      !hasExactKeys(value, STARTUP_FAILURE_KEYS) ||
+      (startupFailureCode !== 'crashed' && startupFailureCode !== 'malformed')
+    ) {
+      return null;
+    }
+    return { ...identity, code: 'circuitOpen', kind: 'error', startupFailureCode };
+  }
   if (value['code'] === 'cacheMiss') {
     if (
       !hasExactKeys(

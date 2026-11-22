@@ -3,13 +3,19 @@ import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
   type RefObject,
 } from 'react';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { loadVideoReviewSource, VideoReviewLoadError } from '../../workflows/video-review/source';
+import {
+  loadVideoReviewSource,
+  refreshVideoReviewRecordingHistory,
+  VideoReviewLoadError,
+} from '../../workflows/video-review/source';
+import { subscribeToMediaHubEvents } from '../../features/media-hub/events';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import type { ReviewAnnotation } from '../../features/video/review/types';
 import {
@@ -28,7 +34,7 @@ export type LoadedReview = Awaited<ReturnType<typeof loadVideoReviewSource>> & {
 };
 
 /** Owns the source URL and rejects late loads from a previously opened video. */
-export function useLoadedReview(aggregateId: string) {
+export function useLoadedReview(aggregateId: string, sourceMediaId?: string) {
   const [resource, setResource] = useState<LoadedReview | null>(null);
   const [failed, setFailed] = useState<VideoReviewLoadError | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -38,20 +44,73 @@ export function useLoadedReview(aggregateId: string) {
     let ownedSession: Session | null = null;
     let reader: AssetResourceSession | null = null;
     let releasing: Promise<void> | null = null;
+    let loadedReview: Awaited<ReturnType<typeof loadVideoReviewSource>> | null = null;
+    let pendingHistory = false;
+    let refreshing: Promise<void> | null = null;
+    const refreshHistory = () => {
+      if (refreshing || !loadedReview?.recordingHistorySource || controller.signal.aborted) return;
+      const identity = loadedReview.recordingHistorySource;
+      const loaded = loadedReview;
+      refreshing = (async () => {
+        while (pendingHistory && !controller.signal.aborted) {
+          pendingHistory = false;
+          try {
+            const history = await refreshVideoReviewRecordingHistory(
+              identity,
+              loaded.source,
+              controller.signal
+            );
+            if (controller.signal.aborted || !history.telemetry) continue;
+            setResource((current) =>
+              current?.session === ownedSession
+                ? {
+                    ...current,
+                    telemetry: history.telemetry,
+                    ...(history.historyProject ? { historyProject: history.historyProject } : {}),
+                  }
+                : current
+            );
+          } catch {
+            if (!controller.signal.aborted) logger.warn('video-review-history-refresh-failed');
+          }
+        }
+      })().finally(() => {
+        refreshing = null;
+      });
+    };
+    // Subscribe before reading metadata so publication during opening is also observed.
+    const unsubscribe = subscribeToMediaHubEvents((event) => {
+      if (event.type !== 'library-changed' || event.reason === 'delete') return;
+      const identity = loadedReview?.recordingHistorySource;
+      if (
+        loadedReview &&
+        (!identity || !event.assetIds.includes(`recording:${identity.recordingId}`))
+      )
+        return;
+      pendingHistory = true;
+      refreshHistory();
+    });
     setResource(null);
     setFailed(null);
     let loadedSource = false;
     const loading = (async () => {
       reader = await acquireAssetResourceSession();
       if (controller.signal.aborted) return null;
-      await ensureNativeEditingRootAvailable({ rootKind: 'video-review', rootId: aggregateId });
+      await ensureNativeEditingRootAvailable(
+        sourceMediaId
+          ? { rootKind: 'media', rootId: sourceMediaId }
+          : { rootKind: 'video-review', rootId: aggregateId }
+      );
       if (controller.signal.aborted) return null;
-      return loadVideoReviewSource(aggregateId, controller.signal);
+      return sourceMediaId
+        ? loadVideoReviewSource(aggregateId, controller.signal, sourceMediaId)
+        : loadVideoReviewSource(aggregateId, controller.signal);
     })();
     const release = (): Promise<void> => {
       releasing ??= (async () => {
-        // Opening can still commit after abort; retain exclusion until that writer settles.
+        // Native media preparation can outlive cancellation of the view.
         await loading.catch(() => undefined);
+        await refreshing;
         try {
           await ownedSession?.dispose();
         } finally {
@@ -65,10 +124,12 @@ export function useLoadedReview(aggregateId: string) {
       .then((loaded) => {
         if (!loaded || controller.signal.aborted) return;
         loadedSource = true;
-        const session = createVideoReviewSession(loaded.snapshot);
+        const session = createVideoReviewSession(loaded.snapshot, undefined, loaded.original);
         ownedSession = session;
         url = URL.createObjectURL(loaded.file);
         setResource({ ...loaded, url, session });
+        loadedReview = loaded;
+        refreshHistory();
       })
       .catch((error: unknown) => {
         void release().catch(() => logger.warn('video-review-resource-cleanup-deferred'));
@@ -86,10 +147,11 @@ export function useLoadedReview(aggregateId: string) {
       });
     return () => {
       controller.abort();
+      unsubscribe();
       void release().catch(() => logger.warn('video-review-resource-cleanup-deferred'));
       if (url) URL.revokeObjectURL(url);
     };
-  }, [aggregateId, attempt]);
+  }, [aggregateId, attempt, sourceMediaId]);
   return { resource, failed, retry: () => setAttempt((value) => value + 1) };
 }
 
@@ -100,6 +162,29 @@ export function useReviewSnapshot(session: Session) {
     session.getSnapshot,
     session.getSnapshot
   );
+  const previousEdits = useRef<{
+    session: Session;
+    key: string;
+    edits: typeof snapshot.document.edits;
+  } | null>(null);
+  const edits = useMemo(() => {
+    const key = JSON.stringify(snapshot.document.edits);
+    if (previousEdits.current?.session === session && previousEdits.current.key === key)
+      return previousEdits.current.edits;
+    previousEdits.current = { session, key, edits: snapshot.document.edits };
+    return snapshot.document.edits;
+  }, [session, snapshot.document.edits]);
+  // A content-only save must not rebuild every timeline map or restart recording-history readers.
+  const view = useMemo(
+    () =>
+      edits === snapshot.document.edits
+        ? snapshot
+        : {
+            ...snapshot,
+            document: { ...snapshot.document, edits },
+          },
+    [snapshot, edits]
+  );
   useEffect(() => {
     const protect = (event: BeforeUnloadEvent) => {
       if (!session.getSnapshot().dirty) return;
@@ -109,7 +194,7 @@ export function useReviewSnapshot(session: Session) {
     window.addEventListener('beforeunload', protect);
     return () => window.removeEventListener('beforeunload', protect);
   }, [session]);
-  return snapshot;
+  return view;
 }
 
 function useComposerUnloadProtection(latest: RefObject<{ dirty: boolean }>) {
@@ -214,6 +299,10 @@ export function useReviewComposer(session: Session) {
     getCurrent: () => latest.current,
     commitField,
     clearLocal,
+    acceptAnnotation: (accepted) => {
+      latest.current = { ...latest.current, before: accepted };
+      setField((field) => ({ ...field, before: accepted }));
+    },
   });
   return {
     annotation,
@@ -261,15 +350,16 @@ function createComposerCompletion(args: {
   getCurrent(): { annotation: ReviewAnnotation | null; before: ReviewAnnotation | null };
   commitField(action: () => Promise<void>): Promise<void>;
   clearLocal(): void;
+  acceptAnnotation(annotation: ReviewAnnotation): void;
 }) {
-  const save = () =>
+  const save = (options?: { durable: true }) =>
     args.commitField(async () => {
       await args.flush();
       const captured = args.getCurrent();
       if (!captured.annotation) return;
       if (JSON.stringify(captured.annotation) === JSON.stringify(captured.before))
         await args.session.saveDraft(null, null);
-      else
+      else {
         await args.session.commit(
           {
             id: crypto.randomUUID(),
@@ -280,21 +370,26 @@ function createComposerCompletion(args: {
           },
           true
         );
+        // A failed durable exit leaves this field attached to the accepted local note.
+        args.acceptAnnotation(captured.annotation);
+      }
+      if (options?.durable) await args.session.flush();
       args.clearLocal();
     });
-  const discard = () =>
+  const discard = (options?: { durable: true }) =>
     args.commitField(async () => {
       await args.flush();
       await args.session.saveDraft(null, null);
+      if (options?.durable) await args.session.flush();
       args.clearLocal();
     });
   return {
     save,
     discard,
-    finishNew: () => {
+    finishNew: (options?: { durable: true }) => {
       const current = args.getCurrent();
       if (!current.annotation || current.before) return Promise.resolve();
-      return current.annotation.text.trim() ? save() : discard();
+      return current.annotation.text.trim() ? save(options) : discard(options);
     },
   };
 }

@@ -37,6 +37,7 @@ import {
   parseScenarioProjectEntry,
 } from './read-guards';
 import { recoverScenarioHtmlPublications, unlinkScenarioHtmlOwnership } from './export-artifacts';
+import { scenarioAssetOriginalId } from './library-publication';
 
 export async function deleteOrphanedScenarioAggregateChild(args: {
   id: string;
@@ -119,17 +120,17 @@ export async function deleteOrphanedScenarioAggregateChild(args: {
   }
 }
 
-export async function deleteScenarioAggregate(projectId: string): Promise<void> {
+export async function deleteScenarioAggregate(projectId: string): Promise<string[]> {
   await recoverScenarioAssetPublications();
   await recoverScenarioHtmlPublications();
   const physicalDelete = buildPhysicalDeleteOperation([]);
-  await runWithIndexedDbMutation(async (db) => {
+  const originalMediaIds = await runWithIndexedDbMutation(async (db) => {
     const tx = createScenarioCleanupTransaction(db);
     try {
       const current = parseScenarioProjectEntry(
         await createScenarioProjectStore(tx).get(projectId)
       );
-      await deleteScenarioAggregateInTransaction(tx, projectId, physicalDelete);
+      const sourceIds = await deleteScenarioAggregateInTransaction(tx, projectId, physicalDelete);
       if (current)
         await captureDeletionInTransaction(
           tx,
@@ -139,13 +140,15 @@ export async function deleteScenarioAggregate(projectId: string): Promise<void> 
           current.workspaceRevision
         );
       await tx.done;
+      return sourceIds;
     } catch (error) {
-      await abortIndexedDbMutation(tx, error);
+      return abortIndexedDbMutation(tx, error);
     }
   });
   if (physicalDelete.assetIds.length > 0) {
     await completePhysicalDeleteOperation(physicalDelete).catch(() => undefined);
   }
+  return originalMediaIds;
 }
 
 function createScenarioCleanupTransaction(db: Awaited<ReturnType<typeof initDB>>) {
@@ -181,7 +184,10 @@ export async function deleteScenarioAggregateInTransaction(
   const stored = await createScenarioProjectStore(tx).get(projectId);
   if (stored !== undefined && !parseScenarioProjectEntry(stored))
     throw new Error('Unavailable scenario project cannot be deleted.');
-  const { assetIds, exportIds, documentIds } = await readScenarioCleanupResources(tx, projectId);
+  const { assetIds, exportIds, documentIds, originalMediaIds } = await readScenarioCleanupResources(
+    tx,
+    projectId
+  );
   await detachScenarioVideoAssets(tx, projectId, new Set(assetIds));
   await createScenarioProjectStore(tx).delete(projectId);
   const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
@@ -204,6 +210,7 @@ export async function deleteScenarioAggregateInTransaction(
   if (physicalDelete.assetIds.length > 0) {
     await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
   }
+  return originalMediaIds;
 }
 
 async function readScenarioCleanupResources(tx: ScenarioCleanupTransaction, projectId: string) {
@@ -212,16 +219,14 @@ async function readScenarioCleanupResources(tx: ScenarioCleanupTransaction, proj
     tx.objectStore(SCENARIO_EXPORTS_STORE).index!('projectId').getAll(projectId),
     tx.objectStore(SCENARIO_STEP_EDITOR_DOCUMENTS_STORE).index!('projectId').getAll(projectId),
   ]);
+  const assets = rawAssets.map(parseScenarioAssetEntry).filter((asset) => asset !== null);
   if (
-    rawAssets.some((raw) => !parseScenarioAssetEntry(raw)) ||
+    assets.length !== rawAssets.length ||
     rawDocuments.some((raw) => !parseScenarioStepEditorDocumentEntry(raw))
   )
     throw new Error('Invalid scenario resource cannot be safely removed.');
-  const assetIds = rawAssets.flatMap((value) => {
-    const parsed = parseScenarioAssetEntry(value);
-    const id = parsed?.id ?? readOwnedScenarioChildId(value, projectId);
-    return id ? [id] : [];
-  });
+  const assetIds = assets.map((asset) => asset.id);
+  const originalMediaIds = [...new Set(assets.map(scenarioAssetOriginalId))];
   const exportIds = rawExports.flatMap((value) => {
     const parsed = parseScenarioExportEntry(value);
     const id = parsed?.id ?? readOwnedScenarioChildId(value, projectId);
@@ -232,7 +237,7 @@ async function readScenarioCleanupResources(tx: ScenarioCleanupTransaction, proj
     const stepId = parsed?.stepId ?? readOwnedScenarioStepId(value, projectId);
     return stepId ? [stepId] : [];
   });
-  return { assetIds, exportIds, documentIds };
+  return { assetIds, exportIds, documentIds, originalMediaIds };
 }
 
 async function removeScenarioAssetChildren(

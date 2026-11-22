@@ -194,9 +194,21 @@ async function interactWithFields(state: ReturnType<typeof createBaseState>) {
   });
 
   selectCategory('highlighter.editor.shadowSection');
+  act(() => {
+    container
+      ?.querySelector<HTMLButtonElement>(
+        'button.field-action[aria-label="highlighter.editor.shadowLabel"]'
+      )
+      ?.click();
+  });
   await act(async () => {
     const shadowInput = getNumericInput('highlighter.editor.shadowLabel');
-    setNumericInputValue(shadowInput, '100');
+    setInputValue(shadowInput, '100');
+  });
+  act(() => {
+    getNumericInput('highlighter.editor.shadowLabel').dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
+    );
   });
 
   selectCategory('highlighter.editor.behaviorSection');
@@ -283,26 +295,7 @@ describe('BorderPresetEditorFields', () => {
     expect(
       widthRow?.querySelector('button[aria-label="highlighter.editor.widthLabel increase"]')
     ).not.toBeNull();
-    vi.spyOn(widthRow as HTMLElement, 'getBoundingClientRect').mockReturnValue({
-      bottom: 40,
-      height: 40,
-      left: 0,
-      right: 240,
-      top: 0,
-      width: 240,
-      x: 0,
-      y: 0,
-      toJSON: () => ({}),
-    });
-    act(() => {
-      widthRow?.dispatchEvent(
-        new MouseEvent('pointermove', { bubbles: true, clientX: 120, clientY: 35 })
-      );
-    });
-    expect(widthRow?.dataset['rangeVisible']).toBe('true');
-    expect(
-      widthRow?.querySelector('input[aria-label="highlighter.editor.widthLabel range"]')
-    ).not.toBeNull();
+    expect(widthRow?.querySelector('input[type="range"]')).toBeNull();
 
     await interactWithFields(state);
   });

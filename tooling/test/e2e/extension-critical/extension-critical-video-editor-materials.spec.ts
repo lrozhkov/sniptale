@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { hydrateVideoProject } from '../../../../apps/extension/src/features/video/project/hydration';
 import { mapCompositionPointThroughSourceContent } from '../../../../apps/extension/src/features/video/composition/motion/source-window';
 import { fitQuickEditSourceCrop } from '../../../../apps/extension/src/features/video/review/advanced/canvas';
@@ -13,7 +14,7 @@ import { readFile } from 'node:fs/promises';
 import { createVideoProjectCursorTrack } from '../../../../apps/extension/src/features/video/project/defaults';
 import { createEmptyVideoProject } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { GALLERY_SAVED_VIEWS_STORAGE_KEY } from '../../../../apps/extension/src/composition/persistence/gallery-saved-views/contract';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { checkInspectorPaintedFont, chooseInspectorValue } from '../support/inspector-utilities';
 import {
@@ -221,8 +222,21 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       const card = list.getByRole('button', { name: /beta-v1\.webm/ });
       await expect(card).toHaveCount(1);
       const search = drawer.locator('input[type="search"]');
+      const searchFrame = search.locator('..');
+      await expect(searchFrame).toHaveCSS('height', '32px');
+      await expect(searchFrame).toHaveCSS('border-top-width', '1px');
+      await expect(search).toHaveAttribute('spellcheck', 'false');
+      const searchWidth = (await searchFrame.boundingBox())!.width;
       await search.fill('interview');
       await expect(card).toHaveCount(0);
+      const clear = searchFrame.locator('.sniptale-field-clear');
+      await expect(clear).toHaveCSS('width', '24px');
+      await clear.click();
+      await expect(search).toBeFocused();
+      await expect(search).toHaveValue('');
+      await expect(card).toHaveCount(1);
+      await expect(saved).toHaveAttribute('aria-pressed', 'true');
+      expect((await searchFrame.boundingBox())!.width).toBeCloseTo(searchWidth, 0);
       await search.fill('beta-v1');
       await expect(card).toHaveCount(1);
       await card.click();
@@ -649,11 +663,13 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         label('gallery.videoReview.webcamPlacement'),
         label('gallery.videoReview.webcamPlacement_top-left')
       );
-      const galleryZoom = galleryCamera.getByRole('textbox', {
-        name: label('videoEditor.sidebar.cameraCropZoom'),
-        exact: true,
-      });
-      await galleryZoom.fill('1.5');
+      const galleryZoom = numericControl(
+        galleryCamera,
+        label('videoEditor.sidebar.cameraCropZoom')
+      );
+      await (
+        await openNumericControl(galleryCamera, label('videoEditor.sidebar.cameraCropZoom'))
+      ).fill('1.5');
       await galleryZoom.press('Enter');
       await cameraSection('gallery.videoReview.webcamAppearance');
       const galleryMirror = galleryCamera.getByRole('switch', {
@@ -762,8 +778,8 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         ['gallery.videoReview.backgroundCornerRadius', '6'],
         ['gallery.videoReview.backgroundShadow', '60'],
       ] as const) {
-        const field = inspector.getByRole('textbox', { name: label(key), exact: true });
-        await field.fill(value);
+        const field = numericControl(inspector, label(key));
+        await (await openNumericControl(inspector, label(key))).fill(value);
         await field.press('Enter');
       }
       const readAuthoredScene = async () => {
@@ -2529,8 +2545,8 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         ['gallery.videoReview.backgroundCornerRadius', '6'],
         ['gallery.videoReview.backgroundShadow', '60'],
       ] as const) {
-        const field = inspector.getByRole('textbox', { name: label(key), exact: true });
-        await field.fill(value);
+        const field = numericControl(inspector, label(key));
+        await (await openNumericControl(inspector, label(key))).fill(value);
         await field.press('Enter');
       }
       await chooseInspectorValue(
@@ -2542,11 +2558,10 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await inspector
         .locator('[data-ui="gallery.videoReview.backgroundInspector"] input[type="file"]')
         .setInputFiles(await solidImageUpload(page, 'Retained background.png', '#2050a0', 32, 32));
-      const backgroundBlur = inspector.getByRole('textbox', {
-        name: label('editor.scene.backgroundBlurAmount'),
-        exact: true,
-      });
-      await backgroundBlur.fill('2');
+      const backgroundBlur = numericControl(inspector, label('editor.scene.backgroundBlurAmount'));
+      await (
+        await openNumericControl(inspector, label('editor.scene.backgroundBlurAmount'))
+      ).fill('2');
       await backgroundBlur.press('Enter');
       if (index === 1)
         await chooseInspectorValue(

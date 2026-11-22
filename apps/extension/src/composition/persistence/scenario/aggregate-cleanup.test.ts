@@ -29,6 +29,64 @@ async function commitLegacyFrozenChild(
   if (child.galleryAssetId) getStore('media_library').delete(child.galleryAssetId);
 }
 
+it.each([
+  ['parent-delete', 'historical-child'],
+  ['parent-delete', 'historical-root'],
+  ['child-delete', 'historical-child'],
+  ['prune', 'historical-child'],
+  ['parent-delete', 'recovery-current'],
+  ['child-delete', 'recovery-current'],
+  ['prune', 'recovery-current'],
+] as const)('preserves retained Montage sources during Scenario %s/%s', async (operation, mode) => {
+  const { createVideoProjectEntryWithMediaClip } = await import('../projects/index.test-support');
+  const project = createGuideProject('Retained Montage source');
+  const child = { ...createAsset(project.id), galleryAssetId: 'origin' };
+  await commitLegacyFrozenChild(project, child);
+  const video = createVideoProjectEntryWithMediaClip();
+  video.project.assets[0]!.source = { kind: 'scenario-asset', scenarioAssetId: child.id };
+  if (mode !== 'recovery-current') video.project = { ...video.project, assets: [], clips: [] };
+  video.history = {
+    version: 1,
+    epoch: 'epoch',
+    past: mode === 'recovery-current' ? [] : [{ assetId: 'inverse' }],
+    future: [],
+    ...(mode === 'recovery-current' ? { recovery: { assetId: 'recovery' } } : {}),
+    sources:
+      mode === 'historical-child'
+        ? [{ kind: 'scenario-asset', id: child.id }]
+        : mode === 'historical-root'
+          ? [{ kind: 'scenario-project', id: project.id }]
+          : [],
+  };
+  getStore('video_projects').set(video.id, video);
+  const names = [
+    'scenario_projects',
+    'scenario_project_history',
+    'scenario_project_units',
+    'scenario_project_revisions',
+    'scenario_assets',
+    'asset_owners',
+    'asset_refs',
+    'video_projects',
+    'project_assets',
+    'media_library',
+    'asset_operations',
+  ];
+  const before = names.map((name) => structuredClone(getStore(name)));
+  const run =
+    operation === 'parent-delete'
+      ? deleteScenarioAggregate(project.id)
+      : operation === 'prune'
+        ? pruneScenarioResources(project.id)
+        : commitScenarioAggregateMutation(project, { children: { assetDeletes: [child.id] } });
+  await expect(run).rejects.toMatchObject({
+    name: 'MediaAssetDeletionBlockedError',
+    reason: 'retained-history',
+  });
+  expect(names.map(getStore)).toEqual(before);
+  expect(completePhysicalDeleteOperation).not.toHaveBeenCalled();
+});
+
 it('retains an external montage snapshot when its scenario is replaced from an archive', async () => {
   const { createVideoProjectEntryWithMediaClip } = await import('../projects/index.test-support');
   const { putScenarioProjectBackupRestore } = await import('./backup-restore');
@@ -80,6 +138,7 @@ function getStoreNames() {
   return [
     'sync_capture',
     'scenario_projects',
+    'scenario_project_revisions',
     'scenario_assets',
     'scenario_exports',
     'scenario_step_editor_documents',
@@ -183,7 +242,7 @@ it.each(['guide', 'tour'] as const)(
     });
     const entry = retainHtml(project.id, mode);
     getStore('scenario_exports').set('legacy', { ...entry, id: 'legacy', html: undefined });
-    await deleteScenarioAggregate(project.id);
+    await expect(deleteScenarioAggregate(project.id)).resolves.toEqual(['scenario-asset:asset-1']);
     expect(getStore('scenario_projects').size).toBe(0);
     expect(getStore('scenario_exports').size).toBe(0);
     expect(getStore('scenario_step_editor_documents').size).toBe(0);
@@ -210,6 +269,29 @@ it('uses confirmed HTML graph ownership even when legacy export metadata is inco
   expect(getStore('scenario_assets').size).toBe(0);
   expect(getStore('scenario_step_editor_documents').size).toBe(0);
   expect(getStore('asset_operations').get('delete-1')).toMatchObject({ assetIds: ['html-body'] });
+});
+
+it('returns the shared original when deleting a Scenario that borrowed its exact bytes', async () => {
+  const owner = createGuideProject('Original owner');
+  const original = createAsset(owner.id, 'shared');
+  await commitScenarioAggregateMutation(owner, { children: { assetPuts: [original] } });
+  const borrower = createGuideProject('Borrower');
+  await commitScenarioAggregateMutation(borrower, {
+    children: {
+      assetPuts: [
+        {
+          ...original,
+          id: 'borrowed',
+          projectId: borrower.id,
+          borrowedMediaId: 'scenario-asset:shared',
+          galleryAssetId: 'scenario-asset:shared',
+        },
+      ],
+    },
+  });
+  await expect(deleteScenarioAggregate(borrower.id)).resolves.toEqual(['scenario-asset:shared']);
+  expect(getStore('scenario_projects').has(owner.id)).toBe(true);
+  expect(getStore('asset_refs').get(original.assetId)).toEqual(original.assetRef);
 });
 
 it('keeps a body referenced by another catalogue owner after deleting its source root', async () => {
@@ -280,7 +362,7 @@ it('keeps durable deletion authority when physical HTML removal temporarily fail
   vi.mocked(completePhysicalDeleteOperation).mockRejectedValueOnce(
     new Error('OPFS temporarily busy')
   );
-  await expect(deleteScenarioAggregate(project.id)).resolves.toBeUndefined();
+  await expect(deleteScenarioAggregate(project.id)).resolves.toEqual([]);
   expect(getStore('scenario_projects').size).toBe(0);
   expect(getStore('scenario_exports').size).toBe(0);
   expect(getStore('asset_operations').get('delete-1')).toMatchObject({
@@ -310,9 +392,13 @@ it('retains shared editor resources while cleaning an orphaned document', async 
   expect(getStore('asset_operations').size).toBe(0);
 });
 
-it.each([true, false])(
-  'retains a scenario snapshot used by a montage with published origin=%s',
-  async (published) => {
+it.each(
+  [true, false].flatMap((published) =>
+    [false, true].map((emptyHistory) => [published, emptyHistory] as const)
+  )
+)(
+  'retains a scenario snapshot with published origin=%s and empty history=%s',
+  async (published, emptyHistory) => {
     const { createVideoProjectEntryWithMediaClip } = await import('../projects/index.test-support');
     const project = createGuideProject('Scenario snapshot owner');
     const child = { ...createAsset(project.id), galleryAssetId: 'original-image' };
@@ -327,9 +413,17 @@ it.each([true, false])(
     const video = createVideoProjectEntryWithMediaClip();
     video.project.source = { kind: 'scenario', scenarioProjectId: project.id };
     video.project.assets[0]!.source = { kind: 'scenario-asset', scenarioAssetId: child.id };
+    if (emptyHistory) {
+      video.history = { version: 1, epoch: 'epoch', past: [], future: [], sources: [] };
+      video.historyPublicationId = 'old-publication';
+    }
     getStore('video_projects').set(video.id, video);
-    await deleteScenarioAggregate(project.id);
+    await expect(deleteScenarioAggregate(project.id)).resolves.toEqual(['original-image']);
     const saved = getStore('video_projects').get(video.id) as typeof video;
+    if (emptyHistory) {
+      expect(saved.history).toEqual(video.history);
+      expect(saved).not.toHaveProperty('historyPublicationId');
+    }
     expect(saved.project.source).toEqual({ kind: 'manual' });
     expect(saved.project.assets[0]!.source.kind).toBe('project-asset');
     const source = saved.project.assets[0]!.source;

@@ -52,7 +52,6 @@ export function renderCompactWorkspaceDefaultAction(params: InspectorCommandPara
 export function CompactWorkspaceColorPanel({ params }: { params: InspectorCommandParams }) {
   return (
     <InspectorParameterRow
-      keepInline
       label={translate('editor.compact.workspaceBacking')}
       className="!grid-cols-[minmax(0,1fr)_auto]"
       dataUi="editor.workspace.background-default-row"

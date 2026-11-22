@@ -556,16 +556,6 @@
   min-height: 0;
   min-width: 0;
 }
-.guide-library-search {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.guide-library-search input {
-  min-width: 0;
-  flex: 1;
-}
 .guide-import-file-action {
   position: relative;
   display: flex;
@@ -1203,12 +1193,6 @@
 .guide-resource-drawer-close > svg,
 .guide-resource-drawer-close > button {
   flex: none;
-}
-.guide-library-search > label:not(.sr-only) {
-  width: 100%;
-}
-.guide-library-search input:focus::placeholder {
-  color: transparent;
 }
 .guide-resource-drawer-body {
   flex: 1;
@@ -2470,8 +2454,6 @@ html[data-guide-height-resizing] * {
 /* Scenario chrome adopts compact roles independently from authored document content. */
 .sniptale-scenario-workspace .guide-page-header .sniptale-glass-toolbar-button,
 .sniptale-scenario-workspace .guide-page-header .sniptale-glass-toolbar-button span,
-.sniptale-scenario-workspace .guide-project-name input,
-.sniptale-scenario-workspace .guide-project-name-measure,
 .sniptale-scenario-workspace .guide-outline a,
 .sniptale-scenario-workspace .guide-outline a[aria-current],
 .sniptale-scenario-workspace .guide-outline .guide-outline-section,
@@ -2584,7 +2566,13 @@ html[data-guide-height-resizing] * {
 }
 
 .sniptale-scenario-workspace .guide-project-name {
-  min-width: calc(4ch + 70px);
+  font: 500 13px / 18px var(--sniptale-font-document-sans);
+  /* Keep eight digits visible with both field accessories present. */
+  min-width: calc(8ch + 78px);
+}
+.sniptale-scenario-workspace .guide-project-name input,
+.sniptale-scenario-workspace .guide-project-name-measure {
+  font: inherit;
 }
 .sniptale-scenario-workspace .guide-project-name-measure {
   padding-inline-end: 8px;
@@ -2600,12 +2588,6 @@ html[data-guide-height-resizing] * {
 .sniptale-scenario-workspace .guide-voice-field:is(:hover, :focus-within) > .sniptale-field-clear {
   opacity: 1;
   pointer-events: auto;
-}
-
-.sniptale-scenario-workspace .guide-project-name input,
-.sniptale-scenario-workspace .guide-project-name-measure,
-.sniptale-scenario-workspace .guide-ai-prompt-input textarea {
-  font-family: var(--sniptale-font-document-sans);
 }
 
 /* Hidden field accessories do not reserve editable text width. */
@@ -2641,7 +2623,7 @@ html[data-guide-height-resizing] * {
 
 /* The complete field owns hover, including the path to its accessories. */
 .sniptale-scenario-workspace
-  .guide-voice-field:is(:hover, :focus-within)
+  .guide-voice-field:is(:hover, :focus-within):not(.guide-ai-prompt-input > .guide-voice-field)
   > :is(input, textarea):not(:disabled) {
   border-color: var(--sniptale-color-border-soft);
   background: var(--sniptale-color-surface-input);

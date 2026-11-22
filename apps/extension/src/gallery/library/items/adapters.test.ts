@@ -1,11 +1,26 @@
-import { createScenarioItem } from '../test-support/items';
+import {
+  createImageProjectItem,
+  createMediaItem,
+  createScenarioItem,
+  createVideoProjectItem,
+} from '../test-support/items';
 import { expect, it } from 'vitest';
 import {
   createGalleryItems,
   createRemoteRootGalleryItem,
   createScenarioExportGalleryItem,
 } from './adapters';
-import { isGalleryMediaItem, isGallerySelectableItem, isGalleryVideoProjectItem } from './types';
+import {
+  canOpenGalleryProject,
+  isGalleryMediaItem,
+  isGalleryQuickEditProjectItem,
+  isGalleryScenarioExportItem,
+  isGalleryScenarioItem,
+  isGallerySelectableItem,
+  isGalleryVideoProjectAvailable,
+  isGalleryVideoProjectItem,
+  usesGalleryImagePresentation,
+} from './types';
 import { createLibraryLifecycle } from '../../../composition/persistence/library-lifecycle';
 import type { MediaLibraryItem } from '../../../composition/persistence/media-library/contracts';
 
@@ -32,6 +47,104 @@ function createMediaLibraryItem(overrides: Partial<MediaLibraryItem> = {}): Medi
   };
 }
 
+it('presents two saved image projects and one original as independent cards', () => {
+  const original = createMediaLibraryItem();
+  const items = createGalleryItems({
+    mediaItems: [original],
+    imageProjects: ['one', 'two'].map((id) => ({
+      aggregateId: id,
+      sourceMediaId: original.id,
+      name: `Edit ${id}`,
+      lifecycle: createLibraryLifecycle('library', 12),
+      createdAt: 12,
+      updatedAt: 12,
+      revision: 2,
+      width: 144,
+      height: 80,
+    })),
+    presentations: [
+      {
+        aggregateId: 'one',
+        aggregateKind: 'image',
+        presentationRevision: 2,
+        thumbnailBlob: new Blob(['preview']),
+        updatedAt: 13,
+      },
+    ],
+    scenarioProjects: [],
+    scenarioExportsByProjectId: new Map(),
+    thumbnailIds: new Set(),
+    videoProjects: [],
+  });
+  expect(items).toEqual([
+    expect.objectContaining({
+      id: 'image-project:one',
+      entityId: 'one',
+      type: 'image-project',
+      hasThumbnail: true,
+    }),
+    expect.objectContaining({
+      id: 'image-project:two',
+      entityId: 'two',
+      type: 'image-project',
+      hasThumbnail: false,
+    }),
+    expect.objectContaining({ id: original.id, type: 'media', hasThumbnail: false }),
+  ]);
+  expect(items.every(isGallerySelectableItem)).toBe(true);
+});
+
+it.each([{ kind: 'screenshot' }, { kind: 'stored-asset', assetId: 'asset-1' }] as const)(
+  'exposes thumbnail and Save Copy eligibility for an original with $kind storage',
+  (source) => {
+    const [item] = createGalleryItems({
+      mediaItems: [createMediaLibraryItem({ source, imageContentState: 'original' })],
+      scenarioProjects: [],
+      scenarioExportsByProjectId: new Map(),
+      thumbnailIds: new Set(),
+      videoProjects: [],
+    });
+    if (!item || !isGalleryMediaItem(item)) throw new Error('Missing Gallery original.');
+    expect(item).toMatchObject({ id: 'asset-1', hasThumbnail: true, presentationRevision: null });
+    expect(usesGalleryImagePresentation(item)).toBe(true);
+  }
+);
+
+it('requires a presentation for edited stored images and excludes other media', () => {
+  const image = createMediaItem({
+    imageContentState: 'edited',
+    source: { kind: 'stored-asset', assetId: 'edited-object' },
+  });
+  expect(usesGalleryImagePresentation(image)).toBe(false);
+  expect(usesGalleryImagePresentation({ ...image, presentationRevision: 0 })).toBe(true);
+  expect(usesGalleryImagePresentation(createMediaItem({ kind: 'recording' }))).toBe(false);
+});
+
+it('preserves project action admission across originals and their editors', () => {
+  const image = createImageProjectItem();
+  const video = createVideoProjectItem();
+  const scenario = createScenarioItem();
+
+  expect(canOpenGalleryProject(image)).toBe(true);
+  expect(canOpenGalleryProject({ ...image, sourceAvailable: false })).toBe(false);
+  expect(
+    canOpenGalleryProject({
+      ...image,
+      lifecycle: { ...image.project.lifecycle, trashedAt: 12 },
+    })
+  ).toBe(false);
+  expect(canOpenGalleryProject(scenario)).toBe(true);
+  expect(
+    canOpenGalleryProject({
+      ...scenario,
+      project: { ...scenario.project, availability: 'invalid' as const },
+    })
+  ).toBe(false);
+  expect(canOpenGalleryProject(video)).toBe(true);
+  expect(isGalleryVideoProjectAvailable(video)).toBe(true);
+  expect(canOpenGalleryProject(createMediaItem())).toBe(false);
+});
+
 it('keeps stored scenario images on the media thumbnail path without an aggregate revision', () => {
   const [item] = createGalleryItems({
     mediaItems: [
@@ -50,6 +163,32 @@ it('keeps stored scenario images on the media thumbnail path without an aggregat
 
   expect(item?.hasThumbnail).toBe(true);
   expect(item?.presentationRevision).toBeUndefined();
+});
+
+it('keeps an edited image presentation after its original moves to durable asset storage', () => {
+  const [item] = createGalleryItems({
+    mediaItems: [
+      createMediaLibraryItem({
+        source: { kind: 'stored-asset', assetId: 'original-bytes' },
+        imageContentState: 'edited',
+        workspaceRevision: 3,
+      }),
+    ],
+    presentations: [
+      {
+        aggregateId: 'asset-1',
+        aggregateKind: 'image',
+        updatedAt: 10,
+        presentationRevision: 3,
+        thumbnailBlob: new Blob(['edited']),
+      },
+    ],
+    scenarioProjects: [],
+    scenarioExportsByProjectId: new Map(),
+    thumbnailIds: new Set(),
+    videoProjects: [],
+  });
+  expect(item).toMatchObject({ id: 'asset-1', presentationRevision: 3, hasThumbnail: true });
 });
 
 it('reconstructs each saved export under its own source project after a library reload', () => {
@@ -139,6 +278,9 @@ it('creates a mixed gallery list with scenario and export items sorted by freshn
 });
 
 function expectMixedGalleryItems(items: ReturnType<typeof createGalleryItems>): void {
+  expect(isGalleryScenarioExportItem(items[0]!)).toBe(true);
+  expect(isGalleryScenarioItem(items[1]!)).toBe(true);
+  expect(items.every(isGallerySelectableItem)).toBe(true);
   expect(items[0]).toMatchObject({
     filename: 'scenario.html',
     hasThumbnail: true,
@@ -414,6 +556,7 @@ it('puts quick-edit in the shared project folder with a distinct stable identity
     size: 0,
   });
   expect(isGallerySelectableItem(items[0]!)).toBe(true);
+  expect(isGalleryQuickEditProjectItem(items[0]!)).toBe(true);
   expect(createGalleryItems(args)).toEqual(items);
   expect(createGalleryItems({ ...args, quickEditProjects: [] })).toHaveLength(1);
 });
@@ -447,4 +590,11 @@ it('keeps remote cards separate from native identities and local batch admission
   expect(item).not.toHaveProperty('project');
   expect(isGalleryMediaItem(item)).toBe(false);
   expect(isGallerySelectableItem(item)).toBe(false);
+  expect(canOpenGalleryProject(item)).toBe(true);
+  expect(
+    canOpenGalleryProject({
+      ...item,
+      remote: { ...item.remote, unavailable: true },
+    })
+  ).toBe(false);
 });

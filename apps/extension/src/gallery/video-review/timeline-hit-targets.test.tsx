@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createReviewCommandFixture } from './editor-fixture.test-support';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -10,6 +11,7 @@ import { ReviewAnnotationEffectsTrack } from './annotation-effects-track';
 
 function ActualTextLane({ selected }: { selected(id: string): void }) {
   const editor = useReviewText({
+    commands: createReviewCommandFixture(() => ({ duration: 4, time: 0 })),
     document: {
       version: 1,
       fragments: [

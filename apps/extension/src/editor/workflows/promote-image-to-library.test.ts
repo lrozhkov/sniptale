@@ -37,6 +37,7 @@ it('saves, commits presentation, and promotes in durable revision order', async 
         serialize();
       },
       getDurableRevision: () => 4,
+      getSourceGeneration: () => 'opened-generation',
       renderPresentation: async () => 'data:image/png;base64,YQ==',
       serializeDocument,
     },
@@ -45,9 +46,13 @@ it('saves, commits presentation, and promotes in durable revision order', async 
   expect(order).toEqual(['flush', 'commit', 'promote']);
   expect(serializeDocument).toHaveBeenCalledOnce();
   expect(mocks.commit).toHaveBeenCalledWith(
-    expect.objectContaining({ aggregateId: 'image-1', expectedWorkspaceRevision: 4 })
+    expect.objectContaining({
+      aggregateId: 'image-1',
+      expectedWorkspaceRevision: 4,
+      expectedGeneration: 'opened-generation',
+    })
   );
-  expect(mocks.promote).toHaveBeenCalledWith('image-1', 4);
+  expect(mocks.promote).toHaveBeenCalledWith('image-1', 4, 'opened-generation');
 });
 
 it('stops before presentation and promotion when no durable revision exists', async () => {
@@ -57,6 +62,7 @@ it('stops before presentation and promotion when no durable revision exists', as
       port: {
         saveNow: vi.fn(async () => undefined),
         getDurableRevision: () => null,
+        getSourceGeneration: () => null,
         renderPresentation: vi.fn(async () => 'data:image/png;base64,YQ=='),
         serializeDocument: vi.fn(createEditorDocumentFixture),
       },
@@ -65,6 +71,33 @@ it('stops before presentation and promotion when no durable revision exists', as
 
   expect(mocks.commit).not.toHaveBeenCalled();
   expect(mocks.promote).not.toHaveBeenCalled();
+});
+
+it('pins the observed generation before asynchronous presentation rendering', async () => {
+  let generation = 'opened';
+  const entered = Promise.withResolvers<void>();
+  const rendered = Promise.withResolvers<string>();
+  const operation = promoteEditorImageToLibrary({
+    aggregateId: 'image-1',
+    port: {
+      saveNow: async () => undefined,
+      getDurableRevision: () => 4,
+      getSourceGeneration: () => generation,
+      serializeDocument: createEditorDocumentFixture,
+      renderPresentation: () => {
+        entered.resolve();
+        return rendered.promise;
+      },
+    },
+  });
+  await entered.promise;
+  generation = 'replacement';
+  rendered.resolve('data:image/png;base64,YQ==');
+  await operation;
+  expect(mocks.commit).toHaveBeenCalledWith(
+    expect.objectContaining({ expectedGeneration: 'opened' })
+  );
+  expect(mocks.promote).toHaveBeenCalledWith('image-1', 4, 'opened');
 });
 
 it('does not promote when presentation commit fails', async () => {
@@ -76,6 +109,7 @@ it('does not promote when presentation commit fails', async () => {
       port: {
         saveNow: vi.fn(async () => undefined),
         getDurableRevision: () => 4,
+        getSourceGeneration: () => null,
         renderPresentation: vi.fn(async () => 'data:image/png;base64,YQ=='),
         serializeDocument: vi.fn(createEditorDocumentFixture),
       },

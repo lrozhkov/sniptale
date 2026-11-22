@@ -1,10 +1,40 @@
 // @vitest-environment jsdom
+import en from '../../../platform/i18n/catalogs/en.json';
+import ru from '../../../platform/i18n/catalogs/ru.json';
+import { prepareTranslations } from '../../../platform/i18n/locale/state';
+import type { AppLocale } from '@sniptale/platform/i18n/config';
 
 import React from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { hideAllToasts } from '@sniptale/ui/product-feedback/toast-service';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (language: AppLocale) => Promise.resolve(catalogFixtureMessages(language)),
+}));
+
+beforeAll(async () => {
+  await prepareTranslations('content', 'en');
+});
+
+function catalogFixtureMessages(language: AppLocale): Record<string, string> {
+  const messages: Record<string, string> = {};
+  function visit(value: unknown, prefix: string) {
+    if (typeof value === 'string') {
+      messages[prefix] = value;
+      return;
+    }
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+      throw new Error('Invalid authored catalog fixture');
+    }
+    for (const [key, child] of Object.entries(value)) {
+      visit(child, prefix ? `${prefix}.${key}` : key);
+    }
+  }
+  visit({ en, ru }[language], '');
+  return messages;
+}
+
 import type { HighlighterSettings } from '../../../features/highlighter/contracts';
 
 const loggerMocks = vi.hoisted(() => ({
@@ -364,7 +394,7 @@ describe('FrameSettingsPopover effect parameter composition', () => {
       if (effectMode === 'blur') {
         expect(
           popover
-            .querySelector('[role="group"][aria-label="Тип размытия"]')
+            .querySelector('[role="group"][aria-label="Blur type"]')
             ?.closest('.sniptale-content-popover-section')
         ).toBe(section);
       }

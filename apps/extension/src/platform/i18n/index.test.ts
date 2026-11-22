@@ -1,17 +1,34 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+
+import { catalogFixtureMessages } from './catalog-fixture.test-support';
+import { loadCatalogMessages } from './catalog-transport';
+
+vi.mock('./catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: AppLocale) => catalogFixtureMessages(locale)),
+}));
 
 import {
   DEFAULT_LOCALE,
   SUPPORTED_LOCALES,
   createTranslator,
   formatNumber,
-  getDictionary,
+  prepareTranslations,
   translate,
   type AppLocale,
   type TranslationKey,
 } from './index';
 
+beforeAll(async () => {
+  await prepareTranslations('design-system', 'ru');
+});
+
 describe('i18n runtime contract', () => {
+  it('prepares the selected language and English fallback before synchronous lookup', () => {
+    expect(vi.mocked(loadCatalogMessages).mock.calls).toEqual([
+      ['en', 'design-system'],
+      ['ru', 'design-system'],
+    ]);
+  });
   it.each([
     ['clearPagePreparation', 'Сбросить всё', 'Reset all'],
     ['clearDrawings', 'Очистить рисунки', 'Clear drawings'],
@@ -59,11 +76,9 @@ describe('i18n runtime contract', () => {
     );
   });
 
-  it('falls back to the default locale dictionary for unsupported locale ids', () => {
-    const dictionary = getDictionary('fr' as AppLocale);
-
-    expect(dictionary.common.actions.cancel).toBe('Отмена');
-    expect(DEFAULT_LOCALE).toBe('ru');
+  it('uses the prepared English fallback for unsupported locale ids', () => {
+    expect(createTranslator('fr' as AppLocale)('common.actions.cancel')).toBe('Cancel');
+    expect(DEFAULT_LOCALE).toBe('en');
   });
 
   it('derives locale registry metadata for supported locales and Intl formatting', () => {

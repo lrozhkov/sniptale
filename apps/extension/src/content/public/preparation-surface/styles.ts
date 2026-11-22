@@ -1,6 +1,10 @@
 import inspectorDisclosureStyles from '../../../ui/compact-inspector-controls/disclosure.css?inline';
 import inspectorSurfaceStyles from '../../../ui/compact-inspector-controls/inspector-surface.css?inline';
+import inspectorNumericStyles from '../../../ui/compact-inspector-controls/inspector-numeric-fields.css?inline';
+import inspectorSelectStyles from '../../../ui/compact-inspector-controls/inspector-select.css?inline';
+import inspectorColorStyles from '../../../ui/color-selector/inspector-color-value.css?inline';
 import colorPickerStyles from '../../../ui/color-selector/picker.css?inline';
+import paintTriggerStyles from '../../../ui/paint-selector/trigger.css?inline';
 import baseStyles from '@sniptale/ui/styles?inline';
 import aiModalStyles from '@sniptale/ui/styles/ai-modal?inline';
 import glassStyles from '@sniptale/ui/styles/glass?inline';
@@ -291,8 +295,12 @@ export function createContentEntrypointStyles(): string {
       [
         contentHostStyles,
         inspectorSurfaceStyles,
+        inspectorNumericStyles,
+        inspectorSelectStyles,
+        inspectorColorStyles,
         inspectorDisclosureStyles,
         colorPickerStyles,
+        paintTriggerStyles,
         baseStyles,
         aiModalStyles,
         glassStyles,

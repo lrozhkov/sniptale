@@ -4,7 +4,7 @@ import type { CompactInspectorUnit } from '../../../ui/compact-inspector-control
 
 /**
  * Tour inspector numeric rows use the camera-settings pattern: a plain single-line
- * row with a hover scrub and a local preview that commits only normalized values.
+ * row with a contextual range or exact step and a local preview.
  */
 export function TourInspectorNumericRow({
   label,
@@ -15,6 +15,7 @@ export function TourInspectorNumericRow({
   unit,
   precision = 0,
   scrub,
+  rangePresentation,
   disabled,
   onPreview,
   onChange,
@@ -26,7 +27,8 @@ export function TourInspectorNumericRow({
   step?: number;
   unit?: CompactInspectorUnit;
   precision?: number;
-  scrub?: { min: number; max: number; step?: number };
+  scrub?: { min: number; max: number; step?: number } | false;
+  rangePresentation?: 'field';
   disabled: boolean;
   onPreview?: (value: number) => void;
   onChange: (value: number) => void;
@@ -42,12 +44,18 @@ export function TourInspectorNumericRow({
       step={step}
       unit={unit}
       precision={precision}
-      scrub={scrub ?? { min, max, step }}
+      scrub={rangePresentation === 'field' ? { min, max, step } : scrub || undefined}
+      rangePresentation={rangePresentation}
+      keyboardStep={!scrub}
       disabled={disabled}
       focusAppearance="accent-box"
       onPreviewValue={(value) => {
         setPreview(value);
         onPreview?.(value);
+      }}
+      onCancelValue={(origin) => {
+        setPreview(null);
+        if (origin !== null) onPreview?.(origin);
       }}
       onCommitValue={(value) => {
         setPreview(null);

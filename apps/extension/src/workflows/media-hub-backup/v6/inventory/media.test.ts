@@ -1,3 +1,13 @@
+import {
+  encodeEditorImageHistorySnapshot,
+  IMAGE_HISTORY_VALUE_TOKEN_PREFIX,
+} from '../../../../features/editor-history/image-snapshot';
+import type { EditorImageHistoryValue } from '../../../../features/editor-history/image-checkpoint';
+import type { PersistedImageHistory } from '../../../../composition/persistence/image-workspaces/history-contracts';
+import type { AssetRef } from '../../../../composition/persistence/assets';
+import { exportMediaHubBackupV6, buildMediaHubBackupExportPlanV6 } from '../export';
+import { inspectMediaHubBackupV6 } from '../inspect';
+import { createArchiveMemorySink } from '../../../../composition/archive-transfer/test-support';
 import { putRecordingBackupRestore } from '../../../../composition/persistence/recordings/backup-restore';
 import { assertPortableJson, parseRootEnvelope } from '../codec';
 import { parsePortableMediaMetadata } from '../root-codecs/media';
@@ -15,6 +25,7 @@ vi.mock('../../../../features/web-snapshot/provenance', async (importOriginal) =
 }));
 
 import { createPersistedEditorDocumentFixture } from '../../../../composition/persistence/document-assets/test-support';
+import { createLibraryLifecycle } from '../../../../composition/persistence/library-lifecycle/contracts';
 import { createEditorDocumentFixture } from '../../../../editor/document/page-session/document.test-support';
 import type {
   MediaLibraryEntry,
@@ -69,6 +80,141 @@ function ref(assetId: string) {
     size: 6,
   };
 }
+
+it.each(['screenshot', 'project-asset', 'different-project-bytes', 'temporary-original'] as const)(
+  'archives independent Image projects and validates the exact retained original (%s)',
+  async (sourceKind) => {
+    const projectAsset =
+      sourceKind === 'project-asset'
+        ? {
+            id: 'original',
+            assetId: 'original-bytes',
+            createdAt: 1,
+            mimeType: 'image/png',
+            size: 5,
+          }
+        : null;
+    const original = mediaEntry({
+      id: projectAsset ? 'project-asset:original' : 'original',
+      ...(projectAsset
+        ? {
+            kind: 'image',
+            source: { kind: 'project-asset', projectAssetId: projectAsset.id },
+          }
+        : {}),
+      lifecycle: createLibraryLifecycle('library', 1),
+      savedIndependently: false,
+      originalSaveId: crypto.randomUUID(),
+    });
+    const unattached = mediaEntry({
+      id: 'unattached',
+      lifecycle: createLibraryLifecycle('library', 1),
+      savedIndependently: false,
+    });
+    const imageProjects = ['first', 'second'].map((id) => ({
+      aggregateId: id,
+      sourceMediaId: original.id,
+      createdAt: 1,
+      updatedAt: 2,
+      revision: 1,
+      sourceTitle: null,
+      sourceUrl: null,
+      document: {
+        ...createPersistedEditorDocumentFixture(createEditorDocumentFixture()),
+        displayName: id,
+      },
+      lifecycle: createLibraryLifecycle('library', 1),
+    }));
+    const workspaces = new Map(imageProjects.map((project) => [project.aggregateId, project]));
+    mocks.readFile.mockImplementation(
+      async (_ref, filename) => new File(['image'], filename, { type: 'image/png' })
+    );
+    const db = {
+      transaction: emptyReviewTransaction,
+      get: async (store: string, id: string) => {
+        if (store === 'media_library') return id === original.id ? original : unattached;
+        if (store === 'project_assets' && id === projectAsset?.id) return projectAsset;
+        if (store === 'image_workspaces') return workspaces.get(id);
+        if (store === 'asset_refs') return { ...ref(id), size: 5 };
+        return undefined;
+      },
+    };
+    const options = createMediaHubBackupExportOptions({ scope: 'all' });
+    const roots = await buildMediaRootInventory({
+      db,
+      items: [item(original), item(unattached)],
+      options,
+      paths: createArchivePathAllocator(),
+      imageProjects,
+      includeLibraryRelationships: true,
+      requiredMediaIds: new Set([original.id]),
+    });
+    expect(roots.map((root) => root.descriptor.rootId)).toEqual([original.id, 'first', 'second']);
+    const metadata = await Promise.all(
+      roots.map(async (root) =>
+        parsePortableMediaMetadata((await root.load()).metadata, {
+          allowLibraryRelationships: true,
+        })
+      )
+    );
+    expect(metadata[0]).toMatchObject({ savedIndependently: false });
+    expect(metadata[0]?.entry).not.toHaveProperty('originalSaveId');
+    expect(metadata.slice(1).map((project) => project.linkedSourceMediaId)).toEqual([
+      original.id,
+      original.id,
+    ]);
+    if (sourceKind === 'different-project-bytes') {
+      const project = roots[1]!;
+      const payload = await project.load();
+      roots[1] = {
+        ...project,
+        load: async () => ({
+          metadata: payload.metadata,
+          objects: payload.objects.map((object) =>
+            object.ref.objectId === metadata[1]?.originalObjectId
+              ? { ref: object.ref, blob: new Blob(['other'], { type: 'image/png' }) }
+              : object
+          ),
+        }),
+      };
+    }
+    if (sourceKind === 'temporary-original') {
+      const source = roots[0]!;
+      const payload = await source.load();
+      const temporary = {
+        ...metadata[0]!,
+        entry: { ...metadata[0]!.entry, lifecycle: createLibraryLifecycle('temporary', 1) },
+      };
+      assertPortableJson(temporary);
+      roots[0] = { ...source, load: async () => ({ ...payload, metadata: temporary }) };
+    }
+    const memory = createArchiveMemorySink();
+    await exportMediaHubBackupV6({
+      plan: buildMediaHubBackupExportPlanV6({
+        layout: 'library-folders-v3',
+        privacy: { includeSourceMetadata: true, includeTelemetry: true, includeWebSnapshots: true },
+        roots,
+      }),
+      sink: memory.sink,
+    });
+    const admitted = inspectMediaHubBackupV6(memory.blob());
+    if (sourceKind === 'different-project-bytes') {
+      await expect(admitted).rejects.toThrow('different original bytes');
+      return;
+    }
+    if (sourceKind === 'temporary-original') {
+      await expect(admitted).rejects.toThrow(
+        'Archived project original must be saved in the Library'
+      );
+      return;
+    }
+    const inspection = await admitted;
+    expect(inspection.manifest.layout).toBe('library-folders-v7');
+    expect(
+      inspection.manifest.sharedObjects?.filter(({ mimeType }) => mimeType === 'image/png')
+    ).toHaveLength(1);
+  }
+);
 
 it.each([true, false])(
   'backs up selected export without parent, explicit MIME=%s',
@@ -517,26 +663,57 @@ function archivedReviewInventoryFixture() {
     transaction: vi.fn(() => ({
       done: Promise.resolve(),
       objectStore: (store: string) => ({
-        get: async () =>
-          store === 'video_workspaces' ? snapshot.workspace : (snapshot.draft ?? undefined),
+        get: async (id: string) =>
+          id !== aggregateId
+            ? undefined
+            : store === 'video_workspaces'
+              ? snapshot.workspace
+              : (snapshot.draft ?? undefined),
         index: () => ({ getAll: async () => [] }),
       }),
     })),
   };
-  const inventory = (expectedReview: VideoWorkspaceSnapshot = snapshot) =>
+  const inventory = (expectedReview: VideoWorkspaceSnapshot = snapshot, linked = false) =>
     buildMediaRootInventory({
       db,
       items: [item(source)],
       reviewWorkspaceHeads: [{ aggregateId, sourceMediaId: source.id }],
       expectedReview,
+      ...(linked ? { includeLibraryRelationships: true } : {}),
       options: createMediaHubBackupExportOptions({
         scope: 'selected',
-        selected: { mediaAssetIds: [aggregateId], videoProjectIds: [], scenarioProjectIds: [] },
+        selected: {
+          mediaAssetIds: linked ? [source.id, aggregateId] : [aggregateId],
+          videoProjectIds: [],
+          scenarioProjectIds: [],
+        },
       }),
       paths: createArchivePathAllocator(),
     });
   return { snapshot, source, aggregateId, db, inventory };
 }
+
+it('keeps an archived Quick Edit project and its original as separate portable roots', async () => {
+  const fixture = archivedReviewInventoryFixture();
+  mocks.readFile.mockResolvedValue(new File(['video!'], 'source.webm', { type: 'video/webm' }));
+  const roots = await fixture.inventory(fixture.snapshot, true);
+  expect(roots.map(({ descriptor }) => descriptor.rootId)).toEqual([
+    fixture.source.id,
+    fixture.aggregateId,
+  ]);
+  const [source, project] = await Promise.all(
+    roots.map(async (root) =>
+      parsePortableMediaMetadata((await root.load()).metadata, {
+        allowLibraryRelationships: true,
+      })
+    )
+  );
+  expect(source).not.toHaveProperty('videoReview');
+  expect(project).toMatchObject({
+    linkedSourceMediaId: fixture.source.id,
+    videoReview: { workspace: { project: { name: 'Independent saved review' } } },
+  });
+});
 
 it('reads archived review and recovery from the supplied database without a native alias row', async () => {
   const fixture = archivedReviewInventoryFixture();
@@ -655,4 +832,158 @@ it('shares media export eligibility with metadata-only Library preparation witho
     )
   ).toBe(false);
   expect(mocks.readFile.mock.calls.length).toBe(before);
+});
+
+it('exports Image past/current/future with portable IDs, shared bitmaps and historical privacy', async () => {
+  const source = 'data:image/png;base64,' + 'QUJD'.repeat(2100);
+  const base = { ...createEditorDocumentFixture(), sourceImageData: source };
+  const units: EditorImageHistoryValue[] = [];
+  const ids = new Map<string, string>();
+  const documents = [0, 1, 2].map((index) => ({
+    ...base,
+    displayName: `Caption ${index}`,
+    frame: {
+      ...base.frame,
+      browserTitle: 'Private past title',
+      browserUrl: 'https://private.test/path?token=secret',
+    },
+  }));
+  const files = new Map<string, Blob>();
+  const snapshots = documents.map((document, index) => {
+    const value = encodeEditorImageHistorySnapshot(
+      document,
+      {
+        intern(value, kind) {
+          const found = ids.get(value);
+          if (found) return found;
+          const id = IMAGE_HISTORY_VALUE_TOKEN_PREFIX + ids.size;
+          ids.set(value, id);
+          units.push({ id, kind, value });
+          return id;
+        },
+      },
+      new Set()
+    );
+    const assetId = `snapshot-${index}`;
+    files.set(assetId, new Blob([value], { type: 'application/json' }));
+    return { assetId };
+  });
+  const values = units.map((unit): PersistedImageHistory['values'][number] => {
+    const assetId = unit.kind === 'image' ? 'shared-source' : `unit-${unit.id}`;
+    if (unit.kind === 'json') {
+      files.set(assetId, new Blob([unit.value], { type: 'application/json' }));
+      return { id: unit.id, kind: 'json', assetId };
+    }
+    files.set(
+      assetId,
+      new Blob(
+        [
+          Uint8Array.from(atob(unit.value.slice(unit.value.indexOf(',') + 1)), (character) =>
+            character.charCodeAt(0)
+          ),
+        ],
+        { type: 'image/png' }
+      )
+    );
+    return {
+      id: unit.id,
+      kind: 'image',
+      assetId,
+      dataUrl: { header: 'data:image/png;base64,', lastCharacter: 'D', padding: 0 },
+    };
+  });
+  const history: PersistedImageHistory = {
+    version: 1,
+    epoch: 'archive-history',
+    cursor: 1,
+    snapshots,
+    values,
+    actions: [null, { operation: 'rename', target: null }, { operation: 'rename', target: null }],
+  };
+  const refs = new Map<string, AssetRef>(
+    [...files].map(([assetId, file]) => [
+      assetId,
+      {
+        assetId,
+        createdAt: 1,
+        mimeType: file.type,
+        size: file.size,
+        sha256: null,
+        location: { kind: 'opfs', objectKey: `objects/${assetId}` },
+      },
+    ])
+  );
+  const entry = mediaEntry({
+    blob: files.get('shared-source')!,
+    size: files.get('shared-source')!.size,
+  });
+  const workspace = {
+    aggregateId: entry.id,
+    createdAt: 1,
+    updatedAt: 1,
+    revision: 1,
+    document: {
+      ...createPersistedEditorDocumentFixture(documents[1]!, 'shared-source'),
+      displayName: documents[1]!.displayName,
+    },
+    history,
+    publicationId: 'native-only-receipt',
+    sourceTitle: null,
+    sourceUrl: null,
+  };
+  mocks.readFile.mockClear();
+  mocks.readFile.mockImplementation(async (ref: AssetRef, name: string) => {
+    const file = files.get(ref.assetId);
+    if (!file) throw new Error('Missing test resource');
+    return new File([file], name, { type: file.type });
+  });
+  const roots = await buildMediaRootInventory({
+    db: {
+      transaction: emptyReviewTransaction,
+      get: async (store: string, id: unknown) =>
+        store === 'media_library'
+          ? entry
+          : store === 'image_workspaces'
+            ? workspace
+            : store === 'asset_refs' && typeof id === 'string'
+              ? refs.get(id)
+              : undefined,
+    },
+    items: [item(entry)],
+    options: createMediaHubBackupExportOptions({ includeSourceMetadata: false }),
+    paths: createArchivePathAllocator(),
+  });
+  const payload = await roots[0]!.load();
+  const portable = parsePortableMediaMetadata(payload.metadata);
+  expect(portable.workspace?.history).toMatchObject({
+    epoch: 'archive-history',
+    cursor: 1,
+    snapshots: expect.any(Array),
+  });
+  expect(portable.workspace?.history?.snapshots).toHaveLength(3);
+  expect(JSON.stringify(portable.workspace)).not.toContain('assetId');
+  expect(JSON.stringify(portable.workspace)).not.toContain('native-only-receipt');
+  expect(portable.workspace?.history?.values[0]?.objectId).toBe(
+    portable.workspace?.document.sourceImage.objectId
+  );
+  expect(mocks.readFile.mock.calls.filter(([ref]) => ref.assetId === 'shared-source')).toHaveLength(
+    1
+  );
+  for (const object of payload.objects)
+    if (object.blob?.type === 'application/json') {
+      const text = await object.blob.text();
+      expect(text).not.toContain('Private past title');
+      expect(text).not.toContain('private.test');
+    }
+  const memory = createArchiveMemorySink();
+  const plan = buildMediaHubBackupExportPlanV6({
+    layout: 'library-folders-v3',
+    roots,
+    privacy: { includeSourceMetadata: false, includeTelemetry: true, includeWebSnapshots: true },
+  });
+  await exportMediaHubBackupV6({ plan, sink: memory.sink });
+  const inspected = await inspectMediaHubBackupV6(
+    new File([memory.blob()], 'history.zip', { type: 'application/zip' })
+  );
+  expect(inspected.manifest.layout).toBe('library-folders-v6');
 });

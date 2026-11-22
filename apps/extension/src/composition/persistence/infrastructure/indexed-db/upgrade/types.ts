@@ -12,10 +12,14 @@ interface UpgradeCursor {
 type UpgradeObjectStore = {
   readonly indexNames?: { contains(name: string): boolean };
   openCursor?(): Promise<UpgradeCursor | null>;
-  index?(name: string): { getAll(query: IDBValidKey): Promise<unknown[]> };
+  index?(name: string): {
+    getAll(query: IDBValidKey): Promise<unknown[]>;
+    getKey?(query: IDBValidKey): Promise<IDBValidKey | undefined>;
+  };
   createIndex?: (name: string, keyPath: string | string[], options?: IDBIndexParameters) => unknown;
   clear(): unknown;
   delete(key: IDBValidKey): unknown;
+  get?(key: IDBValidKey): Promise<unknown>;
   getAll(): unknown;
   put(value: unknown): unknown;
 };

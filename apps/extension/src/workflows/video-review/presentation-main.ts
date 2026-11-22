@@ -385,7 +385,7 @@ class PresentationMain {
       this.transitionFrames = createReviewTransitionFrames(this.transitionSink!, signal);
       this.transitionPlan = blend.plan;
     }
-    const cameraFrames = this.camera?.sourceFrames([this.sourceTime]);
+    const cameraFrames = this.camera?.sourceFrames([this.sourceTime], [this.resultTime]);
     let source: Awaited<ReturnType<SampleSink['getSample']>> = null;
     let raw: VideoFrame | undefined;
     let prepared: Awaited<ReturnType<Renderer['prepare']>> | undefined;

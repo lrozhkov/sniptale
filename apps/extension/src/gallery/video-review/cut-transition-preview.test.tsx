@@ -370,6 +370,31 @@ it('provides result-clock endpoints without creating hybrid canvases or requesti
   expect(state.dispose).toHaveBeenCalledOnce();
 });
 
+it('keeps retired endpoints until an admitted frame releases its borrow', async () => {
+  const left = { ...sample(1.9), allocationSize: () => 16 };
+  const right = { ...sample(4.1), allocationSize: () => 16 };
+  state.sample.mockResolvedValue(left);
+  state.right.mockReturnValue(right);
+  const releaseBytes = vi.fn();
+  const view = mountProvider(true, () => ({ release: releaseBytes }));
+  await view.render(view.binding);
+  const current = view.provider.read(1.75)!;
+  expect(current.frames).toEqual({ left, right });
+  const lease = current.lease!;
+  const release = lease.retain()!;
+  await view.render(undefined);
+  expect(lease.active).toBe(false);
+  expect(view.provider.read(1.75)).toBeNull();
+  expect(left.close).not.toHaveBeenCalled();
+  expect(right.close).not.toHaveBeenCalled();
+  expect(releaseBytes).not.toHaveBeenCalled();
+  release();
+  release();
+  expect(left.close).toHaveBeenCalledOnce();
+  expect(right.close).toHaveBeenCalledOnce();
+  expect(releaseBytes).toHaveBeenCalledOnce();
+});
+
 it('rejects obsolete endpoint reads during replacement render before effect cleanup', async () => {
   const left = sample(1.9);
   state.sample.mockResolvedValueOnce(left).mockResolvedValue(sample(1.8));
@@ -525,4 +550,42 @@ it('normalizes permitted immutable native transition captures before drawing and
     false
   );
   expect(normalized.close).toHaveBeenCalledOnce();
+});
+
+it('loads the next seam from transport reads while the parent time remains unchanged', async () => {
+  state.sample
+    .mockResolvedValueOnce({ ...sample(1.9), allocationSize: () => 300 })
+    .mockResolvedValueOnce({ ...sample(5.9), allocationSize: () => 300 });
+  state.right
+    .mockReturnValueOnce({ ...sample(4.1), allocationSize: () => 400 })
+    .mockReturnValueOnce({ ...sample(8.1), allocationSize: () => 400 });
+  const view = mountProvider(true);
+  const binding = {
+    ...view.binding,
+    duration: 10,
+    edits: [
+      ...view.binding.edits,
+      {
+        id: 'second',
+        kind: 'cut' as const,
+        start: 6,
+        end: 8,
+        requestedStart: 6,
+        requestedEnd: 8,
+        transition: { type: 'dissolve' as const, before: 0.5, after: 0.5 },
+      },
+    ],
+  };
+  await view.render(binding);
+  const first = view.provider.read(1.75)!;
+  expect(first.frames?.left.timestamp).toBe(1.9);
+  await act(async () => {
+    expect(view.provider.read(3)).toBeNull();
+  });
+  const second = view.provider.read(3.75)!;
+  expect(second.blend.plan.id).toBe('second');
+  expect(second.frames?.left.timestamp).toBe(5.9);
+  expect(second.frames?.right.timestamp).toBe(8.1);
+  expect(first.lease?.active).toBe(false);
+  expect(binding.time).toBe(1.75);
 });

@@ -17,7 +17,7 @@ function registeredVectorMigration() {
 
 it('registers the additive vector migration at database61 with exact stores and indexes', async () => {
   const migration = registeredVectorMigration();
-  expect(DB_VERSION).toBe(61);
+  expect(DATABASE_MIGRATIONS.at(-1)?.toDatabaseVersion).toBe(DB_VERSION);
   expect(migration).toMatchObject({
     fromDatabaseVersion: 60,
     toDatabaseVersion: 61,

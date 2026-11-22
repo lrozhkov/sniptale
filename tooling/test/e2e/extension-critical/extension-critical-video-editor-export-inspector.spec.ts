@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { createEmptyVideoProject } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { createTextClip } from '../../../../apps/extension/src/features/video/project/factories/overlay-clip';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, VIDEO_EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
 
@@ -53,6 +53,32 @@ for (const variant of [
       await page.goto(
         `${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}&theme=${variant.theme}`
       );
+      const projectMenu = page.locator('[data-ui="video-editor.timeline.toolbar.project-menu"]');
+      const copy = label('videoEditor.app.copyProjectAction');
+      await projectMenu.click();
+      await page.getByRole('button', { name: copy, exact: true }).click();
+      const copyDialog = page.getByRole('dialog', { name: copy, exact: true });
+      const name = copyDialog.getByRole('textbox', {
+        name: label('videoEditor.app.projectNameLabel'),
+      });
+      await expect(name).toBeFocused();
+      await expect(name).toHaveValue(project.name + label('videoEditor.app.projectCopySuffix'));
+      await expect(name).toHaveCSS('height', '32px');
+      await expect(name).toHaveCSS('box-shadow', 'none');
+      const clear = copyDialog.locator('.sniptale-field-clear');
+      await expect(clear).toHaveCSS('width', '24px');
+      await page.screenshot({
+        path: info.outputPath('copy-project-name.png'),
+        fullPage: false,
+        animations: 'disabled',
+      });
+      await clear.click();
+      await expect(name).toHaveValue('');
+      await expect(name).toBeFocused();
+      await expect(copyDialog.getByRole('button', { name: copy, exact: true })).toBeDisabled();
+      await name.press('Escape');
+      await expect(copyDialog).toHaveCount(0);
+      await expect(projectMenu).toBeFocused();
       const inspector = page.locator('[data-ui="video-editor.floating.context-inspector"]');
       await page.locator('[data-ui="video-editor.inspector.close"]').click();
       await expect(inspector).toHaveCount(0);

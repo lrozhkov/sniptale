@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
 import { chooseInspectorValue } from '../support/inspector-utilities';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';

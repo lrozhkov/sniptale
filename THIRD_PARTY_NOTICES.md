@@ -30,6 +30,57 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 
 The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by the font license.
 
+## JetBrains Mono bundled font
+
+- Source package: `@fontsource-variable/jetbrains-mono`
+- Font version: `5.3.0`
+- License: `OFL-1.1`
+- Copyright: Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono) JetBrainsMono-Italic[wght].ttf: Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
+- Source archive: https://registry.npmjs.org/@fontsource-variable/jetbrains-mono/-/jetbrains-mono-5.3.0.tgz
+- Source archive SHA-256: `996fe6368a480c9ce15d4de22a2682b7c40b403718fee2b15e7272f244fd993f`
+- License text: [`LICENSES/fonts/jetbrains-mono.txt`](LICENSES/fonts/jetbrains-mono.txt)
+
+| Bundled file | Source file | SHA-256 |
+| --- | --- | --- |
+| `apps/extension/public/gallery-fonts/jetbrains-mono-cyrillic-wght-normal.woff2` | `package/files/jetbrains-mono-cyrillic-wght-normal.woff2` | `d274604c40757f98f07df623a8b8fb5194508a6fa4f5413a7a107f09e3b7452a` |
+| `apps/extension/public/gallery-fonts/jetbrains-mono-latin-wght-normal.woff2` | `package/files/jetbrains-mono-latin-wght-normal.woff2` | `18be452724bfdc236c074ca94a249a7f41a86752c7d04ab258ce9ed5651f6a7e` |
+
+The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by the font license.
+
+## Literata bundled font
+
+- Source package: `@fontsource-variable/literata`
+- Font version: `5.3.0`
+- License: `OFL-1.1`
+- Copyright: Copyright 2017 The Literata Project Authors (https://github.com/googlefonts/literata) Literata-Italic[opsz,wght].ttf: Copyright 2017 The Literata Project Authors (https://github.com/googlefonts/literata)
+- Source archive: https://registry.npmjs.org/@fontsource-variable/literata/-/literata-5.3.0.tgz
+- Source archive SHA-256: `6511fb89c1b68ad10a422204580984dd3e27a129edc4cd015ee342f06a8fe4ac`
+- License text: [`LICENSES/fonts/literata.txt`](LICENSES/fonts/literata.txt)
+
+| Bundled file | Source file | SHA-256 |
+| --- | --- | --- |
+| `apps/extension/public/gallery-fonts/literata-cyrillic-wght-normal.woff2` | `package/files/literata-cyrillic-wght-normal.woff2` | `df20f1a8ca3c15497861c6dbf36c0c59507ee351301527ec89543747067ad4d7` |
+| `apps/extension/public/gallery-fonts/literata-latin-wght-normal.woff2` | `package/files/literata-latin-wght-normal.woff2` | `9adbeac5b167fe5ad6c49d9e29aa0c76e2f1bb3b46bf4ebf12a9eca7d3525384` |
+
+The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by the font license.
+
+## Oswald bundled font
+
+- Source package: `@fontsource-variable/oswald`
+- Font version: `5.3.0`
+- License: `OFL-1.1`
+- Copyright: Copyright 2016 The Oswald Project Authors (https://github.com/googlefonts/OswaldFont)
+- Source archive: https://registry.npmjs.org/@fontsource-variable/oswald/-/oswald-5.3.0.tgz
+- Source archive SHA-256: `962bdb468592daece384e9e32d90eb84344301135488ff7adabff88443da6700`
+- License text: [`LICENSES/fonts/oswald.txt`](LICENSES/fonts/oswald.txt)
+
+| Bundled file | Source file | SHA-256 |
+| --- | --- | --- |
+| `apps/extension/public/gallery-fonts/oswald-cyrillic-wght-normal.woff2` | `package/files/oswald-cyrillic-wght-normal.woff2` | `9307b75d3508236a0bae4f29ee3d2ce9aee545120ec9ef29e2cd1187bf6b0e5b` |
+| `apps/extension/public/gallery-fonts/oswald-latin-wght-normal.woff2` | `package/files/oswald-latin-wght-normal.woff2` | `bd73278ee0c50041b91b4c03d1229e35b501637f46b6409e7da2d3a758446ea5` |
+
+The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by the font license.
+
 ## Apple Cursor artwork
 
 - Attribution: ful1e5 and Apple Cursor contributors
@@ -859,9 +910,9 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - MPL-2.0 corresponding source: https://registry.npmjs.org/mediabunny/-/mediabunny-1.61.6.tgz
 - Modified source archive: [sniptale-dependency-source-0.5.2.zip](https://github.com/lrozhkov/sniptale/releases/download/v0.5.2/sniptale-dependency-source-0.5.2.zip)
 - Files inside that source archive (combine with upstream source above):
-  - `LICENSES/dependencies/mediabunny-1.61.6-modified/patch-payload.json.gz` (SHA-256: f9be915f3a4bfb3c6e7648e9c6b32b0da8e551f9f639ad22552d3c0db9111fd8)
-  - `LICENSES/dependencies/mediabunny-1.61.6-modified/patch-manifest.json` (SHA-256: b5201f8d0985605d3769439cc67a2cac1bbbc942de0e882087062e17af1a44cd)
-  - `LICENSES/dependencies/mediabunny-1.61.6-modified/source.patch` (SHA-256: 67e9895b496ac9cb46acad2a2174c2893fe9bbef02f69c63f191e677b2a20cae)
+  - `LICENSES/dependencies/mediabunny-1.61.6-modified/patch-payload.json.gz` (SHA-256: 48b03a105e7e78cc1554f77e13edcdd53af7fbf558c014982c59a4442146aed4)
+  - `LICENSES/dependencies/mediabunny-1.61.6-modified/patch-manifest.json` (SHA-256: ac5a954e5ea148e5a9efd33914e55e3c4cbd7a22f6177aeaac241e46f9733a02)
+  - `LICENSES/dependencies/mediabunny-1.61.6-modified/source.patch` (SHA-256: e58d26e5b06cb842932a7fe64b2d74fb79d1eaa7b0f2c609539a4694c3201dbd)
   - `LICENSES/dependencies/mediabunny-1.61.6-modified/LICENSE` (SHA-256: 3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04)
   - `LICENSES/dependencies/mediabunny-1.61.6-modified/README.md` (SHA-256: 5905b057e08cc26b073407918e587bcc5f0c0dd91b086912cf768503dedf4af2)
 - Original package integrity: sha512-VHEZ53/7jGl4dQ+uOdndsZufFYwEUFWv9UXgvrGun3OapyzoqI9iaPOD7z3xxY/nAttLZBNwswgJzMtGJAquOQ==

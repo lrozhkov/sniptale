@@ -262,7 +262,12 @@ export function createSyncProductExecution(
       try {
         await prepareNativeEditingRoot({
           root: work.root,
-          purpose: work.kind === 'backup-prepare' ? 'backup' : 'editing',
+          purpose:
+            work.kind === 'native-prepare'
+              ? 'editing'
+              : work.includeMontageHistory
+                ? 'backup'
+                : 'cache',
           ...(downloadAllowance ? { downloadAllowance } : {}),
           remote,
           binding: connection.binding,

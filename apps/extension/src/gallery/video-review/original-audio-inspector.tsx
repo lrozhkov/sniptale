@@ -1,5 +1,5 @@
 import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
-import { Trash2, VolumeX, AudioLines, Clock3 } from 'lucide-react';
+import { Trash2, VolumeX, AudioLines } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { useReviewAudio } from './use-review-audio';
 import { DraftNumericRow as ReviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
@@ -12,7 +12,10 @@ import {
 
 /** Manual source gain is independent from the speed edit's linked mute. */
 export function ReviewOriginalAudioInspector(props: {
-  audio: ReturnType<typeof useReviewAudio>;
+  audio: Pick<
+    ReturnType<typeof useReviewAudio>,
+    'selectedOriginal' | 'patchOriginal' | 'removeOriginal'
+  >;
   duration: number;
   speedMuted: boolean;
   originalMuted?: boolean;
@@ -32,6 +35,7 @@ export function ReviewOriginalAudioInspector(props: {
               <>
                 <ReviewNumberRow
                   label={translate('gallery.videoReview.volume')}
+                  rangePresentation="field"
                   unit="%"
                   min={0}
                   max={range.origin && range.origin !== 'manual' ? 100 : 200}
@@ -52,36 +56,10 @@ export function ReviewOriginalAudioInspector(props: {
                   </p>
                 ) : null}
                 {props.originalMuted ? (
-                  <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+                  <p role="status" className="review-inspector-notice">
                     {translate('gallery.videoReview.originalAudioMutedHint')}
                   </p>
                 ) : null}
-              </>
-            ),
-          },
-          {
-            id: 'timing',
-            label: translate('gallery.videoReview.interval'),
-            icon: Clock3,
-            content: (
-              <>
-                {(['start', 'end'] as const).map((edge) => (
-                  <ReviewNumberRow
-                    key={edge}
-                    label={translate(
-                      edge === 'start'
-                        ? 'gallery.videoReview.rangeStart'
-                        : 'gallery.videoReview.rangeEnd'
-                    )}
-                    unit="s"
-                    min={edge === 'start' ? 0 : range.start + 0.001}
-                    max={edge === 'end' ? props.duration : range.end - 0.001}
-                    step={0.01}
-                    precision={2}
-                    value={range[edge]}
-                    onChange={(value) => props.audio.patchOriginal(range.id, { [edge]: value })}
-                  />
-                ))}
               </>
             ),
           },
@@ -96,6 +74,7 @@ export function ReviewOriginalAudioInspector(props: {
                 <span>{translate('gallery.videoReview.muteAudioRange')}</span>
               </ReviewButton>
               <ReviewButton
+                selectionAction="delete"
                 label={translate('gallery.videoReview.removeEdit')}
                 className={`${reviewDeleteButtonClassName} !w-full justify-start`}
                 onClick={() => props.audio.removeOriginal(range.id)}

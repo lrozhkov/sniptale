@@ -1,13 +1,20 @@
+import {
+  anchorReviewVisualDisplay,
+  displayReviewVisualAnchor,
+} from '../../features/video/review/visual-anchor';
+import { reviewTimelineHint } from './timeline-hints';
+import { ReviewPlaybackPresentationClockContext } from './playback-presentation-clock';
 import { useReviewTimelineSnap } from './timeline-magnets';
 import { ReviewTrackVisibilityButton } from './track-row';
 import { reviewTrackMetrics, ReviewTrackCuts, ReviewTrackRow } from './track-row';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Eye, EyeOff, Sticker } from 'lucide-react';
 import { translate, useAppLocale } from '../../platform/i18n';
 import type {
   ReviewAnnotationEffect,
   ReviewAnnotationEffectSnapshot,
+  ReviewAnnotationTextClip,
 } from '../../features/video/review/annotation-effects/types';
 import { readReviewAnnotationEffectDocument } from '../../features/video/review/annotation-effects/validation';
 import { SNAP_THRESHOLD_PX } from '../../features/video/review/snap';
@@ -22,11 +29,20 @@ import { useReviewDragEscape } from './timeline-drag';
 import { ReviewTimelineLabel } from './timeline-label';
 import type { ReviewTrackProjection } from './track-projection';
 
-type Range = Pick<ReviewAnnotationEffect, 'start' | 'end'>;
+type Range = Pick<ReviewAnnotationEffect, 'start' | 'end' | 'timeDomain' | 'visualAnchor'>;
+type ResultRange = Pick<Range, 'start' | 'end'>;
+type TrackRange = Range & { result?: ResultRange };
+type TimelineClip = TrackRange & {
+  id: string;
+  enabled: boolean;
+  order: number;
+  snapshotId?: string;
+  text?: string;
+};
 type Drag = {
   id: string | null;
-  before: Range;
-  after: Range;
+  before: TrackRange;
+  after: TrackRange;
   edge: 'start' | 'end' | 'move' | 'draw';
   moved?: boolean;
   x: number;
@@ -40,6 +56,7 @@ type Drag = {
 
 type TrackProps = {
   instances: readonly ReviewAnnotationEffect[];
+  textClips?: readonly ReviewAnnotationTextClip[] | undefined;
   snapshots: readonly ReviewAnnotationEffectSnapshot[];
   duration: number;
   time: number;
@@ -84,42 +101,207 @@ function boundedRange(
   };
 }
 
+function proposeAnnotationRange(
+  before: TrackRange,
+  edge: Exclude<Drag['edge'], 'draw'>,
+  target: number,
+  displayDuration: number,
+  projection: ReviewTrackProjection | undefined,
+  moveAnchor: 'start' | 'end' = 'start'
+): TrackRange {
+  const boundary = edge === 'move' ? moveAnchor : edge;
+  if (!before.result || !projection)
+    return boundedRange(before, edge, target - before[boundary], displayDuration);
+  const { resultDuration, display } = projection;
+  const original = before.result;
+  const span = original.end - original.start;
+  const minimum = Math.min(0.001, span);
+  const at = display.displayToResult(target);
+  let result: ResultRange;
+  if (edge === 'move') {
+    const latestStart =
+      original.end > resultDuration ? resultDuration - minimum : resultDuration - span;
+    const start = Math.max(0, Math.min(at - (boundary === 'end' ? span : 0), latestStart));
+    result = { start, end: start + span };
+  } else if (edge === 'start') {
+    result = {
+      start: Math.max(0, Math.min(at, original.end - minimum, resultDuration - minimum)),
+      end: original.end,
+    };
+  } else {
+    result = {
+      start: original.start,
+      end: Math.min(resultDuration, Math.max(at, original.start + minimum)),
+    };
+  }
+  return {
+    result,
+    start: display.resultToDisplay(result.start),
+    end: display.resultToDisplay(Math.min(result.end, resultDuration), 'end'),
+  };
+}
+
 /** Source-clock plates; overlap rows are disposable and never change compositing order. */
 export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
   const display = incoming.projection?.display;
-  const props: TrackProps = display
-    ? {
-        ...incoming,
-        duration: display.duration,
-        time: display.sourceToDisplay(incoming.time),
-        instances: incoming.instances.map((item) => ({
-          ...item,
-          start: display.sourceToDisplay(item.start),
-          end: display.sourceToDisplay(item.end, 'end'),
-        })),
-        snapTimes: incoming.snapTimes.map((time) => display.sourceToDisplay(time)),
-        onPreview: (range) =>
-          incoming.onPreview({
-            start: display.displayToSource(range.start),
-            end: display.displayToSource(range.end),
-          }),
-        onPlace: (range, anchor) =>
-          incoming.onPlace?.(
-            {
-              start: display.displayToSource(range.start),
-              ...(range.end === undefined ? {} : { end: display.displayToSource(range.end) }),
-            },
-            anchor
-          ),
-      }
-    : incoming;
+  const duration = incoming.projection?.resultDuration ?? incoming.duration;
+  const instances = useMemo<readonly TimelineClip[]>(
+    () => [
+      ...incoming.instances.map((item) =>
+        display
+          ? {
+              ...item,
+              start: item.visualAnchor
+                ? displayReviewVisualAnchor(item, display)
+                : item.timeDomain === 'result'
+                  ? display.resultToDisplay(item.start)
+                  : display.sourceToDisplay(item.start),
+              end: item.visualAnchor
+                ? displayReviewVisualAnchor(item, display, item.end - item.start)
+                : item.timeDomain === 'result'
+                  ? display.resultToDisplay(item.end, 'end')
+                  : display.sourceToDisplay(item.end, 'end'),
+            }
+          : item
+      ),
+      ...(incoming.textClips ?? []).flatMap((clip) => {
+        if (clip.start >= duration) return [];
+        const end = Math.min(duration, clip.end);
+        return [
+          {
+            id: clip.id,
+            enabled: clip.enabled,
+            order: clip.order,
+            text: clip.text,
+            ...(display ? { result: { start: clip.start, end: clip.end } } : {}),
+            start: display?.resultToDisplay(clip.start) ?? clip.start,
+            end: display?.resultToDisplay(end, 'end') ?? end,
+          },
+        ];
+      }),
+    ],
+    [incoming.instances, incoming.textClips, display, duration]
+  );
+  const clock = useContext(ReviewPlaybackPresentationClockContext);
+  const eventInputs = {
+    time: incoming.time,
+    snapTimes: incoming.snapTimes,
+    display,
+    clock,
+    beforeAction: incoming.beforeAction,
+    onPlace: incoming.onPlace,
+    onEnabled: incoming.onEnabled,
+    onSelect: incoming.onSelect,
+    onBegin: incoming.onBegin,
+    onPreview: incoming.onPreview,
+    onCommit: incoming.onCommit,
+    onCancel: incoming.onCancel,
+  };
+  const receiver = useRef(eventInputs);
+  useLayoutEffect(() => {
+    receiver.current = eventInputs;
+  });
+  const commands = useMemo<AnnotationTrackCommands>(
+    () => ({
+      readTime: () => {
+        const current = receiver.current;
+        return (
+          current.clock?.read() ??
+          (current.display ? current.display.sourceToDisplay(current.time) : current.time)
+        );
+      },
+      readSnapTimes: () => {
+        const current = receiver.current;
+        const display = current.display;
+        return display
+          ? current.snapTimes.map((time) => display.sourceToDisplay(time))
+          : current.snapTimes;
+      },
+      beforeAction: (action) => (receiver.current.beforeAction ?? ((next) => next()))(action),
+      onEnabled: (enabled) => receiver.current.onEnabled(enabled),
+      onSelect: (id) => receiver.current.onSelect(id),
+      onBegin: (id) => receiver.current.onBegin(id),
+      onPreview: (range) => {
+        const current = receiver.current;
+        current.onPreview(
+          range.result ??
+            (current.display
+              ? { ...anchorReviewVisualDisplay(range, current.display), timeDomain: 'result' }
+              : range)
+        );
+      },
+      onPlace: (range, anchor) => {
+        const current = receiver.current;
+        current.onPlace?.(
+          current.display
+            ? {
+                start: current.display.displayToSource(range.start),
+                ...(range.end === undefined
+                  ? {}
+                  : { end: current.display.displayToSource(range.end) }),
+              }
+            : range,
+          anchor
+        );
+      },
+      onCommit: () => receiver.current.onCommit(),
+      onCancel: () => receiver.current.onCancel(),
+    }),
+    []
+  );
+  return (
+    <AnnotationTrackPresentation
+      instances={instances}
+      snapshots={incoming.snapshots}
+      duration={display?.duration ?? incoming.duration}
+      enabled={incoming.enabled}
+      busy={incoming.busy}
+      drawing={incoming.drawing}
+      compact={incoming.compact}
+      projection={incoming.projection}
+      selectedId={incoming.selectedId}
+      {...commands}
+    />
+  );
+}
+
+type AnnotationTrackCommands = Pick<
+  TrackProps,
+  'onEnabled' | 'onSelect' | 'onBegin' | 'onCommit' | 'onCancel'
+> & {
+  onPlace: NonNullable<TrackProps['onPlace']>;
+  beforeAction: NonNullable<TrackProps['beforeAction']>;
+  onPreview(range: TrackRange): void;
+  readTime(): number;
+  readSnapTimes(): readonly number[];
+};
+
+type AnnotationTrackVisual = {
+  instances: readonly TimelineClip[];
+  snapshots: TrackProps['snapshots'];
+  duration: number;
+  enabled: boolean;
+  busy: boolean;
+  drawing: TrackProps['drawing'];
+  compact: TrackProps['compact'];
+  projection: TrackProps['projection'];
+  selectedId: TrackProps['selectedId'];
+};
+
+/** Local preview/capture stays in this owner; transport and command closures are not visual inputs. */
+const AnnotationTrackPresentation = memo(function AnnotationTrackPresentation(
+  props: AnnotationTrackVisual & AnnotationTrackCommands
+) {
+  const display = props.projection?.display;
   const snapTimelineTime = useReviewTimelineSnap(
     display ? { output: display.sourceToDisplay, fromDisplay: (time) => time } : undefined
   );
   const locale = useAppLocale();
   const drag = useRef<Drag | null>(null);
   const latest = useRef(props);
-  latest.current = props;
+  useLayoutEffect(() => {
+    latest.current = props;
+  });
   const [preview, setPreview] = useState<(Range & { id: string | null }) | null>(null);
   const [guide, setGuide] = useState<number | null>(null);
   const boundary = drag.current?.ready && !drag.current.ended ? drag.current : null;
@@ -164,13 +346,19 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
     }
     return result;
   }, [props.instances]);
+  const snapshotIds = [
+    ...new Set(
+      props.instances.flatMap((instance) => (instance.snapshotId ? [instance.snapshotId] : []))
+    ),
+  ]
+    .sort()
+    .join(',');
+  const neededSnapshots = useMemo(() => new Set(snapshotIds.split(',')), [snapshotIds]);
   const labels = useMemo(
     () =>
       new Map(
         props.snapshots
-          .filter((snapshot) =>
-            props.instances.some((instance) => instance.snapshotId === snapshot.id)
-          )
+          .filter((snapshot) => neededSnapshots.has(snapshot.id))
           .map((snapshot) => {
             const document = readReviewAnnotationEffectDocument(snapshot.source, snapshot.sha256);
             return [
@@ -181,7 +369,7 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
             ];
           })
       ),
-    [props.snapshots, props.instances, locale]
+    [props.snapshots, neededSnapshots, locale]
   );
   const metrics = reviewTrackMetrics(props.compact);
   const height = metrics.step;
@@ -208,14 +396,19 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
               : { start: current.before.start },
             current.node
           );
-        } else {
+        } else if (current.moved) {
           props.onPreview(current.after);
           props.onCommit();
+        } else {
+          props.onCancel();
+          if (current.id && current.edge === 'move') props.onSelect(current.id);
         }
       });
   };
   const latestFinish = useRef(finish);
-  latestFinish.current = finish;
+  useLayoutEffect(() => {
+    latestFinish.current = finish;
+  });
   useEffect(() => {
     if (!props.drawing && drag.current?.edge === 'draw') latestFinish.current(true);
   }, [props.drawing]);
@@ -224,18 +417,17 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
       track="annotationEffects"
       muted={!props.enabled}
       label={translate('gallery.videoReview.annotationEffects')}
-      icon={<Sticker size={14} aria-hidden />}
+      icon={Sticker}
       controls={
         <ReviewTrackVisibilityButton
           track={'annotationEffects'}
           label={translate('gallery.videoReview.annotationEffectsEnabled')}
-          aria-pressed={props.enabled}
+          enabled={props.enabled}
           disabled={props.busy}
           className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-          onClick={() => props.onEnabled(!props.enabled)}
-        >
-          {props.enabled ? <Eye size={14} aria-hidden /> : <EyeOff size={14} aria-hidden />}
-        </ReviewTrackVisibilityButton>
+          onToggle={() => props.onEnabled(!props.enabled)}
+          icon={props.enabled ? Eye : EyeOff}
+        />
       }
     >
       <div
@@ -266,7 +458,7 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
           event.preventDefault();
           event.stopPropagation();
           const node = event.currentTarget;
-          const start = Math.max(0, Math.min(props.time, props.duration - 0.001));
+          const start = Math.max(0, Math.min(props.readTime(), props.duration - 0.001));
           (props.beforeAction ?? ((action) => action()))(() => props.onPlace?.({ start }, node));
         }}
         onPointerDown={(event) => {
@@ -280,8 +472,8 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
             : [
                 0,
                 props.duration,
-                props.time,
-                ...props.snapTimes,
+                props.readTime(),
+                ...props.readSnapTimes(),
                 ...props.instances.flatMap((item) => [item.start, item.end]),
               ];
           const time = Math.max(
@@ -330,8 +522,8 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
             : [
                 0,
                 props.duration,
-                props.time,
-                ...props.snapTimes,
+                props.readTime(),
+                ...props.readSnapTimes(),
                 ...props.instances.flatMap((item) => [item.start, item.end]),
               ];
           const snap = snapTimelineTime(
@@ -382,8 +574,10 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
         ) : null}
         {props.instances.map((instance) => {
           const range = preview?.id === instance.id ? preview : instance;
-          const name =
-            labels.get(instance.snapshotId) ?? translate('gallery.videoReview.annotationEffects');
+          const name = instance.snapshotId
+            ? (labels.get(instance.snapshotId) ??
+              translate('gallery.videoReview.annotationEffects'))
+            : instance.text?.trim() || translate('gallery.videoReview.annotationText');
           const value = reviewTimeLabel(range.end - range.start);
           const interval = `${reviewTimeLabel(range.start)} – ${reviewTimeLabel(range.end)}`;
           return (
@@ -401,6 +595,12 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
               data-annotation-effect-row={rows.get(instance.id)}
               data-enabled={instance.enabled}
               title={`${name} ${interval}`}
+              data-review-hint={reviewTimelineHint(
+                name,
+                range.start,
+                range.end,
+                instance.enabled ? undefined : translate('gallery.videoReview.itemDisabled')
+              )}
               className={[
                 'absolute touch-none cursor-grab overflow-hidden rounded border px-3 text-[11px]',
                 'focus-visible:outline focus-visible:outline-2',
@@ -427,21 +627,23 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
                 (props.beforeAction ?? ((action) => action()))(() => {
                   props.onSelect(instance.id);
                   if (!props.onBegin(instance.id)) return;
+                  const edge = event.shiftKey ? 'end' : 'move';
+                  const target =
+                    (edge === 'end' ? instance.end : instance.start) +
+                    (event.key === 'ArrowLeft' ? -1 : 1) *
+                      (event.ctrlKey || event.metaKey ? 1 : 0.1);
                   props.onPreview(
-                    boundedRange(
-                      instance,
-                      event.shiftKey ? 'end' : 'move',
-                      (event.key === 'ArrowLeft' ? -1 : 1) *
-                        (event.ctrlKey || event.metaKey ? 1 : 0.1),
-                      props.duration
-                    )
+                    proposeAnnotationRange(instance, edge, target, props.duration, props.projection)
                   );
                   props.onCommit();
                 });
               }}
               onPointerDown={(event) => {
                 event.stopPropagation();
-                if (props.busy || event.button !== 0 || drag.current) return;
+                if (props.busy || event.button !== 0) return;
+                const pending = drag.current;
+                if (pending && (!pending.ended || !pending.before.result)) return;
+                pending?.admission?.cancel();
                 const edge =
                   event.target instanceof Element
                     ? event.target
@@ -450,8 +652,16 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
                     : null;
                 const current: Drag = {
                   id: instance.id,
-                  before: { start: instance.start, end: instance.end },
-                  after: { start: instance.start, end: instance.end },
+                  before: {
+                    start: instance.start,
+                    end: instance.end,
+                    ...(instance.result ? { result: instance.result } : {}),
+                  },
+                  after: {
+                    start: instance.start,
+                    end: instance.end,
+                    ...(instance.result ? { result: instance.result } : {}),
+                  },
                   edge: edge === 'start' || edge === 'end' ? edge : 'move',
                   x: event.clientX,
                   width: Math.max(
@@ -465,11 +675,10 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
                 };
                 drag.current = current;
                 current.admission = deferReviewGesture(props.beforeAction, () => {
-                  props.onSelect(instance.id);
                   current.ready = props.onBegin(instance.id);
                   if (current.ready) {
                     props.onPreview(current.after);
-                    setPreview({ id: instance.id, ...current.after });
+                    if (!current.ended) setPreview({ id: instance.id, ...current.after });
                   }
                 });
                 event.currentTarget.setPointerCapture(event.pointerId);
@@ -485,19 +694,26 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
                 )
                   return;
                 event.stopPropagation();
-                let next = boundedRange(
+                current.moved ||= Math.abs(event.clientX - current.x) > 3;
+                if (!current.moved) return;
+                const boundary = current.edge === 'end' ? 'end' : 'start';
+                const target =
+                  current.before[boundary] +
+                  ((event.clientX - current.x) / current.width) * props.duration;
+                let next = proposeAnnotationRange(
                   current.before,
                   current.edge,
-                  ((event.clientX - current.x) / current.width) * props.duration,
-                  props.duration
+                  target,
+                  props.duration,
+                  props.projection
                 );
                 const candidates = event.altKey
                   ? []
                   : [
                       0,
                       props.duration,
-                      props.time,
-                      ...props.snapTimes,
+                      props.readTime(),
+                      ...props.readSnapTimes(),
                       ...props.instances
                         .filter((item) => item.id !== instance.id)
                         .flatMap((item) => [item.start, item.end]),
@@ -506,7 +722,12 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
                   ? 0
                   : (SNAP_THRESHOLD_PX / current.width) * props.duration;
                 const start = snapTimelineTime(next.start, candidates, threshold);
-                const end = snapTimelineTime(next.end, candidates, threshold);
+                const visibleResultEnd = props.projection?.resultDuration ?? props.duration;
+                const clippedTail =
+                  current.edge === 'move' && next.result && next.result.end > visibleResultEnd;
+                const end = clippedTail
+                  ? { time: next.end, candidate: null }
+                  : snapTimelineTime(next.end, candidates, threshold);
                 const startDistance =
                   start.candidate === null ? Infinity : Math.abs(start.time - next.start);
                 const endDistance =
@@ -519,18 +740,24 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
                       : startDistance <= endDistance
                         ? start
                         : end;
-                const requested =
-                  current.edge === 'start'
-                    ? snap.time - current.before.start
-                    : current.edge === 'end'
-                      ? snap.time - current.before.end
-                      : next.start -
-                        current.before.start +
-                        (snap === start ? snap.time - next.start : snap.time - next.end);
-                next = boundedRange(current.before, current.edge, requested, props.duration);
+                const anchor = snap === start ? 'start' : 'end';
+                let guide = snap.candidate;
+                if (guide !== null) {
+                  const snapped = proposeAnnotationRange(
+                    current.before,
+                    current.edge,
+                    snap.time,
+                    props.duration,
+                    props.projection,
+                    anchor
+                  );
+                  if (!current.before.result || Math.abs(snapped[anchor] - snap.time) <= 0.000001)
+                    next = snapped;
+                  else guide = null;
+                }
                 current.after = next;
                 setPreview({ id: instance.id, ...next });
-                setGuide(current.edge === 'move' ? snap.candidate : null);
+                setGuide(current.edge === 'move' ? guide : null);
                 if (current.ready) props.onPreview(next);
               }}
               onPointerUp={(event) => {
@@ -572,4 +799,4 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
       </div>
     </ReviewTrackRow>
   );
-}
+});

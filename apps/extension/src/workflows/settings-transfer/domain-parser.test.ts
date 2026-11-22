@@ -1,5 +1,6 @@
 import { createQuickActionAppearance } from '../../contracts/quick-action-appearance';
 import { expect, it } from 'vitest';
+import { SUPPORTED_LOCALES } from '@sniptale/runtime-contracts/i18n';
 import {
   createContextMenuLayout,
   createRecommendedContextMenuTree,
@@ -10,6 +11,19 @@ import type { SettingsTransferDomainPayload } from '../../contracts/settings-tra
 function domains(contextMenu: SettingsTransferDomainPayload['data']) {
   return { 'interface.preferences': { schemaVersion: 1, data: { contextMenu } } };
 }
+
+it.each(SUPPORTED_LOCALES)('round trips registered interface locale %s', (locale) => {
+  const payload = { 'interface.preferences': { schemaVersion: 1, data: { locale } } };
+  expect(parseSettingsTransferDomains(payload)).toEqual(payload);
+});
+
+it.each(['__unsupported__', 'EN', null, 1])('refuses unsupported interface locale %j', (locale) => {
+  expect(() =>
+    parseSettingsTransferDomains({
+      'interface.preferences': { schemaVersion: 1, data: { locale } },
+    })
+  ).toThrow();
+});
 
 it('round trips layout, disabled block positions and legacy partial menu preferences', () => {
   const payload = domains({ enabled: false, showVideo: false, layout: createContextMenuLayout() });

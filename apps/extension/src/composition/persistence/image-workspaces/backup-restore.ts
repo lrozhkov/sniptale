@@ -1,5 +1,6 @@
 import type { AssetOwner, AssetRef } from '../assets';
 import type { StoredImageWorkspaceEntry } from './contracts';
+import { imageWorkspaceAssetBindings } from './assets';
 
 interface PutStore<T> {
   put(value: T): Promise<unknown>;
@@ -12,7 +13,7 @@ export async function putImageWorkspaceBackupRestore(args: {
   refStore: PutStore<AssetRef>;
   workspaceStore: PutStore<StoredImageWorkspaceEntry>;
 }): Promise<void> {
-  for (const asset of args.entry.document.assets) {
+  for (const asset of imageWorkspaceAssetBindings(args.entry)) {
     const ref = args.refsByAssetId.get(asset.assetId);
     if (!ref) throw new Error(`Restored editor asset ref is missing: ${asset.assetId}.`);
     await args.refStore.put(ref);
@@ -23,5 +24,6 @@ export async function putImageWorkspaceBackupRestore(args: {
       role: asset.role,
     });
   }
-  await args.workspaceStore.put(args.entry);
+  const { publicationId: _publicationId, ...entry } = args.entry;
+  await args.workspaceStore.put(entry);
 }

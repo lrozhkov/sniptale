@@ -1,3 +1,7 @@
+import {
+  restoreImageWorkspaceIdentity,
+  type ImageWorkspaceIdentity,
+} from '../image-workspaces/identity';
 import type { AssetOwner, AssetRef } from '../assets';
 import type { AggregatePresentationEntry } from '../aggregate-presentations/contracts';
 import type { MediaLibraryEntry, MediaThumbnailEntry } from '../media-library/contracts';
@@ -12,6 +16,12 @@ import type {
 } from '../review-workspaces/contracts';
 import type { StoredProjectAssetEntry, VideoProjectEntry } from './contracts';
 import { PROJECT_ASSET_OWNER_KIND, PROJECT_MEDIA_ASSET_ROLE } from './asset-publication';
+import { parseAssetRef } from '../assets/guards';
+import { isSha256Digest } from '@sniptale/platform/security/digest';
+import {
+  VIDEO_PROJECT_HISTORY_OWNER_KIND,
+  videoProjectHistoryAssetBindings,
+} from './history-contracts';
 
 export interface PreparedVideoProjectRevision {
   assets: Array<{
@@ -23,6 +33,7 @@ export interface PreparedVideoProjectRevision {
     videoReview?: VideoWorkspaceSnapshot;
   }>;
   entry: VideoProjectEntry;
+  historyRefs?: readonly AssetRef[];
   presentation?: AggregatePresentationEntry;
   thumbnail?: MediaThumbnailEntry;
 }
@@ -34,6 +45,7 @@ interface PublicationStore<T> {
 export interface VideoProjectRevisionPublicationStores {
   assets: PublicationStore<StoredProjectAssetEntry>;
   media: PublicationStore<MediaLibraryEntry>;
+  imageIdentities: PublicationStore<ImageWorkspaceIdentity> & { get(id: string): Promise<unknown> };
   videoWorkspaces: PublicationStore<VideoWorkspace>;
   videoDrafts: PublicationStore<VideoWorkspaceDraft> & { delete(key: string): Promise<unknown> };
   owners: PublicationStore<AssetOwner>;
@@ -49,6 +61,33 @@ export async function publishPreparedVideoProjectRevisionInTransaction(args: {
   stores: VideoProjectRevisionPublicationStores;
   workspaceRevision: number;
 }): Promise<void> {
+  const bindings = videoProjectHistoryAssetBindings(args.root.entry.history);
+  const historyRefs = new Map(
+    (args.root.historyRefs ?? []).map((ref) => [ref.assetId, parseAssetRef(ref)])
+  );
+  if (
+    historyRefs.size !== (args.root.historyRefs?.length ?? 0) ||
+    historyRefs.size !== bindings.length ||
+    bindings.some(({ assetId }) => {
+      const ref = historyRefs.get(assetId);
+      return (
+        !ref ||
+        ref.mimeType !== 'application/json' ||
+        !ref.sha256 ||
+        !isSha256Digest(`sha256:${ref.sha256}`)
+      );
+    })
+  )
+    throw new Error('Prepared video history references are inconsistent.');
+  for (const { assetId, role } of bindings) {
+    await args.stores.refs.put(historyRefs.get(assetId)!);
+    await args.stores.owners.put({
+      assetId,
+      role,
+      ownerKind: VIDEO_PROJECT_HISTORY_OWNER_KIND,
+      ownerId: args.root.entry.id,
+    });
+  }
   const lifecycle =
     args.root.entry.lifecycle ?? createLibraryLifecycle('library', args.root.entry.updatedAt);
   await args.stores.projects.put(
@@ -75,11 +114,17 @@ export async function publishPreparedVideoProjectRevisionInTransaction(args: {
         drafts: args.stores.videoDrafts,
       });
     if (asset.publishToLibrary !== false) {
-      await args.stores.media.put({
+      const media = {
         ...buildProjectAssetMediaEntry(asset.entry),
         filename: asset.filename,
         originalFilename: asset.filename,
-      });
+      };
+      if (media.kind === 'image' || media.kind === 'screenshot')
+        await restoreImageWorkspaceIdentity(
+          { objectStore: () => args.stores.imageIdentities },
+          media.id
+        );
+      await args.stores.media.put(media);
     }
   }
 }

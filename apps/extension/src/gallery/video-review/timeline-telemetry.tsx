@@ -1,3 +1,4 @@
+import { reviewTimelineHint } from './timeline-hints';
 import { useReviewDragEscape } from './timeline-drag';
 import { useReviewTimelineSnap } from './timeline-magnets';
 import { reviewTimelineResizeHandleClassName } from './controls';
@@ -24,6 +25,7 @@ import { reviewHistoryCaptureStatus } from './action-history-coverage';
 import {
   layoutReviewActionLanes,
   reviewActionLane,
+  REVIEW_ACTION_MIN_POINT_WIDTH_PX,
 } from '../../features/video/review/action-lanes';
 import { reviewEventLabel, reviewMouseButtonLabel, reviewTimeLabel } from './controls';
 
@@ -44,14 +46,15 @@ export type ReviewCursorTimelineInteractions = {
 
 type TelemetryStripProps = ReviewCursorTimelineInteractions & {
   family?: 'keyboard' | 'mouse' | undefined;
-  interactionEditor?: import('./interaction-editor').ReviewInteractionEditor | undefined;
+  interactionEditor?:
+    | Pick<import('./interaction-editor').ReviewInteractionEditor, 'update'>
+    | undefined;
   cursorArchiveAvailable?: boolean | undefined;
   sourceId?: string | undefined;
   captureCapabilities?: RecordingTelemetryCapabilities | null | undefined;
   animatedIds?: ReadonlySet<string>;
   markers: readonly ReviewTelemetryMarker[];
   duration: number;
-  time: number;
   playing?: boolean | undefined;
   width: number;
   zoom: number;
@@ -288,7 +291,7 @@ function ReviewHistoryCluster(props: {
           fontSize: 11,
           background: HISTORY_EVENT_BACKGROUND,
           borderColor: selected
-            ? 'var(--sniptale-color-accent)'
+            ? 'var(--sniptale-color-field-focus)'
             : 'var(--sniptale-color-border-soft)',
         }}
         className={[
@@ -362,7 +365,6 @@ function ReviewHistoryItem({
     if (event.button !== 0 || !props.editable || item.members.length > 1) return;
     event.stopPropagation();
     skipClick.current = false;
-    props.onMarker(marker);
     const edge =
       event.target instanceof Element
         ? event.target.closest<HTMLElement>('[data-press-edge]')?.dataset['pressEdge']
@@ -421,7 +423,7 @@ function ReviewHistoryItem({
         if (!d) return;
         event.stopPropagation();
         const delta = ((event.clientX - d.x) / d.width) * props.duration;
-        const length = Math.max(0.05, marker.end - marker.start);
+        const length = Math.max(0, marker.end - marker.start);
         let start =
           d.edge === 'end'
             ? marker.start
@@ -446,7 +448,8 @@ function ReviewHistoryItem({
           } else if (d.edge === 'end') end = v;
           else start = v;
         }
-        if (end < start + 0.05 || start < 0 || end > props.duration) return;
+        if (end < start + (d.edge === 'move' ? 0 : 0.05) || start < 0 || end > props.duration)
+          return;
         if (Math.abs(event.clientX - d.x) > 2) {
           skipClick.current = true;
           d.after = { start, end };
@@ -480,6 +483,19 @@ function ReviewHistoryItem({
       data-animated={animated ? 'true' : 'false'}
       aria-label={`${translate('gallery.videoReview.telemetry')} · ${description}`}
       title={description}
+      data-review-hint={reviewTimelineHint(
+        reviewEventLabel(marker.eventType),
+        marker.start,
+        marker.end,
+        [
+          reviewMouseButtonLabel(marker.mouseButton),
+          marker.target,
+          item.lane === 0 ? translate('gallery.videoReview.historyKeyboardCoverage') : '',
+          animated ? translate('gallery.videoReview.clickAnimation') : '',
+        ]
+          .filter(Boolean)
+          .join('\n')
+      )}
       onClick={() => {
         if (skipClick.current) {
           skipClick.current = false;
@@ -503,9 +519,13 @@ function ReviewHistoryItem({
         left:
           item.left * ratio +
           ((range.start - marker.start) / props.duration) * (drag.current?.width ?? 1),
-        width: draft
-          ? Math.max(6, ((range.end - range.start) / props.duration) * (drag.current?.width ?? 1))
-          : item.width * ratio,
+        width:
+          draft && drag.current?.edge !== 'move'
+            ? Math.max(
+                REVIEW_ACTION_MIN_POINT_WIDTH_PX,
+                ((range.end - range.start) / props.duration) * (drag.current?.width ?? 1)
+              )
+            : item.width * ratio,
         top,
         height: ACTION_MARKER_HEIGHT_PX,
         background: cursorLine

@@ -1,5 +1,11 @@
+// @vitest-environment jsdom
+
 import { renderToStaticMarkup } from 'react-dom/server';
-import { expect, it } from 'vitest';
+import { expect, it, beforeAll, vi } from 'vitest';
+import {
+  loadUiCatalogFixture,
+  prepareUiTranslations,
+} from '../test-support/translations.test-support';
 import { AnnotationTemplateQueryResults, AnnotationTemplateQuerySurface } from './filter';
 
 it('reserves the results viewport and visually hides unfiltered children while tags load', () => {
@@ -56,3 +62,10 @@ it('owns the shared controls and empty result behavior for template lists', () =
   );
   expect(populatedMarkup).toContain('Preset row');
 });
+
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadUiCatalogFixture>[0]) =>
+    loadUiCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareUiTranslations('content', 'ru'));

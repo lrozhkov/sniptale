@@ -566,3 +566,64 @@ it('maps authored cursor motion on an imported Gallery video without recording a
       ?.sourceInteractionDocuments?.[0]?.cursorMotions
   ).toEqual(input.document.advancedContent.cursorMotions);
 });
+
+it('retains authored result cursor phase after relocation and Native rate changes', () => {
+  const input = fixture();
+  input.document.edits = [
+    {
+      id: 'hold',
+      kind: 'freeze',
+      start: 2,
+      end: 2,
+      requestedStart: 2,
+      requestedEnd: 2,
+      duration: 2,
+      frameTime: 1.98,
+      frameDuration: 0.04,
+    },
+  ];
+  input.document.advancedContent.cursorMotionEnabled = true;
+  input.document.advancedContent.cursorMotions = [
+    {
+      id: 'held-cursor',
+      start: 2,
+      end: 4,
+      timeDomain: 'result',
+      enabled: true,
+      shape: 'pointer',
+      size: 44,
+      color: '#eeeeee',
+      outline: '#222222',
+      shadow: true,
+      easing: 'linear',
+      points: [
+        { id: 'a', at: 0, x: 0.2, y: 0.3 },
+        { id: 'b', at: 1, x: 0.8, y: 0.7 },
+      ],
+    },
+  ];
+  const result = planReviewProjectConversion(input);
+  if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+  const project = parseHydratableVideoProject(JSON.parse(JSON.stringify(result.project)))!;
+  const held = project.clips.find((clip) => clip.type === 'VIDEO' && clip.startTime === 2)!;
+  const expected = resolveVideoCompositionCursor(project, 2.5, [], held.id)!;
+  expect(expected).not.toBeNull();
+  for (const rate of [1, 2]) {
+    const moved = {
+      ...project,
+      duration: 20,
+      clips: project.clips.map((clip) =>
+        clip.id === held.id && clip.type === 'VIDEO'
+          ? { ...clip, startTime: 12, duration: clip.duration / rate, playbackRate: rate }
+          : clip
+      ),
+    };
+    const time = 12 + 0.5 / rate;
+    const actual = resolveVideoCompositionCursor(moved, time, [], held.id);
+    expect(actual?.x).toBeCloseTo(expected.x, 8);
+    expect(actual?.y).toBeCloseTo(expected.y, 8);
+    const focus = resolveProjectCursorFocus(moved, time, undefined, held.id);
+    expect(focus?.x).toBeCloseTo(expected.x, 8);
+    expect(focus?.y).toBeCloseTo(expected.y, 8);
+  }
+});

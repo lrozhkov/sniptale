@@ -1,3 +1,4 @@
+import { legacyQuickEditProjectId } from '../../composition/persistence/media-library/legacy-projects';
 import eventsFixture from '../../features/video/project/recording-events/fixtures.json';
 import { VideoWorkspaceError } from '../../composition/persistence/review-workspaces/store';
 import { beforeEach, expect, it, vi } from 'vitest';
@@ -10,10 +11,14 @@ const mocks = vi.hoisted(() => ({
   open: vi.fn(),
   read: vi.fn(),
   publish: vi.fn(),
+  prepare: vi.fn(),
   dispose: vi.fn(),
   duration: vi.fn(),
   metadataDuration: vi.fn(),
   metadata: vi.fn(),
+}));
+vi.mock('../sync-transfer/editing-admission', () => ({
+  ensureNativeEditingRootAvailable: mocks.prepare,
 }));
 vi.mock('../../composition/persistence/media-library', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../composition/persistence/media-library')>()),
@@ -41,7 +46,7 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (importOr
   ...(await importOriginal<
     typeof import('../../composition/persistence/review-workspaces/store')
   >()),
-  openVideoWorkspace: mocks.open,
+  readVideoWorkspaceOpening: mocks.open,
   readVideoWorkspace: mocks.read,
 }));
 vi.mock('../../features/media-hub/events', () => ({
@@ -63,7 +68,7 @@ vi.mock('mediabunny', () => ({
     }
   },
 }));
-import { loadVideoReviewSource } from './source';
+import { loadVideoReviewSource, refreshVideoReviewRecordingHistory } from './source';
 import { projectReviewTelemetry } from '../../features/video/review/telemetry';
 
 beforeEach(() => {
@@ -82,13 +87,19 @@ beforeEach(() => {
   mocks.duration.mockResolvedValue(12);
   mocks.metadataDuration.mockResolvedValue(null);
   mocks.telemetry.mockResolvedValue(undefined);
-  mocks.open.mockResolvedValue({ workspace: {}, draft: null });
+  mocks.open.mockResolvedValue({ snapshot: { workspace: {}, draft: null } });
 });
 
 it('binds the decoded oriented source to the immutable file identity before opening', async () => {
   const result = await loadVideoReviewSource('recording:r', new AbortController().signal);
   expect(result.source).toMatchObject({ duration: 12, width: 360, height: 640, size: 5 });
-  expect(mocks.open).toHaveBeenCalledWith('recording:r', result.source, 'immutable-file');
+  expect(mocks.open).toHaveBeenCalledWith({
+    aggregateId: expect.stringMatching(/^recording:quick-project:/),
+    sourceMediaId: 'recording:r',
+    source: result.source,
+    expectedSourceAssetId: 'immutable-file',
+  });
+  expect(mocks.publish).not.toHaveBeenCalled();
   expect(mocks.dispose).toHaveBeenCalledOnce();
 });
 
@@ -269,17 +280,16 @@ it('carries structured workspace validation details without raw errors', async (
   ).rejects.toMatchObject({ stage: 'workspace', reason: 'invalid', diagnostic });
 });
 
-it('publishes project admission only after commit, including cancellation after commit', async () => {
+it('leaves Library notifications to the first save when a read-only opening is cancelled', async () => {
   const abort = new AbortController();
   mocks.open.mockImplementationOnce(async () => {
     expect(mocks.publish).not.toHaveBeenCalled();
     abort.abort();
-    return { workspace: {}, draft: null };
+    return { snapshot: { workspace: {}, draft: null } };
   });
   await expect(loadVideoReviewSource('recording:r', abort.signal)).rejects.toThrow();
-  expect(mocks.publish).toHaveBeenCalledWith('update', ['recording:r']);
-  mocks.publish.mockClear();
-  mocks.open.mockRejectedValueOnce(new Error('commit refused'));
+  expect(mocks.publish).not.toHaveBeenCalled();
+  mocks.open.mockRejectedValueOnce(new Error('read refused'));
   await expect(
     loadVideoReviewSource('recording:r', new AbortController().signal)
   ).rejects.toThrow();
@@ -288,17 +298,20 @@ it('publishes project admission only after commit, including cancellation after 
 
 it('opens an archived quick project from its original media without changing workspace identity', async () => {
   mocks.read.mockResolvedValue({ workspace: { sourceMediaId: 'recording:r' }, draft: null });
-  mocks.open.mockResolvedValue({ workspace: { project: { name: 'Previous edit' } }, draft: null });
+  mocks.open.mockResolvedValue({
+    snapshot: { workspace: { project: { name: 'Previous edit' } }, draft: null },
+  });
   const loaded = await loadVideoReviewSource(
     'quick-project:archived',
     new AbortController().signal
   );
   expect(mocks.media).toHaveBeenCalledWith('recording:r');
-  expect(mocks.open).toHaveBeenCalledWith(
-    'quick-project:archived',
-    loaded.source,
-    'immutable-file'
-  );
+  expect(mocks.open).toHaveBeenCalledWith({
+    aggregateId: 'quick-project:archived',
+    requireExisting: true,
+    source: loaded.source,
+    expectedSourceAssetId: 'immutable-file',
+  });
   expect(loaded.filename).toBe('Previous edit');
 });
 
@@ -323,4 +336,38 @@ it('exposes compact stream bindings for an original recording', async () => {
   expect(result.telemetry?.recordingEvents).toEqual(eventsFixture.descriptor);
   expect(result.historyProject?.actionFeedback?.[0]?.events).toEqual(eventsFixture.descriptor);
   expect(result.historyProject?.actionEvents).toEqual([]);
+});
+
+it('rejects a replacement recording before reading late history', async () => {
+  await expect(
+    refreshVideoReviewRecordingHistory(
+      { recordingId: 'r', assetId: 'replaced', filename: 'clip.webm' },
+      { duration: 12, width: 360, height: 640, size: 5, mimeType: 'video/webm' },
+      new AbortController().signal
+    )
+  ).rejects.toMatchObject({ stage: 'telemetry', reason: 'changed-source' });
+  expect(mocks.telemetry).not.toHaveBeenCalled();
+  expect(mocks.open).not.toHaveBeenCalled();
+  expect(mocks.dispose).not.toHaveBeenCalled();
+});
+
+it('resumes the migrated Quick Edit project when a legacy link still names its original', async () => {
+  const sourceMediaId = 'recording:r';
+  const id = legacyQuickEditProjectId({
+    id: sourceMediaId,
+    source: { kind: 'recording', recordingId: 'r' },
+  });
+  mocks.read.mockResolvedValueOnce(null).mockResolvedValueOnce({
+    workspace: { aggregateId: id, sourceMediaId },
+    draft: null,
+  });
+  const loaded = await loadVideoReviewSource(sourceMediaId, new AbortController().signal);
+  expect(mocks.prepare).toHaveBeenCalledExactlyOnceWith({ rootKind: 'video-review', rootId: id });
+  expect(mocks.open).toHaveBeenCalledExactlyOnceWith({
+    aggregateId: id,
+    requireExisting: true,
+    source: loaded.source,
+    expectedSourceAssetId: 'immutable-file',
+  });
+  expect(mocks.publish).not.toHaveBeenCalled();
 });

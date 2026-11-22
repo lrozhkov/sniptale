@@ -76,7 +76,9 @@ export async function replaceSanitizedSnapshotPackage(args: {
   envelope: MediaHubBackupRootEnvelope;
   staged: StagedArchiveObject[];
 }): Promise<{ envelope: MediaHubBackupRootEnvelope; staged: StagedArchiveObject[] }> {
-  const metadata = parsePortableMediaMetadata(args.envelope.metadata);
+  const metadata = parsePortableMediaMetadata(args.envelope.metadata, {
+    allowLibraryRelationships: true,
+  });
   if (!metadata.webSnapshot) return args;
   if (!isWebSnapshotManifest(metadata.webSnapshot.entry.manifest)) {
     throw new Error('Restored web snapshot manifest is invalid.');

@@ -5,6 +5,7 @@ import type {
   CompactInspectorUnit,
   CompactInspectorNumericScrub,
 } from '../../../../../ui/compact-inspector-controls/shared';
+import { useInspectorNumericHistory } from '../shared/numeric-history';
 import { useDedupedNumberChange } from '../shared/number-commit';
 
 export function NumberInput({
@@ -16,7 +17,7 @@ export function NumberInput({
   min,
   max,
   step = 1,
-  scrub = min !== undefined && max !== undefined,
+  scrub = false,
   unit = '',
   scrubRange,
   revealScrub = false,
@@ -37,13 +38,21 @@ export function NumberInput({
   disabled?: boolean;
 }) {
   const gesture = useRef<'pointer' | 'keyboard' | null>(null);
+  const previewing = useRef(false);
   const inspector = useInspectorLayout();
   const finish = () => {
+    const active = gesture.current !== null || previewing.current;
     gesture.current = null;
-    onCommit?.();
+    previewing.current = false;
+    if (active) onCommit?.();
   };
   const numericValue = Number.isFinite(value) ? value : 0;
   const commitValue = useDedupedNumberChange(onChange, numericValue);
+  const history = useInspectorNumericHistory(numericValue, commitValue, {
+    disabled,
+    onCancel: finish,
+  });
+  const blocked = disabled || history.disabled;
   const scrubProps = scrubRange
     ? { scrub: scrubRange }
     : scrub && min !== undefined && max !== undefined
@@ -52,6 +61,7 @@ export function NumberInput({
 
   const row = (
     <NumericRow
+      key={history.resetKey}
       appearance="plain"
       focusAppearance="accent-box"
       {...(inspector ? {} : { className: 'py-0! grid-cols-[minmax(0,1fr)_auto]!' })}
@@ -62,14 +72,25 @@ export function NumberInput({
       step={step}
       unit={unit}
       revealScrub={revealScrub}
-      disabled={disabled}
+      disabled={blocked}
       onPreviewValue={(next) => {
-        onPreview?.();
-        commitValue(next);
+        history.preview(() => {
+          previewing.current = true;
+          onPreview?.();
+          commitValue(next);
+        });
       }}
       onCommitValue={(next) => {
-        commitValue(next);
-        if (!gesture.current) onCommit?.();
+        if (!history.commit(() => commitValue(next))) return;
+        if (gesture.current !== 'keyboard') {
+          gesture.current = null;
+          previewing.current = false;
+          onCommit?.();
+        }
+      }}
+      onCancelValue={() => {
+        history.cancel();
+        finish();
       }}
       {...scrubProps}
     />
@@ -78,7 +99,7 @@ export function NumberInput({
     <div
       onPointerDownCapture={(event) => {
         const button = event.target instanceof Element ? event.target.closest('button') : null;
-        if (disabled || !button) return;
+        if (blocked || !button) return;
         gesture.current = 'pointer';
         button.setPointerCapture?.(event.pointerId);
       }}
@@ -87,7 +108,7 @@ export function NumberInput({
       onLostPointerCapture={finish}
       onKeyDownCapture={(event) => {
         if (
-          !disabled &&
+          !blocked &&
           event.target instanceof HTMLButtonElement &&
           (event.key === 'Enter' || event.key === ' ')
         )

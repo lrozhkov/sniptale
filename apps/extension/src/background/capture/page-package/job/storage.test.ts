@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { SUPPORTED_LOCALES } from '@sniptale/runtime-contracts/i18n';
 import type { PagePackageJobStatusV1 } from './status';
 
 const mocks = vi.hoisted(() => ({
@@ -157,12 +158,15 @@ it('parses persisted locale, migrates a legacy record, and rejects an unknown lo
   >;
 
   expect(parsePagePackageJobRecordV1(record)).toMatchObject({ locale: 'en' });
+  for (const locale of SUPPORTED_LOCALES) {
+    expect(parsePagePackageJobRecordV1({ ...record, locale })).toMatchObject({ locale });
+  }
 
   const legacyRecord = { ...record };
   delete legacyRecord['locale'];
   expect(parsePagePackageJobRecordV1(legacyRecord)).toMatchObject({ locale: null });
   expect(parsePagePackageJobRecordV1({ ...record, locale: null })).toMatchObject({ locale: null });
-  expect(parsePagePackageJobRecordV1({ ...record, locale: 'fr' })).toBeNull();
+  expect(parsePagePackageJobRecordV1({ ...record, locale: '__unsupported__' })).toBeNull();
 });
 
 it('still interrupts a stored job when locale hydration fails', async () => {

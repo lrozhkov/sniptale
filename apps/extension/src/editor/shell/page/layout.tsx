@@ -64,18 +64,19 @@ export function EditorPageLayout(props: {
   hasImage: boolean;
   openStatus: EditorOpenStatus;
   onCloseCommandPalette: () => void;
-  onRecoverOriginal: () => Promise<void>;
+  onRecoverOriginal?: () => Promise<void>;
   afterLayout?: React.ReactNode;
   startPage?: React.ReactNode;
 }) {
-  const [confirmRecovery, setConfirmRecovery] = useState(false);
+  const [confirmRecovery, setConfirmRecovery] = useState<(() => Promise<void>) | null>(null);
   const [recoveryFailed, setRecoveryFailed] = useState(false);
 
   const recoverOriginal = async () => {
     setRecoveryFailed(false);
     try {
-      await props.onRecoverOriginal();
-      setConfirmRecovery(false);
+      if (!confirmRecovery) return;
+      await confirmRecovery();
+      setConfirmRecovery(null);
     } catch (error) {
       setRecoveryFailed(true);
       throw error;
@@ -156,18 +157,20 @@ export function EditorPageLayout(props: {
           <p className="mt-1 text-sm text-[var(--sniptale-color-text-muted)]">
             {translate('editor.page.documentFileMissingHint')}
           </p>
-          <ProductActionButton
-            compact
-            tone="secondary"
-            className="mt-3"
-            data-ui="editor.page.recover-original"
-            onClick={() => {
-              setRecoveryFailed(false);
-              setConfirmRecovery(true);
-            }}
-          >
-            {translate('editor.page.recoverOriginalAction')}
-          </ProductActionButton>
+          {props.onRecoverOriginal ? (
+            <ProductActionButton
+              compact
+              tone="secondary"
+              className="mt-3"
+              data-ui="editor.page.recover-original"
+              onClick={() => {
+                setRecoveryFailed(false);
+                setConfirmRecovery(() => props.onRecoverOriginal ?? null);
+              }}
+            >
+              {translate('editor.page.recoverOriginalAction')}
+            </ProductActionButton>
+          ) : null}
         </div>
       ) : null}
       {confirmRecovery && props.openStatus === 'missing' ? (
@@ -187,7 +190,7 @@ export function EditorPageLayout(props: {
           confirmText={translate('editor.page.recoverOriginalConfirm')}
           cancelText={translate('editor.page.recoverOriginalCancel')}
           onConfirm={recoverOriginal}
-          onCancel={() => setConfirmRecovery(false)}
+          onCancel={() => setConfirmRecovery(null)}
         />
       ) : null}
       {props.afterLayout}

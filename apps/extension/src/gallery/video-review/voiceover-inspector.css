@@ -1,10 +1,25 @@
 /* Gallery placement adapts shared recorder views without changing their capture controller. */
+.review-voiceover-header {
+  justify-content: space-between;
+  padding-inline: 8px;
+}
+.review-voiceover-transport {
+  justify-content: space-between;
+  margin-inline: 8px;
+  padding-block-start: 8px;
+  border-block-start: 1px solid var(--sniptale-color-field-border);
+}
+.review-voiceover-inspector [data-ui='audio-recording.setup'] {
+  gap: 4px;
+}
 .review-voiceover-inspector [data-ui='audio-recording.setup'] > div:last-child {
   grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
+  gap: 4px;
+  padding-inline: 8px;
 }
 .review-voiceover-inspector [data-ui='audio-recording.setup'] > div:last-child > span {
   width: 100%;
+  min-height: 32px;
   flex-direction: row-reverse;
   justify-content: space-between;
 }
@@ -17,7 +32,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) 64px auto 40px;
   column-gap: 6px;
-  min-height: 40px;
+  min-height: 32px;
 }
 .review-voiceover-inspector [data-ui='audio-recording.duration-limit'] {
   grid-column: 4;
@@ -33,15 +48,8 @@
   grid-column: 2;
   grid-row: 1;
   min-width: 0;
+  min-height: 32px;
   padding-inline: 6px;
-  background: transparent;
-  border-color: transparent;
-}
-.review-voiceover-inspector [data-ui='audio-recording.duration-options'] input:focus {
-  background: var(--sniptale-color-surface-input);
-  border-color: var(--sniptale-color-border-soft);
-  box-shadow: none;
-  outline: none;
 }
 .review-voiceover-inspector [data-ui='audio-recording.duration-options'] input + span {
   grid-column: 3;

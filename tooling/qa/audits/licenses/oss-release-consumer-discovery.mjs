@@ -25,8 +25,13 @@ const SELF_PATHS = new Set([
   'tooling/qa/audits/licenses/oss-release-surface/check.mjs',
   'tooling/release/policy/oss-release-policy.mjs',
 ]);
-const FONT_LITERAL_PATTERN =
-  /(?:golos-(?:ui|text)-vf\.woff2|@sniptale\/ui\/styles\/(?:interface|document)-font|marck-script-(?:cyrillic|latin)-400-normal\.woff2|@fontsource\/marck-script\/files\/marck-script-)/u;
+const FONT_LITERAL_PATTERNS = [
+  /golos-(?:ui|text)-vf\.woff2/u,
+  /@sniptale\/ui\/styles\/(?:interface|document)-font/u,
+  /marck-script-(?:cyrillic|latin)-400-normal\.woff2/u,
+  /(?:jetbrains-mono|literata|oswald)-(?:cyrillic|latin)-wght-normal\.woff2/u,
+  /@fontsource\/marck-script\/files\/marck-script-/u,
+];
 const VALIDATOR_PATTERN =
   /(?:qa\.rule\.oss-release-surface|verify-oss-release-surface(?:\.mjs)?|OSS release surface)/u;
 const ARCHIVE_PATTERN =
@@ -60,7 +65,8 @@ function categoriesFor(relativePath, contents) {
   const categories = [];
   if (VALIDATOR_PATTERN.test(contents)) categories.push('validator-integration');
   if (ARCHIVE_PATTERN.test(contents)) categories.push('archive-integration');
-  if (FONT_LITERAL_PATTERN.test(contents)) categories.push('bundled-font');
+  if (FONT_LITERAL_PATTERNS.some((pattern) => pattern.test(contents)))
+    categories.push('bundled-font');
   if (relativePath.endsWith('package.json') && RELEASE_COMMAND_PATTERN.test(contents)) {
     categories.push('release-command');
   }

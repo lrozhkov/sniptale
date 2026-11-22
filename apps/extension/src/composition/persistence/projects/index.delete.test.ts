@@ -302,11 +302,15 @@ it('persists and completes physical deletion after removing the last asset owner
             id: 'asset-final',
             mimeType: 'video/mp4',
             size: 10,
+            originMediaId: 'original',
           }
         : undefined
   );
 
-  await expect(deleteVideoProject('project-1')).resolves.toEqual(['asset-final']);
+  await expect(deleteVideoProject('project-1')).resolves.toEqual({
+    deletedProjectAssetIds: ['asset-final'],
+    originalMediaIds: ['original'],
+  });
 
   expect(deleteMocks.txPutMock).toHaveBeenCalledWith(
     expect.objectContaining({ assetIds: ['object-final'], kind: 'physical-delete' })
@@ -521,6 +525,94 @@ it.each(['save-failure', 'delete-failure'] as const)(
         : deleteVideoProject(parent.id);
     await expect(run).rejects.toThrow('release journal failed');
     expect(names.map(table)).toEqual(before);
+    expect(deleteMocks.completePhysicalDeleteOperationMock).not.toHaveBeenCalled();
+  }
+);
+
+it('rolls back inverse ownership and the root when later source release fails', async () => {
+  const { deleteVideoProject } = await import('./index');
+  const { parent, table } = await installNestedResourceGraph(true);
+  const history = {
+    version: 1 as const,
+    epoch: 'epoch',
+    past: [{ assetId: 'inverse' }],
+    future: [],
+    sources: [],
+  };
+  table('video_projects').set(parent.id, { ...parent, history });
+  table('video_workspaces').clear();
+  const owner = {
+    ownerKind: 'video-project-history',
+    ownerId: parent.id,
+    role: 'history:change:inverse',
+    assetId: 'inverse',
+  };
+  table('asset_owners').set(String([owner.ownerKind, owner.ownerId, owner.role]), owner);
+  table('asset_refs').set('inverse', { assetId: 'inverse' });
+  const names = [
+    'video_projects',
+    'asset_owners',
+    'asset_refs',
+    'project_assets',
+    'video_project_revisions',
+    'media_library',
+    'aggregate_presentations',
+    'asset_operations',
+  ];
+  const before = names.map((name) => structuredClone(table(name)));
+  await expect(deleteVideoProject(parent.id)).rejects.toThrow('release journal failed');
+  expect(names.map(table)).toEqual(before);
+  expect(deleteMocks.completePhysicalDeleteOperationMock).not.toHaveBeenCalled();
+});
+
+it('returns a Library original held only in the deleted Montage history', async () => {
+  const { deleteVideoProject } = await import('./index');
+  const { parent, table } = await installNestedResourceGraph();
+  table('video_projects').set(parent.id, {
+    ...parent,
+    project: { ...parent.project, assets: [], clips: [] },
+    history: {
+      version: 1,
+      epoch: 'epoch',
+      past: [{ assetId: 'inverse' }],
+      future: [],
+      sources: [{ kind: 'library-asset', id: 'history-original' }],
+    },
+  });
+  await expect(deleteVideoProject(parent.id)).resolves.toEqual({
+    deletedProjectAssetIds: [],
+    originalMediaIds: ['history-original'],
+  });
+});
+
+it.each([0, 1])(
+  'releases inverse ownership on project deletion with %s other owners',
+  async (others) => {
+    const { deleteVideoProjectInTransaction } = await import('./index.delete');
+    const { createProjectDeletionStores } = await import('./mutation-stores');
+    const { buildPhysicalDeleteOperation } = await import('../assets');
+    const db = await deleteMocks.initDBMock();
+    const { tx } = createProjectDeletionStores(db);
+    deleteMocks.txGetMock.mockResolvedValue({
+      ...createVideoProjectEntry(),
+      history: {
+        version: 1,
+        epoch: 'epoch',
+        past: [{ assetId: 'inverse' }],
+        future: [{ assetId: 'inverse' }],
+        sources: [],
+      },
+    });
+    deleteMocks.txCountMock.mockResolvedValue(others);
+    const operation = buildPhysicalDeleteOperation([]);
+    await deleteVideoProjectInTransaction(tx, 'project-1', operation);
+    expect(deleteMocks.txDeleteMock).toHaveBeenCalledWith([
+      'video-project-history',
+      'project-1',
+      'history:change:inverse',
+    ]);
+    expect(operation.assetIds).toEqual(others ? [] : ['inverse']);
+    expect(deleteMocks.txDeleteMock).toHaveBeenCalledWith('project-1');
     expect(deleteMocks.completePhysicalDeleteOperationMock).not.toHaveBeenCalled();
   }
 );

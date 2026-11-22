@@ -44,6 +44,7 @@ it('retains manual camera controls and forwards their draft without a hybrid dec
       selectVisible: vi.fn(),
       selection: { kind: 'webcam' },
       time: 1,
+      sourceTime: 1,
     },
   };
   const main = createRef<HTMLVideoElement>();
@@ -109,6 +110,7 @@ it('clears a drag draft through the independent callback after detailed mode swi
       selectVisible: vi.fn(),
       selection: { kind: 'webcam' },
       time: 1,
+      sourceTime: 1,
     },
   };
   const main = createRef<HTMLVideoElement>();

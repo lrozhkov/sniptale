@@ -80,7 +80,7 @@ function ColorEditor(props: {
   const SourceIcon = SOURCE_ICONS[props.source];
   const sourceTitle = `${translate('content.stepBadge.colorSourceLabel')} — ${getSourceLabel(props.source)}`;
   return (
-    <PropertyField label={props.label} valueMinimum={178}>
+    <PropertyField label={props.label}>
       <div className="flex min-w-0 items-center gap-1.5">
         <fieldset
           className={
@@ -156,7 +156,6 @@ export function StepBadgeSizeSection(props: StepBadgeAppearanceProps & { embedde
         step={1}
         unit="px"
         value={style.sizeSource === 'frame-border' ? linkedDiameter : style.diameter}
-        scrub={{ min: 16, max: 160, step: 1 }}
         onPreviewValue={(diameter) => updateStyle({ diameter: Math.round(diameter) })}
         onCommitValue={(diameter) => updateStyle({ diameter: Math.round(diameter) })}
       />
@@ -221,7 +220,6 @@ export function StepBadgeColorSection(props: StepBadgeAppearanceProps & { embedd
         step={1}
         unit="px"
         value={style.outlineWidth ?? 2}
-        scrub={{ min: 0, max: 20, step: 1 }}
         onPreviewValue={(outlineWidth) => updateStyle({ outlineWidth })}
         onCommitValue={(outlineWidth) => updateStyle({ outlineWidth })}
       />

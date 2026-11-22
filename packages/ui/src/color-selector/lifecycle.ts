@@ -63,7 +63,9 @@ function useEscapeDismiss(args: {
     }
 
     const trigger = pickerOpen
-      ? rootRef.current?.querySelector<HTMLButtonElement>('button')
+      ? rootRef.current?.querySelector<HTMLButtonElement>(
+          '[data-ui="shared.ui.color-selector.picker-trigger"]'
+        )
       : rootRef.current?.querySelector<HTMLButtonElement>('button[aria-expanded]');
     const handleDocumentKeyDown = (event: Event) => {
       if ('key' in event && event.key === 'Escape') {

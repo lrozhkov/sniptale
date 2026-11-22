@@ -74,7 +74,7 @@ export function ReviewCanvasSettings(props: {
   return (
     <section
       ref={section}
-      className="review-inspector-columns"
+      className="sniptale-parameter-stack"
       data-ui="gallery.videoReview.canvasSettings"
     >
       <SelectField
@@ -115,7 +115,6 @@ export function ReviewCanvasSettings(props: {
       <SegmentedRow
         columns={2}
         label={translate('gallery.videoReview.sourceCropMode')}
-        layout="stacked"
         ariaLabel={translate('gallery.videoReview.sourceCropMode')}
         value={props.canvas?.crop ? 'crop' : 'fit'}
         options={[
@@ -201,6 +200,7 @@ export function ReviewSceneAudio(props: {
             <ReviewNumberRow
               key={lane.key}
               label={translate(lane.label)}
+              rangePresentation="field"
               unit="%"
               value={Math.round(lane.volume * 100)}
               min={0}
@@ -221,7 +221,7 @@ export function ReviewWindowHeaderSettings(props: {
   onChange?: ((header: QuickEditWindowHeader | undefined) => void) | undefined;
 }) {
   return (
-    <section data-ui="gallery.videoReview.windowHeader">
+    <section className="sniptale-parameter-stack" data-ui="gallery.videoReview.windowHeader">
       <WindowHeaderSettings
         key={props.identity}
         header={props.header}

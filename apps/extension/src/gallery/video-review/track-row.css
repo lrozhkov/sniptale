@@ -239,9 +239,10 @@
 [data-ui='gallery.videoReview.trackHeader'][data-review-header-selected='true'][data-review-header-muted='true'] {
   background-color: var(--sniptale-color-surface-input);
 }
-[data-review-multi-selected='true'],
+.review-timeline-item-selected,
+[data-review-multi-selected='true']:not(:has(.review-timeline-item)),
 [data-review-multi-selected='true'] .review-timeline-item {
-  border-color: var(--sniptale-color-accent);
+  border: 1px solid var(--sniptale-color-field-focus);
   --review-item-foreground: var(--sniptale-color-text-primary);
   --review-label-weight: 600;
 }
@@ -287,4 +288,26 @@
     var(--sniptale-color-text-secondary)
   );
   background: var(--review-interaction-item-background);
+}
+
+/* Lane paint stays below the pinned rows and the timeline-wide overlays. */
+[data-review-track] {
+  isolation: isolate;
+}
+
+[data-review-track-pinned] {
+  position: sticky;
+  top: var(--review-pinned-track-top, auto);
+  z-index: 15;
+  background: var(--sniptale-color-surface-panel);
+}
+
+[data-review-track-pinned]::before {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 100%;
+  height: var(--review-pinned-track-gap, 0px);
+  background: inherit;
+  content: '';
+  pointer-events: none;
 }

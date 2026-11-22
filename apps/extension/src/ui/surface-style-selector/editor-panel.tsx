@@ -1,16 +1,9 @@
+import { ProductInput, ProductTextarea } from '@sniptale/ui/product-form-controls';
 import type { SurfaceStyle } from '@sniptale/runtime-contracts/highlighter/surface-style';
 import { translate } from '../../platform/i18n';
 import { CompactPaintSelector } from '../paint-selector';
 import type { SurfaceStyleSelectorProps } from './types';
 
-const FIELD_CLASS_NAME = [
-  'w-full rounded-[9px] border px-2.5 text-xs outline-none transition',
-  'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_68%,transparent)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_72%,transparent)]',
-  'text-[var(--sniptale-color-text-primary)]',
-  'focus:border-[color:color-mix(in_srgb,var(--sniptale-color-accent)_55%,var(--sniptale-color-border-soft))]',
-  'focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--sniptale-color-accent)_14%,transparent)]',
-].join(' ');
 const BUTTON_CLASS_NAME = [
   'min-h-8 rounded-[8px] border px-3 text-xs font-semibold transition',
   'border-[var(--sniptale-color-border-soft)]',
@@ -55,11 +48,12 @@ export function SurfaceStyleEditorPanel(props: {
       />
       <label className="grid gap-1.5 text-[11px] font-medium text-[var(--sniptale-color-text-muted)]">
         {translate('content.callout.surfaceStyle.advancedCss')}
-        <textarea
+        <ProductTextarea
+          invalid={props.canonicalCss === null}
           value={props.draft.surfaceCss}
           maxLength={4000}
           rows={5}
-          className={`${FIELD_CLASS_NAME} min-h-24 resize-y py-2 font-mono leading-relaxed`}
+          className="min-h-24 font-mono! leading-relaxed!"
           onChange={(event) =>
             props.onDraftChange({ ...props.draft, surfaceCss: event.target.value })
           }
@@ -72,9 +66,8 @@ export function SurfaceStyleEditorPanel(props: {
       ) : null}
       <label className="grid gap-1.5 text-[11px] font-medium text-[var(--sniptale-color-text-muted)]">
         {translate('content.callout.surfaceStyle.name')}
-        <input
+        <ProductInput
           aria-label={translate('content.callout.surfaceStyle.name')}
-          className={`${FIELD_CLASS_NAME} h-9`}
           maxLength={80}
           value={props.name}
           onChange={(event) => props.onNameChange(event.target.value)}

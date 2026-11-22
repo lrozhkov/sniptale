@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { NumberInput } from '@sniptale/ui/number-input';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { createDimensionDraftActions } from './dimension-input.helpers';
@@ -87,7 +88,8 @@ const DimensionInputField: React.FC<DimensionInputFieldProps> = ({
           'shadow-[inset_0_1px_0_color-mix(in_srgb,var(--sniptale-color-border-strong)_22%,transparent)]',
         ].join(' ')}
       >
-        <input
+        <NumberInput
+          onNumericStep={applyStep}
           aria-label={label}
           type="text"
           inputMode="numeric"

@@ -327,10 +327,13 @@ it('keeps standalone tools visible and mutually exclusive when the frame is off'
   expect(onChange).not.toHaveBeenCalled();
 });
 
-it('offers explicit element and free placement through the existing segmented control', () => {
+it('offers element and free placement through the shared property segments', () => {
   const onChange = vi.fn();
   act(() => root.render(<AnnotationCreationPlacement value="element" onChange={onChange} />));
-  const buttons = host.querySelectorAll<HTMLButtonElement>('button[aria-pressed]');
+  const group = host.querySelector('[data-property-segments]');
+  const buttons = group?.querySelectorAll<HTMLButtonElement>('button[data-segment-face]');
+  expect(buttons).toBeDefined();
+  if (!buttons) throw new Error('Missing placement segments');
   expect(buttons).toHaveLength(2);
   expect(buttons[0]!.getAttribute('aria-pressed')).toBe('true');
   expect(buttons[1]!.getAttribute('aria-pressed')).toBe('false');

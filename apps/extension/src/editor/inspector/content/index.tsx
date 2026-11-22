@@ -47,6 +47,7 @@ export const EditorInspectorContent: React.FC<EditorInspectorContentProps> = (pr
   return (
     <>
       <div
+        data-compact-select-menu-bounds=""
         className={[
           'sniptale-inspector-surface editor-inspector-surface sniptale-parameter-stack',
           props.inspector === 'frame' ? 'h-full min-h-0' : '',

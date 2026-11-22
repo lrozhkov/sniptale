@@ -1,7 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { isEditorVectorInstance } from '../../../../apps/extension/src/features/editor/document/vector-element';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { expect, test } from '../support/extension-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { EDITOR_HARNESS_PATH, SETTINGS_HARNESS_PATH } from '../extension-critical.helpers';
@@ -227,6 +227,63 @@ async function noHorizontalScroll(page: Page) {
 }
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`vector collection search keeps clear and keyboard navigation ${viewport.name}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    await openFixture(page, hostOrigin, viewport.size);
+    await importFiles(page, false);
+    const trigger = ui(page, 'collection').getByRole('button');
+    await trigger.press('Enter');
+    const searchLabel = translate('editor.elements.searchCollections', 'en');
+    const search = page.getByRole('searchbox', { name: searchLabel, exact: true });
+    const list = page.getByRole('listbox', {
+      name: translate('editor.elements.collectionFilter', 'en'),
+      exact: true,
+    });
+    const noMatches = list.getByText(translate('editor.elements.emptySearch', 'en'));
+    const clear = page.getByRole('button', {
+      name: translate('shared.ui.clearField', 'en').replace('{field}', searchLabel),
+      exact: true,
+    });
+    await expect(search).toBeFocused();
+    expect(await search.evaluate((input) => getComputedStyle(input, '::placeholder').color)).toBe(
+      'rgba(0, 0, 0, 0)'
+    );
+    const bounds = await search.boundingBox();
+    await search.fill('no such collection');
+    await expect(noMatches).toBeVisible();
+    await page.screenshot({
+      path: info.outputPath('collection-search-empty.png'),
+      fullPage: false,
+    });
+    await expect(clear).toBeVisible();
+    expect(await search.boundingBox()).toEqual(bounds);
+    expect(await clear.boundingBox()).toMatchObject({ width: 24, height: 24 });
+    await search.press('Tab');
+    await expect(clear).toBeFocused();
+    await clear.press('Enter');
+    await expect(search).toHaveValue('');
+    await expect(search).toBeFocused();
+    await expect(noMatches).toBeHidden();
+    await search.fill('Proof collection');
+    const proof = list.getByRole('option', { name: 'Proof collection', exact: true });
+    await search.press('ArrowDown');
+    await expect(proof).toBeFocused();
+    await proof.press('ArrowUp');
+    await expect(search).toBeFocused();
+    await search.press('Enter');
+    await expect(list).toBeHidden();
+    await expect(trigger).toContainText('Proof collection');
+    await expect(trigger).toBeFocused();
+    await trigger.press('Enter');
+    await expect(search).toHaveValue('');
+    await search.press('Escape');
+    await expect(list).toBeHidden();
+    await expect(trigger).toBeFocused();
+    await noHorizontalScroll(page);
+  });
+
   test(`vector local imports Add Enter selection and library persistence ${viewport.name}`, async ({
     page,
     hostOrigin,

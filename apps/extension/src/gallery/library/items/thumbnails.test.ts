@@ -1,5 +1,6 @@
 import { createRemoteRootGalleryItem } from './adapters';
 import { beforeEach, expect, it, vi } from 'vitest';
+import { createImageProjectItem } from '../test-support/items';
 import {
   createMediaItem,
   createScenarioItem,
@@ -92,6 +93,41 @@ beforeEach(() => {
   getAggregatePresentationMock.mockResolvedValue(undefined);
   getGalleryProjectCoverMock.mockResolvedValue(undefined);
 });
+
+it('reads the image project thumbnail without reaching for the original file', async () => {
+  const item = createImageProjectItem();
+  const thumbnailBlob = new Blob(['project'], { type: 'image/png' });
+  getAggregatePresentationMock.mockResolvedValueOnce({ thumbnailBlob, updatedAt: 2 });
+
+  await expect(ensureGalleryItemThumbnail(item)).resolves.toMatchObject({
+    assetId: item.id,
+    blob: thumbnailBlob,
+  });
+  expect(getAggregatePresentationMock).toHaveBeenCalledExactlyOnceWith({
+    id: item.entityId,
+    kind: 'image',
+  });
+  expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
+});
+
+it.each([{ kind: 'screenshot' }, { kind: 'stored-asset', assetId: 'asset-1' }] as const)(
+  'builds the thumbnail of a $kind original without a presentation',
+  async (storage) => {
+    const item = createMediaItem({
+      kind: 'screenshot',
+      source: storage,
+      imageContentState: 'original',
+    });
+    const source = new Blob(['original'], { type: 'image/png' });
+    const thumbnail = new Blob(['thumbnail'], { type: 'image/png' });
+    getMediaThumbnailMock.mockResolvedValueOnce(undefined);
+    getMediaAssetBlobMock.mockResolvedValueOnce(source);
+    createImageThumbnailBlobMock.mockResolvedValueOnce(thumbnail);
+
+    await expect(ensureGalleryItemThumbnail(item)).resolves.toMatchObject({ blob: thumbnail });
+    expect(getMediaAssetBlobMock).toHaveBeenCalledExactlyOnceWith(item.entityId);
+  }
+);
 
 it('returns existing thumbnails without rebuilding them', async () => {
   const existingThumbnail = {

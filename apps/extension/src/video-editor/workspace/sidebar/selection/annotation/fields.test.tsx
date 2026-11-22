@@ -1,6 +1,20 @@
+import {
+  videoeditorFixtureMessages,
+  prepareVideoEditorTranslations,
+} from '../../../../testing/translations.test-support';
+
+vi.mock('../../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: Parameters<typeof videoeditorFixtureMessages>[0]) =>
+    videoeditorFixtureMessages(locale)
+  ),
+}));
+
+beforeAll(async () => {
+  await prepareVideoEditorTranslations('en');
+});
 import { InspectorGroupedPanel } from '../grouped-inspector';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   APPLE_GLASS_ANNOTATION_PACK,
   CURSOR_OPS_ANNOTATION_PACK,
@@ -20,7 +34,7 @@ import { AnnotationFields, createAnnotationGroups } from './fields';
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
-  translate: (key: string) => key,
+  translate: (key: string) => `localized:${key}`,
   useAppLocale: () => 'en',
 }));
 

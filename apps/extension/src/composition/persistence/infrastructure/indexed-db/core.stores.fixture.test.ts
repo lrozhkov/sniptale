@@ -26,6 +26,40 @@ function canonicalize(value: unknown): string {
   return JSON.stringify(value);
 }
 
+it('admits Montage history without changing released data or other domain contracts', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 64
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 65
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, videoProjects: 14 });
+  expect(DATABASE_MIGRATIONS.find((step) => step.toDatabaseVersion === 65)).toMatchObject({
+    fromDatabaseVersion: 64,
+    risk: 'additive',
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'videoProjects', from: 13, to: 14 }],
+  });
+});
+
+it('admits inline Montage history without rewriting released data or immutable files', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 65
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 66
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, videoProjects: 15 });
+});
+
 it('admits known-source receipts without rewriting any released rows or object bytes', () => {
   const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
     (fixture) => fixture.databaseVersion === 25
@@ -437,7 +471,7 @@ it('adds empty capture and native revision stores without rewriting version 39 r
   expect(
     PERSISTENCE_DOMAIN_REGISTRY.find((domain) => domain.domainId === 'videoProjects')
   ).toMatchObject({
-    schemaVersion: 13,
+    schemaVersion: 16,
     stores: expect.arrayContaining([
       { storeName: 'video_project_revisions', dataClass: 'durable-authority' },
     ]),
@@ -877,4 +911,96 @@ it('admits retained raster documents without changing any released row, store, i
     mediaLibrary: 38,
     scenarioProjects: 11,
   });
+});
+
+it('adds the Scenario deletion fence without changing released content or immutable bytes', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 62
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 63
+  )!;
+  expect(target.records).toEqual({ ...source.records, scenario_project_revisions: [] });
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores.filter((name) => name !== 'scenario_project_revisions')).toEqual(
+    source.stores
+  );
+  expect(target.indexes).toEqual({ ...source.indexes, scenario_project_revisions: [] });
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, scenarioProjects: 13 });
+});
+
+it('admits editing branch unit references without changing released Scenario data or files', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 63
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 64
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, scenarioProjects: 14 });
+});
+
+it('admits packed Image metadata without rewriting released rows or binary resources', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 66
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 67
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, mediaLibrary: 41 });
+});
+
+it('admits 1000 editor transitions without rewriting released rows or immutable resources', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 67
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 68
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({
+    ...source.domainVersions,
+    mediaLibrary: 42,
+    videoProjects: 16,
+    scenarioProjects: 15,
+  });
+});
+
+it('admits independent Image raster budgets without rewriting version 68 projects or files', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 68
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 69
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, mediaLibrary: 43 });
+});
+
+it('admits quick-edit generations without changing version 69 native rows or files', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 69
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 70
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, mediaLibrary: 44 });
+  expect(buildDatabaseMigrationPlan(70, 69)).toBeNull();
 });

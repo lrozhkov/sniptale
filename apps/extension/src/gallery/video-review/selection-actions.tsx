@@ -2,20 +2,30 @@ import {
   type ReactNode,
   type PointerEvent as ReactPointerEvent,
   createContext,
+  useContext,
   useCallback,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
-import { createPortal } from 'react-dom';
 import type { ReviewSelection } from '../../features/video/review/types';
 import { translate } from '../../platform/i18n';
 import './selection-actions.css';
+import { Copy, Download, RotateCcw, Trash2 } from 'lucide-react';
+import { Icon } from '@iconify/react';
+import containerIcon from '@iconify-icons/tabler/container';
+import { ReviewButton } from './controls';
+import {
+  type ReviewSelectionCommand,
+  type ReviewSelectionCommandSlots,
+} from './selection-command-slots';
 
-type Anchor = { element: HTMLElement; host: HTMLDialogElement; key: string; fraction: number };
+type Anchor = { key: string };
 type Target = Anchor & {
   disabled: boolean;
   commandHost: HTMLFieldSetElement | null;
+  commandSlots: ReviewSelectionCommandSlots;
   dismiss(): void;
 };
 export const ReviewSelectionActionsContext = createContext<Target | null>(null);
@@ -77,8 +87,18 @@ export function useReviewSelectionActions(
   disabled: boolean,
   onSelectKey?: ((key: string | null) => void) | undefined
 ) {
-  const [anchor, setAnchor] = useState<Anchor | null>(null);
+  const selectedKey = reviewTimelineSelectionKey(selection);
+  const [interaction, setInteraction] = useState<{
+    selectionKey: string | null;
+    visible: boolean;
+    multi: boolean;
+    key: string | null | undefined;
+  }>({ selectionKey: selectedKey, visible, multi: false, key: undefined });
   const [commandHost, setHost] = useState<HTMLFieldSetElement | null>(null);
+  const [commandSlots, setSlots] = useState<ReviewSelectionCommandSlots>({});
+  const setSlot = useCallback((action: ReviewSelectionCommand, host: HTMLSpanElement | null) => {
+    setSlots((current) => (current[action] === host ? current : { ...current, [action]: host }));
+  }, []);
   const [keys, setKeys] = useState<readonly string[]>([]);
   const previous = useRef<string | null>(null);
   const deleteAction = useRef<(() => void) | null>(null);
@@ -97,7 +117,38 @@ export function useReviewSelectionActions(
         delete node.dataset['reviewMultiSelected'];
     };
   }, [keys, multi, selection]);
-  const clear = () => setKeys([]);
+  const anchoredKey = interaction.key === undefined ? selectedKey : interaction.key;
+  // Selection/visibility changes expire only transient dismissal or click overrides.
+  // Reset before commit so consumers never lose the new canonical action identity.
+  if (
+    interaction.key !== undefined &&
+    (interaction.selectionKey !== selectedKey ||
+      interaction.visible !== visible ||
+      interaction.multi !== multi)
+  )
+    setInteraction({
+      selectionKey: selectedKey,
+      visible,
+      multi,
+      key:
+        !visible || (multi && selectedKey === null) ? anchoredKey : multi ? selectedKey : undefined,
+    });
+  const setAnchor = useCallback(
+    (key: string | null) => {
+      setInteraction((current) => {
+        const currentKey = current.key === undefined ? selectedKey : current.key;
+        return currentKey === key &&
+          (current.key === undefined ||
+            (current.selectionKey === selectedKey &&
+              current.visible === visible &&
+              current.multi === multi))
+          ? current
+          : { selectionKey: selectedKey, visible, multi, key };
+      });
+    },
+    [selectedKey, visible, multi]
+  );
+  const clear = useCallback(() => setKeys((current) => (current.length ? [] : current)), []);
   const captureModified = (event: ReactPointerEvent): boolean => {
     if (
       disabled ||
@@ -151,12 +202,13 @@ export function useReviewSelectionActions(
     if (!event.shiftKey) previous.current = key;
     const activeKey = next.includes(key) ? key : (next.at(-1) ?? null);
     const activeElement = items.find((item) => reviewTimelineElementKey(item) === activeKey);
-    const host = activeElement?.closest('dialog');
-    setAnchor(
-      activeElement && host && activeKey
-        ? { element: activeElement, host, key: activeKey, fraction: 0.5 }
-        : null
-    );
+    // Modified gestures own an explicit group anchor, including a canonical-key match.
+    setInteraction({
+      selectionKey: selectedKey,
+      visible,
+      multi,
+      key: activeElement && activeKey ? activeKey : null,
+    });
     onSelectKey?.(activeKey);
     event.preventDefault();
     event.stopPropagation();
@@ -167,30 +219,26 @@ export function useReviewSelectionActions(
     if (event.button !== undefined && event.button !== 0) return;
     if (
       !(event.target instanceof Element) ||
-      !event.target.closest('[data-ui="gallery.videoReview.timeline"]')
+      event.target.closest('[data-playback-range-edge]') ||
+      !event.target.closest('[data-ui="gallery.videoReview.timeline"]') ||
+      event.target.closest('[data-ui="gallery.videoReview.toolbar"]')
     )
       return;
     const element = event.target.closest<HTMLElement>(
       '[data-review-removal-key],[data-review-action-key],[data-cursor-focus-key]'
     );
-    const host = element?.closest('dialog');
     const key =
       element?.dataset['reviewRemovalKey'] ??
       element?.dataset['reviewActionKey'] ??
       (element?.dataset['cursorFocusKey']
         ? `cursor-focus:${element.dataset['cursorFocusKey']}`
         : undefined);
-    if (!element || !host || !key) {
+    if (!element || !key) {
       setAnchor(null);
       clear();
       previous.current = null;
       return;
     }
-    const bounds = element.getBoundingClientRect();
-    const fraction =
-      event.clientX === undefined
-        ? 0.5
-        : Math.max(0, Math.min(1, (event.clientX - bounds.left) / Math.max(1, bounds.width)));
     // Modified gestures are admitted after the lane owner updates track focus.
     if (
       !(
@@ -203,182 +251,113 @@ export function useReviewSelectionActions(
       clear();
       previous.current = key;
     }
-    setAnchor({ element, host, key, fraction });
+    setAnchor(key);
   };
+  const captureModifiedRef = useRef(captureModified);
+  captureModifiedRef.current = captureModified;
+  const captureMulti = useCallback(
+    (event: ReactPointerEvent) => captureModifiedRef.current(event),
+    []
+  );
+  const dismiss = useCallback(() => setAnchor(null), [setAnchor]);
+  const target = useMemo(
+    () =>
+      visible && anchoredKey && (multi || anchoredKey === selectedKey)
+        ? { key: anchoredKey, disabled, commandHost, commandSlots, dismiss }
+        : null,
+    [visible, anchoredKey, multi, selectedKey, disabled, commandHost, commandSlots, dismiss]
+  );
+  const multiSelection = useMemo(
+    () => ({ keys, clear, captureModified: captureMulti, deleteAction }),
+    [keys, clear, captureMulti]
+  );
   return {
     capture,
-    multiSelection: { keys, clear, captureModified, deleteAction },
+    multiSelection,
     setHost,
-    target:
-      visible && anchor && (multi || anchor.key === reviewTimelineSelectionKey(selection))
-        ? { ...anchor, disabled, commandHost, dismiss: () => setAnchor(null) }
-        : null,
+    setSlot,
+    target,
   };
 }
 
-/** Moves existing commands inside the active modal; geometry follows the selected timeline item. */
-export function ReviewFloatingSelectionActions({
-  target,
-  onHost,
+const ReviewSelectionActionsHostContext = createContext<{
+  setHost(host: HTMLFieldSetElement | null): void;
+  setSlot(action: ReviewSelectionCommand, host: HTMLSpanElement | null): void;
+  selectInterval?: (() => void) | undefined;
+  fragment?: ReactNode;
+  disabled: boolean;
+} | null>(null);
+
+function ReviewSelectionActionSlot({
+  action,
+  setSlot,
 }: {
-  target: Target;
-  onHost(node: HTMLFieldSetElement | null): void;
+  action: ReviewSelectionCommand;
+  setSlot(action: ReviewSelectionCommand, host: HTMLSpanElement | null): void;
 }) {
-  const panel = useRef<HTMLFieldSetElement>(null);
-  const setPanel = useCallback(
-    (node: HTMLFieldSetElement | null) => {
-      panel.current = node;
-      onHost(node);
-    },
-    [onHost]
+  const ref = useCallback(
+    (host: HTMLSpanElement | null) => setSlot(action, host),
+    [action, setSlot]
   );
-  const { element, host, fraction } = target;
-  useLayoutEffect(() => {
-    const node = panel.current;
-    const view = element.ownerDocument.defaultView;
-    if (!node || !view) return;
-    const fallback = element.closest<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]');
-    let frame = 0;
-    let dragging = false;
-    const update = () => {
-      if (frame) view.cancelAnimationFrame(frame);
-      frame = 0;
-      if (dragging || !element.isConnected || !host.isConnected) {
-        node.hidden = true;
-        return;
-      }
-      const bounds = element.getBoundingClientRect();
-      const limits = host.getBoundingClientRect();
-      let left = limits.left,
-        right = limits.right,
-        top = limits.top,
-        bottom = limits.bottom;
-      for (
-        let parent = element.parentElement;
-        parent && parent !== host;
-        parent = parent.parentElement
-      ) {
-        const style = view.getComputedStyle(parent);
-        const box = parent.getBoundingClientRect();
-        if (/auto|scroll|hidden|clip/.test(style.overflowX)) {
-          left = Math.max(left, box.left);
-          right = Math.min(right, box.right);
-        }
-        if (/auto|scroll|hidden|clip/.test(style.overflowY)) {
-          top = Math.max(top, box.top);
-          bottom = Math.min(bottom, box.bottom);
-        }
-      }
-      if (
-        bounds.right <= left ||
-        bounds.left >= right ||
-        bounds.bottom <= top ||
-        bounds.top >= bottom
-      ) {
-        node.hidden = true;
-        return;
-      }
-      node.hidden = false;
-      if (!node.childElementCount) {
-        node.style.visibility = 'hidden';
-        return;
-      }
-      node.style.maxWidth = `${Math.max(0, limits.width - 16)}px`;
-      const size = node.getBoundingClientRect();
-      const anchorX = Math.max(left, Math.min(right, bounds.left + bounds.width * fraction));
-      const panelLeft = Math.max(
-        limits.left + 8,
-        Math.min(limits.right - size.width - 8, anchorX - size.width / 2)
-      );
-      const above = bounds.top - size.height - 10 >= limits.top + 8;
-      const panelTop = above ? bounds.top - size.height - 10 : bounds.bottom + 10;
-      node.style.left = `${panelLeft}px`;
-      node.style.top = `${Math.max(limits.top + 8, Math.min(limits.bottom - size.height - 8, panelTop))}px`;
-      node.style.setProperty(
-        '--review-actions-tail-x',
-        `${Math.max(12, Math.min(size.width - 12, anchorX - panelLeft))}px`
-      );
-      node.dataset['tailSide'] = above ? 'bottom' : 'top';
-      node.style.visibility = 'visible';
-    };
-    const schedule = () => {
-      if (!frame) frame = view.requestAnimationFrame(update);
-    };
-    const move = (event: PointerEvent) => {
-      if (
-        (event.buttons & 1) !== 0 &&
-        event.target instanceof Element &&
-        event.target.closest('[data-ui="gallery.videoReview.timeline"]') &&
-        event.target.closest(
-          '[data-review-removal-key],[data-review-action-key],[data-cursor-focus-key]'
-        )
-      ) {
-        dragging = true;
-        node.hidden = true;
-        return;
-      }
-      if (event.buttons === 0) dragging = false;
-      schedule();
-    };
-    const finish = () => {
-      dragging = false;
-      schedule();
-    };
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(element);
-    observer.observe(node);
-    observer.observe(host);
-    // Portal commands arrive after the host ref. Measure them before their first paint.
-    const contentObserver = new MutationObserver(update);
-    contentObserver.observe(node, { childList: true, subtree: true });
-    element.ownerDocument.addEventListener('scroll', schedule, true);
-    view.addEventListener('resize', schedule);
-    view.addEventListener('pointermove', move, true);
-    view.addEventListener('pointerup', finish, true);
-    view.addEventListener('pointercancel', finish, true);
-    view.addEventListener('blur', finish);
-    return () => {
-      observer.disconnect();
-      contentObserver.disconnect();
-      view.cancelAnimationFrame(frame);
-      element.ownerDocument.removeEventListener('scroll', schedule, true);
-      view.removeEventListener('resize', schedule);
-      view.removeEventListener('pointermove', move, true);
-      view.removeEventListener('pointerup', finish, true);
-      view.removeEventListener('pointercancel', finish, true);
-      view.removeEventListener('blur', finish);
-      if (node.contains(element.ownerDocument.activeElement)) {
-        const destination = element.isConnected ? element : fallback?.isConnected ? fallback : null;
-        destination?.focus({ preventScroll: true });
-      }
-    };
-  }, [element, host, fraction]);
-  return createPortal(
+  const Glyph = action === 'duplicate' ? Copy : action === 'reset' ? RotateCcw : Trash2;
+  const label = translate(
+    action === 'duplicate'
+      ? 'gallery.videoReview.selectionDuplicate'
+      : action === 'reset'
+        ? 'gallery.videoReview.selectionReset'
+        : 'gallery.videoReview.deleteSelected'
+  );
+  return (
+    <span ref={ref} className="review-selection-action-slot" data-selection-slot={action}>
+      <ReviewButton label={label} disabled className="review-selection-action-fallback">
+        <Glyph size={16} aria-hidden="true" />
+      </ReviewButton>
+    </span>
+  );
+}
+
+/** The main toolbar hosts the selected object's existing commands. */
+export function ReviewSelectionActionsToolbar() {
+  const target = useContext(ReviewSelectionActionsContext);
+  const host = useContext(ReviewSelectionActionsHostContext);
+  if (!host) return null;
+  return (
     <fieldset
-      ref={setPanel}
       role="toolbar"
       aria-label={translate('gallery.videoReview.actionActions')}
       data-ui="gallery.videoReview.selectionActions"
-      className="review-floating-selection-actions"
-      disabled={target.disabled}
-      style={{ position: 'fixed', visibility: 'hidden' }}
+      className="review-timeline-selection-actions"
+      disabled={host.disabled}
       onPointerDown={(event) => event.stopPropagation()}
       onKeyDown={(event) => {
-        if (event.key === 'Tab') {
-          const workspace = target.host.querySelector<HTMLElement>(
-            '[data-ui="gallery.videoReview.workspaceScroll"]'
-          );
-          if (workspace) delete workspace.dataset['reviewPointerSelection'];
-        }
         if (event.key === 'Escape') {
           event.preventDefault();
           event.stopPropagation();
-          target.dismiss();
+          target?.dismiss();
         }
       }}
-    />,
-    target.host
+    >
+      <span className="review-selection-action-slot" data-selection-slot="interval">
+        <ReviewButton
+          label={translate('gallery.videoReview.selectionInterval')}
+          disabled={!host.selectInterval || (target?.disabled ?? true)}
+          onClick={host.selectInterval}
+        >
+          <Icon icon={containerIcon} width={16} height={16} aria-hidden="true" />
+        </ReviewButton>
+      </span>
+      <span className="review-selection-action-slot" data-selection-slot="fragment">
+        {host.fragment ?? (
+          <ReviewButton label={translate('gallery.videoReview.downloadSelection')} disabled>
+            <Download size={16} />
+          </ReviewButton>
+        )}
+      </span>
+      {(['duplicate', 'reset', 'delete'] as const).map((action) => (
+        <ReviewSelectionActionSlot key={action} action={action} setSlot={host.setSlot} />
+      ))}
+      <fieldset ref={host.setHost} className="review-selection-specific-actions" />
+    </fieldset>
   );
 }
 
@@ -388,6 +367,8 @@ export function ReviewSelectionActionsSurface(props: {
   visible: boolean;
   disabled: boolean;
   onSelectKey?: ((key: string | null) => void) | undefined;
+  onSelectInterval?: ((keys: readonly string[]) => void) | undefined;
+  fragmentAction?: ((keys: readonly string[]) => ReactNode) | undefined;
   children: ReactNode;
 }) {
   const actions = useReviewSelectionActions(
@@ -396,60 +377,105 @@ export function ReviewSelectionActionsSurface(props: {
     props.disabled,
     props.onSelectKey
   );
+  const { onSelectInterval, fragmentAction, disabled } = props;
+  const hosts = useMemo(
+    () => ({
+      setHost: actions.setHost,
+      setSlot: actions.setSlot,
+      fragment: fragmentAction?.(actions.multiSelection.keys),
+      disabled,
+      selectInterval: onSelectInterval
+        ? () => onSelectInterval(actions.multiSelection.keys)
+        : undefined,
+    }),
+    [
+      actions.setHost,
+      actions.setSlot,
+      actions.multiSelection.keys,
+      onSelectInterval,
+      fragmentAction,
+      disabled,
+    ]
+  );
+  const pointer = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   return (
     <ReviewTimelineMultiSelectionContext value={actions.multiSelection}>
       <ReviewSelectionActionsContext value={actions.target}>
-        {actions.target ? (
-          <ReviewFloatingSelectionActions target={actions.target} onHost={actions.setHost} />
-        ) : null}
-        <div
-          data-ui="gallery.videoReview.workspaceScroll"
-          className="h-full min-h-0 overflow-x-auto overflow-y-hidden"
-          onPointerDownCapture={(event) => {
-            event.currentTarget.dataset['reviewPointerSelection'] = 'true';
-            actions.capture(event);
-          }}
-          onClickCapture={(event) => {
-            if (
-              (event.ctrlKey || event.metaKey || event.shiftKey) &&
-              event.target instanceof Element &&
-              event.target.closest(
-                '[data-review-removal-key],[data-review-action-key],[data-cursor-focus-key]'
+        <ReviewSelectionActionsHostContext value={hosts}>
+          <div
+            data-ui="gallery.videoReview.workspaceScroll"
+            className="h-full min-h-0 overflow-x-auto overflow-y-hidden"
+            onPointerDownCapture={(event) => {
+              event.currentTarget.dataset['reviewPointerSelection'] = 'true';
+              pointer.current =
+                event.button === 0 &&
+                event.target instanceof Element &&
+                !event.target.closest('[data-ui="gallery.videoReview.toolbar"]') &&
+                event.target.closest(
+                  '[data-review-removal-key],[data-review-action-key],[data-cursor-focus-key]'
+                )
+                  ? { x: event.clientX, y: event.clientY, moved: false }
+                  : null;
+            }}
+            onPointerMoveCapture={(event) => {
+              const current = pointer.current;
+              if (current && event.buttons)
+                current.moved ||=
+                  Math.hypot(event.clientX - current.x, event.clientY - current.y) > 3;
+            }}
+            onPointerCancelCapture={() => {
+              pointer.current = null;
+            }}
+            onClickCapture={(event) => {
+              const moved = event.detail > 0 && pointer.current?.moved;
+              pointer.current = null;
+              if (moved) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+              }
+              actions.capture(event);
+              if (
+                (event.ctrlKey || event.metaKey || event.shiftKey) &&
+                event.target instanceof Element &&
+                event.target.closest(
+                  '[data-review-removal-key],[data-review-action-key],[data-cursor-focus-key]'
+                )
+              ) {
+                event.preventDefault();
+                event.stopPropagation();
+              }
+            }}
+            onKeyDownCapture={(event) => {
+              if (
+                ['Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(
+                  event.key
+                )
               )
-            ) {
-              event.preventDefault();
-              event.stopPropagation();
-            }
-          }}
-          onKeyDownCapture={(event) => {
-            if (
-              ['Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(
-                event.key
-              )
-            )
-              delete event.currentTarget.dataset['reviewPointerSelection'];
-            if (
-              actions.multiSelection.keys.length > 1 &&
-              (event.key === 'Delete' || event.key === 'Backspace') &&
-              event.target instanceof Element &&
-              !event.target.closest('input,textarea,[contenteditable="true"]')
-            ) {
-              event.preventDefault();
-              event.stopPropagation();
-              actions.multiSelection.deleteAction.current?.();
-              return;
-            }
-            if (event.key === 'Escape' && actions.multiSelection.keys.length > 1) {
-              event.preventDefault();
-              event.stopPropagation();
-              actions.multiSelection.clear();
-              return;
-            }
-            if (event.key === 'Enter' || event.key === ' ') actions.capture(event);
-          }}
-        >
-          {props.children}
-        </div>
+                delete event.currentTarget.dataset['reviewPointerSelection'];
+              if (
+                actions.multiSelection.keys.length > 1 &&
+                (event.key === 'Delete' || event.key === 'Backspace') &&
+                event.target instanceof Element &&
+                !event.target.closest('input,textarea,[contenteditable="true"]')
+              ) {
+                event.preventDefault();
+                event.stopPropagation();
+                actions.multiSelection.deleteAction.current?.();
+                return;
+              }
+              if (event.key === 'Escape' && actions.multiSelection.keys.length > 1) {
+                event.preventDefault();
+                event.stopPropagation();
+                actions.multiSelection.clear();
+                return;
+              }
+              if (event.key === 'Enter' || event.key === ' ') actions.capture(event);
+            }}
+          >
+            {props.children}
+          </div>
+        </ReviewSelectionActionsHostContext>
       </ReviewSelectionActionsContext>
     </ReviewTimelineMultiSelectionContext>
   );

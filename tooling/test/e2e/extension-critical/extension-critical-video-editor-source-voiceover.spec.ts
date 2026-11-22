@@ -1,10 +1,11 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { hydrateVideoProject } from '../../../../apps/extension/src/features/video/project/hydration';
 import {
   checkInspectorPaintedFont,
   checkInspectorParameterRows,
 } from '../support/inspector-utilities';
 import { readNativeVideoProject } from '../support/native-video-project';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { readFile, writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import {
@@ -423,18 +424,19 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
           exact: true,
         })
         .click();
-      const level = inspector.getByRole('textbox', {
-        name: label('gallery.videoReview.audioClipVolume'),
-        exact: true,
-      });
-      await level.fill('65');
+      const level = numericControl(inspector, label('gallery.videoReview.audioClipVolume'));
+      await (
+        await openNumericControl(inspector, label('gallery.videoReview.audioClipVolume'))
+      ).fill('65');
       await level.press('Tab');
       await expect.poll(async () => (await take())?.volume).toBe(0.65);
       await page.locator('[data-ui="video-editor.timeline.toolbar.undo"]').click();
       await expect.poll(async () => (await take())?.volume).toBe(0.8);
       await page.locator('[data-ui="video-editor.timeline.toolbar.redo"]').click();
       await expect.poll(async () => (await take())?.volume).toBe(0.65);
-      await level.fill('23');
+      await (
+        await openNumericControl(inspector, label('gallery.videoReview.audioClipVolume'))
+      ).fill('23');
       await level.press('Escape');
       await level.press('Tab');
       expect((await take())?.volume).toBe(0.65);
@@ -493,11 +495,13 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await rail
         .getByRole('button', { name: label('gallery.videoReview.audioOriginal'), exact: true })
         .click();
-      const originalLevel = inspector.getByRole('textbox', {
-        name: label('videoEditor.sidebar.originalAudioLevel'),
-        exact: true,
-      });
-      await originalLevel.fill('50');
+      const originalLevel = numericControl(
+        inspector,
+        label('videoEditor.sidebar.originalAudioLevel')
+      );
+      await (
+        await openNumericControl(inspector, label('videoEditor.sidebar.originalAudioLevel'))
+      ).fill('50');
       await originalLevel.press('Tab');
       await expect
         .poll(
@@ -882,7 +886,9 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
           exact: true,
         })
         .click();
-      await level.fill('55');
+      await (
+        await openNumericControl(inspector, label('gallery.videoReview.audioClipVolume'))
+      ).fill('55');
       await level.press('Tab');
       await expect.poll(async () => (await take())?.volume).toBe(0.55);
       const savedWithoutSources = await readNativeVideoProject(page);

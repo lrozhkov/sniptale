@@ -132,8 +132,12 @@ async function runLibraryMaintenance(
     [
       'orphans',
       async () => {
-        const { collectOrphanAssetObjectsDuringIdle } =
-          await import('../../composition/persistence/asset-publication-recovery/audit');
+        const [{ cleanupProjectOriginals }, { collectOrphanAssetObjectsDuringIdle }] =
+          await Promise.all([
+            import('./trash'),
+            import('../../composition/persistence/asset-publication-recovery/audit'),
+          ]);
+        await cleanupProjectOriginals(signal);
         if (!signal.aborted) await collectOrphanAssetObjectsDuringIdle(signal);
       },
     ],

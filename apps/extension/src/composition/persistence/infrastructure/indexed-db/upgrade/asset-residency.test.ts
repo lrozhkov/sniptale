@@ -58,7 +58,7 @@ it('adds empty native residency authority from v45 without accessing or rewritin
   expect(
     PERSISTENCE_DOMAIN_REGISTRY.find((domain) => domain.domainId === 'assetGraph')
   ).toMatchObject({
-    schemaVersion: 6,
+    schemaVersion: 7,
     stores: expect.arrayContaining([
       { storeName: ASSET_RESIDENCY_STORE, dataClass: 'durable-authority' },
     ]),

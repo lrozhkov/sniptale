@@ -1,6 +1,6 @@
 import { recordedAudioResources } from '../support/quick-editor-media-fixture';
 import { createHash } from 'node:crypto';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { expect, type Page, type TestInfo } from '@playwright/test';

@@ -5,5 +5,7 @@ export function resolveLocalizedText(
   label: { fallback: string; key?: string | undefined },
   translator: Translate = translate
 ): string {
-  return label.key ? translator(label.key as TranslationKey) : label.fallback;
+  if (!label.key) return label.fallback;
+  const resolved = translator(label.key as TranslationKey);
+  return resolved === label.key ? label.fallback : resolved;
 }

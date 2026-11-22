@@ -88,7 +88,7 @@ export async function seed(source: string) {
     },
   ];
   let gain = before.audio.original;
-  for (let index = 0; index < 48; index++) {
+  for (let index = 0; index < 998; index++) {
     const after = { ...gain, muted: !gain.muted };
     history.push({
       id: `gain-${index}`,
@@ -104,7 +104,7 @@ export async function seed(source: string) {
     formatVersion: 1,
     advanced,
     history,
-    cursor: 50,
+    cursor: history.length,
     effectSnapshots: [snapshot],
     sourceAssetId: 'beta-v1-recording-asset',
     source: { duration: 12, width: 640, height: 360, size: 15, mimeType: 'video/webm' },
@@ -179,7 +179,8 @@ export async function holdReader() {
   if (!snapshot) throw new Error('Missing native resource workspace');
   reader = createVideoReviewSession(snapshot);
   reader.setAutosaveEnabled(false);
-  for (let index = 0; index < 49; index++) await reader.history('undo');
+  await reader.history('start');
+  await reader.history('redo');
   return {
     oldEffectCount:
       reader.getSnapshot().document.advancedContent.annotationEffects?.instances.length,
@@ -200,7 +201,7 @@ export async function trim() {
       expectedSourceAssetId: current.workspace.sourceAssetId,
       operation: {
         id: `rollover-${index}`,
-        at: 51 + index,
+        at: 1001 + index,
         target: 'sourceAudio',
         before,
         after: { ...before, muted: !before.muted },

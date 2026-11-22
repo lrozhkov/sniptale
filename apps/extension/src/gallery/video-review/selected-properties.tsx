@@ -1,10 +1,9 @@
 import { useGlTransitionCatalog } from '../../composition/gl-transition-presets/catalog';
 import {
-  glTransitionChoices,
   glTransitionChoiceValue,
   resolveGlTransitionChoice,
+  sceneJoinTransitionChoices,
 } from '../../ui/gl-transition-choices';
-import { GlTransitionPresetActions } from '../../composition/gl-transition-presets/actions';
 
 import { GlTransitionFields } from '../../ui/gl-transition-fields';
 import { withCursorMotionPath } from '../../features/video/project/cursor-motion';
@@ -31,10 +30,8 @@ import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import { ColorField, NumericRow, SelectField } from '../../ui/compact-inspector-controls';
-import { planReviewCutTransitions } from '../../features/video/review/cuts';
 import type { ReviewEdit } from '../../features/video/review/types';
-import { ReviewDetails, reviewSelectFieldClassName } from './controls';
-import { formatNumber, useAppLocale } from '../../platform/i18n';
+import { reviewSelectFieldClassName } from './controls';
 import { ReviewOriginalAudioInspector } from './original-audio-inspector';
 import { planReviewActionEdits } from '../../features/video/review/action-edits';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
@@ -45,13 +42,38 @@ import type { QuickEditAdvancedState } from '../../features/video/review/advance
 import type { LoadedReview } from './use-session';
 import type { useReviewAudio } from './use-review-audio';
 import type { useReviewEdits } from './use-edits';
-import type { useReviewExport } from './use-export';
-import { ReviewEditRangeFields } from './edit-range-fields';
+import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
 import { ReviewSpeedOptions } from './edit-actions';
 import type { useReviewZoomEditor } from './zoom-editor';
-import { Trash2, Volume2, WandSparkles } from 'lucide-react';
+import {
+  Trash2,
+  Volume2,
+  WandSparkles,
+  type LucideIcon,
+  MousePointer2,
+  Focus,
+  Shapes,
+  Captions,
+  Webcam,
+  Keyboard,
+  Mouse,
+  ZoomIn,
+  Box,
+  RectangleHorizontal,
+  Search,
+  ScanEye,
+  Link2,
+  StickyNote,
+  Mic,
+  Music,
+  Snowflake,
+  Scissors,
+  Gauge,
+  Blend,
+} from 'lucide-react';
 import {
   ReviewButton,
+  ReviewDetails,
   ReviewInterval,
   reviewDeleteButtonClassName,
   reviewEventLabel,
@@ -67,6 +89,40 @@ import type { useCanvasComments } from './use-canvas-comments';
 import { ReviewWebcamInspector } from './webcam-inspector';
 import type { useReviewWebcamEditor } from './webcam-editor';
 
+type EditController = Pick<
+  ReturnType<typeof useReviewEdits>,
+  | 'selected'
+  | 'canApply'
+  | 'apply'
+  | 'remove'
+  | 'changeSelectedRate'
+  | 'changeSelectedAudio'
+  | 'changeSelectedFreezeDuration'
+  | 'changeSelectedTransition'
+>;
+
+/** Stable parameter commands name their edit; a replaced selection cannot receive an old field value. */
+export function createReviewInspectorEditCommands(read: () => EditController) {
+  const selected = (id: string) => {
+    const current = read();
+    return current.selected?.id === id ? current : null;
+  };
+  return {
+    canApply: (...args: Parameters<EditController['canApply']>) => read().canApply(...args),
+    apply: (...args: Parameters<EditController['apply']>) => read().apply(...args),
+    remove: (id: string) => selected(id)?.remove(),
+    changeRate: (id: string, value: Parameters<EditController['changeSelectedRate']>[0]) =>
+      selected(id)?.changeSelectedRate(value),
+    changeAudio: (id: string, value: Parameters<EditController['changeSelectedAudio']>[0]) =>
+      selected(id)?.changeSelectedAudio(value),
+    changeFreezeDuration: (id: string, value: number) =>
+      selected(id)?.changeSelectedFreezeDuration(value),
+    changeTransition: (id: string, value: CompositionJoinSettings | null) =>
+      selected(id)?.changeSelectedTransition(value),
+  };
+}
+export type ReviewInspectorEditCommands = ReturnType<typeof createReviewInspectorEditCommands>;
+
 type SelectedPropertiesProps = {
   registerSpeechFlush?: (owner: ReviewSpeechFlushRegistration) => () => void;
   beforeSpeechAction?: ReviewBeforeAction;
@@ -76,7 +132,11 @@ type SelectedPropertiesProps = {
   webcamRange?: { start: number; end: number } | undefined;
   selection: ReviewSelection;
   advanced: QuickEditAdvancedState;
-  editing: ReturnType<typeof useReviewEdits> & { exporter: ReturnType<typeof useReviewExport> };
+  editing: {
+    selected: ReviewEdit | null;
+    commands: ReviewInspectorEditCommands;
+    exporter: { index: ReviewMediaIndex | null; phase: 'idle' | 'exporting' | 'publishing' };
+  };
   zoom: ReturnType<typeof useReviewZoomEditor>;
   busy: boolean;
   interactionEditor?: import('./interaction-editor').ReviewInteractionEditor | undefined;
@@ -104,7 +164,15 @@ type SelectedPropertiesProps = {
   playback?: ComponentProps<typeof ReviewZoomPreview>['playback'];
   toSourceTime(time: number): number | null;
   resource: LoadedReview;
-  audio: ReturnType<typeof useReviewAudio>;
+  audio: Pick<
+    ReturnType<typeof useReviewAudio>,
+    | 'selected'
+    | 'selectedOriginal'
+    | 'patchClip'
+    | 'removeClip'
+    | 'patchOriginal'
+    | 'removeOriginal'
+  >;
   canvasComments: ReturnType<typeof useCanvasComments>;
 };
 
@@ -246,7 +314,7 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
             plan={plan}
             busy={busy || editing.exporter.phase !== 'idle'}
             onEdit={(kind) => {
-              if (plan && !plan.removed) void editing.apply(kind, plan.range);
+              if (plan && !plan.removed) void editing.commands.apply(kind, plan.range);
             }}
             onFocus={() => {
               if (plan?.focus) props.onFocus(plan.focus);
@@ -295,7 +363,6 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
             zoom={zoom}
             zoomPreview={(region, previewing = false) => (
               <ReviewZoomPreview
-                key={region.id}
                 disabled={busy || editing.exporter.phase !== 'idle' || selectedHistory.pending}
                 region={zoom.previewRegion(region)}
                 previewing={previewing}
@@ -392,7 +459,7 @@ function SelectedOriginalAudio(
         speedMuted={!!selected && overlapsSelected(resource, selected, 'speed', true)}
       />
       {selected && overlapsSelected(resource, selected, 'cut') ? (
-        <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+        <p role="status" className="review-inspector-notice">
           {translate('gallery.videoReview.cutOverlapHint')}
         </p>
       ) : null}
@@ -403,7 +470,7 @@ function SelectedOriginalAudio(
 function SelectedEdit(
   props: Pick<SelectedPropertiesProps, 'editing' | 'advanced' | 'resource' | 'busy'>
 ) {
-  const { editing, advanced, resource, busy } = props;
+  const { editing, resource, busy } = props;
   const selected = editing.selected!;
   if (selected.kind === 'freeze')
     return (
@@ -412,17 +479,18 @@ function SelectedEdit(
           duration={selected.duration}
           disabled={busy}
           onChange={(value) => {
-            void editing.changeSelectedFreezeDuration(value);
+            void editing.commands.changeFreezeDuration(selected.id, value);
           }}
         />
         <ReviewInspectorSections
           sections={[
             reviewInspectorActions(
               <ReviewButton
+                selectionAction="delete"
                 label={translate('gallery.videoReview.deleteSelected')}
                 className={reviewDeleteButtonClassName}
                 disabled={busy}
-                onClick={() => void editing.remove()}
+                onClick={() => void editing.commands.remove(selected.id)}
               >
                 <Trash2 size={15} aria-hidden />
                 <span>{translate('gallery.videoReview.deleteSelected')}</span>
@@ -436,57 +504,48 @@ function SelectedEdit(
     <div className="space-y-3">
       <ReviewInterval start={selected.start} end={selected.end} />
       {selected.kind === 'speed' && overlapsSelected(resource, selected, 'cut') ? (
-        <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+        <p role="status" className="review-inspector-notice">
           {translate('gallery.videoReview.cutOverlapHint')}
         </p>
       ) : null}
-      <div className="review-inspector-columns">
-        <ReviewDetails
-          level="section"
-          label={translate('gallery.videoReview.intervalBounds')}
-          preferenceId="group:edit-timing"
-          initiallyOpen
-        >
-          <ReviewEditRangeFields
-            key={`${selected.id}:${advanced.ui.mode}`}
-            edit={selected}
-            edits={resource.session.getSnapshot().document.edits}
-            duration={resource.source.duration}
-            boundaries={
-              advanced.ui.mode === 'advanced' ? undefined : editing.exporter.index?.boundaries
-            }
-            onApply={(range) => editing.commitRange(range, selected)}
-          />
-        </ReviewDetails>
-        <div className="min-w-0 sniptale-parameter-stack">
-          {selected.kind === 'speed' ? (
-            <ReviewSpeedOptions
-              layout="inspector"
-              rate={selected.rate}
-              audio={selected.audio}
-              busy={busy}
-              onRate={editing.changeSelectedRate}
-              onAudio={editing.changeSelectedAudio}
-            />
-          ) : null}
-          {selected.kind === 'cut' ? (
-            <CutTransitionFields
-              key={selected.id}
-              edit={selected}
-              edits={resource.session.getSnapshot().document.edits}
-              duration={resource.source.duration}
-              onChange={editing.changeSelectedTransition}
-            />
-          ) : null}
-        </div>
-      </div>
       <ReviewInspectorSections
         sections={[
+          selected.kind === 'speed'
+            ? {
+                id: 'speed',
+                label: translate('gallery.videoReview.speedMode'),
+                icon: Gauge,
+                content: (
+                  <ReviewSpeedOptions
+                    layout="inspector"
+                    rate={selected.rate}
+                    audio={selected.audio}
+                    busy={busy}
+                    onRate={(value) => editing.commands.changeRate(selected.id, value)}
+                    onAudio={(value) => editing.commands.changeAudio(selected.id, value)}
+                  />
+                ),
+              }
+            : {
+                id: 'transition',
+                label: translate('gallery.videoReview.cutTransition'),
+                icon: Blend,
+                content: (
+                  <CutTransitionFields
+                    key={selected.id}
+                    edit={selected}
+                    edits={resource.session.getSnapshot().document.edits}
+                    duration={resource.source.duration}
+                    onChange={(value) => editing.commands.changeTransition(selected.id, value)}
+                  />
+                ),
+              },
           reviewInspectorActions(
             <ReviewButton
+              selectionAction="delete"
               label={translate('gallery.videoReview.deleteSelected')}
               className={`${reviewDeleteButtonClassName} !w-full justify-start`}
-              onClick={() => void editing.remove()}
+              onClick={() => void editing.commands.remove(selected.id)}
             >
               <Trash2 size={15} aria-hidden="true" />
               <span>{translate('gallery.videoReview.deleteSelected')}</span>
@@ -505,7 +564,6 @@ function CutTransitionFields(props: {
   duration: number;
   onChange(value: CompositionJoinSettings | null): Promise<boolean> | undefined;
 }) {
-  const locale = useAppLocale();
   const glCatalog = useGlTransitionCatalog();
   const [draft, setDraft] = useState(props.edit.transition ?? null);
   const [saving, setSaving] = useState(false);
@@ -525,9 +583,6 @@ function CutTransitionFields(props: {
       setSaving(false);
     }
   };
-  const plan = planReviewCutTransitions(props.duration, props.edits).find(
-    (item) => item.id === props.edit.id
-  );
   const total = draft ? draft.before + draft.after : 0;
   const change = (field: 'total' | 'before' | 'after', value: number) => {
     if (!draft) return null;
@@ -541,126 +596,162 @@ function CutTransitionFields(props: {
         : { ...draft, [field]: value };
     return next;
   };
+  const timingField = (current: CompositionJoinSettings, field: 'total' | 'before' | 'after') => (
+    <NumericRow
+      appearance="plain"
+      className="w-full"
+      label={translate(
+        field === 'total'
+          ? 'gallery.videoReview.zoomTransitionDuration'
+          : field === 'before'
+            ? 'gallery.videoReview.cutTransitionBefore'
+            : 'gallery.videoReview.cutTransitionAfter'
+      )}
+      value={field === 'total' ? total : current[field]}
+      min={0}
+      max={field === 'total' ? 60 : 60 - current[field === 'before' ? 'after' : 'before']}
+      unit="s"
+      step={0.05}
+      precision={3}
+      onPreviewValue={(value) => setDraft(change(field, value))}
+      onCommitValue={(value) => void commit(change(field, value))}
+    />
+  );
   return (
-    <ReviewDetails
-      level="section"
-      label={translate('gallery.videoReview.cutTransition')}
-      preferenceId="gallery.videoReview.cutTransition"
+    <fieldset
+      disabled={saving}
+      className="min-w-0 sniptale-parameter-stack"
+      data-ui="gallery.videoReview.cutTransition"
     >
-      <fieldset
-        disabled={saving}
-        className="min-w-0 sniptale-parameter-stack"
-        data-ui="gallery.videoReview.cutTransition"
-      >
-        <SelectField<string>
-          className={reviewSelectFieldClassName}
-          label={translate('gallery.videoReview.zoomTransitionType')}
-          value={
-            draft?.type === 'gl'
-              ? glTransitionChoiceValue(glCatalog, draft.selection)
-              : (draft?.type ?? 'none')
+      <SelectField<string>
+        className={reviewSelectFieldClassName}
+        label={translate('gallery.videoReview.cutTransition')}
+        value={
+          draft?.type === 'gl'
+            ? glTransitionChoiceValue(glCatalog, draft.selection)
+            : (draft?.type ?? 'none')
+        }
+        options={sceneJoinTransitionChoices(
+          glCatalog,
+          draft?.type === 'gl' ? draft.selection : undefined
+        )}
+        onChange={(type) => {
+          if (type === 'none') {
+            void commit(null);
+            return;
           }
-          options={[
-            { value: 'none', label: translate('gallery.videoReview.transitionNone') },
-            { value: 'dissolve', label: translate('gallery.videoReview.cutDissolve') },
-            { value: 'fade-black', label: translate('gallery.videoReview.cutFadeColor') },
-            ...glTransitionChoices(glCatalog, draft?.type === 'gl' ? draft.selection : undefined),
-          ]}
-          onChange={(type) => {
-            if (type === 'none') {
-              void commit(null);
-              return;
-            }
-            const timing = { before: draft?.before ?? 0.25, after: draft?.after ?? 0.25 };
-            if (type === 'dissolve' || type === 'fade-black') {
-              void commit({ ...timing, type, ...(draft?.color ? { color: draft.color } : {}) });
-              return;
-            }
-            const selection = resolveGlTransitionChoice(glCatalog, type);
-            if (selection)
-              void commit({
-                ...timing,
-                type: 'gl',
-                selection,
-                easing: draft?.type === 'gl' ? draft.easing : 'LINEAR',
-              });
-          }}
-        />
-        {draft ? (
-          <>
-            {draft.type === 'gl' && (
-              <GlTransitionFields
-                presetActions={
-                  <GlTransitionPresetActions
-                    ownerKey={props.edit.id}
-                    ownerRevision={props.edit}
-                    selection={draft.selection}
-                    disabled={saving}
-                    onApply={(selection) => commit({ ...draft, selection })}
-                  />
-                }
-                selection={draft.selection}
-                easing={draft.easing}
-                disabled={saving}
-                onChangeSelection={(selection) => void commit({ ...draft, selection })}
-                onChangeEasing={(easing) => void commit({ ...draft, easing })}
-              />
-            )}
-            {draft.type === 'fade-black' ? (
-              <ColorField
-                className={reviewSelectFieldClassName}
-                label={translate('gallery.videoReview.cutTransitionColor')}
-                title={translate('gallery.videoReview.cutTransitionColor')}
-                value={draft.color ?? '#000000'}
-                allowAlpha={false}
-                allowTransparent={false}
-                onChange={(color) => void commit({ ...draft, color })}
-              />
-            ) : null}
-            {(['total', 'before', 'after'] as const).map((field) => (
-              <NumericRow
-                key={field}
-                appearance="plain"
-                className="w-full"
-                label={translate(
-                  field === 'total'
-                    ? 'gallery.videoReview.zoomTransitionDuration'
-                    : field === 'before'
-                      ? 'gallery.videoReview.cutTransitionBefore'
-                      : 'gallery.videoReview.cutTransitionAfter'
-                )}
-                value={field === 'total' ? total : draft[field]}
-                min={0}
-                max={field === 'total' ? 60 : 60 - draft[field === 'before' ? 'after' : 'before']}
-                unit="s"
-                step={0.05}
-                precision={3}
-                onPreviewValue={(value) => setDraft(change(field, value))}
-                onCommitValue={(value) => void commit(change(field, value))}
-              />
-            ))}
-            <p role="status" className="px-2 text-xs text-[var(--sniptale-color-text-muted)]">
-              {plan
-                ? translate('gallery.videoReview.cutTransitionEffective')
-                    .replace(
-                      '{before}',
-                      formatNumber(plan.before, { maximumFractionDigits: 3 }, locale)
-                    )
-                    .replace(
-                      '{after}',
-                      formatNumber(plan.after, { maximumFractionDigits: 3 }, locale)
-                    )
-                : translate('gallery.videoReview.cutTransitionUnavailable')}
-            </p>
-          </>
-        ) : null}
-      </fieldset>
-    </ReviewDetails>
+          const timing = { before: draft?.before ?? 0.25, after: draft?.after ?? 0.25 };
+          if (type === 'dissolve' || type === 'fade-black') {
+            void commit({ ...timing, type, ...(draft?.color ? { color: draft.color } : {}) });
+            return;
+          }
+          const selection = resolveGlTransitionChoice(glCatalog, type);
+          if (selection)
+            void commit({
+              ...timing,
+              type: 'gl',
+              selection,
+              easing: draft?.type === 'gl' ? draft.easing : 'LINEAR',
+            });
+        }}
+      />
+      {draft ? (
+        <>
+          {draft.type === 'fade-black' ? (
+            <ColorField
+              className={reviewSelectFieldClassName}
+              label={translate('gallery.videoReview.cutTransitionColor')}
+              title={translate('gallery.videoReview.cutTransitionColor')}
+              value={draft.color ?? '#000000'}
+              allowAlpha={false}
+              allowTransparent={false}
+              onChange={(color) => void commit({ ...draft, color })}
+            />
+          ) : null}
+          {timingField(draft, 'total')}
+          {draft.type === 'gl' && (
+            <GlTransitionFields
+              selection={draft.selection}
+              easing={draft.easing}
+              disabled={saving}
+              onChangeSelection={(selection) => void commit({ ...draft, selection })}
+              onChangeEasing={(easing) => void commit({ ...draft, easing })}
+            />
+          )}
+          <ReviewDetails
+            label={translate('gallery.videoReview.presentationJoinTiming')}
+            preferenceId="cut.transition.timing"
+          >
+            {timingField(draft, 'before')}
+            {timingField(draft, 'after')}
+          </ReviewDetails>
+        </>
+      ) : null}
+    </fieldset>
   );
 }
 
+/** Header glyphs follow the selected timeline object's visible kind. */
+export function reviewSelectionIcon(
+  state: Pick<SelectedPropertiesProps, 'selection' | 'markers' | 'advanced'> & {
+    editing: Pick<SelectedPropertiesProps['editing'], 'selected'>;
+  }
+): LucideIcon | undefined {
+  const selection = state.selection;
+  switch (selection.kind) {
+    case 'cursor-motion':
+      return MousePointer2;
+    case 'cursor-focus':
+      return Focus;
+    case 'annotation-effect':
+      return Shapes;
+    case 'text':
+      return Captions;
+    case 'webcam':
+    case 'webcam-position':
+    case 'webcam-hidden':
+      return Webcam;
+    case 'telemetry': {
+      const marker = state.markers.find(
+        (item) => item.ref.kind === selection.ref.kind && item.ref.id === selection.ref.id
+      );
+      return marker?.eventType.startsWith('KEY') ? Keyboard : Mouse;
+    }
+    case 'zoom': {
+      const region = state.advanced.zoom.regions.find((item) => item.id === selection.id);
+      return region?.effect === '3d'
+        ? Box
+        : region?.border
+          ? RectangleHorizontal
+          : region?.spotlight?.effect === 'magnify'
+            ? Search
+            : region?.spotlight
+              ? ScanEye
+              : ZoomIn;
+    }
+    case 'zoom-link':
+      return Link2;
+    case 'canvas-comment':
+      return StickyNote;
+    case 'original-audio':
+      return Volume2;
+    case 'audio':
+      return selection.lane === 'voiceover' ? Mic : Music;
+    case 'edit':
+      return state.editing.selected?.kind === 'freeze'
+        ? Snowflake
+        : state.editing.selected?.kind === 'cut'
+          ? Scissors
+          : Gauge;
+    default:
+      return undefined;
+  }
+}
+
 export function reviewSelectionLabel(
-  state: Pick<SelectedPropertiesProps, 'selection' | 'markers' | 'advanced' | 'editing'>
+  state: Pick<SelectedPropertiesProps, 'selection' | 'markers' | 'advanced'> & {
+    editing: Pick<SelectedPropertiesProps['editing'], 'selected'>;
+  }
 ): string | undefined {
   const selection = state.selection;
   if (selection.kind === 'cursor-motion') return translate('gallery.videoReview.cursorMotionTrack');
@@ -688,9 +779,11 @@ export function reviewSelectionLabel(
         ? 'gallery.videoReview.focus3d'
         : region?.border
           ? 'gallery.videoReview.focusBorder'
-          : region?.spotlight
-            ? 'gallery.videoReview.focusSpotlight'
-            : 'gallery.videoReview.zoomRegionLabel'
+          : region?.spotlight?.effect === 'magnify'
+            ? 'gallery.videoReview.focusLens'
+            : region?.spotlight
+              ? 'gallery.videoReview.focusSpotlight'
+              : 'gallery.videoReview.zoomRegionLabel'
     );
   }
   if (selection.kind === 'zoom-link') return translate('gallery.videoReview.zoomLinkSettings');
@@ -749,6 +842,7 @@ export function ReviewSelectedTextProperties(props: {
   return (
     <fieldset ref={voiceMode.root} disabled={props.busy} className="min-w-0 space-y-3">
       <ReviewTextPhrase
+        inspector
         key={fragment.id}
         fragment={fragment}
         editor={props.editor}
@@ -786,6 +880,7 @@ export function ReviewSelectedTextProperties(props: {
         sections={[
           reviewInspectorActions(
             <ReviewButton
+              selectionAction="delete"
               label={translate('gallery.videoReview.textFragmentDelete')}
               className={`${reviewDeleteButtonClassName} !w-full justify-start`}
               onClick={() => props.editor.remove([fragment.id])}
@@ -869,6 +964,8 @@ function ReviewFreezeDuration(props: {
   useEffect(() => setValue(props.duration), [props.duration]);
   return (
     <NumericRow
+      appearance="plain"
+      className="w-full"
       label={translate('gallery.videoReview.freezeDuration')}
       unit="s"
       value={value}
@@ -876,7 +973,6 @@ function ReviewFreezeDuration(props: {
       max={600}
       step={0.01}
       precision={3}
-      scrub={{ min: 0.5, max: 30, step: 0.5 }}
       disabled={props.disabled}
       onPreviewValue={setValue}
       onCommitValue={props.onChange}

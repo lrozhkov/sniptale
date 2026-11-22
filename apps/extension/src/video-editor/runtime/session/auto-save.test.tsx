@@ -33,32 +33,59 @@ function createEmptyVideoProject(...args: Parameters<typeof createDomainProject>
   return project;
 }
 
-vi.mock('../../../composition/persistence/projects/index-mutations', async (importOriginal) => ({
+const prepareWorkspace = vi.fn();
+vi.mock('../../../composition/persistence/projects/workspace-commit', async (importOriginal) => ({
   ...(await importOriginal<
-    typeof import('../../../composition/persistence/projects/index-mutations')
+    typeof import('../../../composition/persistence/projects/workspace-commit')
   >()),
-  commitVideoProjectMutation: saveVideoProject,
-  commitVideoProjectWorkspaceMutation: async (
-    project: ReturnType<typeof createEmptyVideoProject>,
-    options: {
-      expectedWorkspaceRevision: number | null;
-      expectedProject: ReturnType<typeof createDomainProject> | null;
-    }
+  prepareVideoProjectWorkspaceCommit: async (
+    input: Parameters<
+      typeof import('../../../composition/persistence/projects/workspace-commit').prepareVideoProjectWorkspaceCommit
+    >[0]
   ) => {
-    const saved = await saveVideoProject(project, options);
-    const checkpointReceipt = checkpointReceiptForSave(project);
-    return {
-      project: saved,
-      workspaceRevision: (options.expectedWorkspaceRevision ?? 0) + 1,
-      ...(checkpointReceipt ? { checkpointReceipt } : {}),
+    await prepareWorkspace(input);
+    return async () => {
+      const options = {
+        expectedWorkspaceRevision: input.expectedWorkspaceRevision,
+        expectedProject: input.expectedProject,
+      };
+      const saved = await saveVideoProject(input.project, options);
+      const checkpointReceipt = checkpointReceiptForSave(input.project);
+      return {
+        id: input.project.id,
+        project: saved,
+        workspaceRevision: (input.expectedWorkspaceRevision ?? 0) + 1,
+        historyAssetsByValue: new Map(),
+        ...(checkpointReceipt ? { checkpointReceipt } : {}),
+      };
     };
   },
 }));
 
-vi.mock('../../../composition/persistence/projects/index', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../composition/persistence/projects/index')>()),
-  getVideoProject,
-}));
+function openProject(
+  project: ReturnType<typeof createDomainProject>,
+  recordingId: string | null = null
+) {
+  const baseline = initialProjects.get(project.id) ?? project;
+  useVideoEditorStore.getState().setProject(project, recordingId, {
+    status: 'ready',
+    project: baseline,
+    workspaceRevision: 0,
+    history: { status: 'absent' },
+  });
+}
+
+function bindProject(project: ReturnType<typeof createDomainProject>) {
+  if (useVideoEditorStore.getState().nativeWorkspace?.project.id !== project.id) {
+    openProject(project);
+    const nativeWorkspace = useVideoEditorStore.getState().nativeWorkspace;
+    if (nativeWorkspace)
+      useVideoEditorStore.setState({
+        nativeWorkspace: { ...nativeWorkspace, savedRuntimeProject: project },
+      });
+  }
+  useVideoEditorStore.setState({ project });
+}
 
 vi.mock('../browser-driver', () => ({
   replaceVideoEditorUrl,
@@ -96,7 +123,7 @@ function AutoSaveHarness(props: AutoSaveHarnessProps) {
 
 function renderAutoSaveHarness(props: AutoSaveHarnessProps) {
   act(() => {
-    useVideoEditorStore.setState({ project: props.project });
+    bindProject(props.project);
     props.root?.render(<AutoSaveHarness {...props} />);
   });
 }
@@ -116,6 +143,7 @@ beforeEach(() => {
   wakeCheckpoints.mockReset().mockResolvedValue({ kind: 'checkpoint-woken' });
   vi.useFakeTimers();
   checkpointReceiptForSave.mockReset();
+  prepareWorkspace.mockReset().mockResolvedValue(undefined);
   acquireCheckpoint.mockReset().mockImplementation(async () => ({ release: releaseCheckpoint }));
   releaseCheckpoint.mockReset().mockResolvedValue(undefined);
   saveVideoProject.mockReset();
@@ -239,6 +267,7 @@ it('syncs the saved revision into editor state without triggering a duplicate au
     }
   );
   const Harness = () => {
+    bindProject(currentProject);
     useVideoEditorAutoSave(
       currentProject,
       'rec-1',
@@ -277,7 +306,7 @@ it('persists an undone project without recording autosave revision sync as anoth
     ...candidate,
     updatedAt: candidate.updatedAt + 1,
   }));
-  useVideoEditorStore.getState().setProject(project, 'rec-1');
+  openProject(project, 'rec-1');
   act(() => {
     root?.render(
       <StoreAutoSaveHarness
@@ -299,6 +328,13 @@ it('persists an undone project without recording autosave revision sync as anoth
   );
   expect(useVideoEditorStore.getState().projectHistory.future).toHaveLength(1);
   expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(0);
+  expect(prepareWorkspace).toHaveBeenCalledWith(
+    expect.objectContaining({
+      history: expect.objectContaining({
+        future: expect.arrayContaining([expect.objectContaining({ value: expect.any(String) })]),
+      }),
+    })
+  );
 });
 
 it('rejects a stale real-store autosave revision after project replacement', async () => {
@@ -313,7 +349,7 @@ it('rejects a stale real-store autosave revision after project replacement', asy
         resolveSave = resolve;
       })
   );
-  useVideoEditorStore.getState().setProject(projectA, 'rec-a');
+  openProject(projectA, 'rec-a');
   act(() => {
     root?.render(
       <StoreAutoSaveHarness
@@ -325,7 +361,7 @@ it('rejects a stale real-store autosave revision after project replacement', asy
   act(() => useVideoEditorStore.getState().renameProject('Project A edited'));
   await flushAutoSaveTimers();
 
-  act(() => useVideoEditorStore.getState().setProject(projectB, 'rec-b'));
+  act(() => openProject(projectB, 'rec-b'));
   const activeProjectB = useVideoEditorStore.getState().project;
   const projectBHistory = useVideoEditorStore.getState().projectHistory;
   await act(async () => {
@@ -352,6 +388,7 @@ it('queues overlapping same-project autosaves behind the persisted revision upda
   let currentProject = project;
   let resolveFirstSave: ((project: typeof currentProject) => void) | null = null;
   const Harness = () => {
+    bindProject(currentProject);
     useVideoEditorAutoSave(currentProject, 'rec-1', setSaveState, refreshProjects);
     return null;
   };
@@ -804,7 +841,7 @@ function checkpointDeferred<T>() {
 async function mountCheckpointProject() {
   const project = createEmptyVideoProject('Checkpoint action');
   const hook = await importAutoSaveHook();
-  useVideoEditorStore.getState().setProject(project, 'rec-1');
+  openProject(project, 'rec-1');
   act(() =>
     root?.render(
       <StoreAutoSaveHarness
@@ -1207,4 +1244,209 @@ it('rejects a Montage source edit during the extra exit-intent gap', async () =>
     eligible = exit.isCurrent();
   });
   expect(eligible).toBe(false);
+});
+
+it('retries one accepted publication before preparing only the latest live version', async () => {
+  const hook = await importAutoSaveHook();
+  const project = createEmptyVideoProject('Accepted retry');
+  const props: AutoSaveHarnessProps = {
+    project,
+    projectId: null,
+    root,
+    refreshProjects: vi.fn().mockResolvedValue(undefined),
+    setSaveState: vi.fn(),
+    useVideoEditorAutoSave: hook,
+  };
+  const retry = checkpointDeferred<typeof project>();
+  saveVideoProject
+    .mockRejectedValueOnce(new Error('Publication failed'))
+    .mockImplementationOnce(() => retry.promise)
+    .mockImplementation(async (candidate) => candidate);
+  renderAutoSaveHarness(props);
+  const first = { ...project, name: 'Accepted A' };
+  renderAutoSaveHarness({ ...props, project: first });
+  await flushAutoSaveTimers();
+  expect(prepareWorkspace).toHaveBeenCalledOnce();
+  renderAutoSaveHarness({ ...props, project: { ...project, name: 'Obsolete B' } });
+  await flushAutoSaveTimers();
+  const latest = { ...project, name: 'Latest C' };
+  renderAutoSaveHarness({ ...props, project: latest });
+  await flushAutoSaveTimers();
+  expect(prepareWorkspace).toHaveBeenCalledOnce();
+  expect(saveVideoProject).toHaveBeenNthCalledWith(2, first, expect.anything());
+  await act(async () => retry.resolve({ ...first, updatedAt: first.updatedAt + 1 }));
+  expect(prepareWorkspace).toHaveBeenCalledTimes(2);
+  expect(saveVideoProject).toHaveBeenNthCalledWith(
+    3,
+    latest,
+    expect.objectContaining({ expectedWorkspaceRevision: 1 })
+  );
+  expect(prepareWorkspace.mock.calls.map(([input]) => input.project.name)).toEqual([
+    'Accepted A',
+    'Latest C',
+  ]);
+});
+
+it('captures a newer version after preparation fails before ready-journal acceptance', async () => {
+  const hook = await importAutoSaveHook();
+  const project = createEmptyVideoProject('Preparation failure');
+  const props: AutoSaveHarnessProps = {
+    project,
+    projectId: null,
+    root,
+    refreshProjects: vi.fn().mockResolvedValue(undefined),
+    setSaveState: vi.fn(),
+    useVideoEditorAutoSave: hook,
+  };
+  prepareWorkspace.mockRejectedValueOnce(new Error('Quota before ready'));
+  saveVideoProject.mockImplementation(async (candidate) => candidate);
+  renderAutoSaveHarness(props);
+  renderAutoSaveHarness({ ...props, project: { ...project, name: 'Failed A' } });
+  await flushAutoSaveTimers();
+  expect(saveVideoProject).not.toHaveBeenCalled();
+  const latest = { ...project, name: 'Smaller B' };
+  renderAutoSaveHarness({ ...props, project: latest });
+  await flushAutoSaveTimers();
+  expect(saveVideoProject).toHaveBeenCalledExactlyOnceWith(latest, expect.anything());
+  expect(prepareWorkspace.mock.calls.map(([input]) => input.project.name)).toEqual([
+    'Failed A',
+    'Smaller B',
+  ]);
+});
+
+it('retains unavailable history and refuses to overwrite it with an empty capture', async () => {
+  const hook = await importAutoSaveHook();
+  const project = createEmptyVideoProject('Unavailable history');
+  useVideoEditorStore.getState().setProject(project, null, {
+    status: 'ready',
+    project,
+    workspaceRevision: 4,
+    history: { status: 'unavailable' },
+  });
+  act(() =>
+    root?.render(<StoreAutoSaveHarness refreshProjects={vi.fn()} useVideoEditorAutoSave={hook} />)
+  );
+  act(() => useVideoEditorStore.getState().renameProject('Current edit is preserved'));
+  await flushAutoSaveTimers();
+  expect(prepareWorkspace).not.toHaveBeenCalled();
+  expect(saveVideoProject).not.toHaveBeenCalled();
+  expect(useVideoEditorStore.getState().project?.name).toBe('Current edit is preserved');
+  expect(useVideoEditorStore.getState().saveState).toBe('conflict');
+});
+
+it('ignores an old ACK after reopening the same project identity in a new session', async () => {
+  const hook = await importAutoSaveHook();
+  const project = createEmptyVideoProject('Same identity');
+  const old = checkpointDeferred<typeof project>();
+  saveVideoProject.mockImplementationOnce(() => old.promise);
+  openProject(project);
+  act(() =>
+    root?.render(<StoreAutoSaveHarness refreshProjects={vi.fn()} useVideoEditorAutoSave={hook} />)
+  );
+  act(() => useVideoEditorStore.getState().renameProject('Old pending edit'));
+  await flushAutoSaveTimers();
+  const reopened = { ...project, name: 'Reopened current', updatedAt: project.updatedAt + 5 };
+  act(() =>
+    useVideoEditorStore.getState().setProject(reopened, null, {
+      status: 'ready',
+      project: reopened,
+      workspaceRevision: 5,
+      history: { status: 'absent' },
+    })
+  );
+  const session = useVideoEditorStore.getState().projectSessionId;
+  const history = useVideoEditorStore.getState().projectHistory;
+  await act(async () =>
+    old.resolve({ ...project, name: 'Old pending edit', updatedAt: project.updatedAt + 1 })
+  );
+  expect(useVideoEditorStore.getState().project?.name).toBe('Reopened current');
+  expect(useVideoEditorStore.getState().projectSessionId).toBe(session);
+  expect(useVideoEditorStore.getState().projectHistory).toBe(history);
+  expect(useVideoEditorStore.getState().saveState).toBe('saved');
+});
+
+it('keeps the acknowledged native revision when the autosave owner mounts again', async () => {
+  const hook = await importAutoSaveHook();
+  const project = createEmptyVideoProject('Owner remount');
+  saveVideoProject.mockImplementation(async (candidate) => ({
+    ...candidate,
+    updatedAt: candidate.updatedAt + 1,
+  }));
+  openProject(project);
+  act(() =>
+    root?.render(<StoreAutoSaveHarness refreshProjects={vi.fn()} useVideoEditorAutoSave={hook} />)
+  );
+  act(() => useVideoEditorStore.getState().renameProject('First save'));
+  await flushAutoSaveTimers();
+  await act(async () => undefined);
+  act(() => root?.unmount());
+  root = createRoot(container!);
+  act(() =>
+    root?.render(<StoreAutoSaveHarness refreshProjects={vi.fn()} useVideoEditorAutoSave={hook} />)
+  );
+  await flushAutoSaveTimers();
+  expect(saveVideoProject).toHaveBeenCalledOnce();
+  act(() => useVideoEditorStore.getState().renameProject('Second save'));
+  await flushAutoSaveTimers();
+  expect(saveVideoProject).toHaveBeenLastCalledWith(
+    expect.objectContaining({ name: 'Second save' }),
+    expect.objectContaining({ expectedWorkspaceRevision: 1 })
+  );
+});
+
+it('saves edits that were still dirty when the autosave owner unmounted', async () => {
+  const hook = await importAutoSaveHook();
+  const project = createEmptyVideoProject('Dirty owner remount');
+  saveVideoProject.mockImplementation(async (candidate) => ({
+    ...candidate,
+    updatedAt: candidate.updatedAt + 1,
+  }));
+  openProject(project);
+  act(() =>
+    root?.render(<StoreAutoSaveHarness refreshProjects={vi.fn()} useVideoEditorAutoSave={hook} />)
+  );
+  act(() => useVideoEditorStore.getState().renameProject('Acknowledged'));
+  await flushAutoSaveTimers();
+  await act(async () => undefined);
+  act(() => {
+    useVideoEditorStore.getState().renameProject('Unsaved at unmount');
+    root?.unmount();
+  });
+  root = createRoot(container!);
+  act(() =>
+    root?.render(<StoreAutoSaveHarness refreshProjects={vi.fn()} useVideoEditorAutoSave={hook} />)
+  );
+  await flushAutoSaveTimers();
+  expect(saveVideoProject).toHaveBeenCalledTimes(2);
+  expect(saveVideoProject).toHaveBeenLastCalledWith(
+    expect.objectContaining({ name: 'Unsaved at unmount' }),
+    expect.objectContaining({ expectedWorkspaceRevision: 1 })
+  );
+});
+
+it('saves restored content after a cancelled transaction and a delayed preview ACK', async () => {
+  const original = await mountCheckpointProject();
+  const pending = checkpointDeferred<ReturnType<typeof createEmptyVideoProject>>();
+  saveVideoProject
+    .mockImplementationOnce(() => pending.promise)
+    .mockImplementation(async (project) => project);
+  const lease = beginCheckpointGesture();
+  act(() => useVideoEditorStore.getState().renameProject('Cancelled preview'));
+  await flushAutoSaveTimers();
+  const preview = useVideoEditorStore.getState().project!;
+  expect(saveVideoProject).toHaveBeenCalledOnce();
+  act(() => useVideoEditorStore.getState().endProjectHistoryTransaction(lease, 'cancel'));
+  expect(useVideoEditorStore.getState().project?.name).toBe(original.name);
+  expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(0);
+  expect(releaseCheckpoint).not.toHaveBeenCalled();
+  await act(async () => pending.resolve(preview));
+  await flushAutoSaveTimers();
+  expect(useVideoEditorStore.getState().project?.name).toBe(original.name);
+  expect(saveVideoProject).toHaveBeenLastCalledWith(
+    expect.objectContaining({ name: original.name }),
+    expect.anything()
+  );
+  expect(useVideoEditorStore.getState().projectHistory.transaction).toBeNull();
+  expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(0);
+  expect(releaseCheckpoint).toHaveBeenCalledOnce();
 });

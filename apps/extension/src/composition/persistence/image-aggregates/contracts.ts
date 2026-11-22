@@ -2,20 +2,39 @@ import type { EditorDocument } from '../../../features/editor/document/types';
 import type { AssetRef } from '../assets/contracts';
 import type { ImageContentState } from '../media-library/contracts';
 import type { SyncCheckpointReceipt } from '../sync-capture/contracts';
+import type { EditorImageHistoryCheckpoint } from '../../../features/editor-history/image-checkpoint';
+
+export interface NewImageOriginal {
+  mediaId: string;
+  filename: string;
+  width: number;
+  height: number;
+  dataUrl: string;
+}
 
 export interface CommitImageWorkspaceInput {
   aggregateId: string;
   captureTime?: number;
   document: EditorDocument;
+  /** Undefined preserves retained history; null explicitly clears it. */
+  history?: EditorImageHistoryCheckpoint | null;
+  reusableHistoryAssetsByValue?: ReadonlyMap<string, AssetRef>;
   expectedRevision: number;
+  /** Native lifetime observed before asynchronous capture; legacy absence is null. */
+  expectedGeneration?: string | null;
   imageContentState?: ImageContentState;
   sourceTitle?: string | null;
   sourceUrl?: string | null;
   sourceFavicon?: string | null;
+  /** Supplies the observed original on the first save of an independent project. */
+  original?: { mediaId: string; generation: string | null };
+  /** First publication of a local-file project and its private original. */
+  newOriginal?: NewImageOriginal;
   sourceGuard?: {
     aggregateId: string;
-    presentationRevision: number;
+    presentationRevision?: number;
     workspaceRevision: number;
+    sourceGeneration?: string | null;
   };
   requireMissingRoot?: boolean;
   /** Editing an observed Library root must not recreate it after permanent deletion. */
@@ -25,6 +44,7 @@ export interface CommitImageWorkspaceInput {
 }
 
 export interface ImageWorkspacePublicationResult {
+  readonly sourceGeneration?: string;
   readonly checkpointReceipt?: SyncCheckpointReceipt;
   revision: number;
   updatedAt: number;
@@ -33,18 +53,25 @@ export interface ImageWorkspacePublicationResult {
 export interface CommitImageWorkspaceResult extends ImageWorkspacePublicationResult {
   documentAssetsByRuntimeUrl: ReadonlyMap<string, AssetRef>;
   documentAssetsByVectorDefinitionId: ReadonlyMap<string, AssetRef>;
+  historyAssetsByValue?: ReadonlyMap<string, AssetRef>;
+}
+
+export interface ImageAggregateCopyResult extends CommitImageWorkspaceResult {
+  aggregateId: string;
 }
 
 export interface CommitImagePresentationInput {
   aggregateId: string;
   expectedWorkspaceRevision: number;
+  expectedGeneration?: string | null;
   previewBlob: Blob;
   thumbnailBlob: Blob;
 }
 
 export interface SaveImageAggregateCopyFromDocumentInput {
   document: EditorDocument;
-  imageContentState?: ImageContentState;
+  history?: EditorImageHistoryCheckpoint;
+  original?: CommitImageWorkspaceInput['original'];
   previewBlob: Blob;
   sourceFavicon?: string | null;
   sourceTitle?: string | null;

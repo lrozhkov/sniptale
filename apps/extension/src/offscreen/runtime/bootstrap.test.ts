@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const offscreenMocks = vi.hoisted(() => ({
   initDB: vi.fn(),
+  prepare: vi.fn(),
   logger: {
     debug: vi.fn(),
     error: vi.fn(),
@@ -15,6 +16,10 @@ const offscreenMocks = vi.hoisted(() => ({
   reconcileRecordingCompletionOutbox: vi.fn(),
 }));
 
+vi.mock('../../platform/i18n', async (original) => ({
+  ...(await original<typeof import('../../platform/i18n')>()),
+  prepareTranslations: offscreenMocks.prepare,
+}));
 vi.mock('../../composition/persistence/infrastructure/indexed-db/core', async (importOriginal) => ({
   ...(await importOriginal<
     typeof import('../../composition/persistence/infrastructure/indexed-db/core')
@@ -62,6 +67,7 @@ vi.mock('../recording/post-record-publication', async (importOriginal) => ({
 }));
 
 function resetOffscreenMocks() {
+  offscreenMocks.prepare.mockReset().mockResolvedValue(undefined);
   offscreenMocks.initDB.mockReset();
   offscreenMocks.logger.debug.mockReset();
   offscreenMocks.logger.error.mockReset();
@@ -213,5 +219,34 @@ it('keeps a probe usable when readiness notification fails', async () => {
   );
   await expect(
     probeOffscreenRuntimeReadiness({ challenge: 'x', offscreenStartupId: 'current' })
+  ).resolves.toMatchObject({ state: 'ready' });
+});
+
+it('keeps transport probes independent of pending and failed translation preparation', async () => {
+  vi.resetModules();
+  resetOffscreenMocks();
+  vi.stubGlobal('location', {
+    href: 'chrome-extension://id/offscreen.html?offscreenStartupId=current',
+  });
+  let fail!: (reason: Error) => void;
+  offscreenMocks.prepare.mockReturnValueOnce(
+    new Promise<void>((_, reject) => {
+      fail = reject;
+    })
+  );
+  const { prepareOffscreenRecordingData } = await import('./data-readiness');
+  const { bootstrapOffscreenDocument, probeOffscreenRuntimeReadiness } =
+    await import('./bootstrap');
+  const pending = prepareOffscreenRecordingData();
+  const rejected = expect(pending).rejects.toThrow('Catalog unavailable');
+  bootstrapOffscreenDocument();
+  await expect(
+    probeOffscreenRuntimeReadiness({ challenge: 'pending', offscreenStartupId: 'current' })
+  ).resolves.toMatchObject({ state: 'ready' });
+  expect(offscreenMocks.initDB).not.toHaveBeenCalled();
+  fail(new Error('Catalog unavailable'));
+  await rejected;
+  await expect(
+    probeOffscreenRuntimeReadiness({ challenge: 'failed', offscreenStartupId: 'current' })
   ).resolves.toMatchObject({ state: 'ready' });
 });

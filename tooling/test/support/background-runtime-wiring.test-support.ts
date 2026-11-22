@@ -165,6 +165,11 @@ export const navigationCommittedListenerRef: { current: ((details: unknown) => v
 export const navigationCompletedListenerRef: { current: ((details: unknown) => void) | null } = {
   current: null,
 };
+export const navigationDOMContentLoadedListenerRef: {
+  current: ((details: unknown) => void) | null;
+} = {
+  current: null,
+};
 export const navigationErrorListenerRef: { current: ((details: unknown) => void) | null } = {
   current: null,
 };
@@ -205,6 +210,7 @@ function resetListenerRefs() {
   navigationListenerRef.current = null;
   navigationCommittedListenerRef.current = null;
   navigationCompletedListenerRef.current = null;
+  navigationDOMContentLoadedListenerRef.current = null;
   navigationErrorListenerRef.current = null;
   installedListenerRef.current = null;
 }
@@ -262,6 +268,11 @@ function installBrowserListenerMocks() {
         onCompleted: {
           addListener: vi.fn((listener: (details: unknown) => void) => {
             navigationCompletedListenerRef.current = listener;
+          }),
+        },
+        onDOMContentLoaded: {
+          addListener: vi.fn((listener: (details: unknown) => void) => {
+            navigationDOMContentLoadedListenerRef.current = listener;
           }),
         },
         onErrorOccurred: {

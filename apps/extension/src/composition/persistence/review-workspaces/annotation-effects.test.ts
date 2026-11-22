@@ -1,7 +1,7 @@
 import { verifyRuntimeAnimationSource } from '../../../contracts/effect-runtime/animation';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import { reviewAdvancedContentBaseline } from '../../../features/video/review/document';
@@ -26,7 +26,12 @@ import {
   workspaceStorageRows,
   materializeWorkspaceStorage,
 } from './storage-format';
-import { readWorkspaceStorage, replaceWorkspaceStorage, writeWorkspaceStorage } from './storage';
+import {
+  readWorkspaceStorage,
+  replaceWorkspaceStorage,
+  writeWorkspaceStorage,
+  readWorkspaceEffectSnapshots,
+} from './storage';
 import { createReviewWorkspaceStoreFixture } from './store.test-support';
 import type { VideoWorkspace } from './contracts';
 import { areNewReviewSourcesAvailable } from './new-reference-admission';
@@ -86,6 +91,67 @@ function workspace(cursor = 0): VideoWorkspace {
     cursor,
   };
 }
+
+it.each([1, 49].flatMap((depth) => [false, true].map((split) => ({ depth, split }))))(
+  'reads only the annotation registry at history depth $depth with split storage $split',
+  async ({ depth, split }) => {
+    const value = workspace();
+    for (let index = 1; index < depth; index++)
+      value.history.push({
+        id: `note-${index}`,
+        at: index + 1,
+        target: 'annotation',
+        before: null,
+        after: { id: `note-${index}`, text: `Note ${index}`, anchor: { kind: 'point', time: 1 } },
+      });
+    value.cursor = depth;
+    const admitted = parseVideoWorkspace(value);
+    if (!admitted) throw new Error('Expected valid workspace');
+    const head = split ? workspaceStorageHead(admitted, []) : admitted;
+    const baseline = workspaceStorageRows(admitted)[0];
+    const before = JSON.stringify({ head, baseline });
+    const get = vi.fn(async (name: string, _key: unknown) =>
+      name === 'video_workspaces' ? head : baseline
+    );
+    const result = await readWorkspaceEffectSnapshots(
+      { objectStore: (name) => ({ get: (key) => get(name, key) }) },
+      'review'
+    );
+    expect(result).toEqual(admitted.effectSnapshots);
+    expect(get.mock.calls).toEqual([
+      ['video_workspaces', 'review'],
+      ...(split ? [['video_workspace_history', ['review', 0]]] : []),
+    ]);
+    expect(JSON.stringify({ head, baseline })).toBe(before);
+  }
+);
+
+it.each(['missing-head', 'missing-baseline', 'wrong-owner', 'invalid-registry'])(
+  'refuses invalid annotation registry evidence without loading history: %s',
+  async (kind) => {
+    const value = workspace();
+    const head = workspaceStorageHead(value, []);
+    const baseline = workspaceStorageRows(value)[0];
+    const rawBaseline =
+      kind === 'missing-baseline'
+        ? undefined
+        : kind === 'wrong-owner'
+          ? { ...baseline, aggregateId: 'other' }
+          : kind === 'invalid-registry'
+            ? { ...baseline, effectSnapshots: [{}] }
+            : baseline;
+    const get = vi.fn(async (name: string, _key: unknown) =>
+      name === 'video_workspaces' ? (kind === 'missing-head' ? undefined : head) : rawBaseline
+    );
+    await expect(
+      readWorkspaceEffectSnapshots(
+        { objectStore: (name) => ({ get: (key) => get(name, key) }) },
+        'review'
+      )
+    ).resolves.toBeNull();
+    expect(get.mock.calls.length).toBeLessThanOrEqual(2);
+  }
+);
 
 it.each([0, 1])(
   'embedded sources cannot authorize detached private claims at cursor %i',

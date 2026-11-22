@@ -1,9 +1,10 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { test, openProvider, saveProof } from './webdav-fixtures';
 import { parseSyncProductResponse } from '../../../../apps/extension/src/contracts/messaging/contracts/runtime/sync-product';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import type { NativeEditingRoot } from '../../../../apps/extension/src/composition/persistence/assets/editing-resources';
 import { ASSET_ROOT_DIRECTORY_NAME } from '../../../../apps/extension/src/composition/persistence/assets/opfs-store';
 import { chooseInspectorValue } from '../support/inspector-utilities';
@@ -408,8 +409,8 @@ async function sourceEditor(browser: Provider, fixture: Fixture, kind: Kind) {
   return editor;
 }
 async function number(owner: Page | Locator, key: Parameters<typeof translate>[0], value: string) {
-  const field = owner.getByRole('textbox', { name: label(key), exact: true });
-  await field.fill(value);
+  const field = numericControl(owner, label(key));
+  await (await openNumericControl(owner, label(key))).fill(value);
   await field.press('Enter');
   await expect(field).toHaveValue(value);
 }
@@ -547,7 +548,7 @@ function reviewEdits(page: Page): Edit[] {
         const owner = dialog.locator('[data-ui="gallery.videoReview.cutTransition"]');
         await owner
           .getByRole('button', {
-            name: label('gallery.videoReview.zoomTransitionType'),
+            name: label('gallery.videoReview.cutTransition'),
             exact: true,
           })
           .click();
@@ -779,12 +780,9 @@ async function verifyControls(page: Page, fixture: Fixture, kind: Kind) {
         exact: true,
       })
     ).toHaveValue('12');
-    await expect(
-      dialog.getByRole('textbox', {
-        name: label('gallery.videoReview.backgroundShadow'),
-        exact: true,
-      })
-    ).toHaveValue('40');
+    await expect(numericControl(dialog, label('gallery.videoReview.backgroundShadow'))).toHaveValue(
+      '40'
+    );
     await dialog
       .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
       .first()

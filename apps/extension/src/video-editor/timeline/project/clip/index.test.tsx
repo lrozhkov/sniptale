@@ -88,6 +88,51 @@ afterEach(() => {
   container = null;
 });
 
+it('places converted camera destination markers at their result-time offsets after a freeze', () => {
+  const project = createEmptyVideoProject('Camera markers');
+  const clip = createClip(project.tracks[0]!.id);
+  Object.assign(clip, {
+    startTime: 10,
+    sourceStart: 2,
+    sourceDuration: 6,
+    duration: 3,
+    playbackRate: 2,
+  });
+  clip.cameraTiming = { offsetSeconds: 0, transitions: 'bounded', timeDomain: 'result' };
+  clip.cameraPositions = [
+    {
+      id: 'position',
+      sourceTime: 11.5,
+      transform: clip.transform,
+      fitMode: clip.fitMode,
+      transition: { kind: 'instant', duration: 0 },
+    },
+  ];
+  project.tracks[0]!.role = 'CAMERA';
+  project.clips = [clip];
+  act(() =>
+    root!.render(
+      <ProjectTimelineClip
+        clip={clip}
+        isHovered={false}
+        isSelected={false}
+        pixelsPerSecond={24}
+        preview={{ kind: 'video', frames: [] }}
+        project={project}
+        trackClipRowHeight={64}
+        trackLocked={false}
+        onClipHoverChange={vi.fn()}
+        onSelectClip={vi.fn()}
+        onBeginClipInteraction={vi.fn()}
+      />
+    )
+  );
+  expect(
+    container!.querySelector<HTMLElement>('[data-ui="video-editor.camera-position-marker"]')?.style
+      .left
+  ).toBe('50%');
+});
+
 it('stops click propagation so clip interactions do not trigger timeline seek handlers', () => {
   const project = createEmptyVideoProject('Timeline');
   const onParentClick = vi.fn();

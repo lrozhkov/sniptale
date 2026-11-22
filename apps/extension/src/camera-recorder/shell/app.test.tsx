@@ -18,6 +18,55 @@ import {
 
 installCameraRecorderTestHarness();
 
+it('retains the mounted teleprompter draft through failure and the next recording', async () => {
+  mockRegisteredRecordingState();
+  await renderApp();
+  const editor = getContainer()?.querySelector('textarea');
+  if (!editor) throw new Error('Script editor is unavailable');
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(
+      editor,
+      'Keep this private draft'
+    );
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    editor.dispatchEvent(new Event('change', { bubbles: true }));
+    window.history.replaceState(
+      {},
+      '',
+      '/apps/extension/src/camera-recorder/index.html#failure=unknown'
+    );
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  });
+  expect(getContainer()?.querySelector('textarea')).toBe(editor);
+  expect(editor.value).toBe('Keep this private draft');
+  mockRegisteredRecordingState();
+  await act(async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/apps/extension/src/camera-recorder/index.html#recordingId=rec-1&launchToken=next-launch&teleprompter=1'
+    );
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  });
+  expect(getContainer()?.querySelector('textarea')).toBe(editor);
+  expect(editor.value).toBe('Keep this private draft');
+});
+
+it('shows a failure result without registering recording controls', async () => {
+  window.history.replaceState(
+    {},
+    '',
+    '/apps/extension/src/camera-recorder/index.html?failure=audio-capacity'
+  );
+  await renderApp();
+  expect(getContainer()?.textContent).toContain('popup.video.recordingInterruptedTitle');
+  expect(getContainer()?.textContent).toContain('popup.video.recordingInterruptedAudio');
+  expect(
+    getContainer()?.querySelector('[data-ui="camera-recorder.live"]')?.parentElement?.hidden
+  ).toBe(true);
+  expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
+});
+
 it('surfaces camera recorder registration failures', async () => {
   sendRuntimeMessageMock.mockResolvedValueOnce({
     success: false,

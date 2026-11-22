@@ -1,6 +1,17 @@
 // @vitest-environment jsdom
 import { Blob as NodeBlob } from 'node:buffer';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadGalleryCatalogFixture,
+  prepareGalleryTranslations,
+} from '../test-support/translations.test-support';
+
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadGalleryCatalogFixture>[0]) =>
+    loadGalleryCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareGalleryTranslations('ru'));
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createVideoProjectCursorTrack } from '../../features/video/project/defaults';
 import { createVideoReviewSession } from '../../workflows/video-review/session';

@@ -14,28 +14,31 @@ import {
   type ReviewActionAudioStyle,
 } from '../../features/video/review/advanced/action-audio';
 import { buildReviewActionAudioPlan } from '../../features/video/review/action-audio';
-import type { useReviewEditorState } from './use-editor-state';
+import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
+import type { ReviewSelection } from '../../features/video/review/types';
+import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
+import type { useReviewAdvanced } from './use-advanced';
 type PresentationState = Pick<
-  ReturnType<typeof useReviewEditorState>,
-  | 'busy'
-  | 'editing'
-  | 'canStart'
-  | 'advanced'
-  | 'setMode'
-  | 'setActiveSelection'
-  | 'activeSelection'
-  | 'setMessage'
-  | 'setClickAnimations'
-  | 'setKeyAnimations'
->;
+  ReturnType<typeof useReviewAdvanced>,
+  'setClickAnimations' | 'setKeyAnimations'
+> & {
+  busy: boolean;
+  editing: { exporter: { phase: 'idle' | 'exporting' | 'publishing' } };
+  canStart(): boolean;
+  advanced: QuickEditAdvancedState;
+  setMode(mode: 'basic' | 'advanced'): void;
+  setActiveSelection(selection: ReviewSelection): void;
+  activeSelection: ReviewSelection;
+  setMessage(value: string): void;
+};
 
 /** One guarded continuation flushes preceding content, then submits a patch-only history batch. */
 export async function changeRecordedActionAudio(
   state: PresentationState &
-    Pick<
-      ReturnType<typeof useReviewEditorState>,
-      'setActionAudio' | 'flushAdvanced' | 'performAction'
-    >,
+    Pick<ReturnType<typeof useReviewAdvanced>, 'setActionAudio'> & {
+      flushAdvanced(): Promise<void>;
+      performAction(action: () => Promise<boolean>): Promise<boolean | undefined>;
+    },
   targets: readonly ReviewActionAudioTarget[],
   patch: ReviewActionAudioPatch | null
 ) {
@@ -64,10 +67,16 @@ export async function changeRecordedActionAudio(
 
 /** Audition borrows the same graph and normalized fact; it never stages document content. */
 export function auditionRecordedActionAudio(
-  state: Pick<
-    ReturnType<typeof useReviewEditorState>,
-    'busy' | 'editing' | 'canStart' | 'projected' | 'timeline' | 'actionSoundPreview'
-  >,
+  state: {
+    busy: boolean;
+    editing: PresentationState['editing'];
+    canStart(): boolean;
+    projected: { markers: readonly ReviewTelemetryMarker[] };
+    timeline: {
+      timeMap: { getSegments(): Parameters<typeof buildReviewActionAudioPlan>[0]['segments'] };
+    };
+    actionSoundPreview: { audition(plan: ReturnType<typeof buildReviewActionAudioPlan>): void };
+  },
   target: ReviewActionAudioTarget,
   style: ReviewActionAudioStyle
 ) {
@@ -107,7 +116,7 @@ export function changeRecordedKeys(
 
 /** Both single and bulk edits use the existing advanced-content transaction and admission. */
 export function changeRecordedClicks(
-  state: PresentationState & Pick<ReturnType<typeof useReviewEditorState>, 'projected'>,
+  state: PresentationState & { projected: { markers: readonly ReviewTelemetryMarker[] } },
   ids: readonly string[],
   patch: Partial<ReviewClickStyle> | null
 ) {

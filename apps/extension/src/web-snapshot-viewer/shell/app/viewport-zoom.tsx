@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Minus, Plus, Scan } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { translate, type AppLocale } from '../../../platform/i18n';
@@ -166,42 +166,18 @@ export interface ViewerZoomControls {
 
 export function WebSnapshotZoomControls(props: ViewerZoomControls & { locale: AppLocale }) {
   if (!props.canZoom) return null;
-  const percent = `${Math.round(props.zoom * 100)}%`;
 
   return (
-    <div
-      role="group"
-      aria-label={translate('webSnapshotViewer.app.zoomControls', props.locale)}
-      className="flex shrink-0 items-center gap-2"
+    <SnapshotZoomSteps
+      label={translate('webSnapshotViewer.app.zoomControls', props.locale)}
+      locale={props.locale}
+      zoom={props.zoom}
+      minimum={MIN_ZOOM}
+      maximum={MAX_ZOOM}
+      onZoomOut={props.onZoomOut}
+      onZoomIn={props.onZoomIn}
+      onReset={props.onReset}
     >
-      <ContentToolbarButton
-        tone="utility"
-        type="button"
-        aria-label={translate('webSnapshotViewer.app.zoomOut', props.locale)}
-        className="h-8 w-8 cursor-pointer !p-0"
-        onClick={props.onZoomOut}
-      >
-        <Minus aria-hidden="true" size={16} />
-      </ContentToolbarButton>
-      <ContentToolbarButton
-        tone="utility"
-        type="button"
-        aria-label={translate('webSnapshotViewer.app.actualSize', props.locale)}
-        title={translate('webSnapshotViewer.app.actualSize', props.locale)}
-        className="h-8 cursor-pointer !w-auto !min-w-14 !px-2 tabular-nums"
-        onClick={props.onReset}
-      >
-        {percent}
-      </ContentToolbarButton>
-      <ContentToolbarButton
-        tone="utility"
-        type="button"
-        aria-label={translate('webSnapshotViewer.app.zoomIn', props.locale)}
-        className="h-8 w-8 cursor-pointer !p-0"
-        onClick={props.onZoomIn}
-      >
-        <Plus aria-hidden="true" size={16} />
-      </ContentToolbarButton>
       {props.canFitToWidth ? (
         <ContentToolbarButton
           tone="property"
@@ -216,6 +192,63 @@ export function WebSnapshotZoomControls(props: ViewerZoomControls & { locale: Ap
           <Scan aria-hidden="true" size={16} />
         </ContentToolbarButton>
       ) : null}
+    </SnapshotZoomSteps>
+  );
+}
+
+export function SnapshotZoomSteps(props: {
+  label: string;
+  locale: AppLocale;
+  zoom: number;
+  minimum: number;
+  maximum: number;
+  onZoomOut: () => void;
+  onZoomIn: () => void;
+  onReset?: () => void;
+  children?: ReactNode;
+}) {
+  const percent = `${Math.round(props.zoom * 100)}%`;
+  const actualSize = translate('webSnapshotViewer.app.actualSize', props.locale);
+
+  return (
+    <div role="group" aria-label={props.label} className="flex shrink-0 items-center gap-1">
+      <ContentToolbarButton
+        tone="utility"
+        type="button"
+        aria-label={translate('webSnapshotViewer.app.zoomOut', props.locale)}
+        className="h-8 w-8 cursor-pointer !p-0"
+        disabled={props.zoom <= props.minimum}
+        onClick={props.onZoomOut}
+      >
+        <Minus aria-hidden="true" size={16} />
+      </ContentToolbarButton>
+      {props.onReset ? (
+        <ContentToolbarButton
+          tone="utility"
+          type="button"
+          aria-label={actualSize}
+          title={actualSize}
+          className="h-8 cursor-pointer !w-11 !px-1 tabular-nums"
+          onClick={props.onReset}
+        >
+          {percent}
+        </ContentToolbarButton>
+      ) : (
+        <span className="w-11 text-center text-[13px] leading-[18px] font-normal tabular-nums">
+          {percent}
+        </span>
+      )}
+      <ContentToolbarButton
+        tone="utility"
+        type="button"
+        aria-label={translate('webSnapshotViewer.app.zoomIn', props.locale)}
+        className="h-8 w-8 cursor-pointer !p-0"
+        disabled={props.zoom >= props.maximum}
+        onClick={props.onZoomIn}
+      >
+        <Plus aria-hidden="true" size={16} />
+      </ContentToolbarButton>
+      {props.children}
     </div>
   );
 }

@@ -222,9 +222,7 @@ function parseEdit(value: unknown, duration: number): ReviewEdit | null {
       value['frameTime'] >= duration ||
       !finite(value['frameDuration']) ||
       value['frameDuration'] <= 0 ||
-      value['frameDuration'] > 172800 ||
-      (range.start !== 0 && value['frameTime'] > range.start) ||
-      value['frameTime'] + value['frameDuration'] < range.start - 1e-6
+      value['frameDuration'] > 172800
     )
       return null;
     return {
@@ -326,8 +324,51 @@ export function parseCanvasComment(value: unknown, duration: number): CanvasComm
   };
 }
 
+/** One-shot projections validate values without retaining immutable operation copies. */
+export type ReviewOperationLifetime = 'retained' | 'transient';
+
+const admittedOperations = new WeakMap<
+  object,
+  { operation: ReviewOperation; duration: number; bytes?: number }
+>();
+const operationEncoder = new TextEncoder();
+
+function freezeOperationValue(value: unknown): void {
+  if (value === null || typeof value !== 'object' || Object.isFrozen(value)) return;
+  for (const child of Object.values(value)) freezeOperationValue(child);
+  Object.freeze(value);
+}
+
+/** Reuses only detached immutable outputs admitted for the same source duration. */
+export function parseReviewOperation(
+  value: unknown,
+  duration: number,
+  lifetime: ReviewOperationLifetime = 'retained'
+): ReviewOperation | null {
+  if (isRecord(value)) {
+    // Only this parser's outputs enter the memo; external frozen objects are not trusted.
+    const admitted = admittedOperations.get(value);
+    if (admitted?.duration === duration) return admitted.operation;
+  }
+  const parsed = parseReviewOperationValue(value, duration);
+  if (!parsed || lifetime === 'transient') return parsed;
+  const detached = structuredClone(parsed);
+  freezeOperationValue(detached);
+  admittedOperations.set(detached, { operation: detached, duration });
+  return detached;
+}
+
+/** Measures the canonical JSON encoding once for immutable admitted operations. */
+export function reviewOperationEncodedBytes(operation: ReviewOperation): number {
+  const admitted = admittedOperations.get(operation);
+  if (admitted?.bytes !== undefined) return admitted.bytes;
+  const bytes = operationEncoder.encode(JSON.stringify(operation)).byteLength;
+  if (admitted) admitted.bytes = bytes;
+  return bytes;
+}
+
 /** Parses both undo values, preserving no unvalidated extension properties. */
-export function parseReviewOperation(value: unknown, duration: number): ReviewOperation | null {
+function parseReviewOperationValue(value: unknown, duration: number): ReviewOperation | null {
   if (!isRecord(value) || !identity(value['id']) || !finite(value['at']) || value['at'] < 0)
     return null;
   const metadata = { id: value['id'], at: value['at'] };
@@ -354,6 +395,8 @@ export function parseReviewOperation(value: unknown, duration: number): ReviewOp
       return null;
     if (value['preserveFocusAnchors'] !== undefined && value['preserveFocusAnchors'] !== true)
       return null;
+    if (value['preserveVisualAnchors'] !== undefined && value['preserveVisualAnchors'] !== true)
+      return null;
     if (value['preserveUnderCuts'] !== undefined && value['preserveUnderCuts'] !== true)
       return null;
     if (value['preserveUnderCuts'] === true && value['preserveFocusAnchors'] !== true) return null;
@@ -363,6 +406,11 @@ export function parseReviewOperation(value: unknown, duration: number): ReviewOp
     )
       return null;
     if (value['preserveTextAnchors'] !== undefined && value['preserveTextAnchors'] !== true)
+      return null;
+    if (
+      (value['preserveResultText'] !== undefined && value['preserveResultText'] !== true) ||
+      (value['preserveResultText'] === true && value['preserveTextAnchors'] !== true)
+    )
       return null;
     if (
       (value['normalizeVoiceoverTempo'] !== undefined &&
@@ -376,11 +424,13 @@ export function parseReviewOperation(value: unknown, duration: number): ReviewOp
       before,
       after,
       ...(value['preserveFocusAnchors'] === true ? { preserveFocusAnchors: true as const } : {}),
+      ...(value['preserveVisualAnchors'] === true ? { preserveVisualAnchors: true as const } : {}),
       ...(value['preserveUnderCuts'] === true ? { preserveUnderCuts: true as const } : {}),
       ...(value['preserveVoiceoverAnchors'] === true
         ? { preserveVoiceoverAnchors: true as const }
         : {}),
       ...(value['preserveTextAnchors'] === true ? { preserveTextAnchors: true as const } : {}),
+      ...(value['preserveResultText'] === true ? { preserveResultText: true as const } : {}),
       ...(value['normalizeVoiceoverTempo'] === true
         ? { normalizeVoiceoverTempo: true as const }
         : {}),

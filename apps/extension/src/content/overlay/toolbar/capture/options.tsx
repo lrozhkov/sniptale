@@ -256,7 +256,7 @@ function CaptureImageParameters({
   }, [image.imageQuality, image.saving]);
   return (
     <InspectorSurface className="sniptale-capture-image-parameters">
-      <InspectorParameterRow label={translate('imageSettings.section.formatLabel')} keepInline>
+      <InspectorParameterRow label={translate('imageSettings.section.formatLabel')}>
         <CompactSegmentedSelector
           columns={3}
           ariaLabel={translate('imageSettings.section.formatLabel')}
@@ -270,7 +270,7 @@ function CaptureImageParameters({
         />
       </InspectorParameterRow>
       {image.imageFormat !== 'png' ? (
-        <InspectorParameterRow label={translate('imageSettings.section.qualityLabel')} keepInline>
+        <InspectorParameterRow label={translate('imageSettings.section.qualityLabel')}>
           <NumericValueField
             className="sniptale-capture-quality-input"
             label={translate('imageSettings.section.qualityLabel')}

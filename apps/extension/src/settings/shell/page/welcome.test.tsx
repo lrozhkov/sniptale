@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadSettingsCatalogFixture,
+  prepareSettingsTranslations,
+} from '../../catalog-fixture.test-support';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { WelcomePage } from './welcome';
 import type { WelcomeDependencies } from '../../runtime/welcome';
@@ -236,3 +240,10 @@ it('presents language and theme once and persists direct choices including the c
   expect(f.deps.theme).toHaveBeenCalledWith('dark');
   expect(choice('theme', 'Dark').getAttribute('aria-pressed')).toBe('true');
 });
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadSettingsCatalogFixture>[0]) =>
+    loadSettingsCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareSettingsTranslations('en'));

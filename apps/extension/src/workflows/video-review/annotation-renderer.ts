@@ -510,6 +510,7 @@ export async function createReviewAnnotationRenderer(
       return executor?.prepareGpuFrame && executor.maximumGpuFramesInFlight === 2 ? 2 : 1;
     },
     describe,
+    createFrameScope: ledger.createFrameScope,
     /** Freeze only texture sampling density during a complete geometry gesture, never image placement. */
     setGeometryPreview(instance: ReviewAnnotationEffect | null) {
       geometryPreview = instance;
@@ -597,7 +598,8 @@ export async function createReviewAnnotationRenderer(
       density: Record<Plane, Size>,
       fps: number,
       signal: AbortSignal,
-      instances?: readonly ReviewAnnotationEffect[]
+      instances?: readonly ReviewAnnotationEffect[],
+      resourceScope = ledger.createFrameScope()
     ) {
       signal.throwIfAborted();
       if (active) throw new Error('Annotation bitmap batch is already admitted.');
@@ -656,7 +658,7 @@ export async function createReviewAnnotationRenderer(
                 throw new Error('Standalone annotation expected.');
               },
             },
-            resourceScope: ledger.createFrameScope(),
+            resourceScope,
             signal,
           });
           if (released) {

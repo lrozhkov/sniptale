@@ -7,6 +7,8 @@ import type { GallerySidebarProps } from './types';
 import { GallerySavedViewRows } from './saved-views';
 import { getRenderedGalleryFolders, isGalleryFolderAvailable } from './folder-visibility';
 
+const PROJECT_FOLDERS: readonly FolderFilter[] = ['image-project', 'video-project', 'scenario'];
+
 type FolderListProps = Pick<
   GallerySidebarProps,
   | 'activeSavedView'
@@ -128,9 +130,9 @@ export function GalleryFolderList(props: FolderListProps) {
         folderFilter: props.folderFilter,
       })
     : (['all'] as FolderFilter[]);
-  const projects = folders.filter((folder) => folder === 'video-project' || folder === 'scenario');
-  const materials = folders.filter(
-    (folder) => folder !== 'all' && folder !== 'video-project' && folder !== 'scenario'
+  const projects = folders.filter((folder) => PROJECT_FOLDERS.includes(folder));
+  const originals = folders.filter(
+    (folder) => folder !== 'all' && !PROJECT_FOLDERS.includes(folder)
   );
   const hiddenSavedViewFolders =
     props.countsKnown && props.savedViewsLoaded
@@ -185,12 +187,12 @@ export function GalleryFolderList(props: FolderListProps) {
             </div>
           ) : null}
           {projects.map(renderRow)}
-          {!props.compact && materials.length > 0 ? (
+          {!props.compact && originals.length > 0 ? (
             <div className="px-2 pt-3 pb-1 text-xs leading-4 font-normal text-[var(--sniptale-color-text-muted)]">
               {translate('gallery.preview.materialsHeading')}
             </div>
           ) : null}
-          {materials.map(renderRow)}
+          {originals.map(renderRow)}
           {!props.compact && hiddenSavedViewFolders.length > 0 ? (
             <section data-ui="gallery.sidebar.hiddenSavedViews">
               <h3 className="px-2 pt-3 pb-1 text-xs leading-4 font-normal text-[var(--sniptale-color-text-muted)]">

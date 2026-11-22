@@ -1,8 +1,16 @@
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { transformReviewAnnotationAnchors } from '../../features/video/review/annotation-effects/layout';
-import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EffectBundleCatalogEntry } from '../../features/video/project/effect-bundle/catalog';
+import {
+  applyReviewTextTemplate,
+  reviewBuiltinTextTemplates,
+} from '../../features/video/review/annotation-effects/text-templates';
+import { createReviewAnnotationTextClip } from '../../features/video/review/annotation-effects/text-animation';
+import { prepareReviewAnnotationAppend } from '../../features/video/review/annotation-effects/types';
 import type {
   ReviewAnnotationEffect,
+  ReviewAnnotationTextClip,
   ReviewAnnotationEffects,
   ReviewAnnotationEffectTransform,
 } from '../../features/video/review/annotation-effects/types';
@@ -19,21 +27,38 @@ import {
 import type { createVideoReviewSession } from '../../workflows/video-review/session';
 import type { ReviewBeforeAction } from './note-transitions';
 import type { ReviewAnnotationGeometry } from './annotation-effects-geometry';
+import type { ReviewCommandContext, ReviewCommandPort } from './command-context';
 
 /** A transient move updates only stage consumers; the session still owns commit and Undo. */
 export interface ReviewAnnotationMovement {
   subscribe(listener: (instance: ReviewAnnotationEffect | null) => boolean | void): () => void;
 }
 
+/** Accepted stage geometry notifies its local inspector without updating the editor root. */
+interface ReviewAnnotationGeometrySource {
+  read(): ReviewAnnotationGeometry | null;
+  subscribe(listener: () => void): () => void;
+}
+
 type Session = ReturnType<typeof createVideoReviewSession>;
 type Patch = Partial<Omit<ReviewAnnotationEffect, 'id' | 'snapshotId' | 'order'>>;
-type Gesture = { session: Session; before: ReviewAnnotationEffect; after: ReviewAnnotationEffect };
+type Clip = ReviewAnnotationEffect | ReviewAnnotationTextClip;
+type GesturePatch = Patch & Partial<Omit<ReviewAnnotationTextClip, 'id' | 'order'>>;
+type Gesture = {
+  session: Session;
+  kind: 'field' | 'placement';
+  before: Clip;
+  after: Clip;
+};
 type Failure = 'acquisition' | 'unsupported' | 'save' | 'edit' | 'stale' | 'invalid';
 type Choice = {
   catalog: EffectBundleCatalogEntry;
   documentId: string;
   start: number;
   end?: number;
+  endMax?: number;
+  timeDomain?: 'result';
+  visualAnchor?: ReviewAnnotationEffect['visualAnchor'];
   locale: string;
   presetId?: string;
   attachment?: ReviewAnnotationEffect['attachment'];
@@ -63,20 +88,44 @@ function sameInstance(first: ReviewAnnotationEffect, second: ReviewAnnotationEff
   return JSON.stringify(canonical(first)) === JSON.stringify(canonical(second));
 }
 
+function findClip(lane: ReviewAnnotationEffects | undefined, id: string): Clip | undefined {
+  return (
+    lane?.textClips?.find((clip) => clip.id === id) ??
+    lane?.instances.find((clip) => clip.id === id)
+  );
+}
+
+function sameClip(first: Clip, second: Clip) {
+  if ('text' in first || 'text' in second) return JSON.stringify(first) === JSON.stringify(second);
+  return sameInstance(first, second);
+}
+
+function replaceClip(lane: ReviewAnnotationEffects, clip: Clip): ReviewAnnotationEffects {
+  return 'text' in clip
+    ? {
+        ...lane,
+        textClips: lane.textClips?.map((item) => (item.id === clip.id ? clip : item)) ?? [],
+      }
+    : { ...lane, instances: lane.instances.map((item) => (item.id === clip.id ? clip : item)) };
+}
+
 /** Disposable gallery commands; content, queue and prepared resources remain owned by the session. */
 export function useReviewAnnotationEffects(
   args: {
     session: Session;
     lane: ReviewAnnotationEffects | undefined;
+    readLane(): ReviewAnnotationEffects | undefined;
     setLane(
-      update: (lane: ReviewAnnotationEffects | undefined) => ReviewAnnotationEffects | undefined
+      update: (lane: ReviewAnnotationEffects | undefined) => ReviewAnnotationEffects | undefined,
+      discrete?: boolean
     ): void;
     flush(): Promise<void>;
     allowed(): boolean;
     beforeAction?: ReviewBeforeAction | undefined;
     performAction?(action: () => Promise<boolean>): Promise<boolean | undefined>;
     pause(): void;
-    select(selection: ReviewSelection): void;
+    commands?: ReviewCommandPort;
+    select(selection: ReviewSelection, context?: ReviewCommandContext): void;
   },
   acquire = applyReviewAnnotationCatalogDocument
 ) {
@@ -107,17 +156,41 @@ export function useReviewAnnotationEffects(
     return accepted;
   }, []);
   const completion = useRef<Promise<boolean> | null>(null);
+  const fieldPublication = useRef<{
+    staged: number;
+    published: number;
+    task: Promise<boolean> | null;
+  }>({
+    staged: 0,
+    published: 0,
+    task: null,
+  });
   const failedChoice = useRef<Choice | null>(null);
-  const [geometry, updateGeometry] = useState<ReviewAnnotationGeometry | null>(null);
-  const reportedGeometry = useRef<ReviewAnnotationGeometry | null>(null);
-  const setGeometry = useCallback((next: ReviewAnnotationGeometry | null) => {
-    // The stage reports after render: reject equal reports before scheduling another root update.
-    if (JSON.stringify(reportedGeometry.current) === JSON.stringify(next)) return;
-    reportedGeometry.current = next;
-    // Derived inspector geometry must not compete with continuous pointer updates.
-    if (next) startTransition(() => updateGeometry(next));
-    else updateGeometry(null);
-  }, []);
+  const failedContext = useRef<ReviewCommandContext | undefined>(undefined);
+  const geometryOwner = useMemo(() => {
+    // Session-local accepted snapshots cannot leak into a replacement source's inspector.
+    let current: ReviewAnnotationGeometry | null = null;
+    const listeners = new Set<() => void>();
+    const geometry: ReviewAnnotationGeometrySource = {
+      read: () => current,
+      subscribe(listener) {
+        listeners.add(listener);
+        return () => {
+          listeners.delete(listener);
+        };
+      },
+    };
+    return {
+      session: args.session,
+      geometry,
+      setGeometry(next: ReviewAnnotationGeometry | null) {
+        if (JSON.stringify(current) === JSON.stringify(next)) return;
+        current = next;
+        for (const listener of listeners) listener();
+      },
+    };
+  }, [args.session]);
+  const { geometry, setGeometry } = geometryOwner;
   const [gesture, setGesture] = useState<Gesture | null>(null);
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
@@ -126,6 +199,7 @@ export function useReviewAnnotationEffects(
     notifyMovement(null);
     draft.current = null;
     failedChoice.current = null;
+    failedContext.current = undefined;
     setGesture(null);
     setGeometry(null);
     bodyMeasurements.clear();
@@ -133,7 +207,7 @@ export function useReviewAnnotationEffects(
     setFailure(null);
     const protect = (event: BeforeUnloadEvent) => {
       const value = draft.current;
-      if (!value || value.session !== args.session || sameInstance(value.before, value.after))
+      if (!value || value.session !== geometryOwner.session || sameClip(value.before, value.after))
         return;
       event.preventDefault();
       event.returnValue = '';
@@ -146,8 +220,9 @@ export function useReviewAnnotationEffects(
       operation.current = null;
       draft.current = null;
       completion.current = null;
+      fieldPublication.current = { staged: 0, published: 0, task: null };
     };
-  }, [args.session, setGeometry, notifyMovement, bodyMeasurements]);
+  }, [geometryOwner.session, setGeometry, notifyMovement, bodyMeasurements]);
   const active = (owner: typeof args, controller: AbortController) =>
     mounted.current && latest.current.session === owner.session && !controller.signal.aborted;
   const currentLane = () => args.session.getSnapshot().document.advancedContent.annotationEffects;
@@ -168,7 +243,14 @@ export function useReviewAnnotationEffects(
       parsed.instances.every((item) => {
         const document = documents.get(item.snapshotId);
         return (
-          item.end <= workspace.source.duration &&
+          (item.visualAnchor ||
+            item.end <=
+              (item.timeDomain === 'result'
+                ? buildReviewTimeMap(
+                    workspace.source.duration,
+                    args.session.getSnapshot().document.edits
+                  ).at(-1)!.resultEnd
+                : workspace.source.duration)) &&
           document &&
           reviewAnnotationEffectMatchesDocument(item, document)
         );
@@ -177,7 +259,8 @@ export function useReviewAnnotationEffects(
   };
   const execute = (
     action: (owner: typeof args, controller: AbortController) => Promise<void | boolean>,
-    fallback: 'edit' | 'save' = 'edit'
+    fallback: 'edit' | 'save' = 'edit',
+    context?: ReviewCommandContext
   ): Promise<boolean> => {
     if (completion.current) return Promise.resolve(false);
     const owner = args;
@@ -193,10 +276,14 @@ export function useReviewAnnotationEffects(
       operation.current = controller;
       setPending(true);
       setFailure(null);
-      owner.pause();
+      if (!context) owner.pause();
       try {
         await owner.flush();
         if (!active(owner, controller)) return false;
+        if (context && !owner.commands?.isCurrent(context, 'temporal')) {
+          setFailure('stale');
+          return false;
+        }
         const result = await action(owner, controller);
         return active(owner, controller) && result !== false;
       } catch {
@@ -207,13 +294,15 @@ export function useReviewAnnotationEffects(
         if (active(owner, controller)) setPending(false);
       }
     };
-    const result = owner.performAction
-      ? Promise.resolve(owner.performAction(admitted)).then((value) => value === true)
-      : new Promise<boolean>((resolve) => {
-          (owner.beforeAction ?? ((continueAction) => continueAction()))(() => {
-            void admitted().then(resolve);
+    const result = context
+      ? Promise.resolve(admitted())
+      : owner.performAction
+        ? Promise.resolve(owner.performAction(admitted)).then((value) => value === true)
+        : new Promise<boolean>((resolve) => {
+            (owner.beforeAction ?? ((continueAction) => continueAction()))(() => {
+              void admitted().then(resolve);
+            });
           });
-        });
     const settled = result.catch(() => {
       if (mounted.current && latest.current.session === owner.session) setFailure(fallback);
       return false;
@@ -237,50 +326,133 @@ export function useReviewAnnotationEffects(
       await owner.flush();
       controller.signal.throwIfAborted();
     });
+  const hasFieldPublication = () => {
+    const fields = fieldPublication.current;
+    return fields.staged !== fields.published;
+  };
+  const publishFields = (): Promise<boolean> => {
+    const fields = fieldPublication.current;
+    if (fields.task) return fields.task;
+    if (!hasFieldPublication()) return Promise.resolve(true);
+    const owner = args;
+    const current = () =>
+      mounted.current &&
+      latest.current.session === owner.session &&
+      fieldPublication.current === fields;
+    const task = (async () => {
+      try {
+        while (fields.published !== fields.staged) {
+          const revision = fields.staged;
+          await owner.flush();
+          if (!current()) return false;
+          fields.published = revision;
+        }
+        setFailure((previous) => (previous === 'edit' ? null : previous));
+        return true;
+      } catch {
+        if (current()) setFailure('edit');
+        return false;
+      } finally {
+        fields.task = null;
+      }
+    })();
+    fields.task = task;
+    return task;
+  };
+  const stageField = (
+    update: (
+      lane: ReviewAnnotationEffects | undefined
+    ) => ReviewAnnotationEffects | undefined | false,
+    onStaged?: () => void
+  ): Promise<boolean> => {
+    const owner = args;
+    const stage = async () => {
+      if (
+        !mounted.current ||
+        latest.current.session !== owner.session ||
+        completion.current ||
+        !latest.current.allowed()
+      )
+        return false;
+      const current = owner.readLane();
+      const lane = update(current);
+      if (lane === false) return false;
+      if (lane === current) return true;
+      if (lane && !valid(lane)) {
+        setFailure('invalid');
+        return false;
+      }
+      owner.pause();
+      setFailure(null);
+      owner.setLane(() => lane, true);
+      fieldPublication.current.staged += 1;
+      onStaged?.();
+      return publishFields();
+    };
+    if (owner.performAction) return owner.performAction(stage).then((result) => result === true);
+    return new Promise<boolean>((resolve) => {
+      (owner.beforeAction ?? ((action) => action()))(() => void stage().then(resolve));
+    });
+  };
   const cancelGesture = () => {
     notifyMovement(null);
     draft.current = null;
     setGesture(null);
   };
-  const add = (choice: Choice): Promise<string | null> => {
+  const add = (choice: Choice, context?: ReviewCommandContext): Promise<string | null> => {
     if (draft.current) return Promise.resolve(null);
     let createdId: string | null = null;
     const instanceId = crypto.randomUUID();
-    return execute(async (owner, controller) => {
-      failedChoice.current = choice;
-      try {
-        const id = await acquire({
-          ...choice,
-          instanceId,
-          session: owner.session,
-          signal: controller.signal,
-        });
-        if (active(owner, controller)) {
-          failedChoice.current = null;
-          createdId = id;
-          owner.select({ kind: 'annotation-effect', id });
+    return execute(
+      async (owner, controller) => {
+        failedChoice.current = choice;
+        failedContext.current = context;
+        try {
+          const id = await acquire({
+            ...choice,
+            instanceId,
+            session: owner.session,
+            signal: controller.signal,
+            ...(context
+              ? {
+                  assertCurrentTarget: () => {
+                    if (!owner.commands?.isCurrent(context, 'temporal'))
+                      throw new ReviewAnnotationAcquisitionError('changed-source');
+                  },
+                }
+              : {}),
+          });
+          if (active(owner, controller)) {
+            failedChoice.current = null;
+            createdId = id;
+            if (context) owner.select({ kind: 'annotation-effect', id }, context);
+            else owner.select({ kind: 'annotation-effect', id });
+          }
+        } catch (error) {
+          if (!active(owner, controller)) return;
+          const admitted = currentLane()?.instances.find(({ id }) => id === instanceId);
+          if (admitted) {
+            failedChoice.current = null;
+            createdId = admitted.id;
+            if (context) owner.select({ kind: 'annotation-effect', id: admitted.id }, context);
+            else owner.select({ kind: 'annotation-effect', id: admitted.id });
+            setFailure('save');
+          } else if (
+            error instanceof ReviewAnnotationAcquisitionError &&
+            error.code === 'unsupported-kind'
+          ) {
+            failedChoice.current = null;
+            setFailure('unsupported');
+          } else setFailure('acquisition');
+          throw error;
         }
-      } catch (error) {
-        if (!active(owner, controller)) return;
-        const admitted = currentLane()?.instances.find(({ id }) => id === instanceId);
-        if (admitted) {
-          failedChoice.current = null;
-          createdId = admitted.id;
-          owner.select({ kind: 'annotation-effect', id: admitted.id });
-          setFailure('save');
-        } else if (
-          error instanceof ReviewAnnotationAcquisitionError &&
-          error.code === 'unsupported-kind'
-        ) {
-          failedChoice.current = null;
-          setFailure('unsupported');
-        } else setFailure('acquisition');
-        throw error;
-      }
-    }).then(() => createdId);
+      },
+      'edit',
+      context
+    ).then(() => createdId);
   };
   const applyPatch = (item: ReviewAnnotationEffect, patch: Patch): ReviewAnnotationEffect => {
-    const plane = reportedGeometry.current?.[item.attachment];
+    const plane = geometry.read()?.[item.attachment];
     return {
       ...item,
       ...structuredClone(patch),
@@ -291,51 +463,104 @@ export function useReviewAnnotationEffects(
         : {}),
     };
   };
-  const change = (id: string, patch: Patch) => {
+  const change = (
+    id: string,
+    edit: Patch | ((current: ReviewAnnotationEffect) => Patch | null)
+  ) => {
     if (draft.current) return;
-    void mutate(
-      (lane) =>
-        lane && {
-          ...lane,
-          instances: lane.instances.map((item) =>
-            item.id === id ? applyPatch(item, patch) : item
-          ),
-        }
-    );
+    void stageField((lane) => {
+      const current = lane?.instances.find((item) => item.id === id);
+      if (!lane || !current) return lane;
+      const patch = typeof edit === 'function' ? edit(current) : edit;
+      if (!patch) return lane;
+      return {
+        ...lane,
+        instances: lane.instances.map((item) => (item.id === id ? applyPatch(item, patch) : item)),
+      };
+    });
   };
   const commitGesture = async (): Promise<boolean> => {
     const value = draft.current;
-    if (!value) return true;
+    if (!value) return publishFields();
     if (value.session !== args.session) return false;
-    if (sameInstance(value.before, value.after)) {
+    if (sameClip(value.before, value.after)) {
       cancelGesture();
-      return true;
+      return publishFields();
     }
-    const committed = await mutate((lane) => {
-      const item = lane?.instances.find((entry) => entry.id === value.before.id);
-      if (!lane || !item || !sameInstance(item, value.before)) {
+    const replace = (lane: ReviewAnnotationEffects | undefined) => {
+      const item = findClip(lane, value.before.id);
+      if (!lane || !item || !sameClip(item, value.before)) {
         setFailure('stale');
-        throw new Error('Annotation draft changed.');
+        return false as const;
       }
-      return {
-        ...lane,
-        instances: lane.instances.map((entry) => (entry.id === item.id ? value.after : entry)),
-      };
+      return replaceClip(lane, value.after);
+    };
+    const finish = () => {
+      if (draft.current === value) cancelGesture();
+    };
+    if (value.kind === 'field' || 'text' in value.before) return stageField(replace, finish);
+    const committed = await mutate((lane) => {
+      const next = replace(lane);
+      if (next === false) throw new Error('Annotation draft changed.');
+      return next;
     });
-    if (committed && draft.current === value) cancelGesture();
+    if (committed) finish();
     return committed;
+  };
+  const applyGesturePatch = (gesture: Gesture, patch: GesturePatch) => {
+    const item = gesture.kind === 'placement' ? gesture.before : gesture.after;
+    if ('text' in item) return { ...item, ...structuredClone(patch) };
+    if (gesture.kind === 'placement') return applyPatch(item, patch);
+    return applyPatch(
+      item,
+      patch.controls ? { ...patch, controls: { ...item.controls, ...patch.controls } } : patch
+    );
   };
   const previewPlacement = (patch: Patch) => {
     const value = draft.current;
     if (!value || value.session !== args.session) return false;
+    const patched = applyGesturePatch(value, patch);
+    if ('text' in patched) return false;
     const parsed = parseReviewAnnotationEffects({
       enabled: true,
-      instances: [applyPatch(value.before, patch)],
+      instances: [patched],
     })?.instances[0];
     if (!parsed || !notifyMovement(parsed)) return false;
     draft.current = { ...value, after: parsed };
     return true;
   };
+  const addText = (
+    range: { start: number; end: number },
+    text: string,
+    context: ReviewCommandContext
+  ) => {
+    if (draft.current) return Promise.resolve(false);
+    return execute(
+      async (owner, controller) => {
+        const { lane, order } = prepareReviewAnnotationAppend(currentLane());
+        const id = crypto.randomUUID();
+        const clip = applyReviewTextTemplate(
+          createReviewAnnotationTextClip(id, text, range.start, range.end, order),
+          reviewBuiltinTextTemplates.clean
+        );
+        const next = { ...lane, textClips: [...(lane.textClips ?? []), clip] };
+        if (!valid(next)) {
+          setFailure('invalid');
+          return false;
+        }
+        owner.setLane(() => next, true);
+        try {
+          await owner.flush();
+        } finally {
+          if (active(owner, controller)) owner.select({ kind: 'annotation-effect', id }, context);
+        }
+      },
+      'save',
+      context
+    );
+  };
+  const previewCurrent =
+    gesture?.session === args.session ? findClip(args.lane, gesture.before.id) : undefined;
   return {
     geometry,
     bodyMeasurements,
@@ -344,45 +569,75 @@ export function useReviewAnnotationEffects(
     previewMovement: (transform: ReviewAnnotationEffectTransform) =>
       previewPlacement({ transform }),
     gestureId: gesture?.session === args.session ? gesture.before.id : null,
+    placementGestureActive: gesture?.session === args.session && gesture.kind === 'placement',
     setGeometry,
     pending,
     failure,
     lane: args.lane,
     previewLane:
-      gesture?.session === args.session &&
-      args.lane?.instances.some(
-        (item) => item.id === gesture.before.id && sameInstance(item, gesture.before)
-      )
-        ? {
-            ...args.lane,
-            instances: args.lane.instances.map((item) =>
-              item.id === gesture.before.id ? gesture.after : item
-            ),
-          }
+      gesture && args.lane && previewCurrent && sameClip(previewCurrent, gesture.before)
+        ? replaceClip(args.lane, gesture.after)
         : args.lane,
     add,
+    addText,
+    changeText: (
+      id: string,
+      edit: (clip: ReviewAnnotationTextClip) => ReviewAnnotationTextClip
+    ) => {
+      if (draft.current) return;
+      void stageField((lane) => {
+        const clip = lane?.textClips?.find((item) => item.id === id);
+        return lane && clip ? replaceClip(lane, edit(clip)) : lane;
+      });
+    },
     change,
     enabled: (enabled: boolean) => {
-      if (!draft.current) void mutate((lane) => lane && { ...lane, enabled });
+      if (draft.current || completion.current) return;
+      const owner = args;
+      // A lane flag uses the same buffered content path as Zoom, without global operation busy.
+      (owner.beforeAction ?? ((action) => action()))(() => {
+        if (
+          !mounted.current ||
+          latest.current.session !== owner.session ||
+          draft.current ||
+          completion.current ||
+          operation.current ||
+          !latest.current.allowed()
+        )
+          return;
+        owner.pause();
+        owner.setLane((lane) => lane && { ...lane, enabled });
+        setFailure(null);
+      });
     },
     remove: (id: string) => {
       if (draft.current) cancelGesture();
       void mutate(
-        (lane) => lane && { ...lane, instances: lane.instances.filter((item) => item.id !== id) }
+        (lane) =>
+          lane && {
+            ...lane,
+            instances: lane.instances.filter((item) => item.id !== id),
+            ...(lane.textClips
+              ? { textClips: lane.textClips.filter((item) => item.id !== id) }
+              : {}),
+          }
       );
     },
     duplicate: (id: string) => {
       if (draft.current) return;
       void execute(async (owner, controller) => {
-        const lane = currentLane();
-        const original = lane?.instances.find((item) => item.id === id);
-        if (!lane || !original) return;
+        const { lane, order } = prepareReviewAnnotationAppend(currentLane());
+        const original = findClip(lane, id);
+        if (!original) return;
         const copy = {
           ...structuredClone(original),
           id: crypto.randomUUID(),
-          order: Math.max(-1, ...lane.instances.map((item) => item.order)) + 1,
+          order,
         };
-        const next = { ...lane, instances: [...lane.instances, copy] };
+        const next =
+          'text' in copy
+            ? { ...lane, textClips: [...(lane.textClips ?? []), copy] }
+            : { ...lane, instances: [...lane.instances, copy] };
         if (!valid(next)) {
           setFailure('invalid');
           return;
@@ -393,13 +648,14 @@ export function useReviewAnnotationEffects(
       });
     },
     /** Call inside the existing note/gesture admission; only the final pointer transaction enters history. */
-    beginGesture: (id: string) => {
-      if (operation.current || draft.current || !args.allowed()) return false;
-      const instance = args.lane?.instances.find((item) => item.id === id);
+    beginGesture: (id: string, kind: Gesture['kind'] = 'placement') => {
+      if (!args.allowed() || draft.current || operation.current || completion.current) return false;
+      const instance = findClip(args.readLane(), id);
       if (!instance) return false;
       args.pause();
       const next = {
         session: args.session,
+        kind,
         before: structuredClone(instance),
         after: structuredClone(instance),
       };
@@ -407,7 +663,7 @@ export function useReviewAnnotationEffects(
       setGesture(next);
       return true;
     },
-    previewGesture: (patch: Patch) => {
+    previewGesture: (patch: GesturePatch) => {
       if (
         (patch.transform || patch.anchors) &&
         Object.keys(patch).every((key) => key === 'transform' || key === 'anchors') &&
@@ -417,14 +673,15 @@ export function useReviewAnnotationEffects(
       notifyMovement(null);
       const value = draft.current;
       if (!value || value.session !== args.session) return;
-      const next = { ...value, after: applyPatch(value.before, patch) };
+      const next = { ...value, after: applyGesturePatch(value, patch) };
       draft.current = next;
       setGesture(next);
     },
     cancelGesture,
     commitGesture,
     /** Idle selection stays atomic; only a draft or admitted command needs an async flush. */
-    hasPending: () => draft.current !== null || completion.current !== null,
+    hasPending: () =>
+      draft.current !== null || completion.current !== null || hasFieldPublication(),
     flush: async () => {
       const owner = args.session;
       if (completion.current && !(await completion.current))
@@ -434,7 +691,9 @@ export function useReviewAnnotationEffects(
     },
     retry: () => {
       if (draft.current) void commitGesture();
-      else if (failure === 'acquisition' && failedChoice.current) return add(failedChoice.current);
+      else if (hasFieldPublication()) void publishFields();
+      else if (failure === 'acquisition' && failedChoice.current)
+        return add(failedChoice.current, failedContext.current);
       else if (failure === 'save')
         void execute(async (owner) => {
           await owner.session.saveBuffered();

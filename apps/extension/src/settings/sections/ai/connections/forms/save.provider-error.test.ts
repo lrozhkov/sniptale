@@ -2,7 +2,11 @@ vi.mock('@sniptale/platform/browser/permissions', () => ({
   browserPermissions: { isAvailable: () => false },
 }));
 import type { SetStateAction } from 'react';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadSettingsCatalogFixture,
+  prepareSettingsTranslations,
+} from '../../../../catalog-fixture.test-support';
 
 import { AiSettingsMutationError } from '../../../../runtime/ai-settings/mutations';
 import { translate } from '../../../../../platform/i18n';
@@ -116,3 +120,10 @@ it('preserves structured locked-secret mutation reasons in the provider submit e
   });
   expect(toastErrorMock).not.toHaveBeenCalled();
 });
+
+vi.mock('../../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadSettingsCatalogFixture>[0]) =>
+    loadSettingsCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareSettingsTranslations('en'));

@@ -1,6 +1,6 @@
 import { materializeWorkspaceStorage } from '../../../../apps/extension/src/composition/persistence/review-workspaces/storage-format';
 import { expect, test, type Page } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import {
   replayReviewHistory,

@@ -55,9 +55,17 @@ test('Design Review search cannot probe retained foreign-origin feedback through
   context,
   extensionId,
   hostOrigin,
-}) => {
+}, info) => {
   const currentOrigin = hostOrigin.replace('127.0.0.1', 'localhost');
   const viewport = resolveBrowserViewport();
+  const theme = viewport.width === 1280 ? 'light' : 'dark';
+  const setup = await context.newPage();
+  await setup.setViewportSize(viewport);
+  await setup.goto(`chrome-extension://${extensionId}/apps/extension/src/popup/index.html`);
+  await setup.evaluate(async (theme) => {
+    await chrome.storage.local.set({ 'sniptale-theme-preference': theme });
+  }, theme);
+  await setup.close();
   await context.route(`${hostOrigin}/`, (route) =>
     route.fulfill({
       contentType: 'text/html',
@@ -85,10 +93,26 @@ test('Design Review search cannot probe retained foreign-origin feedback through
     await expect(rows).toHaveCount(1);
     await panel.getByRole('button', { name: /Find feedback|Найти замечание/u }).click();
     const sourceInput = panel.getByRole('textbox', { name: /Find feedback|Найти замечание/u });
+    await expect(sourceInput).toBeFocused();
+    const activeBorder = await sourceInput.evaluate((element) => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--sniptale-color-border-strong)';
+      element.parentElement!.append(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    });
+    await expect(sourceInput).toHaveCSS('border-top-color', activeBorder);
+    const initialWidth = (await sourceInput.boundingBox())!.width;
+    await page.screenshot({ path: info.outputPath('review-feedback-query.png'), fullPage: false });
     for (const query of [FOREIGN_COMMENT, FOREIGN_PATH, FOREIGN_TEXT]) {
       await commandInput(sourceInput, query);
       await expect(rows).toHaveCount(1);
-      await panel.locator('.sniptale-field-clear').click();
+      const clear = panel.locator('.sniptale-field-clear');
+      await expect(clear).toHaveCSS('width', '24px');
+      expect((await sourceInput.boundingBox())!.width).toBeCloseTo(initialWidth, 0);
+      await clear.click();
+      await expect(sourceInput).toBeFocused();
     }
     await sourceInput.press('Escape');
     await expect(sourceInput).toBeHidden();

@@ -1,5 +1,123 @@
 export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
   {
+    owner: 'editor-history-product-budget',
+    productionFile: 'apps/extension/src/features/editor-history/policy.ts',
+    allowCrossOwner: true,
+    reason:
+      'The common budget affects four native history writers and retained resources. ' +
+      'Runtime retention and native conflict, lifetime and retry suites cover these consumers.',
+    testFiles: [
+      'apps/extension/src/features/editor-history/policy.test.ts',
+      'apps/extension/src/editor/controller/history/index.test.ts',
+      'apps/extension/src/features/editor-history/image-checkpoint.test.ts',
+      'apps/extension/src/composition/persistence/image-workspaces/history-codec.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.history.integration.test.ts',
+      'apps/extension/src/features/video/project/history-checkpoint.test.ts',
+      'apps/extension/src/composition/persistence/projects/history-publication.test.ts',
+      'apps/extension/src/composition/persistence/scenario/editing-history.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-checkpoint-write.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.identity.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.test.ts',
+      'apps/extension/src/composition/persistence/scenario/storage-units.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/history-retention.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store-history-retention.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store-performance.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store-annotation-retention.test.ts',
+    ],
+  },
+  {
+    owner: 'native-project-replacement-consumers',
+    productionFile: 'apps/extension/src/composition/persistence/projects/backup-restore.ts',
+    allowCrossOwner: true,
+    reason:
+      'Archive publication replaces native project graphs and their resource claims. ' +
+      'Native history and actual archive publication prove shared ownership, rollback and cleanup.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/projects/history-publication.test.ts',
+      'apps/extension/src/composition/persistence/projects/backup-restore.review-assets.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.test.ts',
+    ],
+  },
+  {
+    owner: 'native-project-replica-publication',
+    productionFile:
+      'apps/extension/src/composition/persistence/sync-capture/apply-video-project.ts',
+    reason:
+      'Replica publication shares native project, binary residency and Scenario dependency admission. ' +
+      'These consumers prove atomic replacement, receipt retry and resource retention.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/sync-capture/apply-video-project.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-video-project.binary.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-video-project.scenario.test.ts',
+    ],
+  },
+  {
+    owner: 'durable-ready-media-locators',
+    productionFile: 'apps/extension/src/composition/persistence/assets/ready-media-claims.ts',
+    exclusive: true,
+    reason:
+      'Ready media locators serve native journals and replica retention. ' +
+      'Direct locator tests and pending-publication consumer tests prove complete source families.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/assets/ready-media-claims.test.ts',
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.pending-publication.test.ts',
+    ],
+  },
+  {
+    owner: 'sync-project-snapshot-native-admission',
+    productionFile: 'apps/extension/src/composition/persistence/sync-capture/project-snapshot.ts',
+    exclusive: true,
+    reason:
+      'Project snapshot helpers and graph admission serve native freeze and replica application. ' +
+      'Direct, guard, capture, recording, binary and Scenario consumer tests prove the retained graph.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/sync-capture/project-snapshot.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/capture.integration.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/guards.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/freeze.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/freeze.recording.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-video-project.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-video-project.binary.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-video-project.scenario.test.ts',
+    ],
+  },
+  {
+    owner: 'native-database-migrations',
+    productionFile:
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts',
+    exclusive: true,
+    reason:
+      'Migration fixtures and branch integration prove admission, retained records and malformed prototype refusal.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.fixture.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/branch-integration.test.ts',
+    ],
+  },
+  {
+    owner: 'sync-capture-project-fixture',
+    productionFile:
+      'apps/extension/src/composition/persistence/sync-capture/test-support/freeze.ts',
+    reason:
+      'Frozen project and recording tests use this database fixture to prove detached capture boundaries.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/sync-capture/freeze.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/freeze.recording.test.ts',
+    ],
+  },
+  {
+    owner: 'sync-capture-project-apply-prototype',
+    productionFile:
+      'apps/extension/src/composition/persistence/sync-capture/test-support/apply-video-project.ts',
+    reason:
+      'Capture integration proves duplicate application, stale source refusal and atomic replica publication.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/sync-capture/capture.integration.test.ts',
+    ],
+  },
+  {
     owner: 'review-attachment-target-retention-consumers',
     productionFile: 'apps/extension/src/composition/persistence/assets/retention-index.ts',
     allowCrossOwner: true,
@@ -103,6 +221,21 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
       'apps/extension/src/composition/persistence/sync-capture/apply-video-project.test.ts',
       'apps/extension/src/composition/persistence/sync-capture/apply-video-project.scenario.test.ts',
       'apps/extension/src/composition/persistence/sync-capture/replica-publication.test.ts',
+    ],
+  },
+  {
+    owner: 'sync-native-media-replica',
+    productionFile: 'apps/extension/src/composition/persistence/sync-capture/apply-media.ts',
+    allowCrossOwner: true,
+    reason:
+      'Native replica suites cover original metadata and retention. ' +
+      'The portable trajectory suite covers the recording stream publication caller.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/sync-capture/apply-media.export.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-media.recording.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-media.snapshot.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-media.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/cursor-trajectory.test.ts',
     ],
   },
   {
@@ -260,6 +393,93 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'scenario-retained-resource-closure',
+    productionFile: 'apps/extension/src/composition/persistence/scenario/resource-references.ts',
+    reason:
+      'Retained Scenario references serve editing admission, cleanup and source promotion. ' +
+      'Direct projection and native aggregate identity suites cover these consumers.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/scenario/resource-references.test.ts',
+      'apps/extension/src/composition/persistence/assets/editing-resources.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.identity.test.ts',
+    ],
+  },
+  {
+    owner: 'scenario-native-aggregate-cleanup',
+    productionFile: 'apps/extension/src/composition/persistence/scenario/aggregate-cleanup.ts',
+    reason: 'Native cleanup and replica tombstones prove retained resource and rollback paths.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/scenario/aggregate-cleanup.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-history-storage.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-deletion.test.ts',
+    ],
+  },
+  {
+    owner: 'scenario-library-source-publication',
+    productionFile: 'apps/extension/src/composition/persistence/scenario/library-publication.ts',
+    allowCrossOwner: true,
+    reason: 'Native and archive tests exercise source visibility, borrowed bytes and replacement.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/scenario/library-publication.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.shared-source.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/media.review-asset-retention.test.ts',
+    ],
+  },
+  {
+    owner: 'scenario-pooled-editing-checkpoint',
+    productionFile: 'apps/extension/src/composition/persistence/scenario/editing-history.ts',
+    exclusive: true,
+    reason:
+      'Shared pooled admission and retention affect native commands and editing snapshots. ' +
+      'Native CAS, revision identity and unit storage proof must accompany runtime activation.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/scenario/editing-history.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-checkpoint-write.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.identity.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-unit-storage.test.ts',
+      'apps/extension/src/composition/persistence/scenario/history.test.ts',
+    ],
+  },
+  {
+    owner: 'scenario-native-unit-storage',
+    productionFile: 'apps/extension/src/composition/persistence/scenario/storage-units.ts',
+    exclusive: true,
+    reason:
+      'Unit reference sharing affects native admission and checkpoint publication. ' +
+      'Native revision, recreation and retry suites cover these consumers.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/scenario/storage-units.test.ts',
+      'apps/extension/src/composition/persistence/scenario/storage.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-checkpoint-write.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.identity.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-unit-storage.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-history-storage.test.ts',
+      'apps/extension/src/composition/persistence/scenario/history.test.ts',
+      'apps/extension/src/composition/persistence/scenario/editing-history.test.ts',
+    ],
+  },
+  {
+    owner: 'shared-db-scenario-project-entry',
+    productionFile: 'apps/extension/src/composition/persistence/scenario/projects/entry.ts',
+    reason:
+      'Canonical Scenario entry construction serves project, asset, export and capture writers. ' +
+      'Checkpoint admission and native producer suites prove those consumers.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/scenario/editing-history.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.identity.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/project.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/assets.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/exports.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/index.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/project.capture-format.test.ts',
+    ],
+  },
+  {
     owner: 'shared-db-scenario-aggregate-mutations',
     productionFile: 'apps/extension/src/composition/persistence/scenario/aggregate-mutations.ts',
     reason: 'Scenario suites cover aggregate CAS, rollback, and graph deletion.',
@@ -279,13 +499,16 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
   {
     owner: 'shared-db-media-library-provenance',
     productionFile: 'apps/extension/src/composition/persistence/media-library/index.library.ts',
-    reason: 'Media library provenance patch writes are covered by focused provenance tests.',
+    reason:
+      'Focused tests cover provenance, original visibility and synchronized source retention.',
     testFiles: [
       'apps/extension/src/composition/persistence/media-library/index.library.mutations.test.ts',
       'apps/extension/src/composition/persistence/media-library/index.library.provenance.test.ts',
       'apps/extension/src/composition/persistence/media-library/index.library.tags.test.ts',
       'apps/extension/src/composition/persistence/media-library/index.library.test.ts',
       'apps/extension/src/composition/persistence/media-library/index.library.web-snapshot-provenance.test.ts',
+      'apps/extension/src/composition/persistence/media-library/usage.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-media.test.ts',
     ],
   },
   {
@@ -329,11 +552,14 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
   {
     owner: 'shared-db-video-project-persistence',
     productionFile: 'apps/extension/src/composition/persistence/projects/index.ts',
-    reason: 'Video project persistence writes are covered by focused project DB regression suites.',
+    reason:
+      'Video project persistence covers history publication, source transfer, and native writes.',
     testFiles: [
+      'apps/extension/src/composition/persistence/projects/history-publication.test.ts',
       'apps/extension/src/composition/persistence/projects/index.delete.test.ts',
       'apps/extension/src/composition/persistence/projects/index.test.ts',
       'apps/extension/src/composition/persistence/projects/index.stale-save.test.ts',
+      'apps/extension/src/composition/persistence/projects/library-project-binding.transfer.test.ts',
     ],
   },
   {
@@ -352,6 +578,8 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/mutation-inventory.test.ts',
       'apps/extension/src/composition/persistence/projects/index.delete.test.ts',
       'apps/extension/src/composition/persistence/projects/index.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/checkpoint-schedule.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/capture.integration.test.ts',
     ],
   },
   {

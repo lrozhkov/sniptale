@@ -1,6 +1,7 @@
 import { useInspectorLayout } from '../../../../../ui/compact-inspector-controls/layout';
 import { NumericRow } from '../../../../../ui/compact-inspector-controls';
 import type { CompactInspectorUnit } from '../../../../../ui/compact-inspector-controls/shared';
+import { useInspectorNumericHistory } from './numeric-history';
 import { useDedupedNumberChange } from './number-commit';
 
 type SliderDisplayMapping = {
@@ -28,6 +29,8 @@ type SliderFieldProps = {
   scrubValueToDisplayValue?: (value: number) => number;
   step?: number;
   precision?: number;
+  rangePresentation?: 'field';
+  scrubEnabled?: boolean;
   value: number;
 };
 
@@ -150,10 +153,14 @@ function resolveSliderUnit(
 }
 
 function resolveSliderScrub(props: SliderFieldProps, display: SliderDisplayMapping, step: number) {
+  const displayStep =
+    props.rangePresentation === 'field' && props.scrubStep !== undefined && props.max > props.min
+      ? (props.scrubStep * (display.max - display.min)) / (props.max - props.min)
+      : display.step;
   return {
     max: props.scrubValue === undefined ? display.max : (props.scrubMax ?? props.max),
     min: props.scrubValue === undefined ? display.min : (props.scrubMin ?? props.min),
-    step: props.scrubValue === undefined ? display.step : (props.scrubStep ?? step),
+    step: props.scrubValue === undefined ? displayStep : (props.scrubStep ?? step),
     ...(props.scrubValue === undefined ? {} : { value: props.scrubValue }),
     ...(props.scrubValueToDisplayValue === undefined
       ? {}
@@ -163,10 +170,13 @@ function resolveSliderScrub(props: SliderFieldProps, display: SliderDisplayMappi
 
 export function SliderField(props: SliderFieldProps) {
   const inspector = useInspectorLayout();
-  const disabledProps = props.disabled === undefined ? {} : { disabled: props.disabled };
   const changeValue = useDedupedNumberChange(props.onChange, props.value);
   const separateCommitValue = useDedupedNumberChange(props.onCommit ?? props.onChange, props.value);
   const commitValue = props.onCommit ? separateCommitValue : changeValue;
+  const history = useInspectorNumericHistory(props.value, changeValue, {
+    disabled: props.disabled,
+  });
+  const disabledProps = { disabled: props.disabled || history.disabled };
   const step = props.step ?? 1;
   const display = resolveSliderDisplayMapping({
     formatValue: props.formatValue,
@@ -177,18 +187,18 @@ export function SliderField(props: SliderFieldProps) {
   });
   const previewValue = (value: number) => {
     const nextValue = display.toDomainValue(value);
-    if (props.onCommit) {
-      props.onChange(nextValue);
-      return;
-    }
-    changeValue(nextValue);
+    history.preview(() => {
+      if (props.onCommit) props.onChange(nextValue);
+      else changeValue(nextValue);
+    });
   };
   const commitDisplayValue = (value: number) => {
-    commitValue(display.toDomainValue(value));
+    history.commit(() => commitValue(display.toDomainValue(value)));
   };
 
   return (
     <NumericRow
+      key={history.resetKey}
       appearance="plain"
       focusAppearance="accent-box"
       {...(inspector ? {} : { className: 'min-h-8! py-0! grid-cols-[minmax(0,1fr)_auto]!' })}
@@ -196,13 +206,16 @@ export function SliderField(props: SliderFieldProps) {
       max={display.max}
       min={display.min}
       precision={props.precision ?? display.precision}
-      scrub={resolveSliderScrub(props, display, step)}
+      scrub={props.scrubEnabled === false ? undefined : resolveSliderScrub(props, display, step)}
+      rangePresentation={props.rangePresentation}
+      stepperPlacement="sides"
       step={display.step}
       unit={resolveSliderUnit(props.value, props.formatValue) || display.unit}
       value={display.value}
       {...disabledProps}
       onPreviewValue={previewValue}
       onCommitValue={commitDisplayValue}
+      onCancelValue={history.cancel}
     />
   );
 }

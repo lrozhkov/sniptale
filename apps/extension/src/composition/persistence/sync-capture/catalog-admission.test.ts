@@ -1,3 +1,9 @@
+import { createAutomaticCatalogSync } from '../../../workflows/sync-transfer/automatic';
+import { projectSyncCatalog } from '../../../workflows/sync-transfer/catalog-graph';
+import { parseSyncOperationText } from '../../../workflows/sync-transfer/wire-record';
+import { digestImageProjectSnapshot } from './image-snapshot';
+import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
+import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
 import { createGuideProject } from '../../../features/scenario/project/factories';
 import { createScenarioProjectEntry } from '../scenario/projects/entry';
 import { deferCheckpointInTransaction } from './checkpoints';
@@ -22,6 +28,11 @@ vi.mock('../infrastructure/indexed-db/core', async (original) => ({
   ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
   initDB: io.database,
   capturePreparedDatabase: io.prepared,
+}));
+vi.mock('../assets', async (original) => ({
+  ...(await original<typeof import('../assets')>()),
+  listReadyJournals: async () => [],
+  completePhysicalDeleteOperation: async () => undefined,
 }));
 beforeEach(() => vi.clearAllMocks());
 const scope = { spaceId: 'space', profileCreatedAt: 1, connectionGeneration: 3 };
@@ -793,3 +804,85 @@ it(
     }
   }
 );
+
+it('applies an automatic Image project tombstone through native admission with no source download', async () => {
+  const f = setup();
+  const rootKind = 'image-project' as const;
+  const rootId = 'automatic-image-project';
+  const rootKey = captureRootKey(scope.spaceId, rootKind, rootId);
+  const workspace = {
+    aggregateId: rootId,
+    sourceMediaId: 'unloaded-original',
+    revision: 1,
+    createdAt: 1,
+    updatedAt: 2,
+    sourceTitle: null,
+    sourceUrl: null,
+    lifecycle: { storageClass: 'library' as const, savedAt: 1, updatedAt: 2 },
+    document: createPersistedEditorDocumentFixture(
+      createEditorDocumentFixture(),
+      f.input.rows.ref.assetId
+    ),
+  };
+  f.table('image_workspaces').set(rootId, workspace);
+  f.table('asset_refs').set(f.input.rows.ref.assetId, f.input.rows.ref);
+  const key = JSON.stringify(['root-state', rootKey]);
+  f.table('sync_capture').set(key, {
+    version: 1,
+    kind: 'root-state',
+    key,
+    createdAt: 1,
+    spaceId: scope.spaceId,
+    rootKind,
+    rootId,
+    rootKey,
+    generation: 1,
+    basis: ['base'],
+    nativeRevision: 1,
+    nativeDigest: digestImageProjectSnapshot({
+      workspace,
+      presentation: null,
+      refs: [f.input.rows.ref],
+    }),
+  });
+  const operationText = JSON.stringify({
+    format: 'sniptale-sync-operation',
+    version: 4,
+    spaceId: scope.spaceId,
+    operationId: 'tombstone',
+    rootKind,
+    rootId,
+    kind: 'delete',
+    parents: ['base'],
+    dependencies: [],
+    envelope: null,
+    objects: [],
+  });
+  const operation = await parseSyncOperationText(operationText);
+  const catalog = {
+    ...projectSyncCatalog(scope.spaceId, [
+      {
+        operation: { ...operation, kind: 'edit', operationId: 'base', parents: [] },
+        operationText: 'previously-accepted',
+        recordKey: 'base',
+        attemptId: 'base',
+        objects: [],
+      },
+      { operation, operationText, recordKey: 'tombstone', attemptId: 'tombstone', objects: [] },
+    ]),
+    invalid: [],
+    metadataBytes: 0,
+    pages: 1,
+  };
+  const remote = { read: vi.fn(), stat: vi.fn(), list: vi.fn(), write: vi.fn() };
+  const result = await createAutomaticCatalogSync().run({
+    scope,
+    authorization,
+    catalog,
+    remote,
+    signal: new AbortController().signal,
+  });
+  expect(result).toMatchObject({ applied: 1, deferred: 0 });
+  expect(f.table('image_workspaces').has(rootId)).toBe(false);
+  expect(remote.read).not.toHaveBeenCalled();
+});

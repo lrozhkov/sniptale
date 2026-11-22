@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
 import { expect, test, type Page } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { startHostServer } from '../support/host-server';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
@@ -545,3 +545,76 @@ async function measureColorExport(page: Page, encoded: string, sourceEncoded: st
     { encoded, sourceEncoded }
   );
 }
+
+test('advanced export options and actions remain reachable in a short viewport', async ({
+  page,
+}, info) => {
+  const host = await startHostServer();
+  try {
+    await page.setViewportSize({ width: 1280, height: 560 });
+    await applyHarnessBootstrap(page, {
+      preserveMediaLibrary: true,
+      storage: {
+        'sniptale-locale-preference': 'en',
+        'sniptale-theme-preference': 'dark',
+      },
+    });
+    await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=dark`);
+    await page.locator('[data-ui="gallery.page.root"]').waitFor();
+    await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+    await page.reload();
+    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+    const review = page.locator('dialog');
+    await review
+      .getByRole('button', {
+        name: translate('gallery.videoReview.advancedEditing', 'en'),
+        exact: true,
+      })
+      .click();
+    await review.locator('[data-ui="gallery.videoReview.openExport"]').click();
+    const section = review.locator('[data-ui="gallery.videoReview.exportSection"]');
+    const settings = section.locator('[data-ui="gallery.videoReview.exportSettings"]');
+    const quality = settings.getByRole('button', {
+      name: translate('gallery.videoReview.exportQuality', 'en'),
+      exact: true,
+    });
+    await expect(quality).toBeVisible();
+    await quality.click();
+    const mediumLabel = translate('videoEditor.exportDialog.qualityMedium', 'en');
+    const medium = page.getByRole('option', { name: mediumLabel, exact: true });
+    await expect(medium).toBeVisible();
+    await page.screenshot({
+      path: info.outputPath('short-export-quality.png'),
+      fullPage: false,
+      animations: 'disabled',
+    });
+    await medium.click();
+    await expect(quality).toHaveText(mediumLabel);
+    await quality.click();
+    await expect(medium).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(medium).toBeHidden();
+    await expect(quality).toBeFocused();
+    await expect(quality).toHaveCSS('outline-width', '1px');
+    const accent = await quality.evaluate((button) => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--sniptale-color-accent)';
+      button.append(probe);
+      const expected = getComputedStyle(probe).color;
+      probe.remove();
+      return expected;
+    });
+    await expect(quality).not.toHaveCSS('outline-color', accent);
+    const exportVideo = section.getByRole('button', {
+      name: translate('gallery.videoReview.exportVideo', 'en'),
+      exact: true,
+    });
+    await exportVideo.scrollIntoViewIfNeeded();
+    await expect(exportVideo).toBeInViewport({ ratio: 1 });
+    await expect(exportVideo).toBeEnabled();
+    await page.screenshot({ path: info.outputPath('short-export-actions.png'), fullPage: false });
+  } finally {
+    host.server.close();
+  }
+});

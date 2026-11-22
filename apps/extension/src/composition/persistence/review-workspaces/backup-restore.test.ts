@@ -1,3 +1,8 @@
+import {
+  applyReviewTextTemplate,
+  reviewBuiltinTextTemplates,
+} from '../../../features/video/review/annotation-effects/text-templates';
+import { createReviewAnnotationTextClip } from '../../../features/video/review/annotation-effects/text-animation';
 import type { CursorFocusPath } from '../../../features/video/project/cursor-focus-path/types';
 import { createQuickEditSpotlight } from '../../../features/video/project/scene/focus-appearance';
 import { annotation, workspace, snapshotDatabase } from './backup-restore.test-support';
@@ -36,18 +41,20 @@ const draft = {
 it.each(['legacy', 'physical'] as const)(
   'exports full %s undo/redo and field recovery, excluding the local source object identity',
   async (format) => {
+    const native = { ...workspace, generation: crypto.randomUUID() };
     const review = await readVideoReviewForBackup({
       aggregateId: workspace.aggregateId,
       sourceAssetId: 'original-local',
       db: snapshotDatabase(
-        format === 'physical' ? workspaceStorageHead(workspace, []) : workspace,
+        format === 'physical' ? workspaceStorageHead(native, []) : native,
         draft,
-        format === 'physical' ? workspaceStorageRows(workspace) : []
+        format === 'physical' ? workspaceStorageRows(native) : []
       ),
     });
     expect(review?.workspace.history).toEqual(workspace.history);
     expect(review?.workspace.cursor).toBe(0);
     expect(review?.workspace).not.toHaveProperty('sourceAssetId');
+    expect(review?.workspace).not.toHaveProperty('generation');
     expect(review?.workspace).toHaveProperty('formatVersion', 1);
     expect(review?.workspace).not.toHaveProperty('historyLength');
     expect(review?.draft).toEqual(draft);
@@ -64,7 +71,11 @@ it.each(['legacy', 'physical'] as const)(
     const workspaces = { put: vi.fn() };
     const drafts = { put: vi.fn(), delete: vi.fn() };
     await putVideoReviewRestore({ review: restored, workspaces, drafts });
-    expect(workspaces.put).toHaveBeenCalledWith(withReviewWorkspaceUsage(restored.workspace));
+    expect(workspaces.put).toHaveBeenCalledWith({
+      ...withReviewWorkspaceUsage(restored.workspace),
+      generation: expect.any(String),
+    });
+    expect(workspaces.put.mock.calls[0]?.[0].generation).not.toBe(native.generation);
     expect(drafts.put).toHaveBeenCalledWith(restored.draft);
     expect(drafts.delete).not.toHaveBeenCalled();
   }
@@ -86,6 +97,12 @@ it('refuses corrupt or stale source state instead of silently dropping it from b
   expect(() => parsePortableVideoReview({ workspace, draft }, workspace.aggregateId)).toThrow(
     'invalid'
   );
+  expect(() =>
+    parsePortableVideoReview(
+      { workspace: { ...portable, generation: 'local-generation' }, draft },
+      workspace.aggregateId
+    )
+  ).toThrow('invalid');
   expect(() =>
     parsePortableVideoReview(
       { workspace: { ...portable, history: [...portable.history, ...portable.history] }, draft },
@@ -210,7 +227,10 @@ it('roundtrips disabled webcam settings, redo history and recovery through porta
   const workspaces = { put: vi.fn() },
     drafts = { put: vi.fn(), delete: vi.fn() };
   await putVideoReviewRestore({ review: restored, workspaces, drafts });
-  expect(workspaces.put).toHaveBeenCalledWith(withReviewWorkspaceUsage(restored.workspace));
+  expect(workspaces.put).toHaveBeenCalledWith({
+    ...withReviewWorkspaceUsage(restored.workspace),
+    generation: expect.any(String),
+  });
 });
 
 it('backs up disabled image history and restores it with newly allocated asset references', async () => {
@@ -271,7 +291,10 @@ it('backs up disabled image history and restores it with newly allocated asset r
   const workspaces = { put: vi.fn() },
     drafts = { put: vi.fn(), delete: vi.fn() };
   await putVideoReviewRestore({ review: restored, workspaces, drafts });
-  expect(workspaces.put).toHaveBeenCalledWith(withReviewWorkspaceUsage(restored.workspace));
+  expect(workspaces.put).toHaveBeenCalledWith({
+    ...withReviewWorkspaceUsage(restored.workspace),
+    generation: expect.any(String),
+  });
 });
 
 it.each([false, true])(
@@ -414,7 +437,10 @@ it('transfers an inactive image choice even without history', async () => {
   const workspaces = { put: vi.fn() },
     drafts = { put: vi.fn(), delete: vi.fn() };
   await putVideoReviewRestore({ review: restored, workspaces, drafts });
-  expect(workspaces.put).toHaveBeenCalledWith(withReviewWorkspaceUsage(restored.workspace));
+  expect(workspaces.put).toHaveBeenCalledWith({
+    ...withReviewWorkspaceUsage(restored.workspace),
+    generation: expect.any(String),
+  });
 });
 
 it('backs up remembered watermark bytes and remaps the exact slot across a restored aggregate', async () => {
@@ -474,7 +500,10 @@ it('backs up remembered watermark bytes and remaps the exact slot across a resto
   const workspaces = { put: vi.fn() },
     drafts = { put: vi.fn(), delete: vi.fn() };
   await putVideoReviewRestore({ review: restored, workspaces, drafts });
-  expect(workspaces.put).toHaveBeenCalledWith(withReviewWorkspaceUsage(restored.workspace));
+  expect(workspaces.put).toHaveBeenCalledWith({
+    ...withReviewWorkspaceUsage(restored.workspace),
+    generation: expect.any(String),
+  });
 });
 
 it('backs up and restores scene variants under none including history and recovery with new identities', async () => {
@@ -723,4 +752,33 @@ it('preserves recording-bound focus history across archived-source aliases and r
   expect(input.advanced.cursorFocusPath?.segments[0]?.binding).toMatchObject({
     recordingId: 'original',
   });
+});
+
+it('restores native annotation text, geometry and phase settings from the portable workspace', async () => {
+  const title = applyReviewTextTemplate(
+    createReviewAnnotationTextClip('title', 'Восстановлено', 2, 5, 0),
+    reviewBuiltinTextTemplates.marker
+  );
+  title.entrance.preset = 'words';
+  title.loop = { preset: 'sway', amount: 0.5, period: 2.2 };
+  title.exit.preset = 'blur';
+  title.transform.y = 0.63;
+  const annotationEffects = { enabled: true, instances: [], textClips: [title] };
+  const input: VideoWorkspace = {
+    ...workspace,
+    advanced: { ...workspace.advanced, annotationEffects },
+  };
+  const portable = await readVideoReviewForBackup({
+    aggregateId: input.aggregateId,
+    sourceAssetId: input.sourceAssetId,
+    db: snapshotDatabase(input, undefined),
+  });
+  if (!portable) throw new Error('Missing portable workspace');
+  const restored = prepareVideoReviewRestore({
+    review: portable,
+    sourceAggregateId: input.aggregateId,
+    targetAggregateId: 'recording:restored',
+    sourceAssetId: 'restored-source',
+  });
+  expect(restored.workspace.advanced.annotationEffects).toEqual(annotationEffects);
 });

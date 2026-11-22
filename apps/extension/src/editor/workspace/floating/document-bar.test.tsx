@@ -33,6 +33,7 @@ import {
   createDeferred,
   getButton,
   unmountDocumentBar,
+  createCopyReceipt,
 } from './document-bar.test-support';
 
 it('centers the document title without a storage badge and keeps the library icon unfilled', async () => {
@@ -166,7 +167,7 @@ it('promotes a linked draft without showing a storage badge or changing its id',
   expect(promote.previousElementSibling?.className).toContain('items-center');
   await act(async () => promote.click());
 
-  expect(mocks.promoteImageAggregate).toHaveBeenCalledWith('asset-1', 1);
+  expect(mocks.promoteImageAggregate).toHaveBeenCalledWith('asset-1', 1, null);
   expect(container?.textContent).not.toContain(translate('editor.documentActions.inLibrary'));
   expect(container?.querySelector('[data-storage-class]')).toBeNull();
   expect(promote.className).toContain('scale-90 opacity-0');
@@ -186,7 +187,7 @@ it('keeps a failed promotion retryable and preserves the draft until success', a
   expect(getButton('editor.floating.document-bar.promote-button').disabled).toBe(false);
 
   await act(async () => getButton('editor.floating.document-bar.promote-button').click());
-  expect(mocks.promoteImageAggregate).toHaveBeenCalledWith('asset-1', 1);
+  expect(mocks.promoteImageAggregate).toHaveBeenCalledWith('asset-1', 1, null);
   expect(getButton('editor.floating.document-bar.promote-button').className).toContain(
     'scale-90 opacity-0'
   );
@@ -408,13 +409,14 @@ it('offers reload and an atomic copy when another tab made the workspace stale',
     expect.objectContaining({ sourceTitle: 'Captured page', targetAggregateId: expect.any(String) })
   );
   expect(mocks.autosaveRebindAggregate).toHaveBeenCalledWith(
-    expect.objectContaining({ durableRevision: 1, sourceTitle: 'Captured page' })
+    expect.objectContaining({ durableRevision: 1, sourceTitle: 'Captured page' }),
+    expect.objectContaining({ sourceGeneration: 'copy-generation' })
   );
   expect(window.location.search).toContain('assetId=');
 });
 
 it('does not rebind a stale conflict copy after an A to B to A activation change', async () => {
-  const copy = createDeferred<string>();
+  const copy = createDeferred<ReturnType<typeof createCopyReceipt>>();
   mocks.autosaveLastWriteError = new StaleImageWorkspaceError('asset-1');
   mocks.saveImageAggregateCopyFromDocument.mockImplementationOnce(() => copy.promise);
   storeState.value.saveState = 'error';
@@ -434,10 +436,43 @@ it('does not rebind a stale conflict copy after an A to B to A activation change
   storeState.value = { ...storeState.value, sessionId: 'asset-1' };
   rerenderDocumentBar();
   await act(async () => Promise.resolve());
-  await act(async () => copy.resolve('image-copy'));
+  await act(async () =>
+    copy.resolve(
+      createCopyReceipt(
+        mocks.saveImageAggregateCopyFromDocument.mock.calls[0]![0].targetAggregateId
+      )
+    )
+  );
 
   expect(mocks.autosaveActivate).not.toHaveBeenCalled();
   expect(getButton('editor.floating.document-bar.promote-button')).not.toBeNull();
+});
+
+it('releases copy feedback without rebinding when a newer edit invalidates its capture', async () => {
+  const copy = createDeferred<ReturnType<typeof createCopyReceipt>>();
+  mocks.autosaveLastWriteError = new StaleImageWorkspaceError('asset-1');
+  mocks.saveImageAggregateCopyFromDocument.mockImplementationOnce(() => copy.promise);
+  storeState.value.saveState = 'error';
+  renderDocumentBar();
+  const saveCopy = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
+    (candidate) => candidate.textContent?.includes(translate('editor.documentActions.saveCopy'))
+  );
+  await act(async () => {
+    saveCopy?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  mocks.autosaveCaptureCurrent = false;
+  await act(async () =>
+    copy.resolve(
+      createCopyReceipt(
+        mocks.saveImageAggregateCopyFromDocument.mock.calls[0]![0].targetAggregateId
+      )
+    )
+  );
+  expect(mocks.autosaveRebindAggregate).not.toHaveBeenCalled();
+  expect(saveCopy?.disabled).toBe(false);
+  expect(storeState.value.saveState).toBe('error');
 });
 
 it('removes the file menu from the floating document bar', () => {

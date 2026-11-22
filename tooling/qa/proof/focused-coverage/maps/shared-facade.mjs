@@ -1,5 +1,14 @@
 export const SHARED_FACADE_OWNER_MAPPINGS = [
   {
+    owner: 'product-form-controls',
+    productionFile: 'packages/ui/src/product-form-controls/index.tsx',
+    reason: 'Markup and mounted input/range tests prove shared control rendering and finalization.',
+    testFiles: [
+      'packages/ui/src/product-form-controls/index.test.tsx',
+      'packages/ui/src/product-form-controls/commit.test.tsx',
+    ],
+  },
+  {
     owner: 'private-voice-history-completion',
     productionFile: 'apps/extension/src/composition/persistence/voice-input-history/index.ts',
     exclusive: true,

@@ -2,12 +2,14 @@ import { parseSyncCheckpointReceipt } from '../../../composition/persistence/syn
 import type { SyncCheckpointReceipt } from '../../../composition/persistence/sync-capture/contracts';
 import { createSyncProductClient } from '../../../platform/runtime-messaging/sync-product-client';
 import { guideProjectContentIdentity as guideDraftContent } from './content-identity';
-import type { ScenarioProjectSnapshot } from '../../../composition/persistence/scenario/contracts';
+import type {
+  ScenarioProjectSnapshot,
+  ScenarioEditingHistory,
+} from '../../../composition/persistence/scenario/contracts';
 import { useEffect, useRef } from 'react';
 import { createAutosaveCoordinator } from '@sniptale/platform/data/autosave';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { saveScenarioProjectRecord } from '../../../composition/persistence/scenario/store/public';
-import type { GuideHistoryCapture } from './history';
 import {
   acquireSyncCheckpointEdit,
   type SyncCheckpointEdit,
@@ -27,7 +29,7 @@ type SaveStatus = 'dirty' | 'saving' | 'saved' | 'failed' | 'conflict';
 type AutosaveInput = {
   project: GuideProject | null;
   actionId?: string | undefined;
-  closedCaptures?: readonly GuideHistoryCapture[];
+  editingHistory?: ScenarioEditingHistory;
   onSealEdit?(): void;
   dirty: boolean;
   enabled?: boolean;
@@ -45,10 +47,10 @@ type Session = {
   projectId: string | undefined;
   acknowledgement?: {
     source: GuideProject;
+    editingHistory?: ScenarioEditingHistory;
     committed: ScenarioProjectSnapshot;
     checkpointReceipt: SyncCheckpointReceipt | null;
   };
-  acknowledgedActions: WeakMap<GuideProject, Set<string>>;
   conflict: boolean;
   publication?: Promise<SyncCheckpointEdit>;
   publicationCommitted?: boolean;
@@ -81,6 +83,7 @@ export function useGuideAutosave(input: AutosaveInput) {
       if (
         committed &&
         !state.autosaving.current &&
+        !owner.current?.hasUnpublishedHistory() &&
         (state.project === committed ||
           guideDraftContent(state.project) === guideDraftContent(committed))
       )
@@ -204,12 +207,7 @@ function createGuideAutosave(latest: () => AutosaveInput) {
     const source = args.project;
     const base = args.saved.current;
     if (!source || !base || source.id !== base.project.id) return;
-    if (
-      (args.closedCaptures ?? []).some(
-        (group) => !guideActionAcknowledged(turn, group.project, group.actionId)
-      )
-    )
-      return;
+    if (!guideHistoryAcknowledged(turn, args)) return;
     if (guideDraftContent(source) === guideDraftContent(base.project))
       await finishPublication(turn, revision);
   }
@@ -254,7 +252,6 @@ function createGuideAutosave(latest: () => AutosaveInput) {
         conflict: false,
         revision: 0,
         finishAt: 0,
-        acknowledgedActions: new WeakMap(),
       };
       observed = undefined;
       observedRevision = 0;
@@ -282,7 +279,6 @@ function createGuideAutosave(latest: () => AutosaveInput) {
       session: getSession(),
       args: {
         ...args,
-        ...(args.closedCaptures ? { closedCaptures: [...args.closedCaptures] } : {}),
       },
     };
   }
@@ -293,10 +289,10 @@ function createGuideAutosave(latest: () => AutosaveInput) {
       await releasePublication(capture.session);
       return false;
     }
-    return persistGuideCaptures(
+    return persistGuideDraft(
       capture,
       () => current(capture.session),
-      () => latest().project
+      () => latest()
     );
   }
   function saveCaptured(capture = captureLatest()): Promise<boolean> {
@@ -323,9 +319,7 @@ function createGuideAutosave(latest: () => AutosaveInput) {
         if (!source || !base || source.id !== base.project.id || args.conflict || turn.conflict)
           return null;
         if (
-          !(args.closedCaptures ?? []).some(
-            (group) => !guideActionAcknowledged(turn, group.project, group.actionId)
-          ) &&
+          guideHistoryAcknowledged(turn, args) &&
           ((source === turn.acknowledgement?.source && base === turn.acknowledgement.committed) ||
             guideDraftContent(source) === guideDraftContent(base.project))
         ) {
@@ -383,9 +377,7 @@ function createGuideAutosave(latest: () => AutosaveInput) {
         args.project !== null &&
         guideDraftContent(args.project) === content &&
         guideDraftContent(committed.project) === content &&
-        !(args.closedCaptures ?? []).some(
-          (group) => !guideActionAcknowledged(turn, group.project, group.actionId)
-        )
+        guideHistoryAcknowledged(turn, args)
       );
     };
     if (!isCurrent()) return null;
@@ -395,6 +387,7 @@ function createGuideAutosave(latest: () => AutosaveInput) {
     return { receipt: receipt ? { ...receipt } : null, isCurrent };
   }
   return {
+    hasUnpublishedHistory: () => !guideHistoryAcknowledged(session, latest()),
     beginEdit,
     prepareCheckpointExit,
     beginInteraction(pointerId: number) {
@@ -429,7 +422,8 @@ function createGuideAutosave(latest: () => AutosaveInput) {
       }
       if (!args.dirty) return;
       const changed =
-        previous?.project !== args.project && !isTimestampRebase(previous?.project, args.project);
+        previous?.editingHistory !== args.editingHistory ||
+        (previous?.project !== args.project && !isTimestampRebase(previous?.project, args.project));
       if ((!previous || changed) && turn.revision === observedRevision) beginEdit();
       observedRevision = turn.revision;
       if (!previous || changed || previous.enabled === false || !previous.dirty)
@@ -464,51 +458,39 @@ function createGuideAutosave(latest: () => AutosaveInput) {
   };
 }
 
-function guideActionAcknowledged(turn: Session, project: GuideProject, actionId: string): boolean {
-  return turn.acknowledgedActions.get(project)?.has(actionId) === true;
+function guideHistoryAcknowledged(turn: Session | undefined, args: AutosaveInput): boolean {
+  const history = args.editingHistory;
+  if (history === undefined) return true;
+  const acknowledgement = turn?.acknowledgement;
+  if (
+    acknowledgement &&
+    acknowledgement.committed === args.saved.current &&
+    sameGuideHistory(acknowledgement.editingHistory, history)
+  )
+    return true;
+  return sameGuideHistory(args.saved.current?.editingHistory, history);
 }
 
-function acknowledgeGuideAction(turn: Session, project: GuideProject, actionId?: string): void {
-  if (!actionId) return;
-  const ids = turn.acknowledgedActions.get(project) ?? new Set<string>();
-  ids.add(actionId);
-  turn.acknowledgedActions.set(project, ids);
-}
-
-/** Drains closed user actions without waiting for React to remove their rendered captures. */
-async function persistGuideCaptures(
-  capture: Capture,
-  isCurrent: () => boolean,
-  currentProject: () => GuideProject | null
-): Promise<boolean> {
-  const closed = capture.args.closedCaptures ?? [];
-  const closedIsCurrent =
-    closed.at(-1)?.actionId === capture.args.actionId && capture.args.actionId !== undefined;
-  for (const [index, group] of closed.entries()) {
-    if (guideActionAcknowledged(capture.session, group.project, group.actionId)) continue;
-    if (
-      !(await persistGuideDraft(
-        {
-          session: capture.session,
-          args: { ...capture.args, project: group.project, actionId: group.actionId },
-        },
-        isCurrent,
-        currentProject,
-        closedIsCurrent && index === closed.length - 1
-      ))
-    )
-      return false;
-  }
-  if (closedIsCurrent) return true;
-  return persistGuideDraft(capture, isCurrent, currentProject);
+function sameGuideHistory(
+  left: ScenarioEditingHistory | undefined,
+  right: ScenarioEditingHistory
+): boolean {
+  return (
+    left === right ||
+    (left !== undefined &&
+      left.version === right.version &&
+      left.past.length === right.past.length &&
+      left.future.length === right.future.length &&
+      left.past.every((project, index) => project === right.past[index]) &&
+      left.future.every((project, index) => project === right.future[index]))
+  );
 }
 
 /** Owns one admitted scenario write, its committed revision and admission cleanup. */
 function persistGuideDraft(
   { session: turn, args }: Capture,
   isCurrent: () => boolean,
-  currentProject: () => GuideProject | null,
-  isFinalCapture = true
+  currentState: () => Pick<AutosaveInput, 'project' | 'editingHistory'>
 ): Promise<boolean> {
   const source = args.project;
   const base = args.saved.current;
@@ -522,10 +504,12 @@ function persistGuideDraft(
     args.busy.current
   )
     return Promise.reject(new Error('Scenario save admission is unavailable.'));
-  if (source === base.project || guideDraftContent(source) === guideDraftContent(base.project)) {
-    acknowledgeGuideAction(turn, source, args.actionId);
+  if (
+    guideHistoryAcknowledged(turn, args) &&
+    (source === base.project || guideDraftContent(source) === guideDraftContent(base.project))
+  ) {
     if (args.actionId) args.onPublish(base.project, source, args.actionId);
-    args.onStatus(isFinalCapture ? 'saved' : 'saving');
+    args.onStatus('saved');
     return Promise.resolve(true);
   }
   args.busy.current = true;
@@ -534,6 +518,7 @@ function persistGuideDraft(
   return saveScenarioProjectRecord(source, {
     expectedRevision: base.workspaceRevision,
     ...(args.actionId ? { historyActionId: args.actionId } : {}),
+    ...(args.editingHistory === undefined ? {} : { editingHistory: args.editingHistory }),
   })
     .then((committed) => {
       turn.publicationCommitted = true;
@@ -541,21 +526,21 @@ function persistGuideDraft(
       const receipt = parseSyncCheckpointReceipt(committed.checkpointReceipt);
       turn.acknowledgement = {
         source,
+        ...(args.editingHistory === undefined ? {} : { editingHistory: args.editingHistory }),
         committed,
         checkpointReceipt:
           receipt?.rootKind === 'scenario-project' && receipt.rootId === source.id ? receipt : null,
       };
-      acknowledgeGuideAction(turn, source, args.actionId);
       args.saved.current = committed;
       if (args.actionId) args.onPublish(committed.project, source, args.actionId);
       else args.onPublish(committed.project, source);
-      const current = currentProject();
+      const current = currentState();
       args.onStatus(
-        !isFinalCapture
-          ? 'saving'
-          : current === source || (current && isTimestampRebase(source, current))
-            ? 'saved'
-            : 'dirty'
+        current.editingHistory === args.editingHistory &&
+          (current.project === source ||
+            (current.project && isTimestampRebase(source, current.project)))
+          ? 'saved'
+          : 'dirty'
       );
       return true;
     })

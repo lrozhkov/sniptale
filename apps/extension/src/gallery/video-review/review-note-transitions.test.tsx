@@ -222,8 +222,8 @@ it('restores a deleted note with keyboard Undo after its focused action disappea
     });
     const remove = fixture.host.querySelector<HTMLButtonElement>('[data-note-delete]')!;
     expect(remove).not.toBeNull();
-    const commit = integration.commit.getMockImplementation()!;
-    integration.commit.mockImplementationOnce(async (...args) => {
+    const commit = fixture.liveSession.commit;
+    vi.spyOn(fixture.liveSession, 'commit').mockImplementationOnce(async (...args) => {
       await gate;
       return commit(...args);
     });
@@ -275,14 +275,16 @@ it('retains failed new-note text and blocks Back until retry succeeds', async ()
     );
     await fixture.click('addComment');
     await fixture.fill('Keep on failure');
-    integration.commit.mockRejectedValueOnce(new Error('Quota'));
+    const save = integration.snapshot.getMockImplementation()!;
+    integration.snapshot.mockRejectedValue(new Error('Quota'));
     await fixture.click('common.actions.close');
     expect(fixture.back).not.toHaveBeenCalled();
     expect(fixture.host.querySelector('textarea')?.value).toBe('Keep on failure');
     expect(fixture.host.textContent).toContain('gallery.videoReview.saveFailed');
+    integration.snapshot.mockImplementation(save);
     await fixture.click('common.actions.close');
     expect(fixture.back).toHaveBeenCalledOnce();
-    expect(fixture.snapshot.workspace.history).toHaveLength(1);
+    expect(fixture.persistedSnapshot.workspace.history).toHaveLength(1);
   } finally {
     await fixture.cleanup();
   }
@@ -427,13 +429,14 @@ it.each(['success', 'cancel', 'failure'] as const)(
       const calls = vi.mocked(HTMLMediaElement.prototype.play).mock.calls.length;
       await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' })));
       expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(calls);
-      const revision = fixture.snapshot.workspace.revision;
+      await fixture.flush();
+      const revision = fixture.persistedSnapshot.workspace.revision;
       await act(async () =>
         window.dispatchEvent(
           new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', ctrlKey: true })
         )
       );
-      expect(fixture.snapshot.workspace.revision).toBe(revision);
+      expect(fixture.persistedSnapshot.workspace.revision).toBe(revision);
       if (outcome === 'cancel') await fixture.click('cancelExport');
       await act(async () => finish());
       expect(fixture.button('play').disabled).toBe(false);
@@ -450,13 +453,18 @@ it.each(['success', 'cancel', 'failure'] as const)(
   }
 );
 
-it.each(['toolbar', 'shortcut'] as const)(
+it.each(['inspector', 'shortcut'] as const)(
   'anchors %s Notes to the ruler range, then the playhead with action history hidden',
   async (entry) => {
     const fixture = createEditorFixture(integration);
     const add = async () => {
-      if (entry === 'toolbar') await fixture.click('addComment');
-      else
+      if (entry === 'inspector') {
+        const add =
+          fixture.host.querySelector<HTMLButtonElement>(
+            'button[aria-label="gallery.videoReview.commentRange"]'
+          ) ?? fixture.button('addComment');
+        await act(async () => add.click());
+      } else
         await act(async () =>
           fixture.key(new KeyboardEvent('keydown', { key: 'm', code: 'KeyM' }))
         );
@@ -466,11 +474,8 @@ it.each(['toolbar', 'shortcut'] as const)(
         fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
       );
       await fixture.selectRulerRange(1, 3);
-      expect(
-        fixture.host.querySelector(
-          '[data-ui="gallery.videoReview.primaryTools"] [aria-label="gallery.videoReview.addComment"]'
-        )
-      ).not.toBeNull();
+      await fixture.click('comments');
+      expect(fixture.button('commentRange').disabled).toBe(false);
       await add();
       await fixture.fill('Ruler note');
       await fixture.click('save');
@@ -517,8 +522,8 @@ it('retains the requested playhead while admission finishes the previous draft',
     await fixture.selectRulerRange(2, 2);
     await fixture.click('addComment');
     await fixture.fill('Previous draft');
-    const commit = integration.commit.getMockImplementation()!;
-    integration.commit.mockImplementationOnce(async (...args) => {
+    const commit = fixture.liveSession.commit;
+    vi.spyOn(fixture.liveSession, 'commit').mockImplementationOnce(async (...args) => {
       await gate;
       return commit(...args);
     });

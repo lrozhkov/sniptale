@@ -1,11 +1,13 @@
+import { createImageWorkspaceIdentity } from '../image-workspaces/identity';
 import { captureMediaInTransaction } from '../sync-capture/capture';
 import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
-import { getScenarioResourceReferences } from '../../../features/scenario/project/public';
+import { collectScenarioResourceReferences } from './resource-references';
 import { promoteReferencedMediaLifecycles } from '../library-lifecycle/promotion';
 import type { ScenarioProjectEntry } from './contracts';
 import {
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   SCENARIO_ASSETS_STORE,
@@ -50,6 +52,10 @@ export async function assertNewScenarioGallerySource(
 
 export function scenarioLibraryMediaId(assetId: string): string {
   return `scenario-asset:${assetId}`;
+}
+
+export function scenarioAssetOriginalId(asset: ScenarioAssetEntry): string {
+  return asset.borrowedMediaId ?? asset.galleryAssetId ?? scenarioLibraryMediaId(asset.id);
 }
 
 /** Existing borrowed children keep their original bytes when the Library presentation is edited. */
@@ -100,7 +106,10 @@ export async function assertBorrowedScenarioAsset(
     throw new UnavailableBorrowedScenarioSourceError();
 }
 
-function buildScenarioLibraryEntry(asset: ScenarioAssetEntry): MediaLibraryEntry {
+function buildScenarioLibraryEntry(
+  asset: ScenarioAssetEntry,
+  savedIndependently: boolean
+): MediaLibraryEntry {
   const extension =
     asset.mimeType === 'audio/webm' ? 'webm' : asset.mimeType.split('/')[1] || 'bin';
   const filename = `Scenario ${asset.duration === undefined ? 'image' : 'audio'} ${asset.id}.${extension}`;
@@ -122,6 +131,7 @@ function buildScenarioLibraryEntry(asset: ScenarioAssetEntry): MediaLibraryEntry
     sourceFavicon: null,
     tags: [],
     lifecycle: createLibraryLifecycle('library', asset.createdAt),
+    savedIndependently,
     workspaceRevision: 0,
   };
 }
@@ -129,7 +139,8 @@ function buildScenarioLibraryEntry(asset: ScenarioAssetEntry): MediaLibraryEntry
 /** Adds only missing library identity, preserving user edits on an existing entry. */
 export async function publishScenarioAssetToLibrary(
   tx: ScenarioLibraryTransaction,
-  asset: ScenarioAssetEntry
+  asset: ScenarioAssetEntry,
+  savedIndependently = false
 ): Promise<boolean> {
   // Rendered Library imports are project-private snapshots, not new publications.
   if (asset.galleryAssetId && !asset.borrowedMediaId) return false;
@@ -166,7 +177,10 @@ export async function publishScenarioAssetToLibrary(
     });
   }
   if (!existing) {
-    await mediaStore.put!(buildScenarioLibraryEntry(asset));
+    const entry = buildScenarioLibraryEntry(asset, savedIndependently);
+    if (entry.kind === 'image' || entry.kind === 'screenshot')
+      await createImageWorkspaceIdentity(tx, mediaId);
+    await mediaStore.put!(entry);
     await captureMediaInTransaction(tx, mediaId);
   }
   return !existing;
@@ -181,6 +195,7 @@ export async function backfillScenarioLibraryAssets(): Promise<number> {
         SCENARIO_ASSETS_STORE,
         ASSET_REFS_STORE,
         ASSET_OWNERS_STORE,
+        IMAGE_WORKSPACE_IDENTITIES_STORE,
         MEDIA_LIBRARY_STORE,
         PROJECT_ASSETS_STORE,
         STORE_NAME,
@@ -236,18 +251,12 @@ export async function promoteScenarioSourceLifecycles(
   entry: ScenarioProjectEntry,
   now: number
 ): Promise<void> {
-  const childIds = new Set<string>();
-  for (const project of [
-    entry.project,
-    ...(entry.history ?? []).map((version) => version.project),
-  ]) {
-    for (const id of getScenarioResourceReferences(project).assets) childIds.add(id);
-  }
+  const { assets: childIds } = collectScenarioResourceReferences(entry);
   const mediaIds = new Set<string>();
   for (const id of childIds) {
     const child = parseScenarioAssetEntry(await tx.objectStore(SCENARIO_ASSETS_STORE).get(id));
     if (child?.projectId !== entry.id) continue;
-    mediaIds.add(child.borrowedMediaId ?? child.galleryAssetId ?? scenarioLibraryMediaId(child.id));
+    mediaIds.add(scenarioAssetOriginalId(child));
   }
   await promoteReferencedMediaLifecycles({
     mediaIds,

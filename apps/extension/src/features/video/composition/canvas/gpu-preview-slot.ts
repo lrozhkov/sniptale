@@ -3,7 +3,7 @@ import { createSourceImageFilterGpu } from '../../../image-filters/gpu';
 import type { SourceImageFilterProgram } from '../../../image-filters/plan';
 import type { createGlTransitionGpu } from './gl-transition';
 import { rasterizeGpuPreviewPaint } from './gpu-preview-primitive';
-import { GpuPreviewDeviceError } from './gpu-preview-device-error';
+import { GpuPreviewDeviceError, GpuPreviewValidationError } from './gpu-preview-device-error';
 import type { GpuPreviewLayer, GpuPreviewGroup, GpuPreviewPaintSource } from './gpu-preview-types';
 import { createGpuPreviewDrawBounds } from './gpu-preview-bounds';
 import { createGpuPreviewFilter } from './gpu-preview-filter';
@@ -565,7 +565,7 @@ export async function createGpuPreviewSlot({
         if (submitted.status === 'rejected') throw submitted.reason;
         if (validation.status === 'rejected') throw validation.reason;
         const error = validation.value;
-        if (error) throw new Error(error.message);
+        if (error) throw new GpuPreviewValidationError(error.message, { cause: error });
         check(request.signal);
         const result = outputTexture ? undefined : surface.transferToImageBitmap();
         completed = true;

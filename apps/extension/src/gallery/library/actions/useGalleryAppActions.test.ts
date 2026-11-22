@@ -177,7 +177,7 @@ describe('useGalleryAppActions', () => {
     actions.preview.restoreOriginal();
     actions.preview.saveCopy();
     actions.preview.openSnapshotScreenshotInEditor();
-    actions.preview.openInEditor(createMediaItem({ id: 'asset-3' }));
+    actions.preview.openInEditor(createMediaItem({ id: 'asset-3', kind: 'recording' }));
 
     expect(actionMocks.createBusyActionRunnerMock).toHaveBeenCalledWith(controller);
     expect(actions.importing.importDroppedFiles).toEqual(expect.any(Function));
@@ -213,6 +213,28 @@ describe('useGalleryAppActions', () => {
     expect(actionMocks.openInEditorMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'asset-3' })
     );
+  });
+
+  it('opens the selected original project picker and refuses a stale selection', () => {
+    vi.clearAllMocks();
+    prepareActionFactoryMocks();
+    const item = createMediaItem({ id: 'original', kind: 'screenshot' });
+    const { controller, getState } = createController({
+      previewItem: item,
+      previewInspectorCollapsed: true,
+    });
+    const actions = renderActions(controller);
+
+    actions.preview.openInEditor(item);
+    expect(getState().preview.session).toMatchObject({
+      item,
+      inspectorCollapsed: false,
+      imageProjectPickerRequest: expect.any(String),
+    });
+    const current = getState().preview.session;
+    actions.preview.openInEditor(createMediaItem({ id: 'former-original' }));
+    expect(getState().preview.session).toBe(current);
+    expect(actionMocks.openInEditorMock).not.toHaveBeenCalled();
   });
 
   it('confirms a pending media import with the selected conflict strategy', async () => {

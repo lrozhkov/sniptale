@@ -1,7 +1,16 @@
 // @vitest-environment jsdom
+import {
+  loadPopupCatalogFixture,
+  prepareRussianPopupTranslations,
+} from '../../../catalog-fixture.test-support';
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadPopupCatalogFixture>[0]) =>
+    loadPopupCatalogFixture(locale),
+}));
+beforeAll(prepareRussianPopupTranslations);
 
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { vi, beforeAll, describe, expect, it } from 'vitest';
 
 import { cx, formatPhaseLabel, getResultBadgeClassName, renderResultIcon } from './utils';
 

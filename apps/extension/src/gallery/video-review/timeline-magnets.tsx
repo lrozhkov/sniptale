@@ -69,19 +69,17 @@ export function snapReviewMagnet(
   return target ? { time: target.time, candidate: target.time } : { time, candidate: null };
 }
 
-/** Cursor geometry and aggregate event groups are not timeline magnet targets. */
+const NON_MAGNET_TARGET_SELECTOR = [
+  '[data-review-snap-priority="none"]',
+  '[data-review-snap-priority="history"]',
+  '[data-ui="cursorFocusPath.timelineKeys"]',
+  '[data-ui="gallery.videoReview.historyStrip"]',
+  '[data-history-family]',
+].join(',');
+
+/** Recorded interactions and cursor geometry do not provide timeline magnet targets. */
 export function reviewTimelineMagnetPriority(node: HTMLElement): number | null {
-  if (
-    node.closest(
-      '[data-review-snap-priority="none"],[data-ui="cursorFocusPath.timelineKeys"],[data-history-family="cursor"]'
-    )
-  )
-    return null;
-  return node.closest(
-    '[data-review-snap-priority="history"],[data-ui="gallery.videoReview.historyStrip"]'
-  )
-    ? 1
-    : 0;
+  return node.closest(NON_MAGNET_TARGET_SELECTOR) ? null : 0;
 }
 
 function showTarget(snapshot: Snapshot, target?: ReviewMagnetTarget | null) {

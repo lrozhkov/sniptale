@@ -1,5 +1,76 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'editor-native-image-restore',
+    productionFile: 'apps/extension/src/editor/document/page-session/index.ts',
+    reason:
+      'Image restore tests cover native generations, parallel writers, retries and delayed acknowledgements.',
+    testFiles: [
+      'apps/extension/src/editor/document/page-session/index.test.ts',
+      'apps/extension/src/editor/shell/page/runtime.bootstrap.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.history.integration.test.ts',
+      'apps/extension/src/editor/document/session-autosave/durable-history.test.ts',
+    ],
+  },
+  {
+    owner: 'project-source-interaction-editing',
+    productionFile: 'apps/extension/src/features/video/project/source-interaction-authoring.ts',
+    reason:
+      'Conversion and Native effect commands cover retained input timing, point edits, reset and deletion.',
+    testFiles: [
+      'apps/extension/src/features/video/review/project-conversion.actions.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.source-interaction.test.ts',
+    ],
+  },
+  {
+    owner: 'gallery-focus-insertion',
+    productionFile: 'apps/extension/src/gallery/video-review/focus-placement.ts',
+    reason:
+      'Timeline binding and zoom editor tests exercise immediate focus insertion and selection admission.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/timeline-binding.test.tsx',
+      'apps/extension/src/gallery/video-review/zoom-editor.test.tsx',
+      'apps/extension/src/gallery/video-review/zoom-editor.revision.test.tsx',
+    ],
+  },
+  {
+    owner: 'gallery-original-audio-inspector',
+    productionFile: 'apps/extension/src/gallery/video-review/original-audio-inspector.tsx',
+    reason: 'Mounted original audio controls cover gain, deletion and inspector commands.',
+    testFiles: ['apps/extension/src/gallery/video-review/original-audio-track.test.tsx'],
+  },
+  {
+    owner: 'gallery-comment-markers',
+    productionFile: 'apps/extension/src/gallery/video-review/timeline-comment-markers.tsx',
+    reason:
+      'Timeline interaction tests retain comment identities, navigation and inserted display time.',
+    testFiles: ['apps/extension/src/gallery/video-review/timeline.test.tsx'],
+  },
+  {
+    owner: 'gallery-voiceover-save',
+    productionFile: 'apps/extension/src/gallery/video-review/voiceover-save.ts',
+    reason:
+      'Voiceover recording tests exercise retained take attachment, publication failure and retry.',
+    testFiles: ['apps/extension/src/gallery/video-review/voiceover-recording.test.tsx'],
+  },
+  {
+    owner: 'gallery-timeline-command-slots',
+    productionFile: 'apps/extension/src/gallery/video-review/selection-command-slots.ts',
+    reason:
+      'Mounted selection actions prove slot routing, disabled guards and inspector command fallback.',
+    testFiles: ['apps/extension/src/gallery/video-review/selection-actions.test.tsx'],
+  },
+  {
+    owner: 'gallery-live-seek-toolbar',
+    productionFile: 'apps/extension/src/gallery/video-review/live-seek-icon.tsx',
+    reason:
+      'Gallery entrypoint and toolbar tests retain the Live Seek command and its preview lifetime.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/index.test.tsx',
+      'apps/extension/src/gallery/video-review/use-live-seek.test.tsx',
+      'apps/extension/src/gallery/video-review/review-toolbar.test.tsx',
+    ],
+  },
+  {
     owner: 'review-inserted-time-contract',
     productionFile: 'apps/extension/src/features/video/review/time-segment.ts',
     reason:
@@ -59,6 +130,7 @@ export const LOCAL_OWNER_MAPPINGS = [
     reason:
       'Mounted editing, source admission and workspace CAS tests check history commands and refused writes.',
     testFiles: [
+      'apps/extension/src/gallery/video-review/use-review-editing.test.tsx',
       'apps/extension/src/gallery/video-review/index.test.tsx',
       'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
       'apps/extension/src/gallery/video-review/use-edits.test.tsx',
@@ -78,17 +150,22 @@ export const LOCAL_OWNER_MAPPINGS = [
     ],
   },
   {
-    owner: 'review-inserted-playback-clock',
-    productionFile: 'apps/extension/src/gallery/video-review/use-freeze-playback.ts',
+    owner: 'review-transport-controller',
+    productionFile: 'apps/extension/src/gallery/video-review/transport.ts',
     reason:
-      'Controlled playback tests check held source, project time, pause, resume, loops and insertion removal.',
-    testFiles: ['apps/extension/src/gallery/video-review/use-playback.test.tsx'],
+      'Controlled transport and adapter tests check atomic time, freeze, loops, recovery and accepted map changes.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/transport.test.ts',
+      'apps/extension/src/gallery/video-review/use-playback.test.tsx',
+      'apps/extension/src/gallery/video-review/use-review-transport.test.tsx',
+      'apps/extension/src/gallery/video-review/use-review-audio-runtime.test.tsx',
+    ],
   },
   {
     owner: 'review-presented-clock',
     productionFile: 'apps/extension/src/gallery/video-review/playback-presentation-clock.ts',
     reason:
-      'Transport validation and mounted readouts cover presented time, pause, seek and stale commits.',
+      'Mounted readouts use transport position; preview receipts do not change the logical clock.',
     testFiles: [
       'apps/extension/src/gallery/video-review/use-playback.test.tsx',
       'apps/extension/src/gallery/video-review/timeline-chrome.test.tsx',
@@ -229,7 +306,7 @@ export const LOCAL_OWNER_MAPPINGS = [
     owner: 'review-edit-snap-consumers',
     reason: 'Edit snapping is exercised by source-axis magnets and timeline gestures.',
     testFiles: [
-      'apps/extension/src/gallery/video-review/timeline-magnets.test.ts',
+      'apps/extension/src/gallery/video-review/timeline-magnets.test.tsx',
       'apps/extension/src/gallery/video-review/timeline-drag.test.tsx',
       'apps/extension/src/gallery/video-review/timeline-selection.test.tsx',
     ],
@@ -257,7 +334,9 @@ export const LOCAL_OWNER_MAPPINGS = [
     testFiles: [
       'apps/extension/src/platform/i18n/catalog-reader.test.ts',
       'apps/extension/src/platform/i18n/catalog-types.test.ts',
-      'apps/extension/src/platform/i18n/dictionaries.test.ts',
+      'apps/extension/src/platform/i18n/catalog-store.test.ts',
+      'apps/extension/src/platform/i18n/catalog-transport.test.ts',
+      'apps/extension/src/platform/i18n/locale/state.test.ts',
       'apps/extension/src/platform/i18n/index.test.ts',
       'apps/extension/src/platform/i18n/popup.test.ts',
       'apps/extension/src/platform/i18n/highlighter-messages.test.ts',
@@ -356,6 +435,19 @@ purged-root refusal and recovery validation.`,
     ],
   },
   {
+    owner: 'image-aggregate-mutation',
+    productionFile: 'apps/extension/src/composition/persistence/image-aggregates/mutations.ts',
+    reason:
+      'Image aggregate tests prove source reuse, staged cleanup, publication retry and deletion.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.history.integration.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.reused-assets.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.root-lifecycle.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.vector-assets.test.ts',
+    ],
+  },
+  {
     owner: 'review-text-source-placement',
     productionFile: 'apps/extension/src/gallery/video-review/use-review-text.ts',
     reason:
@@ -390,6 +482,23 @@ purged-root refusal and recovery validation.`,
     ],
   },
   {
+    owner: 'sync-native-cache-release',
+    productionFile: 'apps/extension/src/workflows/sync-transfer/native-cache.ts',
+    reason:
+      'Cache release fixtures verify native bytes and preserve history resources reserved for ZIP preparation.',
+    testFiles: [
+      'apps/extension/src/workflows/sync-transfer/native-residency.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project-history.test.ts',
+    ],
+  },
+  {
+    owner: 'sync-native-cache-policy',
+    productionFile: 'apps/extension/src/workflows/sync-transfer/native-cache-policy.ts',
+    reason:
+      'Native residency fixtures drive budget trim, pinned roots and pending capture protection.',
+    testFiles: ['apps/extension/src/workflows/sync-transfer/native-residency.test.ts'],
+  },
+  {
     owner: 'sync-prepared-root-native-consumers',
     productionFile: 'apps/extension/src/workflows/sync-transfer/prepared-root.ts',
     reason:
@@ -405,6 +514,72 @@ purged-root refusal and recovery validation.`,
     ],
   },
 
+  {
+    owner: 'gallery-annotation-text-inspector',
+    productionFile: 'apps/extension/src/gallery/video-review/annotation-text-appearance.tsx',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'The mounted title inspector uses the project command and profile catalog for distinct writes.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/annotation-text-interactions.test.tsx',
+      'apps/extension/src/gallery/video-review/annotation-effects-editor.test.tsx',
+      'apps/extension/src/composition/persistence/annotation-text-templates/storage.test.ts',
+    ],
+  },
+  {
+    owner: 'gallery-annotation-text-inspector',
+    productionFile: 'apps/extension/src/gallery/video-review/annotation-text-inspector.tsx',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'The mounted title inspector uses the project command and profile catalog for distinct writes.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/annotation-text-interactions.test.tsx',
+      'apps/extension/src/gallery/video-review/annotation-effects-editor.test.tsx',
+      'apps/extension/src/composition/persistence/annotation-text-templates/storage.test.ts',
+    ],
+  },
+  {
+    owner: 'gallery-annotation-text-inspector',
+    productionFile: 'apps/extension/src/gallery/video-review/annotation-text-templates.tsx',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'The mounted title inspector uses the project command and profile catalog for distinct writes.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/annotation-text-interactions.test.tsx',
+      'apps/extension/src/gallery/video-review/annotation-effects-editor.test.tsx',
+      'apps/extension/src/composition/persistence/annotation-text-templates/storage.test.ts',
+    ],
+  },
+  {
+    owner: 'gallery-annotation-text-inspector',
+    productionFile:
+      'apps/extension/src/gallery/video-review/use-annotation-text-template-catalog.ts',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'The mounted title inspector uses the project command and profile catalog for distinct writes.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/annotation-text-interactions.test.tsx',
+      'apps/extension/src/gallery/video-review/annotation-effects-editor.test.tsx',
+      'apps/extension/src/composition/persistence/annotation-text-templates/storage.test.ts',
+    ],
+  },
+  {
+    owner: 'gallery-annotation-text-layout',
+    productionFile: 'apps/extension/src/workflows/video-review/annotation-text-layout.ts',
+    exclusive: true,
+    reason: 'The shared frame renderer retains geometry through reveal, hold, preview and export.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/draw-annotation-text.test.ts',
+      'apps/extension/src/workflows/video-review/annotation-text-fonts.test.ts',
+      'apps/extension/src/workflows/video-review/render-preview.test.ts',
+      'apps/extension/src/workflows/video-review/gpu-preview-geometry.test.ts',
+      'apps/extension/src/workflows/video-review/export-lifecycle.test.ts',
+    ],
+  },
   {
     owner: 'review-inspector-section-consumers',
     productionFile: 'apps/extension/src/gallery/video-review/inspector-sections.tsx',
@@ -474,6 +649,33 @@ cancellation and keyboard movement.',
     ],
   },
   {
+    owner: 'settings-context-menu-tree-row',
+    exclusive: true,
+    productionFile:
+      'apps/extension/src/settings/sections/general/interface-browser/content/context-menu-tree-row.tsx',
+    reason: 'The mounted tree exercises keyboard rename, pointer rename and blur.',
+    testFiles: [
+      'apps/extension/src/settings/sections/general/interface-browser/content/context-menu-tree.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-composer-field',
+    productionFile: 'apps/extension/src/gallery/video-review/composer.tsx',
+    reason: 'The mounted composer test covers dictation, focus and clearing the comment field.',
+    testFiles: ['apps/extension/src/gallery/video-review/voice.test.tsx'],
+  },
+  {
+    owner: 'review-search-field',
+    productionFile: 'apps/extension/src/gallery/video-review/search-field.tsx',
+    reason: 'The search consumers cover filtering, clearing and retaining the search input.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/action-history.test.tsx',
+      'apps/extension/src/gallery/video-review/action-history-rendering.test.tsx',
+      'apps/extension/src/gallery/video-review/text-panel.test.tsx',
+      'apps/extension/src/gallery/video-review/track-items-inspector.test.tsx',
+    ],
+  },
+  {
     owner: 'review-advanced-content-gesture-journal',
     productionFile: 'apps/extension/src/gallery/video-review/use-advanced-content.ts',
     allowCrossOwner: true,
@@ -482,6 +684,7 @@ cancellation and keyboard movement.',
 rebasing, reset generations and the existing autosave session boundary.',
     testFiles: [
       'apps/extension/src/workflows/video-review/session.project-purge.test.ts',
+      'apps/extension/src/gallery/video-review/annotation-effects-editor.test.tsx',
       'apps/extension/src/gallery/video-review/use-advanced-content.test.tsx',
       'apps/extension/src/gallery/video-review/use-advanced.test.tsx',
       'apps/extension/src/gallery/video-review/use-advanced.autosave.test.tsx',
@@ -1108,6 +1311,24 @@ unchanged project admission.',
     ],
   },
   {
+    owner: 'gradient-template-save',
+    productionFile: 'apps/extension/src/ui/paint-selector/template-save.tsx',
+    reason: 'The template panel suite operates the save field, retry and keyboard dismissal.',
+    testFiles: ['apps/extension/src/ui/paint-selector/template-panel.test.tsx'],
+  },
+  {
+    owner: 'surface-style-editor-fields',
+    productionFile: 'apps/extension/src/ui/surface-style-selector/editor-panel.tsx',
+    reason: 'The surface selector suite operates the editor and verifies its active draft.',
+    testFiles: ['apps/extension/src/ui/surface-style-selector/index.test.tsx'],
+  },
+  {
+    owner: 'watermark-inspector-fields',
+    productionFile: 'apps/extension/src/ui/watermark/controls.tsx',
+    reason: 'The watermark inspector suite operates exact numeric entry, opacity and preview.',
+    testFiles: ['apps/extension/src/ui/watermark/inspector.test.tsx'],
+  },
+  {
     owner: 'shared-paint-selector-trigger',
     productionFile: 'apps/extension/src/ui/paint-selector/trigger.tsx',
     reason:
@@ -1173,11 +1394,33 @@ unchanged project admission.',
     ],
   },
   {
+    owner: 'review-edit-history-inspector',
+    productionFile: 'apps/extension/src/gallery/video-review/edit-history.tsx',
+    reason:
+      'Mounted Gallery tests cover menu entry, cursor selection, reset, and failed save retry.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/index.test.tsx',
+      'apps/extension/src/gallery/video-review/review-reset.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-workspace-history-cursor',
+    productionFile:
+      'apps/extension/src/composition/persistence/review-workspaces/history-cursor.ts',
+    reason: 'Session and store tests prove retained step identity, cursor ordering, and rollback.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/session.history-start.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store.history-start.test.ts',
+    ],
+  },
+  {
     owner: 'review-workspace-concurrency',
     productionFile: 'apps/extension/src/composition/persistence/review-workspaces/store.ts',
     reason: 'Real writer tests prevent deleted content from returning after purge and recreation.',
     testFiles: [
       'apps/extension/src/composition/persistence/review-workspaces/sync-capture.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store-history-retention.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store.history-start.test.ts',
       'apps/extension/src/workflows/video-review/session.project-purge.test.ts',
       'apps/extension/src/gallery/video-review/use-session.purge.test.tsx',
     ],
@@ -1194,8 +1437,18 @@ unchanged project admission.',
   {
     owner: 'review-session-concurrency',
     productionFile: 'apps/extension/src/workflows/video-review/session.ts',
-    reason: 'Real writer tests prevent deleted content from returning after purge and recreation.',
-    testFiles: ['apps/extension/src/workflows/video-review/session.project-purge.test.ts'],
+    reason:
+      'Local acceptance, publication recovery and native purge share the session writer lifetime.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/session.project-purge.test.ts',
+      'apps/extension/src/workflows/video-review/session-buffer-autosave.test.ts',
+      'apps/extension/src/workflows/video-review/session.autosave.test.ts',
+      'apps/extension/src/workflows/video-review/session.checkpoint-publication.test.ts',
+      'apps/extension/src/workflows/video-review/session.checkpoint-receipt.test.ts',
+      'apps/extension/src/workflows/video-review/session.test.ts',
+      'apps/extension/src/workflows/video-review/session.reset.test.ts',
+      'apps/extension/src/workflows/video-review/session.history-start.test.ts',
+    ],
   },
   {
     owner: 'review-loading-concurrency',

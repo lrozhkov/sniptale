@@ -4,7 +4,11 @@ import { InspectorLayout } from '../../compact-inspector-controls/layout';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { expect, it, vi } from 'vitest';
+import { expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadUiCatalogFixture,
+  prepareUiTranslations,
+} from '../../test-support/translations.test-support';
 import { createSystemStepBadgePresetCatalog } from '../../../features/highlighter/step-badge-presets/catalog';
 import { StepBadgePresetEditor } from './index';
 
@@ -162,3 +166,10 @@ it('clears the migrated preset name without committing or changing the preview',
     host.remove();
   }
 });
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadUiCatalogFixture>[0]) =>
+    loadUiCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareUiTranslations('settings', 'ru'));

@@ -42,9 +42,7 @@ function validateReviewEditIntervals(duration: number, edits: readonly ReviewEdi
       edit.frameTime < 0 ||
       edit.frameTime >= duration ||
       edit.frameDuration <= 0 ||
-      edit.frameDuration > 172800 ||
-      (edit.start !== 0 && edit.frameTime > edit.start) ||
-      edit.frameTime + edit.frameDuration < edit.start - 1e-6
+      edit.frameDuration > 172800
     )
       throw new Error('Review freeze interval is invalid.');
   }
@@ -83,6 +81,14 @@ export function buildReviewTimeMap(
   duration: number,
   edits: readonly ReviewEdit[]
 ): ReviewTimeSegment[] {
+  return buildReviewSegments(duration, edits, false);
+}
+
+function buildReviewSegments(
+  duration: number,
+  edits: readonly ReviewEdit[],
+  retainHiddenFreezes: boolean
+): ReviewTimeSegment[] {
   if (!Number.isFinite(duration) || duration <= 0) throw new Error('Review duration is invalid.');
   validateReviewEditIntervals(duration, edits);
   const segments: ReviewTimeSegment[] = [];
@@ -106,7 +112,8 @@ export function buildReviewTimeMap(
     ...new Set([0, duration, ...edits.flatMap((edit) => [edit.start, edit.end])]),
   ].sort((a, b) => a - b);
   const holds = (at: number) => {
-    if (edits.some((edit) => edit.kind === 'cut' && edit.start <= at && at < edit.end)) return;
+    const hidden = edits.some((edit) => edit.kind === 'cut' && edit.start < at && at < edit.end);
+    if (hidden && !retainHiddenFreezes) return;
     for (const edit of edits
       .filter((edit) => edit.kind === 'freeze' && edit.start === at)
       .sort((a, b) => a.id.localeCompare(b.id))) {
@@ -115,14 +122,14 @@ export function buildReviewTimeMap(
         sourceStart: at,
         sourceEnd: at,
         resultStart: resultEnd,
-        resultEnd: resultEnd + edit.duration,
+        resultEnd: resultEnd + (hidden ? 0 : edit.duration),
         kind: 'freeze',
         rate: 0,
         freezeId: edit.id,
         frameTime: edit.frameTime,
         frameDuration: edit.frameDuration,
       });
-      resultEnd += edit.duration;
+      if (!hidden) resultEnd += edit.duration;
     }
   };
   for (let index = 1; index < boundaries.length; index += 1) {
@@ -216,11 +223,14 @@ export function mapReviewAnchor(anchor: ReviewAnchor, segments: readonly ReviewT
 /** Timeline display retains cut widths and source speed widths, while insertions have their own width. */
 export function createReviewDisplayMap(duration: number, edits: readonly ReviewEdit[]) {
   let cursor = 0;
-  const parts = buildReviewTimeMap(duration, edits).map((segment) => {
+  const freezeWidths = new Map(
+    edits.flatMap((edit) => (edit.kind === 'freeze' ? [[edit.id, edit.duration] as const] : []))
+  );
+  const parts = buildReviewSegments(duration, edits, true).map((segment) => {
     const start = cursor;
     cursor +=
       segment.kind === 'freeze'
-        ? segment.resultEnd - segment.resultStart
+        ? (freezeWidths.get(segment.freezeId!) ?? 0)
         : segment.sourceEnd - segment.sourceStart;
     return { segment, start, end: cursor };
   });
@@ -264,7 +274,7 @@ export function createReviewDisplayMap(duration: number, edits: readonly ReviewE
     const part = parts.find((part) => time >= part.start && time < part.end);
     return part
       ? part.segment.resultStart +
-          (part.segment.kind === 'cut'
+          (part.segment.resultEnd === part.segment.resultStart
             ? 0
             : (time - part.start) / (part.segment.kind === 'freeze' ? 1 : part.segment.rate))
       : time <= 0

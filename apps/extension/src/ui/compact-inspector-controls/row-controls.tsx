@@ -1,8 +1,9 @@
-import type React from 'react';
+import React from 'react';
 import { Search } from 'lucide-react';
 import { OptionRowValue, OptionToggleIndicator } from './control-renderers';
 import { cx } from './shared';
 import { InspectorParameterRow, useInspectorLayout } from './layout';
+import { InspectorFieldClear } from './text-field';
 
 function getNodeTitle(value: React.ReactNode): string | undefined {
   return typeof value === 'string' ? value : undefined;
@@ -54,7 +55,6 @@ export function StatusRow(props: { label: React.ReactNode; value: React.ReactNod
       <InspectorParameterRow
         label={props.label}
         className="sniptale-static-parameter-row"
-        keepInline
         dataUi="shared.ui.compact-inspector.status-row"
       >
         <span
@@ -99,32 +99,46 @@ export function StatusRow(props: { label: React.ReactNode; value: React.ReactNod
 
 export function SearchField(props: {
   label: string;
+  clearLabel?: string;
+  showClear?: boolean;
+  className?: string;
+  dataUi?: string;
+  inputProps?: Pick<
+    React.InputHTMLAttributes<HTMLInputElement>,
+    'autoFocus' | 'onCompositionStart' | 'onCompositionEnd'
+  >;
   placeholder: string;
   value: string;
+  disabled?: boolean;
+  /** Suppress native suggestions and spelling assistance for literal queries. */
+  disableTextAssistance?: boolean;
   onChange: (value: string) => void;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
+  onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
 }) {
+  const localRef = React.useRef<HTMLInputElement>(null);
+  const inputRef = props.inputRef ?? localRef;
+  const assistance = props.disableTextAssistance
+    ? { autoComplete: 'off', autoCorrect: 'off', autoCapitalize: 'none', spellCheck: false }
+    : {};
   return (
-    <label
-      className={cx(
-        'flex h-10 items-center gap-2 rounded-[10px] border px-3',
-        'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
-        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]'
-      )}
-    >
-      <Search size={15} strokeWidth={2} className="text-[color:var(--sniptale-color-text-muted)]" />
-      <span className="sr-only">{props.label}</span>
+    <div className={cx('sniptale-inspector-search', props.className)} data-ui={props.dataUi}>
+      <Search size={14} aria-hidden="true" />
       <input
+        ref={inputRef}
         aria-label={props.label}
         type="search"
+        disabled={props.disabled}
+        {...assistance}
+        {...props.inputProps}
         value={props.value}
         placeholder={props.placeholder}
         onChange={(event) => props.onChange(event.currentTarget.value)}
-        className={cx(
-          'min-w-0 flex-1 border-0 bg-transparent p-0 text-[length:var(--sniptale-compact-font-size,12px)] font-medium',
-          'text-[color:var(--sniptale-color-text-primary)] outline-none',
-          'placeholder:text-[color:var(--sniptale-color-text-muted)]'
-        )}
+        onKeyDown={props.onKeyDown}
       />
-    </label>
+      {props.showClear !== false && props.value && !props.disabled ? (
+        <InspectorFieldClear label={props.label} clearLabel={props.clearLabel} target={inputRef} />
+      ) : null}
+    </div>
   );
 }

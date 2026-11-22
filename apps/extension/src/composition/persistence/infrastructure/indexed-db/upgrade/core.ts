@@ -17,7 +17,9 @@ import {
   EDITOR_VECTOR_LIBRARY_STORE,
   FRAME_ANNOTATION_RASTER_JOBS_STORE,
   IMAGE_WORKSPACES_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_REVIEW_IDENTITIES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   MEDIA_LIBRARY_STORE,
@@ -35,6 +37,7 @@ import {
   SCENARIO_ASSETS_STORE,
   SCENARIO_EXPORTS_STORE,
   SCENARIO_PENDING_ASSETS_STORE,
+  SCENARIO_PROJECT_REVISIONS_STORE,
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
   SCENARIO_PROJECT_UNITS_STORE,
@@ -160,6 +163,7 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, DIAGNOSTICS_EVENTS_STORE, ['recordingId', 'chunkIndex'], ['recordingId']);
   createStore(db, VIDEO_PROJECTS_STORE, 'id', ['updatedAt', 'usageReferenceKeys']);
   createStore(db, VIDEO_PROJECT_REVISIONS_STORE, 'projectId');
+  createStore(db, SCENARIO_PROJECT_REVISIONS_STORE, 'projectId');
   createStore(db, SCENARIO_PROJECTS_STORE, 'id', ['updatedAt']);
   createStore(db, SCENARIO_PROJECT_HISTORY_STORE, ['projectId', 'revision'], ['projectId']);
   createStore(db, SCENARIO_PROJECT_UNITS_STORE, ['projectId', 'unitId', 'revision'], ['projectId']);
@@ -177,7 +181,9 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, MEDIA_LIBRARY_STORE, 'id', ['createdAt', 'kind']);
   createStore(db, THUMBNAILS_STORE, 'assetId');
   createStore(db, IMAGE_WORKSPACES_STORE, 'aggregateId', ['updatedAt']);
+  createStore(db, IMAGE_WORKSPACE_IDENTITIES_STORE, 'aggregateId');
   createStore(db, VIDEO_WORKSPACES_STORE, 'aggregateId', ['updatedAt', 'usageReferenceKeys']);
+  createStore(db, VIDEO_REVIEW_IDENTITIES_STORE, 'key');
   createStore(db, VIDEO_WORKSPACE_HISTORY_STORE, ['aggregateId', 'ordinal'], ['aggregateId']);
   createStore(db, VIDEO_WORKSPACE_DRAFTS_STORE, 'aggregateId', ['updatedAt']);
   createStore(db, AGGREGATE_PRESENTATIONS_STORE, ['aggregateKind', 'aggregateId'], ['updatedAt']);

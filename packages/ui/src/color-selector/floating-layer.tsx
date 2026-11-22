@@ -31,7 +31,7 @@ const COLOR_SELECTOR_PICKER_LAYER_WIDTH = 304;
 const COLOR_SELECTOR_LAYER_GAP = 8;
 const COLOR_SELECTOR_VIEWPORT_PADDING = 8;
 
-type ColorSelectorFloatingPlacement = 'auto' | 'side';
+type ColorSelectorFloatingPlacement = 'auto' | 'side' | 'anchor';
 
 function projectElementRect(anchor: HTMLElement, uiScale: number) {
   const clientRect = anchor.getBoundingClientRect();
@@ -97,10 +97,11 @@ function resolveVerticalLayerSpace(args: {
   boundaryTop: number;
   layerHeight: number;
   viewportHeight: number;
+  stayNear?: boolean;
 }) {
   const belowRoom = args.viewportHeight - args.boundaryBottom - COLOR_SELECTOR_VIEWPORT_PADDING;
   const aboveRoom = args.boundaryTop - COLOR_SELECTOR_VIEWPORT_PADDING;
-  if (Math.max(belowRoom, aboveRoom) < Math.min(args.layerHeight, 420)) {
+  if (!args.stayNear && Math.max(belowRoom, aboveRoom) < Math.min(args.layerHeight, 420)) {
     return {
       maxHeight: Math.max(
         0,
@@ -113,7 +114,7 @@ function resolveVerticalLayerSpace(args: {
   const placeAbove = belowRoom < args.layerHeight && aboveRoom > belowRoom;
   return {
     maxHeight: Math.max(
-      180,
+      args.stayNear ? 0 : 180,
       Math.min(620, (placeAbove ? aboveRoom : belowRoom) - COLOR_SELECTOR_LAYER_GAP)
     ),
     placeAbove,
@@ -154,7 +155,7 @@ function resolveColorSelectorLayerStyle(
   const viewportWidth = viewport.width;
   const viewportHeight = viewport.height;
   const layerWidth = Math.min(preferredWidth, Math.max(0, viewportWidth - 16));
-  if (placement === 'side' || ownerBoundary) {
+  if (placement === 'side' || (placement === 'auto' && ownerBoundary)) {
     const sideStyle = resolveSideLayerStyle({
       anchorRect: rect,
       boundaryRect,
@@ -174,9 +175,13 @@ function resolveColorSelectorLayerStyle(
     boundaryTop: rect.y,
     layerHeight: measuredHeight,
     viewportHeight,
+    stayNear: placement === 'anchor',
   });
+  const prefersStart =
+    placement === 'anchor' &&
+    rect.x + layerWidth <= viewportWidth - COLOR_SELECTOR_VIEWPORT_PADDING;
   const left = Math.min(
-    Math.max(right - layerWidth, COLOR_SELECTOR_VIEWPORT_PADDING),
+    Math.max(prefersStart ? rect.x : right - layerWidth, COLOR_SELECTOR_VIEWPORT_PADDING),
     Math.max(
       COLOR_SELECTOR_VIEWPORT_PADDING,
       viewportWidth - COLOR_SELECTOR_VIEWPORT_PADDING - layerWidth

@@ -22,6 +22,7 @@ export type {
   GalleryRemoteRootItem,
   GalleryItemKind,
   GalleryMediaItem,
+  GalleryImageProjectItem,
   GalleryQuickEditProjectItem,
   GalleryScenarioExportItem,
   GalleryScenarioItem,

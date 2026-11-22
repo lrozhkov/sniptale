@@ -19,6 +19,10 @@ Measure parameter rhythm between visible label baselines. Equivalent compact row
 
 Inline and stacked labels retain the same text inset from the row start. Moving a control below its label must not pull that label upward. Include text editors, dropdowns, segments, and compound resources in mixed-row checks.
 
+Place a shape choice next to its preview when comparison helps the task. Show a silhouette and a complete label for each shape. Place fields that depend on the shape below the choice.
+
+Use one label and value split for each inspector group. In a narrow group, reduce the label share before moving short choices below their labels. Use the same split for neighboring numeric fields and switches.
+
 Every parameter stack constrains its columns to the available width. Intrinsic content must wrap or truncate inside its row. It must not widen adjacent rows.
 
 Reserve at least 140px for the compact color value construction. Keep HEX and the trailing 32px swatch target inline when they fit. The visible swatch is 16px. Numeric values reach the same trailing content edge without an empty stepper gutter. Check the actual 320px inspector, including its padding and scrollbar. Stacked content and wrapped names can increase row height.

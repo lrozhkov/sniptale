@@ -1,4 +1,6 @@
 import type { SniptaleHarnessBootstrap } from './browser-mocks/browser-mocks.types';
+import { prepareTranslations } from '../../../apps/extension/src/platform/i18n';
+import type { CatalogProfile } from '../../../apps/extension/src/platform/i18n/catalog-profiles';
 
 const profiles = [
   'video-editor',
@@ -37,6 +39,7 @@ export interface DevSurfaceConfig {
 }
 interface SurfacePorts {
   prepareAdapters(config: DevSurfaceConfig): Promise<void>;
+  prepareCatalogs(config: DevSurfaceConfig): Promise<void>;
   readInventory(): Promise<Inventory>;
   restoreFixture(config: DevSurfaceConfig): Promise<readonly string[]>;
   readImported(digest: string): Imported | null;
@@ -137,6 +140,7 @@ function groupFor(profile: Profile): keyof Inventory | null {
 /** Prepare adapters and the complete archive before selecting or importing a production page. */
 export async function prepareDevSurface(config: DevSurfaceConfig, ports: SurfacePorts) {
   await ports.prepareAdapters(config);
+  await ports.prepareCatalogs(config);
   let imported = config.fixtureDigest ? ports.readImported(config.fixtureDigest) : null;
   let inventory: Inventory;
   if (config.fixtureUrl && config.fixtureDigest && !imported) {
@@ -207,6 +211,22 @@ async function prepareAdapters(config: DevSurfaceConfig) {
   const { harnessReady } = await import('./browser-mocks/browser-mocks');
   await harnessReady;
 }
+async function prepareCatalogs(config: DevSurfaceConfig): Promise<void> {
+  const catalogProfiles: Record<Profile, CatalogProfile | null> = {
+    'video-editor': 'video-editor',
+    'image-editor': 'editor',
+    'gallery-editor': 'gallery',
+    popup: 'popup',
+    settings: 'settings',
+    library: 'gallery',
+    'scenario-editor': 'scenario-editor',
+    components: 'design-system',
+    'image-inspector': 'editor',
+    'audio-preview': null,
+  };
+  const profile = catalogProfiles[config.profile];
+  if (profile) await prepareTranslations(profile);
+}
 async function readInventory(): Promise<Inventory> {
   const [
     { listMediaLibrary },
@@ -232,7 +252,11 @@ async function readInventory(): Promise<Inventory> {
   const reviewProjects: Candidate[] = [];
   for (const item of reviews) {
     if (item.lifecycle.trashedAt !== undefined || item.unavailableReason || !item.source) continue;
-    const snapshot = await readVideoWorkspace(item.aggregateId);
+    const snapshot = await readVideoWorkspace(item.aggregateId).catch((error: unknown) => {
+      if (error instanceof Error && 'diagnostic' in error)
+        console.error('[dev-surface] Workspace admission:', JSON.stringify(error.diagnostic));
+      throw error;
+    });
     if (!snapshot) continue;
     const workspace = snapshot.workspace;
     const candidate = {
@@ -456,6 +480,7 @@ export async function startDevSurface() {
     status.profile = config.profile;
     const prepared = await prepareDevSurface(config, {
       prepareAdapters,
+      prepareCatalogs,
       readInventory,
       restoreFixture,
       readImported,
@@ -465,6 +490,7 @@ export async function startDevSurface() {
       mount,
     });
     Object.assign(status, prepared, { status: 'ready' });
+    console.info('[dev-surface] Preparation ready.');
     if (config.profile === 'video-editor') {
       const { useVideoEditorStore } =
         await import('../../../apps/extension/src/video-editor/state/store');
@@ -481,6 +507,7 @@ export async function startDevSurface() {
     }
     if (feedback) feedback.hidden = true;
   } catch (error) {
+    console.error('[dev-surface] Preparation failed:', error);
     status.status = 'error';
     status.error =
       error instanceof SurfacePreparationError
@@ -489,6 +516,12 @@ export async function startDevSurface() {
     if (feedback) {
       feedback.hidden = false;
       feedback.textContent = status.error;
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.textContent = 'Reload development surface';
+      retry.style.marginInlineStart = '12px';
+      retry.addEventListener('click', () => location.reload());
+      feedback.append(retry);
     }
   }
 }

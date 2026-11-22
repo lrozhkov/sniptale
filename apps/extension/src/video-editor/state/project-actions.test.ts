@@ -1,3 +1,6 @@
+import type { RestoredVideoProjectHistoryValue } from '../../features/video/project/history-capture';
+import { createVideoProjectHistoryChange } from '../../features/video/project/history-change';
+import { captureVideoEditorProjectHistory } from '../project/history';
 import { resolveVideoProjectActionOccurrences } from '../../features/video/project/action-occurrences';
 import { describe, expect, it } from 'vitest';
 import { hydrateVideoProject } from '../../features/video/project/hydration';
@@ -487,4 +490,127 @@ it('keeps autosave preference out of project revisions and undo history', () => 
   expect(store.getState().projectHistory).toBe(before.projectHistory);
   store.getState().setAutosaveEnabled(true);
   expect(store.getState().autosaveEnabled).toBe(true);
+});
+
+function restoredInverse(
+  before: VideoProject,
+  after: VideoProject
+): RestoredVideoProjectHistoryValue {
+  const change = createVideoProjectHistoryChange(before, after);
+  if (!change) throw new Error('Expected an inverse change');
+  const value = JSON.stringify(change);
+  return { change, value, bytes: new TextEncoder().encode(value).byteLength, sources: [] };
+}
+
+describe('native workspace history adoption', () => {
+  it('reopens both history directions with the observed revision and a new session identity', () => {
+    const store = createTimelineStore();
+    const before = createEmptyVideoProject('Before');
+    const current = { ...before, name: 'Current' };
+    const later = { ...before, name: 'Later' };
+    const past = restoredInverse(before, current);
+    const future = restoredInverse(later, current);
+    const workspace = {
+      status: 'ready' as const,
+      project: current,
+      workspaceRevision: 17,
+      history: {
+        status: 'ready' as const,
+        value: {
+          projectId: current.id,
+          epoch: 'native-epoch',
+          past: [past],
+          future: [future],
+          assetsByValue: new Map(),
+        },
+      },
+    };
+    const initialSession = store.getState().projectSessionId;
+    store.getState().setProject(current, null, workspace);
+    const openedSession = store.getState().projectSessionId;
+    expect(openedSession).not.toBe(initialSession);
+    expect(store.getState().nativeWorkspace).toMatchObject({
+      project: workspace.project,
+      workspaceRevision: 17,
+      historyStatus: 'ready',
+    });
+    expect(store.getState().projectHistory.epoch).toBe('native-epoch');
+    expect(captureVideoEditorProjectHistory(store.getState().projectHistory)?.past[0]?.value).toBe(
+      past.value
+    );
+    store.getState().undoProject();
+    expect(store.getState().project?.name).toBe('Before');
+    store.getState().redoProject();
+    expect(store.getState().project?.name).toBe('Current');
+    store.getState().redoProject();
+    expect(store.getState().project?.name).toBe('Later');
+    store.getState().setProject(current, null, workspace);
+    expect(store.getState().projectSessionId).not.toBe(openedSession);
+  });
+
+  it('restores an interrupted draft as one undoable edit and discards the previous redo branch', () => {
+    const store = createTimelineStore();
+    const before = createEmptyVideoProject('Before');
+    const anchor = { ...before, name: 'Anchor' };
+    const draft = { ...before, name: 'Draft' };
+    const oldFuture = { ...before, name: 'Old future' };
+    store.getState().setProject(draft, null, {
+      status: 'ready',
+      project: draft,
+      workspaceRevision: 3,
+      history: {
+        status: 'ready',
+        value: {
+          projectId: draft.id,
+          epoch: 'draft-epoch',
+          past: [restoredInverse(before, anchor)],
+          future: [restoredInverse(oldFuture, anchor)],
+          recovery: restoredInverse(anchor, draft),
+          assetsByValue: new Map(),
+        },
+      },
+    });
+    expect(store.getState().project?.name).toBe('Draft');
+    expect(store.getState().projectHistory.future).toEqual([]);
+    expect(store.getState().projectHistory.transaction).toBeNull();
+    store.getState().undoProject();
+    expect(store.getState().project?.name).toBe('Anchor');
+    store.getState().undoProject();
+    expect(store.getState().project?.name).toBe('Before');
+    store.getState().redoProject();
+    store.getState().redoProject();
+    expect(store.getState().project?.name).toBe('Draft');
+    expect(store.getState().projectHistory.future).toEqual([]);
+  });
+
+  it('preserves valid current content and an explicit unavailable-history status', () => {
+    const store = createTimelineStore();
+    const project = createEmptyVideoProject('Recoverable current');
+    store.getState().setProject(project, null, {
+      status: 'ready',
+      project,
+      workspaceRevision: 8,
+      history: { status: 'unavailable' },
+    });
+    expect(store.getState().project?.name).toBe(project.name);
+    expect(store.getState().nativeWorkspace?.historyStatus).toBe('unavailable');
+    expect(store.getState().projectHistory.error).toBe('snapshotFailed');
+    expect(captureVideoEditorProjectHistory(store.getState().projectHistory)).toBeNull();
+  });
+
+  it('refuses another project opening snapshot before changing the active store', () => {
+    const store = createTimelineStore();
+    const project = createEmptyVideoProject('Active');
+    store.getState().setProject(project);
+    const state = store.getState();
+    expect(() =>
+      store.getState().setProject(project, null, {
+        status: 'ready',
+        project: createEmptyVideoProject('Other'),
+        workspaceRevision: 1,
+        history: { status: 'absent' },
+      })
+    ).toThrow('another project');
+    expect(store.getState()).toBe(state);
+  });
 });

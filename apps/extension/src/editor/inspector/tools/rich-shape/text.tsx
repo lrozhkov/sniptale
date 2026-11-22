@@ -8,10 +8,11 @@ import {
   Underline,
 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
+import { NumericValueField } from '../../../../ui/compact-inspector-controls/numeric';
 import { ColorField, ToggleGrid } from '../../../chrome/ui';
 import { buildShapeColorControlProps } from '../shape-color-control';
 import { TextIconOptionButtons } from '../text-option-buttons';
-import { CollapsibleSection, NumberField, RangeField, SelectField } from './fields';
+import { CollapsibleSection, RangeField, SelectField } from './fields';
 import { VerticalTextAlignIcon } from './text-icons';
 import type { RichShapeControlsProps } from './types';
 
@@ -197,15 +198,20 @@ function RichShapeTextInsetFields({ props }: { props: RichShapeControlsProps }) 
       <div className="text-[13px] font-medium leading-[18px] text-[color:var(--sniptale-color-text-secondary)]">
         {translate('editor.compact.richShapeTextInsets')}
       </div>
-      <div className="grid grid-cols-4 gap-1.5">
+      <div className="grid grid-cols-2 gap-2">
         {(['top', 'right', 'bottom', 'left'] as const).map((side) => (
-          <NumberField
-            key={side}
-            label={labels[side]}
-            value={props.shape.text.insets[side]}
-            min={0}
-            onChange={(value) => patchInsets({ [side]: value })}
-          />
+          <div key={side} className="min-w-0 space-y-1">
+            <div className="sniptale-parameter-name">{labels[side]}</div>
+            <NumericValueField
+              label={labels[side]}
+              value={props.shape.text.insets[side]}
+              min={0}
+              unit="px"
+              className="!w-full"
+              onPreviewValue={() => undefined}
+              onCommitValue={(value) => patchInsets({ [side]: value })}
+            />
+          </div>
         ))}
       </div>
     </div>

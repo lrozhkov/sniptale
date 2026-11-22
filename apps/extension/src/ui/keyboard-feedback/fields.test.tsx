@@ -64,7 +64,13 @@ it('retains all three font families and changes only the selected style property
   expect(
     host.querySelector('input[aria-label="videoEditor.sidebar.actionOpacity"]')
   ).not.toBeNull();
-  expect(host.querySelector('input[aria-label="gallery.videoReview.key_fontSize"]')).not.toBeNull();
+  for (const key of ['fontSize', 'cornerRadius'] as const) {
+    const label = `gallery.videoReview.key_${key}`;
+    const field = host.querySelector(`input[aria-label="${label}"]`)!;
+    const row = field.closest('[data-ui="shared.ui.compact-inspector.numeric-row"]')!;
+    expect(row.querySelector('input[type="range"]')).toBeNull();
+    expect(row.querySelector(`button[aria-label="${label} increase"]`)).not.toBeNull();
+  }
 });
 
 it('renders one mixed display status for a batch with different enabled values', () => {

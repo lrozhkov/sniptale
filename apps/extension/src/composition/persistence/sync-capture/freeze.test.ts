@@ -24,6 +24,84 @@ import {
   memoryStore,
   reference,
 } from './test-support/freeze';
+import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
+import { VIDEO_PROJECT_HISTORY_OWNER_KIND } from '../projects/history-contracts';
+
+it.each([1, EDITOR_HISTORY_LIMITS.maxActions])(
+  'freezes %s history bodies and historical private sources after their current placement is removed',
+  async (count) => {
+    const data = fixture();
+    const changes = Array.from({ length: count }, (_, index) => ({ assetId: `history-${index}` }));
+    data.project.history = {
+      version: 1,
+      epoch: 'epoch',
+      past: changes,
+      future: [],
+      sources: [{ kind: 'project-asset', id: data.asset.id }],
+    };
+    data.project.project.assets = [];
+    data.project.project.clips = [];
+    data.stores.projects.seed(data.project.id, data.project);
+    for (const { assetId } of changes) {
+      data.stores.refs.seed(assetId, {
+        ...reference(assetId, 'application/json', 10),
+        sha256: 'a'.repeat(64),
+      });
+      const role = `history:change:${assetId}`;
+      data.stores.owners.seed([VIDEO_PROJECT_HISTORY_OWNER_KIND, data.project.id, role], {
+        assetId,
+        role,
+        ownerId: data.project.id,
+        ownerKind: VIDEO_PROJECT_HISTORY_OWNER_KIND,
+      });
+    }
+    const rows = await freezeVideoProjectInTransaction(data.tx, data.project.id);
+    expect(rows.assets).toEqual([data.asset]);
+    for (const { assetId } of changes)
+      expect(rows.refs.some((ref) => ref.assetId === assetId)).toBe(true);
+    expect(collectCapturedProjectEditingMediaIds(rows)).toContain(data.original.id);
+    for (const store of Object.values(data.stores)) {
+      expect(store.put).not.toHaveBeenCalled();
+      expect(store.delete).not.toHaveBeenCalled();
+    }
+  }
+);
+
+it.each(['owner', 'ref', 'mime', 'digest', 'logical-budget'] as const)(
+  'refuses incomplete native history capture before acceptance: %s',
+  async (failure) => {
+    const data = fixture();
+    const assetId = 'history';
+    const role = `history:change:${assetId}`;
+    data.project.history = {
+      version: 1,
+      epoch: 'epoch',
+      past: [{ assetId }],
+      future: [],
+      sources: [],
+    };
+    data.stores.projects.seed(data.project.id, data.project);
+    if (failure !== 'owner')
+      data.stores.owners.seed([VIDEO_PROJECT_HISTORY_OWNER_KIND, data.project.id, role], {
+        assetId,
+        role,
+        ownerKind: VIDEO_PROJECT_HISTORY_OWNER_KIND,
+        ownerId: data.project.id,
+      });
+    if (failure !== 'ref')
+      data.stores.refs.seed(assetId, {
+        ...reference(
+          assetId,
+          failure === 'mime' ? 'video/webm' : 'application/json',
+          failure === 'logical-budget' ? EDITOR_HISTORY_LIMITS.maxBytes + 1 : 10
+        ),
+        sha256: failure === 'digest' ? null : 'a'.repeat(64),
+      });
+    await expect(freezeVideoProjectInTransaction(data.tx, data.project.id)).rejects.toBeInstanceOf(
+      UnsupportedSyncCaptureGraphError
+    );
+  }
+);
 
 it('freezes exact native rows and the origin media dependency without reading another database', async () => {
   const data = fixture();

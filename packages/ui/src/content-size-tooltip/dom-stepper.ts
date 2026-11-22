@@ -11,6 +11,7 @@ import {
 } from './styles';
 import { applyTooltipDomStyle } from './dom-style';
 import { startContentSizeTooltipStepperRepeat } from './repeat';
+import { attachNumericInputWheel, stepNativeNumberInput } from '../number-input/wheel';
 
 interface ContentSizeTooltipDomStepperGroup {
   group: HTMLDivElement;
@@ -173,6 +174,10 @@ export function createTooltipStepperGroup(props: {
     className: 'sniptale-size-btn-plus',
     target: props.dimension,
     variant: props.variant,
+  });
+
+  attachNumericInputWheel(input, (direction) => {
+    stepNativeNumberInput(input, direction);
   });
 
   group.append(input, createStepperControls(increaseButton, decreaseButton));

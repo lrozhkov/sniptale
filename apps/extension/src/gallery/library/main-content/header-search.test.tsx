@@ -4,7 +4,8 @@ import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { GalleryHeaderSearchField } from './header-search';
-import { getResolvedDictionaries } from '../../../platform/i18n/dictionaries';
+import en from '../../../platform/i18n/catalogs/en.json';
+import ru from '../../../platform/i18n/catalogs/ru.json';
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
@@ -64,10 +65,9 @@ it('shows a quiet clear button for nonempty search and restores input focus imme
     '[data-ui="gallery.header.clearSearch"]'
   );
   expect(clear?.getAttribute('aria-label')).toBe('gallery.app.clearSearch');
-  expect(clear?.className).toContain('h-7 w-7');
-  expect(clear?.className).toContain('focus-visible:ring-2');
-  expect(input?.className).toContain('min-w-0 flex-1');
-  expect(input?.parentElement?.tagName).toBe('DIV');
+  expect(clear?.classList.contains('sniptale-field-clear')).toBe(true);
+  expect(input?.type).toBe('search');
+  expect(input?.parentElement?.classList.contains('sniptale-inspector-search')).toBe(true);
 
   act(() => clear?.click());
   expect(commit).toHaveBeenLastCalledWith('');
@@ -81,12 +81,12 @@ it('commits Enter immediately while ignoring an active IME composition', () => {
   const input = container?.querySelector<HTMLInputElement>('input');
   expect(input?.getAttribute('aria-label')).toBe('gallery.app.trashSearchLabel');
   expect({
-    en: getResolvedDictionaries().en.gallery.app.trashSearchPlaceholder,
-    ru: getResolvedDictionaries().ru.gallery.app.trashSearchPlaceholder,
+    en: en.gallery.app.trashSearchPlaceholder,
+    ru: ru.gallery.app.trashSearchPlaceholder,
   }).toEqual({ ru: 'Поиск', en: 'Search' });
   expect({
-    en: getResolvedDictionaries().en.gallery.app.trashSearchLabel,
-    ru: getResolvedDictionaries().ru.gallery.app.trashSearchLabel,
+    en: en.gallery.app.trashSearchLabel,
+    ru: ru.gallery.app.trashSearchLabel,
   }).toEqual({
     ru: 'Поиск в корзине',
     en: 'Search Trash Bin',

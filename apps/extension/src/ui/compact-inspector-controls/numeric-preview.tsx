@@ -12,6 +12,10 @@ export function DraftNumericRow(props: {
   step: number;
   precision?: number;
   enterBehavior?: ComponentProps<typeof NumericRow>['enterBehavior'];
+  stepperPlacement?: ComponentProps<typeof NumericRow>['stepperPlacement'];
+  rangePresentation?: ComponentProps<typeof NumericRow>['rangePresentation'];
+  /** Opt in to a contextual range for continuously adjustable values. */
+  scrubEnabled?: boolean;
   scrubStep?: number;
   scrubMax?: number;
   scrubMin?: number;
@@ -71,15 +75,21 @@ export function PreviewNumericRow(
         max={props.max}
         step={props.step}
         enterBehavior={props.enterBehavior}
+        stepperPlacement={props.stepperPlacement}
+        rangePresentation={props.rangePresentation}
         precision={props.precision}
         unit={props.unit}
         value={draft}
         disabled={props.disabled}
-        scrub={{
-          min: props.scrubMin ?? props.min,
-          max: props.scrubMax ?? props.max,
-          step: props.scrubStep ?? props.step,
-        }}
+        scrub={
+          props.scrubEnabled || props.rangePresentation === 'field'
+            ? {
+                min: props.scrubMin ?? props.min,
+                max: props.scrubMax ?? props.max,
+                step: props.scrubStep ?? props.step,
+              }
+            : undefined
+        }
         onPreviewValue={(value) => {
           if (!cancelled.current) {
             initial.current ??= props.value;
@@ -87,6 +97,7 @@ export function PreviewNumericRow(
             props.onPreview?.(value);
           }
         }}
+        onCancelValue={cancel}
         onCommitValue={(value) => {
           if (cancelled.current) return;
           const baseline = initial.current ?? props.value;

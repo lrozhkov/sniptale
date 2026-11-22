@@ -10,6 +10,7 @@ export function EditorShadowField({ state }: { state: EditorState }) {
       value={state.shadow}
       onChange={state.setShadow}
       label={translate('highlighter.editor.shadowLabel')}
+      scale
       displaySuffix="%"
     />
   );

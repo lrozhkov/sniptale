@@ -1,12 +1,13 @@
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { canOpenGalleryProject } from '../items/types';
+import { browserTabs } from '@sniptale/platform/browser/tabs';
+import { buildEditorUrl } from '../../../platform/navigation/extension-pages/editor';
+import { canOpenGalleryProject, usesGalleryImagePresentation } from '../items/types';
 import { getGalleryProjectSummary } from '../ui/project-presentation';
 import { translate } from '../../../platform/i18n';
 import { getControlIconButtonClassName } from '@sniptale/ui/control-language';
 import {
   Archive,
   ArrowUpRight,
-  Clapperboard,
   CopyPlus,
   Copy,
   Check,
@@ -36,6 +37,7 @@ import {
 import { PromotionAction } from './promotion-action';
 import type { PreviewPanelProps } from './types';
 import { ScenarioViewingActions } from './scenario-viewing-actions';
+import { ImageEditorActions, VideoReviewActions } from './image-editor-actions';
 import {
   listPreviewMediaAssetProjectUsage,
   subscribeToPreviewProjectUsageInvalidation,
@@ -258,19 +260,35 @@ export function PreviewMetadataCards({ item }: Pick<PreviewPanelProps, 'item'>) 
 export function PreviewProjectUsage({
   item,
   trashMode,
-}: Pick<PreviewPanelProps, 'item' | 'trashMode'>) {
-  const mediaId = isGalleryMediaItem(item) ? (item.entityId ?? item.id) : null;
-  if (!mediaId) return null;
-  return <PreviewProjectUsageDetails key={mediaId} mediaId={mediaId} trashMode={trashMode} />;
+  onRemoveFromOriginals,
+}: Pick<PreviewPanelProps, 'item' | 'trashMode' | 'onRemoveFromOriginals'>) {
+  if (!isGalleryMediaItem(item)) return null;
+  const mediaId = item.entityId ?? item.id;
+  const canRemoveClaim =
+    !trashMode &&
+    item.lifecycle?.trashedAt === undefined &&
+    item.lifecycle?.storageClass !== 'temporary' &&
+    item.imageContentState !== 'edited' &&
+    item.savedIndependently !== false;
+  return (
+    <PreviewProjectUsageDetails
+      key={mediaId}
+      mediaId={mediaId}
+      trashMode={trashMode}
+      {...(canRemoveClaim && onRemoveFromOriginals ? { onRemoveFromOriginals } : {})}
+    />
+  );
 }
 
 /** Object identity resets disclosure and pending lookup before another source is shown. */
 function PreviewProjectUsageDetails({
   mediaId,
   trashMode,
+  onRemoveFromOriginals,
 }: {
   mediaId: string;
   trashMode?: boolean | undefined;
+  onRemoveFromOriginals?: () => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [usage, setUsage] = useState<MediaAssetProjectUsage[]>([]);
@@ -362,6 +380,8 @@ function PreviewProjectUsageDetails({
                     if (project.kind === 'scenario') void openScenarioEditorPage(project.id);
                     if (project.kind === 'review')
                       void openGalleryPage({ mediaId: project.id, quickEdit: true });
+                    if (project.kind === 'image')
+                      void browserTabs.create({ url: buildEditorUrl({ assetId: project.id }) });
                   }}
                 >
                   <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -369,6 +389,11 @@ function PreviewProjectUsageDetails({
                 </ProductActionButton>
               )
             )}
+            {usage.length > 0 && onRemoveFromOriginals ? (
+              <PreviewActionButton icon={Archive} onClick={onRemoveFromOriginals}>
+                {translate('gallery.preview.removeFromOriginals')}
+              </PreviewActionButton>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -539,27 +564,34 @@ function getPreviewPrimaryActionLabel(item: PreviewPanelProps['item']) {
   return canOpenGalleryProject(item) ? 'gallery.preview.openInEditor' : null;
 }
 
-function PreviewPrimaryActions(props: PreviewPanelProps & { onReview?: () => void }) {
+function PreviewPrimaryActions(
+  props: PreviewPanelProps & { onReview?: (projectId?: string) => void }
+) {
   const { item, onEdit, onReview } = props;
   const primaryLabel = getPreviewPrimaryActionLabel(item);
+  const imageId =
+    isGalleryMediaItem(item) && isImageKind(item.kind) ? (item.entityId ?? item.id) : null;
+  const originalId =
+    item.type === 'image-project' && item.sourceAvailable
+      ? item.project.sourceMediaId
+      : item.type === 'quick-edit-project' && !item.unavailableReason
+        ? (item.project.sourceMediaId ?? item.entityId)
+        : null;
   return (
     <>
       {onReview || primaryLabel ? (
         <div className="space-y-1">
-          {onReview ? (
-            <ProductActionButton
-              compact
-              tone="secondary"
-              type="button"
-              data-ui="gallery.videoReview.enter"
-              onClick={onReview}
-              className={previewActionButtonClassName}
-            >
-              <Clapperboard className="h-4 w-4 shrink-0" aria-hidden="true" />
-              {translate('gallery.videoReview.enter')}
-            </ProductActionButton>
+          {onReview && isGalleryMediaItem(item) ? (
+            <VideoReviewActions mediaId={item.entityId ?? item.id} onOpen={onReview} />
           ) : null}
-          {primaryLabel ? (
+          {imageId ? (
+            <ImageEditorActions
+              key={imageId}
+              mediaId={imageId}
+              request={props.imageProjectPickerRequest}
+              onRequested={props.onImageProjectPickerRequested}
+            />
+          ) : primaryLabel ? (
             <ProductActionButton
               compact
               tone="secondary"
@@ -569,6 +601,18 @@ function PreviewPrimaryActions(props: PreviewPanelProps & { onReview?: () => voi
             >
               <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
               {translate(primaryLabel)}
+            </ProductActionButton>
+          ) : null}
+          {originalId ? (
+            <ProductActionButton
+              compact
+              tone="secondary"
+              type="button"
+              onClick={() => void openGalleryPage({ mediaId: originalId })}
+              className={previewActionButtonClassName}
+            >
+              <Images className="h-4 w-4 shrink-0" aria-hidden="true" />
+              {translate('gallery.preview.openImageOriginal')}
             </ProductActionButton>
           ) : null}
         </div>
@@ -586,7 +630,9 @@ function PreviewPrimaryActions(props: PreviewPanelProps & { onReview?: () => voi
   );
 }
 
-export function PreviewActions(props: PreviewPanelProps & { onReview?: () => void }) {
+export function PreviewActions(
+  props: PreviewPanelProps & { onReview?: (projectId?: string) => void }
+) {
   if (props.trashMode)
     return (
       <>
@@ -613,7 +659,8 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
   const canDownload =
     isGalleryMediaItem(item) || (isGalleryScenarioExportItem(item) && item.format === 'html');
   const canCopy = isGalleryMediaItem(item) && isImageKind(item.kind);
-  const canUseImageAggregateActions = canCopy && item.source.kind === 'screenshot';
+  const canUseImageAggregateActions =
+    isGalleryMediaItem(item) && usesGalleryImagePresentation(item);
   const hasEditedImageContent = canUseImageAggregateActions && item.imageContentState === 'edited';
   const canOpenWebSnapshot = isGalleryMediaItem(item) && item.kind === 'web-archive';
   const hasFileActions =
@@ -737,7 +784,12 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
 export function PreviewPromotionAction(
   props: Pick<PreviewPanelProps, 'item' | 'onPromote' | 'trashMode'>
 ) {
-  if (props.trashMode || props.item.lifecycle?.storageClass !== 'temporary' || !props.onPromote) {
+  const savesOriginal = isGalleryMediaItem(props.item) && props.item.savedIndependently === false;
+  if (
+    props.trashMode ||
+    (!savesOriginal && props.item.lifecycle?.storageClass !== 'temporary') ||
+    !props.onPromote
+  ) {
     return null;
   }
 
@@ -746,6 +798,7 @@ export function PreviewPromotionAction(
       key={props.item.id}
       className={`${getControlIconButtonClassName()} !h-8 !w-8 !rounded-[4px]`}
       onPromote={props.onPromote}
+      savesOriginal={savesOriginal}
       visible
     />
   );

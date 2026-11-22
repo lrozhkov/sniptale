@@ -2,6 +2,7 @@ import { vi } from 'vitest';
 import { useReviewAudioRuntime } from './use-review-audio-runtime';
 import type {
   ReviewAudioClipBuffer,
+  ReviewAudioClockSample,
   ReviewAudioEngine,
 } from '../../workflows/video-review/audio-playback-engine';
 import type { QuickEditAudioPlanEntry } from '../../features/video/review/advanced/audio-plan';
@@ -20,6 +21,9 @@ export class FakeEngine implements ReviewAudioEngine {
   }
   now() {
     return this.currentTime;
+  }
+  readActiveClock(): ReviewAudioClockSample {
+    return { identity: this, graphTime: this.currentTime, outputTime: this.currentTime };
   }
   async decode() {
     return this.decoded;

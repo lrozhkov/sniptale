@@ -10,6 +10,7 @@ export const EFFECT_RUNTIME_SANDBOX_READY_MESSAGE = 'sniptale:effect-runtime:rea
 export const EFFECT_RUNTIME_SANDBOX_RENDER_MESSAGE = 'sniptale:effect-runtime:render' as const;
 export const EFFECT_RUNTIME_WORKER_REQUEST = 'sniptale:effect-runtime:worker-request' as const;
 export const EFFECT_RUNTIME_WORKER_RESPONSE = 'sniptale:effect-runtime:worker-response' as const;
+export const EFFECT_RUNTIME_WORKER_READY = 'sniptale:effect-runtime:worker-ready' as const;
 
 export type EffectRuntimeErrorCode =
   | 'cacheMiss'
@@ -23,6 +24,8 @@ export type EffectRuntimeErrorCode =
   | 'resourceLimit'
   | 'stale'
   | 'timeout';
+
+export type EffectRuntimeStartupFailureCode = 'crashed' | 'malformed';
 
 export interface EffectRuntimeFrameIdentity {
   effectInstanceId: string;
@@ -172,6 +175,8 @@ export interface EffectRuntimeFrameSuccess extends EffectRuntimeFrameIdentity {
 export interface EffectRuntimeFrameFailure extends EffectRuntimeFrameIdentity {
   code: Exclude<EffectRuntimeErrorCode, 'cacheMiss'>;
   kind: 'error';
+  /** Diagnostic cause of the first terminal worker startup refusal. */
+  startupFailureCode?: EffectRuntimeStartupFailureCode;
 }
 
 export interface EffectRuntimeCacheMissFailure extends EffectRuntimeFrameIdentity {
@@ -199,7 +204,7 @@ export interface EffectRuntimeSandboxExecutor {
   dispose(): void;
   /** Borrow isolated preparation. A caller gate permits later handoff at its intended frame boundary; omission retains startup-only handoff. */
   createWarmExecutor?(canAdopt?: () => boolean): EffectRuntimeSandboxExecutor | undefined;
-  /** Prepare transport readiness without a frame request; an unavailable session can retry. */
+  /** Prepare readiness without a frame; startup refusal lasts until this executor is replaced. */
   preload?(): void;
   /** A local signal can refuse queued work before transfer; submitted results must still drain. */
   prepareGpuFrame?(

@@ -23,7 +23,7 @@ describe('QA Oxfmt wrapper', () => {
     const ru = 'apps/extension/src/platform/i18n/catalogs/ru.json';
     writeFile(
       root,
-      'packages/platform/src/i18n/config.ts',
+      'packages/runtime-contracts/src/i18n.ts',
       'const LOCALE_REGISTRY = {en:{},ru:{}} as const;'
     );
     writeFile(root, en, '{"done":"Done","long":"' + 'x'.repeat(2000) + '"}');
@@ -47,7 +47,7 @@ describe('QA Oxfmt wrapper', () => {
     const ru = 'apps/extension/src/platform/i18n/catalogs/ru.json';
     writeFile(
       root,
-      'packages/platform/src/i18n/config.ts',
+      'packages/runtime-contracts/src/i18n.ts',
       'const LOCALE_REGISTRY = {en:{},ru:{}} as const;'
     );
     writeFile(root, en, '{"done":"Done"}');

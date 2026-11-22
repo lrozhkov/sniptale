@@ -8,6 +8,9 @@ export interface CursorMotion {
   id: string;
   start: number;
   end: number;
+  timeDomain?: 'result';
+  /** Full curve time for a projected slice with smaller visible bounds. */
+  phaseClock?: { start: number; end: number };
   enabled: boolean;
   shape: CursorMotionShape;
   size: number;
@@ -25,6 +28,8 @@ const motionFields = new Set([
   'id',
   'start',
   'end',
+  'timeDomain',
+  'phaseClock',
   'enabled',
   'shape',
   'size',
@@ -70,6 +75,7 @@ export function parseCursorMotions(value: unknown): CursorMotion[] | null {
       !bounded(start, 0, 86400) ||
       !bounded(end, 0, 86400) ||
       end <= start ||
+      (raw['timeDomain'] !== undefined && raw['timeDomain'] !== 'result') ||
       typeof enabled !== 'boolean' ||
       !isShape(shape) ||
       !bounded(size, 12, 160) ||
@@ -82,6 +88,14 @@ export function parseCursorMotions(value: unknown): CursorMotion[] | null {
       !Array.isArray(rawPoints) ||
       rawPoints.length < 2 ||
       rawPoints.length > 256
+    )
+      return null;
+    const phaseClock = raw['phaseClock'];
+    if (
+      phaseClock !== undefined &&
+      (!isRecord(phaseClock) ||
+        !bounded(phaseClock['start'], -1e9, start) ||
+        !bounded(phaseClock['end'], end, 1e9))
     )
       return null;
     const points: CursorMotion['points'] = [];
@@ -109,6 +123,12 @@ export function parseCursorMotions(value: unknown): CursorMotion[] | null {
       id,
       start,
       end,
+      ...(raw['timeDomain'] === 'result' ? { timeDomain: 'result' as const } : {}),
+      ...(isRecord(phaseClock) &&
+      typeof phaseClock['start'] === 'number' &&
+      typeof phaseClock['end'] === 'number'
+        ? { phaseClock: { start: phaseClock['start'], end: phaseClock['end'] } }
+        : {}),
       enabled,
       shape,
       size,
@@ -118,7 +138,16 @@ export function parseCursorMotions(value: unknown): CursorMotion[] | null {
       easing,
       points,
     };
-    if (enabled && result.some((other) => other.enabled && other.start < end && other.end > start))
+    if (
+      enabled &&
+      result.some(
+        (other) =>
+          other.enabled &&
+          other.timeDomain === motion.timeDomain &&
+          other.start < end &&
+          other.end > start
+      )
+    )
       return null;
     ids.add(id);
     result.push(motion);
@@ -129,6 +158,7 @@ const segments = new WeakMap<CursorMotion, CursorFocusSegment>();
 export function cursorMotionSegment(motion: CursorMotion): CursorFocusSegment {
   let segment = segments.get(motion);
   if (!segment) {
+    const clock = motion.phaseClock ?? motion;
     segment = {
       id: motion.id,
       binding: { kind: 'project' },
@@ -136,7 +166,7 @@ export function cursorMotionSegment(motion: CursorMotion): CursorFocusSegment {
       end: motion.end,
       keys: motion.points.map((p) => ({
         id: p.id,
-        time: motion.start + p.at * (motion.end - motion.start),
+        time: clock.start + p.at * (clock.end - clock.start),
         x: p.x,
         y: p.y,
         anchor: 'manual' as const,
@@ -161,9 +191,15 @@ export function cursorMotionSegment(motion: CursorMotion): CursorFocusSegment {
   }
   return segment;
 }
-export function evaluateCursorMotion(motions: readonly CursorMotion[] | undefined, time: number) {
-  const motion = motions?.find((m) => m.enabled && time >= m.start && time < m.end);
-  const point = motion && evaluateCursorFocusSegment(cursorMotionSegment(motion), time, 0.5);
+export function evaluateCursorMotion(
+  motions: readonly CursorMotion[] | undefined,
+  time: number,
+  resultTime = time
+) {
+  const clock = (motion: CursorMotion) => (motion.timeDomain === 'result' ? resultTime : time);
+  const motion = motions?.find((m) => m.enabled && clock(m) >= m.start && clock(m) < m.end);
+  const point =
+    motion && evaluateCursorFocusSegment(cursorMotionSegment(motion), clock(motion), 0.5);
   return motion && point ? { motion, ...point } : null;
 }
 /** Retain old source facts; authored intervals replace only the corresponding focus intervals. */

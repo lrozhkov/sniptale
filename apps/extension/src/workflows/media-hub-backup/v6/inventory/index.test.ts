@@ -32,13 +32,23 @@ vi.mock('../../../../composition/persistence/gallery-saved-views', async (import
 }));
 
 import {
+  IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
+  PROJECT_ASSETS_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_PROJECTS_STORE,
   VIDEO_EFFECT_BUNDLES_STORE,
   VIDEO_PROJECTS_STORE,
+  VIDEO_WORKSPACES_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
-import { createVideoProjectEntry } from '../../../../composition/persistence/projects/index.test-support';
+import {
+  createMediaLibraryEntry,
+  createVideoProjectEntry,
+} from '../../../../composition/persistence/projects/index.test-support';
+import { reviewFixture } from '../root-publication/media.review-assets.test-support';
+import { createPersistedEditorDocumentFixture } from '../../../../composition/persistence/document-assets/test-support';
+import { createEditorDocumentFixture } from '../../../../editor/document/page-session/document.test-support';
+import { createLibraryLifecycle } from '../../../../composition/persistence/library-lifecycle/contracts';
 import { createMediaHubBackupExportOptions } from '../options';
 import {
   buildMediaHubBackupExportPlanFromLibraryV6,
@@ -71,8 +81,64 @@ beforeEach(() => {
 });
 
 describe('media backup v6 dependency admission', () => {
+  it.each(['all', 'selected'] as const)(
+    'refuses malformed linked project metadata for a %s backup',
+    async (scope) => {
+      mocks.db.getAll.mockImplementation(async (store: string) =>
+        store === IMAGE_WORKSPACES_STORE
+          ? [{ aggregateId: 'independent-project', sourceMediaId: 'original' }]
+          : []
+      );
+      await expect(
+        buildMediaHubBackupExportPlanFromLibraryV6(
+          createMediaHubBackupExportOptions({
+            scope,
+            selected: {
+              mediaAssetIds: ['independent-project'],
+              scenarioProjectIds: [],
+              videoProjectIds: [],
+            },
+          })
+        )
+      ).rejects.toThrow('Image project backup metadata is invalid');
+      expect(mocks.buildMedia).not.toHaveBeenCalled();
+    }
+  );
+
+  it('refuses full backup when first image publication commits during inventory preparation', async () => {
+    const linked: unknown[] = [];
+    mocks.db.getAll.mockImplementation(async (store: string) =>
+      store === IMAGE_WORKSPACES_STORE ? [...linked] : []
+    );
+    mocks.buildMedia.mockImplementationOnce(async () => {
+      linked.push({
+        aggregateId: 'independent-project',
+        sourceMediaId: 'promoted-original',
+        document: createPersistedEditorDocumentFixture(createEditorDocumentFixture()),
+        revision: 1,
+        createdAt: 1,
+        updatedAt: 2,
+        lifecycle: createLibraryLifecycle('library', 1),
+        sourceTitle: null,
+        sourceUrl: null,
+      });
+      return [];
+    });
+
+    await expect(
+      buildMediaHubBackupExportPlanFromLibraryV6(
+        createMediaHubBackupExportOptions({ scope: 'all', includeDrafts: false })
+      )
+    ).rejects.toThrow('Image project inventory changed');
+    expect(mocks.buildMedia).toHaveBeenCalledOnce();
+    expect(mocks.buildEffects).not.toHaveBeenCalled();
+  });
   it('does not inspect unrelated effect bundles for an image-only selection', async () => {
-    mocks.db.getAll.mockResolvedValue([]);
+    mocks.db.getAll.mockImplementation(async (store: string) =>
+      store === IMAGE_WORKSPACES_STORE
+        ? [{ aggregateId: 'independent-project', sourceMediaId: 'image-one' }]
+        : []
+    );
     mocks.buildEffects.mockRejectedValue(new Error('Unrelated effect bundle is invalid'));
 
     await expect(
@@ -123,6 +189,58 @@ describe('media backup v6 dependency admission', () => {
     expect(full.manifest.galleryViews).toEqual([view]);
     expect(selected.manifest.galleryViews).toBeUndefined();
     expect(mocks.listGalleryViews).toHaveBeenCalledOnce();
+  });
+
+  it('includes a private Quick Edit auxiliary origin in a full backup', async () => {
+    const original = createMediaLibraryEntry({ id: 'quick-original' });
+    const retainedOrigin = createMediaLibraryEntry({
+      id: 'hidden-narration',
+      savedIndependently: false,
+    });
+    const unattached = createMediaLibraryEntry({
+      id: 'abandoned-import',
+      savedIndependently: false,
+    });
+    const review = {
+      ...reviewFixture().workspace,
+      aggregateId: 'project-asset:quick-project:authored',
+      sourceMediaId: original.id,
+      sourceAssetId: 'video-bytes',
+    };
+    const privateAudio = {
+      id: 'voice',
+      assetId: 'voice-bytes',
+      size: 10,
+      mimeType: 'audio/mpeg',
+      createdAt: 1,
+      originMediaId: retainedOrigin.id,
+    };
+    mocks.db.getAll.mockImplementation(async (store: string) => {
+      if (store === MEDIA_LIBRARY_STORE) return [original, retainedOrigin, unattached];
+      if (store === VIDEO_WORKSPACES_STORE) return [review];
+      if (store === PROJECT_ASSETS_STORE) return [privateAudio];
+      return [];
+    });
+    mocks.buildMedia.mockResolvedValue(
+      [original.id, review.aggregateId, retainedOrigin.id].map((rootId) => ({
+        descriptor: {
+          rootId,
+          rootKind: 'media',
+          mediaSubtype: 'library-item',
+          metadataPath: `_sniptale/metadata/media/${encodeURIComponent(rootId)}.json`,
+          objectCount: 0,
+          totalBytes: 0,
+        },
+      }))
+    );
+    await buildMediaHubBackupExportPlanFromLibraryV6(
+      createMediaHubBackupExportOptions({ scope: 'all' })
+    );
+    expect(mocks.buildMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requiredMediaIds: new Set([original.id, retainedOrigin.id]),
+      })
+    );
   });
 
   it('does not export dependencies of a selected draft project after draft opt-out', async () => {

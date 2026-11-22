@@ -1,7 +1,7 @@
 import {
-  glTransitionChoices,
   glTransitionChoiceValue,
   resolveGlTransitionChoice,
+  sceneJoinTransitionChoices,
   type GlTransitionChoiceCatalog,
 } from './gl-transition-choices';
 import { GlTransitionFields } from './gl-transition-fields';
@@ -43,7 +43,8 @@ export function PresentationJoinFields(props: {
         value={timing[edge]}
         min={value[opposite] === 0 ? 0.05 : 0}
         max={60 - value[opposite]}
-        scrubMax={Math.min(3, 60 - value[opposite])}
+        scrubEnabled={false}
+        stepperPlacement="sides"
         step={0.05}
         precision={2}
         unit="s"
@@ -63,15 +64,10 @@ export function PresentationJoinFields(props: {
             ? glTransitionChoiceValue(props.glCatalog, value.selection)
             : (value?.type ?? 'none')
         }
-        options={[
-          { value: 'none', label: translate('gallery.videoReview.transitionNone') },
-          { value: 'dissolve', label: translate('gallery.videoReview.cutDissolve') },
-          { value: 'fade-black', label: translate('gallery.videoReview.cutFadeColor') },
-          ...glTransitionChoices(
-            props.glCatalog,
-            value?.type === 'gl' ? value.selection : undefined
-          ),
-        ]}
+        options={sceneJoinTransitionChoices(
+          props.glCatalog,
+          value?.type === 'gl' ? value.selection : undefined
+        )}
         onChange={(type) => {
           if (type === 'none') {
             props.onChange(null);
@@ -124,7 +120,8 @@ export function PresentationJoinFields(props: {
             value={timing.before + timing.after}
             min={0.05}
             max={60}
-            scrubMax={3}
+            scrubEnabled={false}
+            stepperPlacement="sides"
             step={0.05}
             precision={2}
             unit="s"

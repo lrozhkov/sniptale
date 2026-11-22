@@ -1,9 +1,10 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { test } from '../support/extension-fixture';
 import { SCENARIO_EDITOR_VISUAL_HARNESS_PATH } from '../extension-critical.helpers';
-import { createTranslator } from '../../../../apps/extension/src/platform/i18n';
+import { createTranslator } from '../support/catalog-fixture';
 import { openVisualHarness, createPageIssueCollector } from './scenario-editor-visual.helpers';
 
 async function choose(page: Page, scope: Locator, label: string, value: string) {
@@ -241,10 +242,7 @@ for (const [locale, theme, size] of [
     await expect(page.locator('#guide-resource-drawer')).toHaveCount(0);
     await expect(replace).toBeFocused();
     const framing = panel.locator('[data-ui="tour.image.framing"]');
-    const scale = framing.getByRole('textbox', {
-      name: t('scenario.editor.tourImageScale'),
-      exact: true,
-    });
+    const scale = numericControl(framing, t('scenario.editor.tourImageScale'));
     const position = framing.getByRole('textbox', {
       name: t('scenario.editor.tourImagePositionX'),
       exact: true,
@@ -262,7 +260,7 @@ for (const [locale, theme, size] of [
       })
       .toBeGreaterThan(1);
     const headerWidth = (await player.locator('.tour-window-header').boundingBox())!.width;
-    await scale.fill('150');
+    await (await openNumericControl(framing, t('scenario.editor.tourImageScale'))).fill('150');
     await scale.press('Enter');
     const miniStage = framing.locator('.tour-image-viewport');
     const miniBox = (await miniStage.boundingBox())!;

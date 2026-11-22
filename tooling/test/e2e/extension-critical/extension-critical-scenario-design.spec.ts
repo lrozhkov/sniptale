@@ -9,7 +9,7 @@ import {
   createTourDocument,
   createTourImageSlide,
 } from '../../../../apps/extension/src/features/scenario/project/factories';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 test.use({ actionTimeout: 10_000 });
 
@@ -565,7 +565,7 @@ async function exerciseNative(page: Page, locale: Locale, info: TestInfo) {
     .getByRole('button', { name: t('scenario.editor.tourPreviewSlide'), exact: true });
   await preview.click();
   const back = page
-    .locator('.tour-header-controls')
+    .getByRole('dialog', { name: t('scenario.editor.previewTitle'), exact: true })
     .getByRole('button', { name: t('scenario.editor.tourReturnToEditing'), exact: true });
   await expect(back).toBeFocused();
   await back.click();

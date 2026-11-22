@@ -146,3 +146,59 @@ it('cancels without publication, protects an in-flight save and restores the inv
   act(() => root.render(null));
   expect(document.activeElement).toBe(anchor);
 });
+
+it('steps optional bound drafts while preserving invalid and empty text and save validation', async () => {
+  await render();
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('[aria-label="opacity"]')!.click()
+  );
+  const input = document.querySelector<HTMLInputElement>(
+    '[aria-label="' + translate('videoEditor.effectsLibrary.mapping.maximum') + ' opacity"]'
+  )!;
+  input.focus();
+  const wheel = () => {
+    const event = new WheelEvent('wheel', {
+      altKey: true,
+      deltaY: -20,
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => input.dispatchEvent(event));
+    expect(event.defaultPrevented).toBe(true);
+  };
+  wheel();
+  expect(input.value).toBe('101');
+  for (const value of ['-', '', '0.25']) {
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    wheel();
+    expect(input.value).toBe(value === '0.25' ? '1.25' : value);
+    expect(button(saveLabel()).disabled).toBe(value !== '0.25');
+  }
+  const minimum = document.querySelector<HTMLInputElement>(
+    '[aria-label="' + translate('videoEditor.effectsLibrary.mapping.minimum') + ' opacity"]'
+  )!;
+  minimum.focus();
+  act(() =>
+    minimum.dispatchEvent(
+      new WheelEvent('wheel', {
+        altKey: true,
+        deltaY: 20,
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+  );
+  expect(minimum.value).toBe('-1');
+  input.focus();
+  expect(onSave).not.toHaveBeenCalled();
+  await render(true);
+  act(() =>
+    input.dispatchEvent(
+      new WheelEvent('wheel', { altKey: true, deltaY: -20, bubbles: true, cancelable: true })
+    )
+  );
+  expect(input.value).toBe('1.25');
+});

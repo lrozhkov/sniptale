@@ -23,6 +23,28 @@ const telemetryControllerOwner = createLazyContentDefaultOwner(() =>
       });
       if (response?.success !== true) throw new Error('Cursor observation packet was refused');
     },
+    publishFinalEvents: async (eventPackets) => {
+      const recordingId = eventPackets[0]?.recordingId;
+      if (!recordingId) return;
+      const response = await getContentRuntimeServices().messaging.sendRuntimeMessage({
+        type: VideoMessageType.RECORDING_OBSERVATIONS,
+        recordingId,
+        eventPackets,
+      });
+      if (response?.success !== true)
+        throw new Error('Final event observation packets were refused');
+    },
+    publishFinalCursor: async (cursorPackets) => {
+      const recordingId = cursorPackets[0]?.recordingId;
+      if (!recordingId) return;
+      const response = await getContentRuntimeServices().messaging.sendRuntimeMessage({
+        type: VideoMessageType.RECORDING_OBSERVATIONS,
+        recordingId,
+        cursorPackets,
+      });
+      if (response?.success !== true)
+        throw new Error('Final cursor observation packets were refused');
+    },
     publish: (recordingId, telemetry) => {
       void getContentRuntimeServices()
         .messaging.sendRuntimeMessage({

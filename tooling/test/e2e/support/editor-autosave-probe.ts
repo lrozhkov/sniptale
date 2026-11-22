@@ -16,6 +16,35 @@ import {
   DB_VERSION,
 } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores';
 import { handleDatabaseUpgrade } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core';
+import { recoverAndGetImageWorkspace } from '../../../../apps/extension/src/composition/persistence/image-workspaces';
+import { commitImageWorkspace } from '../../../../apps/extension/src/composition/persistence/image-aggregates';
+
+/** Advances the native source through its writer while the mounted editor retains its revision. */
+export async function advanceImageWorkspace(aggregateId: string) {
+  const source = await recoverAndGetImageWorkspace(aggregateId);
+  if (!source) throw new Error('Missing Image workspace');
+  try {
+    return await commitImageWorkspace({
+      aggregateId,
+      document: source.document,
+      ...(source.history ? { history: source.history } : {}),
+      expectedRevision: source.revision,
+      expectedGeneration: source.sourceGeneration ?? null,
+      requireExistingRoot: true,
+      ...(source.documentAssetsByRuntimeUrl
+        ? { reusableAssetsByRuntimeUrl: source.documentAssetsByRuntimeUrl }
+        : {}),
+      ...(source.documentAssetsByVectorDefinitionId
+        ? { reusableAssetsByVectorDefinitionId: source.documentAssetsByVectorDefinitionId }
+        : {}),
+      ...(source.historyAssetsByValue
+        ? { reusableHistoryAssetsByValue: source.historyAssetsByValue }
+        : {}),
+    });
+  } finally {
+    source.releaseDocumentAssets?.();
+  }
+}
 
 /** Seeds the retained scale fixture with real source, audio and effect bytes before mounting Gallery. */
 export async function seedGallery(source: string, fragments = 112) {

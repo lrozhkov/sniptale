@@ -19,6 +19,7 @@ vi.mock('../../platform/runtime-messaging', async (importOriginal) => ({
 
 import {
   discardPendingPostRecordResult,
+  delayPostRecordPublication,
   hasPendingPostRecordResult,
   PostRecordPublicationError,
   retryPendingPostRecordResult,
@@ -160,4 +161,73 @@ it('does not replace an unacknowledged result with another recording', async () 
     )
   ).toThrow('Another post-record result');
   expect(discardPendingPostRecordResult('rec-1')).toBe(true);
+});
+
+it('holds the actual saved-result notification until history delivery settles', async () => {
+  const drain = Promise.withResolvers<void>();
+  const release = delayPostRecordPublication(RESULT.recordingId, drain.promise);
+  sendRuntimeMessageMock.mockResolvedValueOnce({ success: true, result: 'accepted' });
+  const publishing = stageAndPublishPostRecordResult(RESULT, MESSAGING);
+  try {
+    await Promise.resolve();
+    expect(readCompletionOutboxMock).not.toHaveBeenCalled();
+    expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
+    drain.resolve();
+    await publishing;
+    expect(sendRuntimeMessageMock).toHaveBeenCalledExactlyOnceWith({
+      type: 'VIDEO_SAVED_TO_IDB',
+      ...RESULT,
+    });
+  } finally {
+    drain.resolve();
+    release();
+  }
+});
+
+it('preserves valid media publication when the history drain fails', async () => {
+  const drain = Promise.withResolvers<void>();
+  const release = delayPostRecordPublication(RESULT.recordingId, drain.promise);
+  sendRuntimeMessageMock.mockResolvedValueOnce({ success: true, result: 'accepted' });
+  const publishing = stageAndPublishPostRecordResult(RESULT, MESSAGING);
+  try {
+    drain.reject(new Error('history storage unavailable'));
+    await expect(publishing).resolves.toBeUndefined();
+    expect(sendRuntimeMessageMock).toHaveBeenCalledOnce();
+  } finally {
+    release();
+  }
+});
+
+it('rejects duplicate drain ownership and fences an old release from a new owner', async () => {
+  const old = delayPostRecordPublication(RESULT.recordingId, Promise.resolve());
+  expect(() => delayPostRecordPublication(RESULT.recordingId, Promise.resolve())).toThrow(
+    'drain owner'
+  );
+  old();
+  const drain = Promise.withResolvers<void>();
+  const release = delayPostRecordPublication(RESULT.recordingId, drain.promise);
+  old();
+  sendRuntimeMessageMock.mockResolvedValueOnce({ success: true, result: 'accepted' });
+  const publishing = stageAndPublishPostRecordResult(RESULT, MESSAGING);
+  try {
+    await Promise.resolve();
+    expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
+    drain.resolve();
+    await publishing;
+  } finally {
+    drain.resolve();
+    release();
+  }
+});
+
+it('does not let another recording drain block the exact saved result', async () => {
+  const drain = Promise.withResolvers<void>();
+  const release = delayPostRecordPublication('rec-2', drain.promise);
+  sendRuntimeMessageMock.mockResolvedValueOnce({ success: true, result: 'accepted' });
+  try {
+    await expect(stageAndPublishPostRecordResult(RESULT, MESSAGING)).resolves.toBeUndefined();
+  } finally {
+    drain.resolve();
+    release();
+  }
 });

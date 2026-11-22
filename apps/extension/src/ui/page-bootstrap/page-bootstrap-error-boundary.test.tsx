@@ -38,8 +38,8 @@ describe('PageBootstrapErrorBoundary', () => {
       );
     });
 
-    expect(container.textContent).toContain('Не удалось загрузить страницу');
-    expect(container.textContent).toContain('Страница Sniptale столкнулась с неожиданной ошибкой');
+    expect(container.textContent).toContain('This page failed to load');
+    expect(container.textContent).toContain('This Sniptale page hit an unexpected error');
     expect(onError).toHaveBeenCalledTimes(1);
     consoleErrorSpy.mockRestore();
   });

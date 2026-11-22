@@ -1,3 +1,6 @@
+import { digestImageProjectSnapshot } from './image-snapshot';
+import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
+import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
 import { deferCheckpointInTransaction, consumeCheckpointInTransaction } from './checkpoints';
 import type { PreparedVideoReviewReplicaRoot } from './prepared-review';
 import { updateQuickEditBackground } from '../../../features/video/review/advanced/background';
@@ -220,6 +223,62 @@ it('refuses a competing deletion after the first commit', async () => {
   ).rejects.toThrow('Incoming deletion refused');
   expect(f.table('sync_capture')).toEqual(before);
 });
+
+it('accepts a later descendant tombstone while retaining the retired Image lifetime', async () => {
+  const f = await setup();
+  await applyCatalogDeletionNative(f.input);
+  const identity = structuredClone(f.table('image_workspace_identities').get(f.input.rootId));
+  expect(identity).toMatchObject({ retired: true });
+  // The receiver skips the remote restore and observes its subsequent deletion.
+  const descendant = {
+    ...f.input,
+    operationId: 'delete-after-remote-restore',
+    sourceDigest: 'd'.repeat(64),
+    expectedLocalGeneration: 2,
+    expectedBasis: ['delete'],
+  };
+  expect(await applyCatalogDeletionNative(descendant)).toEqual({
+    status: 'applied',
+    generation: 3,
+  });
+  expect(f.table('image_workspace_identities').get(f.input.rootId)).toEqual(identity);
+  expect(f.table('sync_capture').get(f.stateKey)).toMatchObject({
+    generation: 3,
+    basis: [descendant.operationId],
+    deleted: true,
+  });
+  const before = structuredClone(f.nativeRows);
+  expect(await applyCatalogDeletionNative(descendant)).toEqual({
+    status: 'duplicate',
+    generation: 3,
+  });
+  expect(f.nativeRows).toEqual(before);
+});
+
+it.each(['live', 'malformed'] as const)(
+  'refuses descendant deletion with %s orphan lifetime evidence',
+  async (kind) => {
+    const f = await setup();
+    await applyCatalogDeletionNative(f.input);
+    f.table('image_workspace_identities').set(f.input.rootId, {
+      version: 1,
+      aggregateId: f.input.rootId,
+      generation: kind === 'malformed' ? 42 : 'live-orphan',
+      retired: kind !== 'live',
+    });
+    const before = structuredClone(f.nativeRows);
+    await expect(
+      applyCatalogDeletionNative({
+        ...f.input,
+        operationId: 'descendant',
+        sourceDigest: 'd'.repeat(64),
+        expectedLocalGeneration: 2,
+        expectedBasis: ['delete'],
+      })
+    ).rejects.toThrow();
+    expect(f.nativeRows).toEqual(before);
+  }
+);
 
 it.each(['media', 'video-project'] as const)(
   'refuses a delayed delete after restore or same-ID recreation of %s',
@@ -789,4 +848,117 @@ it('refuses incoming deletion while the native root has a pending checkpoint', a
   expect(await consumeCheckpointInTransaction(consume, pending)).toBe(true);
   await consume.done;
   await expect(applyCatalogDeletionNative(f.input)).resolves.toMatchObject({ status: 'applied' });
+});
+
+it('deletes one linked image project without loading the original or touching its sibling', async () => {
+  const f = await setup();
+  const sourceMediaId = 'unloaded-original';
+  const original = createMediaLibraryEntry({
+    id: sourceMediaId,
+    kind: 'screenshot',
+    source: { kind: 'screenshot' },
+    savedIndependently: false,
+  });
+  f.table('media_library').set(sourceMediaId, original);
+  const projects = ['first-image-project', 'second-image-project'].map((aggregateId) => ({
+    workspace: {
+      aggregateId,
+      sourceMediaId,
+      revision: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      sourceTitle: null,
+      sourceUrl: null,
+      lifecycle: { storageClass: 'library' as const, savedAt: 1, updatedAt: 1 },
+      document: createPersistedEditorDocumentFixture(
+        createEditorDocumentFixture(),
+        f.rows.ref.assetId
+      ),
+    },
+    presentation: {
+      aggregateId,
+      aggregateKind: 'image' as const,
+      updatedAt: 2,
+      presentationRevision: 1,
+      thumbnailBlob: new Blob(['thumbnail'], { type: 'image/png' }),
+    },
+    refs: [f.rows.ref],
+  }));
+  for (const project of projects) {
+    const id = project.workspace.aggregateId;
+    f.table('image_workspaces').set(id, project.workspace);
+    f.table('aggregate_presentations').set(JSON.stringify(['image', id]), project.presentation);
+  }
+  const [first, sibling] = projects as [(typeof projects)[number], (typeof projects)[number]];
+  const rootId = first.workspace.aggregateId;
+  const rootKey = captureRootKey('space', 'image-project', rootId);
+  const key = JSON.stringify(['root-state', rootKey]);
+  f.table('sync_capture').set(key, {
+    version: 1,
+    kind: 'root-state',
+    key,
+    createdAt: 1,
+    spaceId: 'space',
+    rootKind: 'image-project',
+    rootId,
+    rootKey,
+    generation: 1,
+    basis: ['first-image-head'],
+    nativeRevision: 1,
+    nativeDigest: digestImageProjectSnapshot(first),
+  });
+  const deletion = {
+    ...f.input,
+    rootKind: 'image-project' as const,
+    rootId,
+    expectedBasis: ['first-image-head'],
+    expectedWorkspaceRevision: 1,
+  };
+  await expect(
+    applyCatalogDeletionNative({ ...deletion, expectedWorkspaceRevision: 0 })
+  ).rejects.toThrow('Incoming deletion refused');
+  expect(f.table('image_workspaces').get(rootId)).toEqual(first.workspace);
+  await expect(applyCatalogDeletionNative(deletion)).resolves.toMatchObject({ status: 'applied' });
+  await expect(applyCatalogDeletionNative(deletion)).resolves.toMatchObject({
+    status: 'duplicate',
+  });
+  expect(f.table('image_workspaces').has(rootId)).toBe(false);
+  expect(f.table('aggregate_presentations').has(JSON.stringify(['image', rootId]))).toBe(false);
+  expect(f.table('image_workspaces').get(sibling.workspace.aggregateId)).toEqual(sibling.workspace);
+  expect(f.table('media_library').get(sourceMediaId)).toEqual(original);
+});
+
+it('refuses a remote tombstone when durable authorization is revoked before native deletion', async () => {
+  const f = await setup();
+  const authorization = { incarnation: '10000000-0000-4000-8000-000000000001', revision: 1 };
+  const connection = {
+    version: 1,
+    kind: 'sync-connection',
+    key: 'connection',
+    binding: {
+      spaceId: f.input.spaceId,
+      profileCreatedAt: f.input.profileCreatedAt,
+      connectionGeneration: f.input.connectionGeneration,
+      provider: 'webdav',
+      rootUrl: 'https://dav.example.test/root/',
+      accountId: 'account',
+    },
+    identity: authorization,
+    phase: 'active',
+    updateNonce: null,
+    credentialId: '10000000-0000-4000-8000-000000000002',
+  };
+  f.table('sync_connection').set('connection', connection);
+  io.journals.mockImplementationOnce(async () => {
+    f.table('sync_connection').set('connection', {
+      ...connection,
+      phase: 'paused',
+      identity: { ...authorization, revision: 2 },
+    });
+    return [];
+  });
+  const input = { ...f.input, authorization };
+  await expect(applyCatalogDeletionNative(input)).rejects.toThrow('admission refused');
+  expect(f.table('media_library').get(input.rootId)).toBeDefined();
+  expect(io.cleanup).not.toHaveBeenCalled();
 });

@@ -46,14 +46,30 @@ export const CANVAS_TOOLBAR_GROUP_ORDER: FloatingToolbarGroupKind[] = [
 ];
 
 export const CANVAS_TOOLBAR_GROUP_TITLES: Record<FloatingToolbarGroupKind, string> = {
-  templates: translate('editor.toolbar.preset'),
-  content: translate('editor.toolbar.text'),
-  fill: translate('editor.toolbar.fillColor'),
-  stroke: translate('editor.toolbar.strokeColor'),
-  geometry: translate('editor.toolbar.size'),
-  layout: translate('editor.toolbar.textAlignment'),
-  effects: translate('editor.toolbar.effects'),
-  more: translate('editor.toolbar.moreActions'),
+  get templates() {
+    return translate('editor.toolbar.preset');
+  },
+  get content() {
+    return translate('editor.toolbar.text');
+  },
+  get fill() {
+    return translate('editor.toolbar.fillColor');
+  },
+  get stroke() {
+    return translate('editor.toolbar.strokeColor');
+  },
+  get geometry() {
+    return translate('editor.toolbar.size');
+  },
+  get layout() {
+    return translate('editor.toolbar.textAlignment');
+  },
+  get effects() {
+    return translate('editor.toolbar.effects');
+  },
+  get more() {
+    return translate('editor.toolbar.moreActions');
+  },
 };
 
 export const CANVAS_TOOLBAR_GROUP_WIDTHS: Record<

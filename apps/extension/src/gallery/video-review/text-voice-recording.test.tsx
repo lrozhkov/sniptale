@@ -30,14 +30,19 @@ let stopped: ReturnType<typeof vi.fn>;
 
 function fixture(
   beforeRequest: () => Promise<void> = vi.fn(async () => undefined),
-  options?: { maximum: number; pendingText: boolean }
+  options?: {
+    maximum?: number;
+    pendingText?: boolean;
+    resultStart?: number;
+    transport?: { seek(time: number): void; play(): Promise<void>; pause(): void };
+  }
 ) {
   const advanced = createQuickEditAdvancedState();
   const added = addReviewTextFragment(createReviewTextDocument(), {
     id: 'text',
     text: 'Human narration',
-    start: 1,
-    end: 2,
+    start: options?.resultStart ?? 1,
+    end: (options?.resultStart ?? 1) + 1,
     timeDomain: 'result',
   });
   if (!added.ok) throw new Error('fixture');
@@ -117,6 +122,7 @@ function fixture(
     },
     context: {
       video,
+      ...(options?.transport ? { transport: options.transport } : {}),
       registerPending: guard.register,
       beforeAction: (action) => {
         void guard.perform(action);
@@ -261,7 +267,7 @@ it('records inline, pauses/resumes, applies one ordinary human take, and rearms 
       textSnapshot: { kind: 'microphone', text: 'Human narration' },
     }
   );
-  expect(candidate.commit).toHaveBeenCalledOnce();
+  expect(candidate.session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
   await click('videoEditor.app.recordAudioStart');
   expect(created).toBe(2);
   expect(io.acquire).toHaveBeenCalledTimes(2);
@@ -278,14 +284,14 @@ it('keeps the human take on publication failure and retries its receipt without 
   await render(candidate);
   await record();
   await click('gallery.videoReview.textVoiceLocalSave');
-  expect(candidate.commit).toHaveBeenCalledOnce();
+  expect(candidate.session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
   expect(candidate.session.getSnapshot().document.advancedContent.audio.voiceover).toHaveLength(1);
   expect(host.querySelector('[role="alert"]')).not.toBeNull();
   expect(host.textContent).toContain('gallery.videoReview.textVoiceLocalSave');
   await click('gallery.videoReview.textVoiceLocalSave');
   expect(publish).toHaveBeenCalledTimes(2);
   expect(io.prepared).toHaveBeenCalledOnce();
-  expect(candidate.commit).toHaveBeenCalledOnce();
+  expect(candidate.session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
   expect(host.textContent).not.toContain('gallery.videoReview.textVoiceLocalSave');
   expect(cancel).not.toHaveBeenCalled();
 });
@@ -307,7 +313,7 @@ it('keeps a declined restart and acquires exactly once after confirmed discard',
   });
   await click('videoEditor.app.recordAudioStop');
   await click('gallery.videoReview.textVoiceLocalSave');
-  expect(candidate.commit).toHaveBeenCalledOnce();
+  expect(candidate.session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
 });
 
 it('declines discard without leaving, then releases capture before a guarded lane Mic continuation', async () => {
@@ -420,7 +426,7 @@ it('shows the pending editor cap without saving and joins the new fragment only 
   expect(beforeRequest).toHaveBeenCalledOnce();
   expect(io.acquire).not.toHaveBeenCalled();
   await act(async () => resolve());
-  expect(candidate.commit).toHaveBeenCalledOnce();
+  expect(candidate.session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
   expect(candidate.session.getSnapshot().document.advancedContent.text?.fragments[0]?.text).toBe(
     'Human narration'
   );
@@ -436,4 +442,52 @@ it('keeps pending text unsaved and refuses capture when its explicit join fails'
   expect(candidate.commit).not.toHaveBeenCalled();
   expect(io.acquire).not.toHaveBeenCalled();
   expect(host.querySelector('[role="alert"]')).not.toBeNull();
+});
+
+it('starts and resumes text recording through the logical result transport inside a freeze', async () => {
+  const transport = { seek: vi.fn(), play: vi.fn(async () => undefined), pause: vi.fn() };
+  const candidate = fixture(undefined, { resultStart: 2, transport });
+  await candidate.session.commit({
+    id: 'hold-operation',
+    at: 1,
+    target: 'edit',
+    before: null,
+    after: {
+      id: 'hold',
+      kind: 'freeze',
+      start: 1,
+      end: 1,
+      requestedStart: 1,
+      requestedEnd: 1,
+      duration: 3,
+      frameTime: 0.98,
+      frameDuration: 0.04,
+    },
+  });
+  const before = candidate.session.getSnapshot().document.advancedContent;
+  const text = addReviewTextFragment(createReviewTextDocument(), {
+    id: 'text',
+    text: 'Human narration',
+    timeDomain: 'result',
+    start: 2,
+    end: 3,
+  });
+  if (!text.ok) throw new Error('Invalid text inside the freeze.');
+  await candidate.session.commit({
+    id: 'text-inside-freeze',
+    at: 2,
+    target: 'advancedContent',
+    before,
+    after: { ...before, text: text.document },
+  });
+  await render(candidate);
+  await click('videoEditor.app.recordAudioStart');
+  expect(transport.seek).toHaveBeenCalledExactlyOnceWith(2);
+  expect(transport.play).toHaveBeenCalledOnce();
+  expect(candidate.video.current.play).not.toHaveBeenCalled();
+  await click('videoEditor.app.recordAudioPause');
+  expect(transport.pause).toHaveBeenCalled();
+  await click('videoEditor.app.recordAudioResume');
+  expect(transport.play).toHaveBeenCalledTimes(2);
+  expect(transport.seek).toHaveBeenCalledOnce();
 });

@@ -36,9 +36,10 @@ export async function registerPinnedToolbarAllSitesAccess(args: {
 
 export async function ensureActivePageAccessRuntime(
   tabId: number,
-  failureMessage?: string
+  failureMessage?: string,
+  options?: { injectImmediately?: boolean }
 ): Promise<void> {
-  await defaultPageAccessService.ensureActivePageAccessRuntime(tabId, failureMessage);
+  await defaultPageAccessService.ensureActivePageAccessRuntime(tabId, failureMessage, options);
 }
 
 export async function ensureNativeVisibleCaptureAuthority(

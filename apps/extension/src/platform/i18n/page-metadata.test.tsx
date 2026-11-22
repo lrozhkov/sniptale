@@ -2,7 +2,14 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
+import { catalogFixtureMessages } from './catalog-fixture.test-support';
+import { prepareTranslations } from './locale/state';
+import type { AppLocale } from './types';
+
+vi.mock('./catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: AppLocale) => catalogFixtureMessages(locale)),
+}));
 
 const { useAppLocaleMock } = vi.hoisted(() => ({
   useAppLocaleMock: vi.fn(),
@@ -21,6 +28,11 @@ function Harness(props: { titleKey: 'gallery.app.documentTitle' }) {
   usePageLocaleMetadata(props.titleKey);
   return null;
 }
+
+beforeAll(async () => {
+  await prepareTranslations('gallery', 'ru');
+  await prepareTranslations('scenario-editor', 'ru');
+});
 
 beforeEach(() => {
   useAppLocaleMock.mockReset();

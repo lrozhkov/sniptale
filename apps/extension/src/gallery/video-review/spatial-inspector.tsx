@@ -38,6 +38,7 @@ export function ReviewSpatialInspector(props: Props) {
   const depthField = (key: keyof typeof depthLabels) => (
     <ReviewPreviewNumberRow
       enterBehavior="blur"
+      rangePresentation={key === 'strength' || key === 'softness' ? 'field' : undefined}
       step={0.1}
       precision={1}
       key={key}
@@ -75,6 +76,7 @@ export function ReviewSpatialInspector(props: Props) {
             return (
               <ReviewPreviewNumberRow
                 enterBehavior="blur"
+                rangePresentation={angle ? undefined : 'field'}
                 step={0.1}
                 precision={1}
                 key={key}

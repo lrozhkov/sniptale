@@ -1,3 +1,4 @@
+import type { AppLocale } from '@sniptale/platform/i18n/config';
 import { useEffect } from 'react';
 
 import { browserRuntime } from '@sniptale/platform/browser/runtime';
@@ -42,7 +43,7 @@ export function usePopupExportMessageListener(state: PopupExportRuntimeContract)
           requestIdRef.current = null;
         },
       });
-    const applyJobStatus = (status: PagePackageJobStatusV1, locale?: 'en' | 'ru' | null) => {
+    const applyJobStatus = (status: PagePackageJobStatusV1, locale?: AppLocale | null) => {
       if (terminalRequestIdRef.current === status.jobId) return;
       const applied = applyMessage({
         ...(locale ? { locale } : {}),

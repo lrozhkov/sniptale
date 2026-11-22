@@ -48,7 +48,7 @@ export function AIModalPromptField(props: {
         <ProductTextarea
           ref={props.textareaRef as Ref<HTMLTextAreaElement>}
           aria-describedby={[hintId, hasVoiceError ? voiceErrorId : null].filter(Boolean).join(' ')}
-          className="sniptale-ai-modal-prompt-textarea"
+          className="sniptale-ai-modal-prompt-textarea sniptale-compact-text-scroll"
           id="ai-prompt"
           value={props.prompt}
           onChange={(event) => {

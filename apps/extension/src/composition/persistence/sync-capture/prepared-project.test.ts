@@ -6,6 +6,9 @@ import { createProjectExportEntry } from '../projects/index.test-support';
 import { parseVideoProjectEntry } from '../projects/read-guards';
 import { annotation, workspace } from '../review-workspaces/backup-restore.test-support';
 import type { AssetRef } from '../assets';
+import { createVideoProjectHistoryChange } from '../../../features/video/project/history-change';
+import { createSha256Digest } from '@sniptale/platform/security/digest';
+import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
 import {
   collectPreparedProjectReplicaRefs,
   hydratePreparedVideoProjectReplicaRoot,
@@ -57,6 +60,69 @@ async function setup() {
   return { root, files, staged };
 }
 
+async function historyFixture() {
+  const data = await setup();
+  const value = JSON.stringify(
+    createVideoProjectHistoryChange(
+      { ...data.root.entry.project, name: 'Historical name' },
+      data.root.entry.project
+    )
+  );
+  const ref = data.staged('history-inverse', new TextEncoder().encode(value), 'application/json');
+  ref.sha256 = (await createSha256Digest(value)).slice('sha256:'.length);
+  const history = {
+    head: {
+      version: 1 as const,
+      epoch: 'prepared-history',
+      past: [{ assetId: ref.assetId }],
+      future: [],
+      sources: [],
+    },
+    refs: [ref],
+  };
+  data.root.history = history;
+  return { ...data, history, ref };
+}
+
+it('claims and cold-admits an explicit history graph without accepting native fields in the entry', async () => {
+  const data = await historyFixture();
+  expect(collectPreparedProjectReplicaRefs(data.root)).toEqual([data.ref]);
+  const hydrated = await hydratePreparedVideoProjectReplicaRoot(data.root);
+  expect(hydrated.entry.history).toEqual(data.history.head);
+  expect(hydrated.historyRefs).toEqual([data.ref]);
+  expect(data.root.entry).not.toHaveProperty('history');
+});
+
+it.each(['missing', 'extra', 'duplicate', 'mime', 'digest', 'budget', 'logical-budget'])(
+  'refuses an inconsistent prepared history binding before file IO: %s',
+  async (kind) => {
+    const data = await historyFixture();
+    if (kind === 'missing') data.history.refs = [];
+    if (kind === 'extra') data.history.refs.push({ ...data.ref, assetId: 'extra' });
+    if (kind === 'duplicate') data.history.refs.push(data.ref);
+    if (kind === 'mime') data.ref.mimeType = 'text/plain';
+    if (kind === 'digest') data.ref.sha256 = 'invalid';
+    if (kind === 'budget') data.ref.size = EDITOR_HISTORY_LIMITS.maxBytes + 1;
+    if (kind === 'logical-budget') {
+      data.history.head.past = Array.from({ length: 3 }, () => ({ assetId: data.ref.assetId }));
+      data.ref.size = Math.floor(EDITOR_HISTORY_LIMITS.maxBytes / 2) + 1;
+    }
+    expect(() => parsePreparedVideoProjectReplicaRoot(data.root)).toThrow('invalid');
+    expect(io.read).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['hash', 'sources'])(
+  'refuses corrupt prepared history before native publication: %s',
+  async (kind) => {
+    const data = await historyFixture();
+    if (kind === 'hash') data.ref.sha256 = 'b'.repeat(64);
+    else data.root.history!.head.sources = [{ kind: 'library-asset', id: 'undeclared' }];
+    await expect(hydratePreparedVideoProjectReplicaRoot(data.root)).rejects.toThrow();
+    expect(data.root.entry).not.toHaveProperty('history');
+  }
+);
+
 it('hydrates exact self-contained animation bytes without staged effect bindings', async () => {
   const data = await setup(),
     before = JSON.stringify(data.root);
@@ -68,6 +134,32 @@ it('hydrates exact self-contained animation bytes without staged effect bindings
   data.files.clear();
   expect(hydrated.entry.project.effectSnapshots).toEqual(data.root.entry.project.effectSnapshots);
   expect(JSON.stringify(data.root)).toBe(before);
+  expect(io.read).not.toHaveBeenCalled();
+});
+
+it.each([
+  { history: { version: 1 as const, epoch: 'foreign', past: [], future: [], sources: [] } },
+  {
+    history: {
+      version: 1 as const,
+      epoch: 'foreign',
+      past: [{ assetId: 'unowned-native-file' }],
+      future: [],
+      sources: [],
+    },
+  },
+  {
+    history: { version: 1 as const, epoch: 'foreign', past: [], future: [], sources: [] },
+    historyPublicationId: 'foreign-publication',
+  },
+  { historyPublicationId: 'foreign-publication' },
+])('refuses private native history in a synced root before file IO: %j', async (fields) => {
+  const { root } = await setup();
+  const candidate = { ...root, entry: { ...root.entry, ...fields } };
+  const before = structuredClone(candidate);
+  expect(() => parsePreparedVideoProjectReplicaRoot(candidate)).toThrow('invalid');
+  await expect(hydratePreparedVideoProjectReplicaRoot(candidate)).rejects.toThrow('invalid');
+  expect(candidate).toEqual(before);
   expect(io.read).not.toHaveBeenCalled();
 });
 it.each(['extra', 'duplicate', 'wrong-slot', 'size', 'mime', 'digest'] as const)(

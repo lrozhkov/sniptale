@@ -48,10 +48,14 @@ const io = vi.hoisted(() => ({
   unloaded: vi.fn(),
   restoreStaged: vi.fn(),
   resident: vi.fn(),
+  readImageOriginal: vi.fn(),
   write: vi.fn(),
 }));
 vi.mock('../../composition/persistence/sync-capture/catalog-admission', () => ({
   loadCatalogReplicaResidentCandidates: io.resident,
+}));
+vi.mock('../../composition/persistence/image-workspaces/read', () => ({
+  readImageOriginalSource: io.readImageOriginal,
 }));
 vi.mock('./native-residency', () => ({
   hasUnloadedNativeEditingRoot: io.unloaded,
@@ -1399,3 +1403,94 @@ it.each([false, true])(
     expect(f.reads).toEqual([]);
   }
 );
+
+it('opens an image project without downloading its original again after the original is saved separately', async () => {
+  const f = await fixture();
+  const { entry, envelope } = mediaEnvelope();
+  const currentOriginal = parseRootEnvelope({
+    ...envelope,
+    metadata: { ...(envelope.metadata as object), savedIndependently: true },
+  });
+  const projectId = 'image-work';
+  const document = encodePortableEditorDocument({
+    document: createPersistedEditorDocumentFixture(createEditorDocumentFixture(), 'bitmap'),
+    objectsByAssetId: new Map([['bitmap', 'original']]),
+  });
+  const project = parseRootEnvelope({
+    ...envelope,
+    descriptor: { ...envelope.descriptor, rootId: projectId },
+    metadata: {
+      ...(envelope.metadata as object),
+      entry: { ...entry, id: projectId },
+      linkedSourceMediaId: mediaId,
+      workspace: {
+        aggregateId: projectId,
+        revision: 1,
+        createdAt: 2,
+        updatedAt: 2,
+        sourceTitle: null,
+        sourceUrl: null,
+        document,
+      },
+    },
+  });
+  async function physical(
+    operationId: string,
+    rootKind: 'media' | 'image-project',
+    portable: typeof envelope,
+    parents: string[],
+    dependencies: { mediaId: string; basis: string[] }[]
+  ) {
+    const operationText = JSON.stringify({
+      format: 'sniptale-sync-operation',
+      version: 4,
+      spaceId: 'space',
+      operationId,
+      rootKind,
+      rootId: portable.descriptor.rootId,
+      kind: 'edit',
+      parents,
+      dependencies,
+      envelope: portable,
+      objects: [{ objectId: 'original', sha256: sha }],
+    });
+    const attempt = await createSyncAttempt(operationText, crypto.randomUUID());
+    return { ...(await parseSyncAttemptText(attempt.recordText)), operationText };
+  }
+  const originalHead = await physical('media-saved', 'media', currentOriginal, ['media-op'], []);
+  const selected = await physical(
+    'image-edit',
+    'image-project',
+    project,
+    [],
+    [{ mediaId, basis: ['media-op'] }]
+  );
+  const catalog = {
+    ...f.catalog,
+    ...projectSyncCatalog('space', [f.selected, originalHead, selected]),
+  };
+  io.readImageOriginal.mockResolvedValue({
+    asset: entry,
+    blob: new Blob([new Uint8Array(3)], { type: 'image/png' }),
+  });
+  const journal = await prepareCatalogReplica({
+    ...f,
+    catalog,
+    rootKind: 'image-project',
+    rootId: projectId,
+    admission: {
+      ...f.admission,
+      imageOriginal: { mediaId, generation: 2, basis: ['media-saved'] },
+    },
+    signal: new AbortController().signal,
+  });
+  expect(journal.payload).toMatchObject({
+    kind: 'image',
+    input: {
+      linkedOriginal: { mediaId, generation: 2, basis: ['media-saved'] },
+      workspace: { aggregateId: projectId, sourceMediaId: mediaId },
+    },
+  });
+  expect(io.readImageOriginal).toHaveBeenCalledExactlyOnceWith(mediaId);
+  expect(f.reads).toEqual([]);
+});

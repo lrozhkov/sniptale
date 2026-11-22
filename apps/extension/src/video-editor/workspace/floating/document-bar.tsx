@@ -1,4 +1,5 @@
-import { useRef, type ReactNode } from 'react';
+import { ProductInput } from '@sniptale/ui/product-form-controls';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { InspectorFieldClear } from '../../../ui/compact-inspector-controls/text-field';
 import { ValueBadge } from '@sniptale/ui/editor-chrome';
 import { translate } from '../../../platform/i18n';
@@ -7,17 +8,10 @@ import {
   useVideoEditorHistoryController,
 } from '../../runtime/controller/composition/hooks';
 import type { VideoEditorHeaderController } from '../../runtime/controller/contracts/header';
+import { useVideoEditorHistoryPort } from '../../runtime/controller/store';
+import type { VideoEditorProjectHistoryTransactionLease } from '../../contracts/commands/history';
 
 const DOCUMENT_BAR_CLASS_NAME = 'flex min-w-0 flex-1 items-center justify-start gap-2';
-
-const PROJECT_TITLE_CLASS_NAME = [
-  'h-8 min-w-0 w-full rounded-[4px] border border-transparent bg-transparent',
-  'pl-2 pr-8 text-left text-[13px] leading-[18px] font-medium',
-  'text-[var(--sniptale-color-text-primary)] outline-none transition',
-  'hover:border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_76%,transparent)]',
-  'focus:border-[color:var(--sniptale-color-border-accent-strong)]',
-  'focus:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_70%,transparent)]',
-].join(' ');
 
 type VideoEditorDocumentBarProps = {
   header: VideoEditorHeaderController;
@@ -29,28 +23,62 @@ function VideoEditorProjectTitle({
   projectName,
 }: Pick<VideoEditorDocumentBarProps['header'], 'onRenameProject' | 'projectName'>) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const lease = useRef<VideoEditorProjectHistoryTransactionLease | null>(null);
+  const history = useVideoEditorHistoryPort((port) => ({
+    begin: port.beginProjectHistoryTransaction,
+    end: port.endProjectHistoryTransaction,
+    current: port.isProjectHistoryTransactionCurrent,
+  }));
+  const endHistory = history.end;
+  useEffect(
+    () => () => {
+      const current = lease.current;
+      lease.current = null;
+      if (current) endHistory(current);
+    },
+    [endHistory]
+  );
+  const finish = (outcome?: 'cancel') => {
+    const current = lease.current;
+    lease.current = null;
+    if (current) history.end(current, outcome);
+  };
   return (
     <label
       className={[
         'relative grid min-w-[6rem] max-w-full shrink items-center',
         'focus-within:flex-1',
+        'sniptale-text-value',
       ].join(' ')}
+      data-framed
     >
       <span
         aria-hidden="true"
         className={[
           'invisible col-start-1 row-start-1 min-w-0 overflow-hidden whitespace-pre border',
-          'border-transparent pl-2 pr-8 text-[13px] leading-[18px] font-medium',
+          'border-transparent pl-2 pr-8 text-[13px] leading-[18px] font-normal',
         ].join(' ')}
       >
         {projectName || ' '}
       </span>
-      <input
+      <ProductInput
         ref={inputRef}
         aria-label={translate('videoEditor.app.title')}
         value={projectName}
-        onChange={(event) => onRenameProject(event.currentTarget.value)}
-        className={`${PROJECT_TITLE_CLASS_NAME} col-start-1 row-start-1 text-ellipsis focus:text-clip`}
+        onChange={(event) => {
+          if (lease.current && !history.current(lease.current)) lease.current = null;
+          lease.current ??= history.begin({ onlyIfIdle: true });
+          if (lease.current) onRenameProject(event.currentTarget.value);
+        }}
+        onBlur={() => finish()}
+        onKeyDown={(event) => {
+          if (event.nativeEvent.isComposing) return;
+          if (event.key !== 'Enter' && event.key !== 'Escape') return;
+          event.preventDefault();
+          if (event.key === 'Escape') finish('cancel');
+          event.currentTarget.blur();
+        }}
+        className="col-start-1 row-start-1 pe-8! text-ellipsis focus:text-clip"
       />
       {projectName ? (
         <InspectorFieldClear label={translate('videoEditor.app.title')} target={inputRef} />

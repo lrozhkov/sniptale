@@ -1,12 +1,17 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { db, getStore } from './aggregate-mutations.test-support';
-import { createGuideProject } from '../../../features/scenario/project/public';
+import { createGuideProject, createGuideStep } from '../../../features/scenario/project/public';
 import { createScenarioProjectEntry } from './projects/entry';
 import { parseScenarioProjectEntry } from './read-guards';
 import { scenarioStorageHead, scenarioStorageRows } from './storage-format';
 import { createScenarioProjectStore, readAllScenarioStorage, readScenarioStorage } from './storage';
 
-const names = ['scenario_projects', 'scenario_project_history', 'scenario_project_units'];
+const names = [
+  'scenario_projects',
+  'scenario_project_history',
+  'scenario_project_units',
+  'scenario_project_revisions',
+];
 afterEach(() => vi.restoreAllMocks());
 
 function seed(id = 'guide') {
@@ -89,4 +94,68 @@ it('rejects malformed replacement and keys before any request', async () => {
   expect(
     puts.mock.contexts.filter((context) => names.some((name) => context === getStore(name)))
   ).toHaveLength(0);
+});
+
+it('preserves both editing branches on metadata writes and permits retry after an aborted replacement', async () => {
+  const source = seed();
+  const past = { ...source.project, name: 'Past', items: [createGuideStep('Past step', 'step')] };
+  const future = {
+    ...source.project,
+    name: 'Future',
+    items: [createGuideStep('Future step', 'step')],
+  };
+  const initial = {
+    ...source,
+    editingHistory: { version: 1 as const, past: [past], future: [future] },
+  };
+  await createScenarioProjectStore(db.transaction(names)).put(initial);
+  expect(getStore('scenario_project_units').size).toBe(2);
+  const beforeUnits = structuredClone([...getStore('scenario_project_units')]);
+  const metadata = { ...initial, lifecycle: { ...source.lifecycle, updatedAt: 4 } };
+  await createScenarioProjectStore(db.transaction(names)).put(metadata);
+  expect([...getStore('scenario_project_units')]).toEqual(beforeUnits);
+  const current = parseScenarioProjectEntry(
+    await createScenarioProjectStore(db.transaction(names)).get(source.id)
+  );
+  expect(current?.editingHistory).toEqual(initial.editingHistory);
+  const replacement = {
+    ...metadata,
+    editingHistory: {
+      version: 1 as const,
+      past: [past],
+      future: [{ ...future, items: [createGuideStep('New future step', 'step')] }],
+    },
+  };
+  const beforeHead = structuredClone(getStore('scenario_projects').get(source.id));
+  const tx = db.transaction(names);
+  const objectStore = tx.objectStore.bind(tx);
+  vi.spyOn(tx, 'objectStore').mockImplementation((name) => {
+    const store = objectStore(name);
+    return name === 'scenario_projects'
+      ? {
+          ...store,
+          put: async () => {
+            throw new Error('head write refused');
+          },
+        }
+      : store;
+  });
+  await expect(createScenarioProjectStore(tx).put(replacement)).rejects.toThrow(
+    'head write refused'
+  );
+  tx.abort();
+  await tx.done;
+  expect(getStore('scenario_projects').get(source.id)).toEqual(beforeHead);
+  expect([...getStore('scenario_project_units')]).toEqual(beforeUnits);
+  await createScenarioProjectStore(db.transaction(names)).put(replacement);
+  const accepted = parseScenarioProjectEntry(
+    await createScenarioProjectStore(db.transaction(names)).get(source.id)
+  );
+  expect(accepted?.editingHistory).toEqual(replacement.editingHistory);
+  expect(getStore('scenario_project_units').size).toBe(2);
+  await createScenarioProjectStore(db.transaction(names)).delete(source.id);
+  expect(getStore('scenario_project_units').size).toBe(0);
+  expect(getStore('scenario_project_revisions').get(source.id)).toMatchObject({
+    revision: source.workspaceRevision,
+  });
 });

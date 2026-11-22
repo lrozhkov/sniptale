@@ -54,7 +54,7 @@ export async function encodeCapturedPortableRoot(
   if (capture.change.kind === 'image') {
     const portable = await encodeCapturedImageRoot(capture.change.rows, deferredExports);
     await parsePortableSyncRoot(portable.envelope);
-    return portable;
+    return { ...portable, dependencies: capture.change.mediaDependencies ?? [] };
   }
   if (capture.change.kind === 'video-project') {
     const portable = await encodeCapturedProjectRoot(capture.change.rows, deferredExports);
@@ -68,6 +68,12 @@ export async function encodeCapturedPortableRoot(
   }
   if (capture.change.kind === 'media') {
     const rows = capture.change.rows;
+    const media = {
+      ...rows.media,
+      ...(rows.savedIndependently === undefined
+        ? {}
+        : { savedIndependently: rows.savedIndependently }),
+    };
     const deferred = createCapturedAssetInventory(
       [
         ...('webSnapshot' in rows ? [] : [rows.ref]),
@@ -77,13 +83,14 @@ export async function encodeCapturedPortableRoot(
     );
     const roots = await buildMediaRootInventory({
       db: frozenReviewDatabase({
-        source: rows,
+        source: { ...rows, media },
         assets: [],
         refs: [],
         media: [],
         privateReviews: [],
       }),
-      items: [{ ...rows.media, hasThumbnail: false }],
+      items: [{ ...media, hasThumbnail: false }],
+      includeLibraryRelationships: true,
       options: createMediaHubBackupExportOptions({
         includeDrafts: false,
         includeSourceMetadata: true,
@@ -103,7 +110,7 @@ export async function encodeCapturedPortableRoot(
       { metadata, objects },
       deferred.descriptors()
     );
-    const portable = parsePortableMediaMetadata(metadata);
+    const portable = parsePortableMediaMetadata(metadata, { allowLibraryRelationships: true });
     const bindings: { objectId: string; ref: AssetRef }[] = [];
     const bind = async (objectId: string, ref: AssetRef, checkBytes = false) => {
       const object = objects.find((item) => item.ref.objectId === objectId);

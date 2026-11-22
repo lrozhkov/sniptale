@@ -308,7 +308,7 @@ it('uses the same shape rules for project metadata and native projects', () => {
     { id: 7 },
     { width: NaN },
     { duration: -1 },
-    { version: 56 },
+    { version: 57 },
     { source: { kind: 'unsupported' } },
     { templateInstances: [] },
     { actionPresentation: { enabled: 'yes' } },

@@ -52,9 +52,40 @@ export function PaintSelectorTrigger(props: {
     ].join(', '),
     backgroundSize: '100% 100%, 8px 8px',
   };
+  if (props.draft.kind === 'gradient' && (inspector || props.variant === 'swatch')) {
+    const button = (
+      <button
+        ref={props.buttonRef}
+        type="button"
+        disabled={props.disabled}
+        aria-label={props.label}
+        aria-expanded={props.open}
+        onClick={props.onClick}
+        title={summary}
+        data-ui="shared.ui.paint-selector.trigger"
+        className="sniptale-paint-value sniptale-gradient-value"
+      >
+        <span
+          aria-hidden="true"
+          className="paint-inspector-swatch"
+          data-ui="shared.ui.paint-selector.preview"
+          style={previewStyle}
+        />
+        <span className="paint-inspector-value">{summary}</span>
+      </button>
+    );
+    return inspector ? (
+      <InspectorParameterRow label={props.label}>{button}</InspectorParameterRow>
+    ) : (
+      <div className="paint-inspector-field">
+        <span className="paint-inspector-label">{props.label}</span>
+        {button}
+      </div>
+    );
+  }
   if (inspector)
     return (
-      <InspectorParameterRow label={props.label} valueMinimum={132}>
+      <InspectorParameterRow label={props.label}>
         <div className="sniptale-paint-value">
           {props.draft.kind === 'solid' ? (
             <ColorValue

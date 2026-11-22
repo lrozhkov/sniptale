@@ -4,7 +4,7 @@
 
 ## Segment fit
 
-Follow [layout adaptation](responsive.md#compaction-order) for intrinsic fit, stacking, and deferred representation changes.
+Follow [layout adaptation](responsive.md#compaction-order) for segment fit and deferred representation changes.
 
 ## Choose the presentation
 
@@ -17,19 +17,21 @@ Follow [layout adaptation](responsive.md#compaction-order) for intrinsic fit, st
 | Associated content panels | [Tabs](navigation.md) |
 | Exclusive drawing tool | Radio tools under [Buttons](buttons.md) |
 
-Choose by label length, comparison, and width. Search filters existing values without accepting arbitrary new values. Preserve accepted values across representation changes and defer changes during gestures. Segments use a neutral selected surface without an inner frame. Light-theme selection must remain distinct from both idle and hover surfaces. Selected labels retain their normal weight.
+Choose by label length, comparison, and width. Search only filters existing values. Preserve values across presentations. Defer changes during gestures. Keep the segment group transparent. Use the stepper surface token and a neutral border on the selected segment. Use the field hover token on available idle segments. Keep label weight and segment size constant. Show keyboard focus independently of selection.
 
-Dropdown selection uses the shared orange vector check, separate from the neutral active-row highlight. Do not use orange option frames, underlines, generic repeated instructions, or bold selected labels.
+Mark dropdown selection with a vector check. Use orange in the product and neutral ink in the sandbox. Keep the active row neutral. Omit option frames, underlines, repeated instructions, and bold selection labels.
 
 ## Width, material, and scrolling
 
-Stacked fields keep 8px between fields and 4px between name and value. Keep the next label outside the trigger-to-menu gap. Inline inspector rows retain a 4px gap. The owner defines a stable value column independent of selected text and search queries. When space permits, menus match trigger width and expand for complete options.
+Use a stable value column. Allow 8px between stacked fields and 4px between labels and values or inspector rows. Keep the next label clear of the menu gap. Match trigger width where possible. Expand for complete options.
 
-Measure labels, descriptions, icons, check column, padding, and an actual scrollbar. Clamp to the viewport and wrap long values. In a narrow inspector, an explicit section boundary defines menu width and horizontal position across name and value columns. The surface declares content-fit or full-column placement. A full-column menu covers the group’s name/value region. A content-fit menu can align to the trailing field edge. Neither mode can cover the inspector scrollbar or adjacent category rail.
+Sandbox triggers have a light gray surface and border. Hover darkens the surface and border. An open trigger keeps the hover surface and shows one focus border. Keep geometry constant.
+
+Measure labels, descriptions, icons, checks, padding, and any visible scrollbar. Clamp to the viewport and wrap long values. In a narrow inspector, section bounds define the menu width and horizontal position. The surface declares content-fit or full-column placement. A full-column menu covers the group’s name/value region. A content-fit menu can align to the trailing field edge. Neither mode can cover the inspector scrollbar or adjacent category rail.
 
 Measure the content box after actual padding, borders, and scrollbar width. Do not create per-parameter width exceptions. Use 5px shell padding, 8px option padding, a 32px minimum row, and the shared 4px radius. Use light glass with the [shared fallbacks](foundations.md). Long lists scroll inside the menu. Use a narrow neutral scrollbar separated from highlighting.
 
-Reserve scrollbar space only when overflow exists. Necessary check columns remain stable.
+Reserve scrollbar space only for overflow. Keep check columns stable.
 
 Searchable catalogs keep the search field visible while their results scroll. Bound the surface to the viewport and its clipping ancestors. Long user-defined names must not expand the host layout. Follow [full-text access](localization.md#full-text-access) for truncated names. Keep text behind the surface from showing through its input and option labels.
 
@@ -47,10 +49,10 @@ The sample uses an active descendant and commits its active value on Tab exit. T
 
 Represent mixed, empty, custom, loading, unavailable, and error states explicitly. Escape, failed loading, and empty search retain the accepted value. Do not silently select the first available option. Preserve dependent values when temporarily hidden. Keep source dimensions distinct from an explicit aspect ratio. Custom-size editing is a command outside the value list. Invalid input preserves valid dimensions.
 
-Segment motion must not delay acceptance. Initial layout and resize do not animate selection. The chevron folds upward while open. Keep its drawing box and stroke fixed. Do not animate field geometry on hover. Respect reduced motion and dismiss through the layer owner when the anchor becomes invisible.
+Paint selection as soon as the value changes. Animate only the idle segment hover color. The chevron folds upward while open. Keep its drawing box and stroke fixed. Respect reduced motion. Dismiss through the layer owner when the anchor becomes invisible.
 
 [WAI combobox](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/).
 
-Compact inspector segments use 32px height and 6px horizontal padding per option. General controls retain their existing height.
+Compact inspector segments use 32px height and 6px horizontal padding per option. Inset the selected and hover surfaces by 3px vertically and 2px horizontally. Keep the button targets and row spacing at their specified sizes.
 
 Configured provider/model pickers refresh catalogs when opened. Keep the menu open and preserve search and choice during reads. Failed reads retain the last catalog and expose retry. Refresh never selects a different provider or model. Keep removed choices unresolved until replacement. Existing owners retain initial configured defaults.

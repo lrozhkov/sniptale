@@ -1,7 +1,17 @@
 // @vitest-environment jsdom
+import {
+  loadScenarioCatalogFixture,
+  prepareScenarioTranslations,
+} from './test-support/translations.test-support';
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadScenarioCatalogFixture>[0]) =>
+    loadScenarioCatalogFixture(locale),
+}));
+beforeAll(prepareScenarioTranslations);
+
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { expect, it, vi } from 'vitest';
+import { beforeAll, expect, it, vi } from 'vitest';
 import { GuideAiScopePicker } from './ai-scope-picker';
 import {
   createGuideProject,
@@ -54,7 +64,7 @@ it('shows section context, hidden numbering and image descriptions with reversib
   expect(node.textContent).toContain('Preparation');
   expect(node.textContent).toContain('Screenshot of upload');
   expect(node.querySelector('.guide-ai-selection-number svg')).not.toBeNull();
-  const input = node.querySelector('input[type="text"]')!;
+  const input = node.querySelector('input[type="search"]')!;
   act(() => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
       input,

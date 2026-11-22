@@ -1,9 +1,20 @@
 // @vitest-environment jsdom
+import {
+  loadScenarioCatalogFixture,
+  prepareScenarioTranslations,
+} from './test-support/translations.test-support';
 import { createTourDocument, createTourImageSlide } from '../../features/scenario/project/public';
 import { hideAllToasts } from '@sniptale/ui/product-feedback/toast-service';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, beforeEach, expect, it, vi } from 'vitest';
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadScenarioCatalogFixture>[0]) =>
+    loadScenarioCatalogFixture(locale),
+}));
+
+beforeAll(prepareScenarioTranslations);
+
 import {
   createGuideImageBlock,
   createGuideProject,
@@ -50,15 +61,13 @@ vi.mock('./image-editor', async (original) => ({
 vi.mock('./runtime/resource-session', () => ({ useGuideResourceSession: () => enterSession }));
 const enterSession = async () => true;
 vi.mock('../../composition/persistence/scenario/history', () => ({
-  getScenarioSavedVersions: async (id: string) => {
+  getScenarioEditingSnapshot: async (id: string) => {
     const project = await io.load(id);
     return project
       ? {
-          currentRevision: 1,
-          versions: [
-            { project, revision: 1, savedAt: project.updatedAt },
-            ...(io.previous() ?? []),
-          ],
+          project,
+          workspaceRevision: 1,
+          editingHistory: { version: 1, past: io.previous() ?? [], future: [] },
         }
       : null;
   },
@@ -595,7 +604,7 @@ it('uses the project name in the tab and distinguishes reader preview', async ()
   await editField('.guide-project-name input', 'Renamed guide');
   expect(document.title).toBe('Renamed guide');
   await click('Export');
-  expect(document.title).toBe('Renamed guide · Просмотр');
+  expect(document.title).toBe('Renamed guide · Preview');
   await click('Back to editing');
   expect(document.title).toBe('Renamed guide');
 });
@@ -783,7 +792,7 @@ it('detaches old media URLs before revocation across undo, redo and a delayed as
     items: [{ ...step, blocks: blocks.map((block) => ({ ...block, assetId: 'prior-original' })) }],
   };
   io.load.mockResolvedValue(project);
-  io.previous.mockReturnValue([{ project: previous, revision: 0, savedAt: 90 }]);
+  io.previous.mockReturnValue([previous]);
   const blob = new Blob(['image'], { type: 'image/png' });
   io.asset.mockResolvedValue(blob);
   const sources = () =>

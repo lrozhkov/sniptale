@@ -1,3 +1,4 @@
+import { hasResultSourceInteractionContent } from './source-interaction-documents';
 import { requiresExtendedBorderSchema } from './scene/focus-appearance';
 import type { VideoProject } from './types/index';
 
@@ -68,6 +69,14 @@ function motionSchemaRequirement(regions: VideoProject['motionRegions']): VideoP
 }
 
 function clipSchemaRequirement(clips: VideoProject['clips']): VideoProject['version'] {
+  if (
+    clips.some(
+      (clip) =>
+        clip.type === 'VIDEO' &&
+        (clip.cameraTiming?.timeDomain === 'result' || clip.sourceInteractionTiming !== undefined)
+    )
+  )
+    return 56;
   if (
     clips.some(
       (clip) =>
@@ -168,6 +177,12 @@ function projectSchemaRequirement(
     )
   )
     return 54;
+  if (
+    (patch.sourceInteractionDocuments ?? project.sourceInteractionDocuments)?.some(
+      hasResultSourceInteractionContent
+    )
+  )
+    return 56;
   if ((patch.sourceInteractionDocuments ?? project.sourceInteractionDocuments) !== undefined)
     return 54;
   if (

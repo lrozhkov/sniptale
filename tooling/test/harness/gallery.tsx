@@ -8,10 +8,12 @@ import '@sniptale/ui/styles/overlays';
 import { initializeAppTheme } from '../../../apps/extension/src/ui/theme/index';
 import { installPcmSpeechFixture } from './pcm-speech';
 import { GalleryApp } from '../../../apps/extension/src/gallery/shell/app-shell';
+import { prepareTranslations } from '../../../apps/extension/src/platform/i18n';
 
 initializeAppTheme(new URLSearchParams(location.search).get('theme') === 'dark' ? 'dark' : 'light');
 
 void harnessReady.then(async () => {
+  await prepareTranslations('gallery');
   if (new URLSearchParams(location.search).get('clickLensOverflowFixture') === '1') {
     const { installClickLensOverflowFixture } = await import('./click-lens-overflow');
     installClickLensOverflowFixture();

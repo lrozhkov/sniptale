@@ -68,11 +68,11 @@ for (const viewport of [
         expect(result.currentPreserved).toBe(true);
         expect(result.physicalHistoryRows).toBe(result.readback.historyLength + 1);
         expect(result.readback.cursor).toBe(result.readback.historyLength);
-        expect(result.readback.historyLength).toBeLessThanOrEqual(50);
+        expect(result.readback.historyLength).toBeLessThanOrEqual(1000);
         if (historyLength > 64) {
           expect(result.readback).toMatchObject({ fragments: 112, effects: 1, actionAudio: 1 });
           expect(result.typing).toEqual({
-            historyLength: 50,
+            historyLength: Math.min(1000, result.readback.historyLength + 1),
             typedTailPuts: 1,
             retainedRowsUnchanged: true,
             actionCount: 1,

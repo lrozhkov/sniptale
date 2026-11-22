@@ -1,5 +1,6 @@
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { AssetOperation } from './contracts';
+import { VIDEO_PROJECT_WORKSPACE_PUBLICATION_DOMAIN } from '../projects/history-contracts';
 
 /** Pending legacy receipts retain both replaced and rollback objects until resolved. */
 export function collectBackupRollbackAssetIds(operation: AssetOperation): string[] {
@@ -35,7 +36,11 @@ export function collectReadyJournalAssetIds(
   };
   const payload = journal.payload;
   if (!isRecord(payload)) return [...ids];
-  if (journal.domain === 'image-workspace') add(payload['refs']);
+  if (
+    journal.domain === 'image-workspace' ||
+    journal.domain === VIDEO_PROJECT_WORKSPACE_PUBLICATION_DOMAIN
+  )
+    add(payload['refs']);
   const children = payload['children'];
   if (isRecord(children)) {
     add(children['assetPuts']);

@@ -78,3 +78,15 @@ it('uses the nearest opted-in settings width without moving the menu below its s
   content.getBoundingClientRect = () => ({ left: 950, width: 320 }) as DOMRect;
   expect(resolveCompactSelectMenuStyle(trigger)).toMatchObject({ left: 672, width: 320, top: 127 });
 });
+
+it('expands inspector menus to the label while preserving the trigger’s trailing edge', () => {
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1280 });
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 });
+  const row = anchorRect({ left: 750, right: 1250, width: 500 });
+  row.setAttribute('data-compact-select-menu-bounds', 'parameter');
+  const label = anchorRect({ left: 758, right: 878, width: 120 });
+  label.setAttribute('data-compact-select-menu-label', '');
+  const trigger = anchorRect({ left: 886, right: 1092, width: 206, top: 90, bottom: 122 });
+  row.append(label, trigger);
+  expect(resolveCompactSelectMenuStyle(trigger)).toMatchObject({ left: 758, width: 334, top: 127 });
+});

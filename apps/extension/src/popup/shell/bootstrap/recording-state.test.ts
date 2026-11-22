@@ -1,4 +1,14 @@
-import { describe, expect, it, vi } from 'vitest';
+import {
+  loadPopupCatalogFixture,
+  preparePopupTranslations,
+} from '../../catalog-fixture.test-support';
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadPopupCatalogFixture>[0]) =>
+    loadPopupCatalogFixture(locale),
+}));
+beforeAll(preparePopupTranslations);
+
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import {

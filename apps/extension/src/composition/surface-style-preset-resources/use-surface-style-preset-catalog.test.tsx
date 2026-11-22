@@ -1,4 +1,12 @@
 // @vitest-environment jsdom
+import {
+  loadCompositionCatalogFixture,
+  prepareCompositionTranslations,
+} from '../catalog-fixture.test-support';
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadCompositionCatalogFixture>[0]) =>
+    loadCompositionCatalogFixture(locale),
+}));
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -180,4 +188,8 @@ it('reports initial load failures without publishing an unsafe partial catalog',
   expect(latest.catalog).toBeNull();
   expect(await latest.actions.onReset()).toBe(false);
   expect(mocks.toast).toHaveBeenCalledOnce();
+});
+
+beforeEach(async () => {
+  await prepareCompositionTranslations('content', 'ru');
 });

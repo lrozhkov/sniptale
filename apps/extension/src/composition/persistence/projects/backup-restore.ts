@@ -1,3 +1,10 @@
+import type { ImageWorkspaceIdentity } from '../image-workspaces/identity';
+import { removeEditorDocumentOwnership } from '../document-assets/ownership';
+import { createScenarioProjectStore } from '../scenario/storage';
+import {
+  VIDEO_PROJECT_HISTORY_OWNER_KIND,
+  videoProjectHistoryAssetBindings,
+} from './history-contracts';
 import {
   publishPreparedVideoProjectRevisionInTransaction,
   publishPreparedVideoProjectSidecarsInTransaction,
@@ -10,7 +17,7 @@ import {
   promoteReviewSourceLifecycles,
 } from '../review-workspaces/new-reference-admission';
 import type { IDBPTransaction } from 'idb';
-import { promoteProjectSourceLifecycles } from './new-reference-admission';
+import { promoteProjectSourceLifecycles, assertNewProjectSources } from './new-reference-admission';
 import {
   STORE_NAME,
   MEDIA_LIBRARY_STORE,
@@ -84,6 +91,7 @@ interface PreparedVideoProjectArchiveRoot extends PreparedVideoProjectRevision {
 
 export interface VideoProjectBackupRestoreStores extends VideoProjectRevisionPublicationStores {
   assets: Store<StoredProjectAssetEntry>;
+  imageIdentities: Store<ImageWorkspaceIdentity>;
   exports: IndexStore<StoredProjectExportEntry>;
   media: Store<MediaLibraryEntry>;
   videoWorkspaces: Store<VideoWorkspace>;
@@ -110,6 +118,14 @@ async function deleteExisting(args: {
 }) {
   const existing = parseVideoProjectEntry(await args.stores.projects.get(args.projectId));
   if (!existing) return;
+  if (existing.history)
+    await removeEditorDocumentOwnership({
+      document: { assets: videoProjectHistoryAssetBindings(existing.history) },
+      ownerKind: VIDEO_PROJECT_HISTORY_OWNER_KIND,
+      ownerId: existing.id,
+      physicalDelete: args.operation,
+      stores: args.stores,
+    });
   for (const id of args.assetOwnership.owned) {
     if (args.assetOwnership.protected.has(id)) continue;
     const published: unknown = await args.stores.media.get(`project-asset:${id}`);
@@ -337,6 +353,19 @@ export async function putVideoProjectBackupRestore(args: {
     workspaceRevision,
   });
   await retainRestoredReviewSources(args.root, args.tx);
+  if (args.root.entry.history)
+    await assertNewProjectSources(
+      args.root.entry.project,
+      undefined,
+      {
+        mediaLibraryStore: args.tx.objectStore(MEDIA_LIBRARY_STORE),
+        projectAssetStore: args.tx.objectStore(PROJECT_ASSETS_STORE),
+        scenarioAssetStore: args.tx.objectStore(SCENARIO_ASSETS_STORE),
+        scenarioProjectStore: createScenarioProjectStore(args.tx),
+        recordingStore: args.tx.objectStore(STORE_NAME),
+      },
+      { next: args.root.entry.history }
+    );
   await promoteProjectSourceLifecycles(
     args.root.entry.project,
     {
@@ -345,7 +374,8 @@ export async function putVideoProjectBackupRestore(args: {
       scenarioAssetStore: args.tx.objectStore(SCENARIO_ASSETS_STORE),
       recordingStore: args.tx.objectStore(STORE_NAME),
     },
-    Date.now()
+    Date.now(),
+    args.root.entry.history
   );
   await releaseUnpublishedProjectAssets(args.tx, releasedCandidates, args.operation);
   return { conflicted, imported: true };

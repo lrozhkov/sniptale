@@ -22,17 +22,20 @@ afterEach(async () => {
   host.remove();
   vi.unstubAllGlobals();
 });
-function Harness({ echo }: { echo: boolean }) {
+function Harness({ echo, scrub = true }: { echo: boolean; scrub?: boolean }) {
   const [authored, setAuthored] = useState(2);
   const [preview, setPreview] = useState<number | null>(null);
   return (
     <>
       <output>{authored}</output>
+      <output data-preview>{preview ?? 'none'}</output>
       <ReviewPreviewNumberRow
         label="Amount"
         min={0}
         max={10}
         step={1}
+        stepperPlacement="sides"
+        scrubEnabled={scrub}
         value={echo ? (preview ?? authored) : authored}
         previewValue={echo ? undefined : (preview ?? undefined)}
         onPreview={setPreview}
@@ -47,6 +50,36 @@ function Harness({ echo }: { echo: boolean }) {
 function range() {
   return host.querySelector<HTMLInputElement>('input[type="range"]')!;
 }
+
+it.each([true, false])('clears an external stepper preview on Undo (echo=%s)', async (echo) => {
+  await act(async () => root.render(<Harness echo={echo} scrub={false} />));
+  const field = host.querySelector<HTMLInputElement>('input[aria-label="Amount"]')!;
+  const button = host.querySelector<HTMLButtonElement>('button[aria-label="Amount increase"]')!;
+  act(() => {
+    field.focus();
+    button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+  });
+  expect(host.querySelector('output[data-preview]')!.textContent).toBe('3');
+  act(() =>
+    field.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'z',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+  );
+  expect(host.querySelector('output[data-preview]')!.textContent).toBe('none');
+  expect(field.value).toBe('2');
+  expect(commit).not.toHaveBeenCalled();
+  act(() => window.dispatchEvent(new MouseEvent('pointerup')));
+  act(() => {
+    button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    window.dispatchEvent(new MouseEvent('pointerup'));
+  });
+  expect(commit).toHaveBeenCalledExactlyOnceWith(3);
+});
 function key(type: string, key: string) {
   act(() => range().dispatchEvent(new KeyboardEvent(type, { key, bubbles: true })));
 }
@@ -115,6 +148,7 @@ it('deduplicates direct authored updates and accepts the same edit after restora
           min={0}
           max={10}
           step={1}
+          scrubEnabled
           scrubMin={0}
           scrubMax={5}
           scrubStep={0.5}
@@ -141,7 +175,9 @@ it.each([ReviewNumberRow, ReviewPreviewNumberRow])(
   'keeps a range gesture disposable and skips a return to its original value (%s)',
   async (Row) => {
     await act(async () =>
-      root.render(<Row label="Amount" min={0} max={10} step={1} value={2} onChange={commit} />)
+      root.render(
+        <Row label="Amount" min={0} max={10} step={1} value={2} scrubEnabled onChange={commit} />
+      )
     );
     act(() => range().dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
     for (const value of [5, 2]) {
@@ -189,3 +225,13 @@ it.each([ReviewNumberRow, ReviewPreviewNumberRow])(
     expect(commit).not.toHaveBeenCalled();
   }
 );
+
+it('keeps bounded values exact unless the caller requests a range', async () => {
+  await act(async () =>
+    root.render(
+      <ReviewNumberRow label="Size" min={1} max={400} step={1} value={24} onChange={commit} />
+    )
+  );
+  expect(host.querySelector('input[type="range"]')).toBeNull();
+  expect(host.querySelector('button[aria-label="Size increase"]')).not.toBeNull();
+});

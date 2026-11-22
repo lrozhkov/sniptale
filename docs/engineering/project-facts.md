@@ -7,7 +7,7 @@ This file projects changeable values and inventories from their existing machine
 | --- | --- | --- |
 | Product version | `0.5.2` | `package.json#/version` |
 | Minimum Chrome version | `148` | `apps/extension/manifest.json#/minimum_chrome_version` |
-| Persistence database version | `61` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
+| Persistence database version | `72` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
 | Security reporting | .github/SECURITY.md and GitHub private vulnerability reporting | `tooling/configs/ci/github-policy.json#/security/privateVulnerabilityReporting` |
 | Immutable GitHub Releases | `true` | `tooling/configs/ci/github-policy.json#/security/immutableReleases` |
 | Required GitHub checks | `pr-gate` | `tooling/configs/ci/github-policy.json#/ruleset` |
@@ -42,6 +42,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/audio-preset-resources`
 - `apps/extension/src/composition/audio-recording`
 - `apps/extension/src/composition/background-resources`
+- `apps/extension/src/composition/catalog-fixture.test-support.ts`
 - `apps/extension/src/composition/editor-resource-admission.test.tsx`
 - `apps/extension/src/composition/editor-resource-admission.tsx`
 - `apps/extension/src/composition/frame-annotation-controls`
@@ -53,6 +54,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/persistence/aggregate-presentations`
 - `apps/extension/src/composition/persistence/ai-settings`
 - `apps/extension/src/composition/persistence/annotation-template-tags`
+- `apps/extension/src/composition/persistence/annotation-text-templates`
 - `apps/extension/src/composition/persistence/asset-publication-recovery`
 - `apps/extension/src/composition/persistence/assets`
 - `apps/extension/src/composition/persistence/audio-presets`
@@ -134,6 +136,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/features/ai`
 - `apps/extension/src/features/autosave`
 - `apps/extension/src/features/browser-frame`
+- `apps/extension/src/features/catalog-fixture.test-support.ts`
 - `apps/extension/src/features/drawing`
 - `apps/extension/src/features/editor`
 - `apps/extension/src/features/editor-history`
@@ -188,6 +191,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/gl-transition-choices.ts`
 - `apps/extension/src/ui/gl-transition-fields.test.tsx`
 - `apps/extension/src/ui/gl-transition-fields.tsx`
+- `apps/extension/src/ui/gl-transition-labels.ts`
 - `apps/extension/src/ui/glass-select`
 - `apps/extension/src/ui/gradient-preset-grid`
 - `apps/extension/src/ui/highlighter-preset-editor`
@@ -215,6 +219,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/source-image-filter-fields.tsx`
 - `apps/extension/src/ui/surface-style-selector`
 - `apps/extension/src/ui/sync-cache-feedback.tsx`
+- `apps/extension/src/ui/test-support`
 - `apps/extension/src/ui/text-document.test.tsx`
 - `apps/extension/src/ui/text-document.tsx`
 - `apps/extension/src/ui/theme`

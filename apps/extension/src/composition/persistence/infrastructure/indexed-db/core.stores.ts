@@ -8,7 +8,7 @@ import { ROW_REFERENCE_INDEX } from './row-index-contract';
 // This is the first stable beta persistence generation. Alpha databases use a different name and
 // are intentionally excluded from the supported migration graph.
 export const DB_NAME = 'sniptale-db';
-export const DB_VERSION = 61;
+export const DB_VERSION = 72;
 export const LEGACY_ALPHA_DB_NAMES = ['sniptale-video-db'] as const;
 export const ALPHA_RESET_JOURNAL_KEY = 'sniptale.persistence.alpha-reset.v1';
 export const DATABASE_RESET_JOURNAL_KEY = 'sniptale.persistence.database-reset.v1';
@@ -26,6 +26,7 @@ export const DIAGNOSTICS_META_STORE = 'diagnostics_meta';
 export const DIAGNOSTICS_EVENTS_STORE = 'diagnostics_events';
 export const VIDEO_PROJECTS_STORE = 'video_projects';
 export const VIDEO_PROJECT_REVISIONS_STORE = 'video_project_revisions';
+export const SCENARIO_PROJECT_REVISIONS_STORE = 'scenario_project_revisions';
 export const SCENARIO_PROJECTS_STORE = 'scenario_projects';
 export const SCENARIO_PROJECT_HISTORY_STORE = 'scenario_project_history';
 export const SCENARIO_PROJECT_UNITS_STORE = 'scenario_project_units';
@@ -38,7 +39,9 @@ export const SCENARIO_STEP_EDITOR_DOCUMENTS_STORE = 'scenario_step_editor_docume
 export const MEDIA_LIBRARY_STORE = 'media_library';
 export const THUMBNAILS_STORE = 'thumbnails';
 export const IMAGE_WORKSPACES_STORE = 'image_workspaces';
+export const IMAGE_WORKSPACE_IDENTITIES_STORE = 'image_workspace_identities';
 export const VIDEO_WORKSPACES_STORE = 'video_workspaces';
+export const VIDEO_REVIEW_IDENTITIES_STORE = 'video_review_identities';
 export const VIDEO_WORKSPACE_HISTORY_STORE = 'video_workspace_history';
 export const VIDEO_WORKSPACE_DRAFTS_STORE = 'video_workspace_drafts';
 export const AGGREGATE_PRESENTATIONS_STORE = 'aggregate_presentations';
@@ -74,6 +77,7 @@ export const EXPECTED_STORES = [
   DIAGNOSTICS_EVENTS_STORE,
   VIDEO_PROJECTS_STORE,
   VIDEO_PROJECT_REVISIONS_STORE,
+  SCENARIO_PROJECT_REVISIONS_STORE,
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
   SCENARIO_PROJECT_UNITS_STORE,
@@ -86,7 +90,9 @@ export const EXPECTED_STORES = [
   MEDIA_LIBRARY_STORE,
   THUMBNAILS_STORE,
   IMAGE_WORKSPACES_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_REVIEW_IDENTITIES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
@@ -127,6 +133,7 @@ export const EXPECTED_INDEXES = {
   [DIAGNOSTICS_EVENTS_STORE]: ['recordingId'],
   [VIDEO_PROJECTS_STORE]: ['updatedAt', 'usageReferenceKeys', ROW_REFERENCE_INDEX],
   [VIDEO_PROJECT_REVISIONS_STORE]: [],
+  [SCENARIO_PROJECT_REVISIONS_STORE]: [],
   [SCENARIO_PROJECTS_STORE]: ['updatedAt'],
   [SCENARIO_PROJECT_HISTORY_STORE]: ['projectId'],
   [SCENARIO_PROJECT_UNITS_STORE]: ['projectId'],
@@ -145,7 +152,9 @@ export const EXPECTED_INDEXES = {
   [MEDIA_LIBRARY_STORE]: ['createdAt', 'kind', ROW_REFERENCE_INDEX],
   [THUMBNAILS_STORE]: [],
   [IMAGE_WORKSPACES_STORE]: ['updatedAt', ROW_REFERENCE_INDEX],
+  [IMAGE_WORKSPACE_IDENTITIES_STORE]: [],
   [VIDEO_WORKSPACES_STORE]: ['updatedAt', 'usageReferenceKeys', ROW_REFERENCE_INDEX],
+  [VIDEO_REVIEW_IDENTITIES_STORE]: [],
   [VIDEO_WORKSPACE_HISTORY_STORE]: ['aggregateId', ROW_REFERENCE_INDEX],
   [VIDEO_WORKSPACE_DRAFTS_STORE]: ['updatedAt'],
   [AGGREGATE_PRESENTATIONS_STORE]: ['updatedAt'],

@@ -6,7 +6,7 @@ vi.mock('./aggregate-mutations', () => ({ commitScenarioAggregateMutation: io.co
 vi.mock('../../../features/media-hub/events', () => ({
   publishMediaHubLibraryChanged: io.publish,
 }));
-import { getScenarioSavedVersions } from './history';
+import { getScenarioSavedVersions, getScenarioEditingSnapshot } from './history';
 const previous = createGuideProject('Previous', 'guide', 1);
 const current = { ...previous, name: 'Current', updatedAt: 2 };
 beforeEach(() => {
@@ -34,4 +34,49 @@ it('returns null for a missing project and propagates read failures', async () =
   io.get.mockRejectedValueOnce(failure);
   await expect(getScenarioSavedVersions('guide')).rejects.toBe(failure);
   expect(io.commit).not.toHaveBeenCalled();
+});
+
+it('loads exact editing navigation independently from saved-revision chronology', async () => {
+  const editingHistory = {
+    version: 1,
+    past: [{ ...current, name: 'Past action' }],
+    future: [{ ...current, name: 'Redo action' }],
+  };
+  io.get.mockResolvedValueOnce({
+    project: current,
+    workspaceRevision: 7,
+    history: [{ revision: 1, savedAt: 1, project: previous }],
+    editingHistory,
+  });
+  expect(await getScenarioEditingSnapshot('guide')).toEqual({
+    project: current,
+    workspaceRevision: 7,
+    editingHistory,
+  });
+  expect(io.commit).not.toHaveBeenCalled();
+});
+it('keeps explicit empty checkpoints empty and derives past only for legacy entries', async () => {
+  const empty = { version: 1, past: [], future: [] };
+  io.get.mockResolvedValueOnce({
+    project: current,
+    workspaceRevision: 7,
+    history: [{ revision: 1, savedAt: 1, project: previous }],
+    editingHistory: empty,
+  });
+  expect((await getScenarioEditingSnapshot('guide'))?.editingHistory).toEqual(empty);
+  expect((await getScenarioEditingSnapshot('guide'))?.editingHistory).toEqual({
+    version: 1,
+    past: [previous],
+    future: [],
+  });
+});
+
+it('keeps editing reads write-free and propagates missing or failed native reads', async () => {
+  io.get.mockResolvedValueOnce(undefined);
+  expect(await getScenarioEditingSnapshot('missing')).toBeNull();
+  const failure = new Error('Native read refused');
+  io.get.mockRejectedValueOnce(failure);
+  await expect(getScenarioEditingSnapshot('guide')).rejects.toBe(failure);
+  expect(io.commit).not.toHaveBeenCalled();
+  expect(io.publish).not.toHaveBeenCalled();
 });

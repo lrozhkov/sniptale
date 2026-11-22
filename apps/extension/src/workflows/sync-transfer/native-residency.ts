@@ -6,6 +6,7 @@ import {
 import { initDB } from '../../composition/persistence/infrastructure/indexed-db/core';
 import {
   ASSET_RESIDENCY_STORE,
+  IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   VIDEO_PROJECTS_STORE,
   SCENARIO_PROJECTS_STORE,
@@ -94,10 +95,12 @@ type Resource =
   | { kind: 'inline-image'; media: MediaLibraryEntry; copy: AssetResidencyCopy | null };
 const STORES = [...new Set([...NATIVE_EDITING_RESOURCE_STORES, ASSET_RESIDENCY_STORE])];
 
+type NativeResourcePurpose = 'editing' | 'backup' | 'cache';
+
 async function loadResources(
   db: Database,
   root: NativeEditingRoot,
-  purpose: 'editing' | 'backup' = 'editing'
+  purpose: NativeResourcePurpose = 'editing'
 ): Promise<Resource[]> {
   const tx = db.transaction(STORES, 'readonly');
   const closure = await collectNativeEditingResources(tx, root, purpose);
@@ -182,7 +185,7 @@ export async function hasUnloadedNativeEditingRoot(root: NativeEditingRoot): Pro
 /** Existing local creation and missing-document flows retain their own opening behavior. */
 export async function needsNativeEditingPreparation(
   root: NativeEditingRoot,
-  purpose: 'editing' | 'backup' = 'editing'
+  purpose: NativeResourcePurpose = 'editing'
 ): Promise<boolean> {
   const db = await initDB();
   const store =
@@ -192,7 +195,9 @@ export async function needsNativeEditingPreparation(
         ? VIDEO_PROJECTS_STORE
         : root.rootKind === 'scenario-project'
           ? SCENARIO_PROJECTS_STORE
-          : VIDEO_WORKSPACES_STORE;
+          : root.rootKind === 'image-project'
+            ? IMAGE_WORKSPACES_STORE
+            : VIDEO_WORKSPACES_STORE;
   const tx = db.transaction([...new Set([store, MEDIA_LIBRARY_STORE])], 'readonly');
   let present = (await tx.objectStore(store).get(root.rootId)) !== undefined;
   if (!present && root.rootKind === 'video-review')
@@ -204,7 +209,7 @@ export async function needsNativeEditingPreparation(
 /** Local availability can admit an already committed editor opening without remote authorization or writes. */
 export async function isNativeEditingRootReady(
   root: NativeEditingRoot,
-  purpose: 'editing' | 'backup' = 'editing'
+  purpose: NativeResourcePurpose = 'editing'
 ): Promise<boolean> {
   const db = await initDB();
   return runWithAssetResourceRead(async () => {
@@ -227,7 +232,7 @@ interface NativePreparationArgs {
 export async function prepareNativeEditingRoot(
   args: NativePreparationArgs & {
     root: NativeEditingRoot;
-    purpose?: 'editing' | 'backup';
+    purpose?: NativeResourcePurpose;
   }
 ): Promise<{ downloaded: number }> {
   const root = structuredClone(args.root);

@@ -74,7 +74,9 @@ async function resolveScreenCaptureSource(
 
   const desktopSource = await deps.requestDesktopMedia(captureMode, controlledCursorCaptureEnabled);
   if (!desktopSource) {
-    await deps.notifyStartFailed(deps.localize('background.runtime.sourceSelectionCancelled'));
+    await deps.notifyStartFailed(deps.localize('background.runtime.sourceSelectionCancelled'), {
+      diagnosticCode: 'cancelled',
+    });
     return null;
   }
 
@@ -137,7 +139,9 @@ async function requestMultiScreenDesktopSource(params: {
     }
 
     await rollbackPreparedMultiScreenCaptureSources(deps);
-    await deps.notifyStartFailed(deps.localize('background.runtime.sourceSelectionCancelled'));
+    await deps.notifyStartFailed(deps.localize('background.runtime.sourceSelectionCancelled'), {
+      diagnosticCode: 'cancelled',
+    });
     return null;
   } catch (error) {
     await handleMultiScreenDesktopPreparationFailure(error, params);

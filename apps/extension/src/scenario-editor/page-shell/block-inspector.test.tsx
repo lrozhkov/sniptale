@@ -1,7 +1,17 @@
 // @vitest-environment jsdom
+import {
+  loadScenarioCatalogFixture,
+  prepareScenarioTranslations,
+} from './test-support/translations.test-support';
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadScenarioCatalogFixture>[0]) =>
+    loadScenarioCatalogFixture(locale),
+}));
+beforeAll(prepareScenarioTranslations);
+
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { expect, it, vi } from 'vitest';
+import { beforeAll, expect, it, vi } from 'vitest';
 import { createGuideStep } from '../../features/scenario/project/public';
 import { createTranslator } from '../../platform/i18n';
 import { GuideBlockInspector } from './block-inspector';
@@ -194,20 +204,13 @@ it('preserves text settings across presentations and commits one scrubbed minimu
     expect(host.textContent).toContain('Reset text appearance');
     expect(change).not.toHaveBeenCalled();
     await act(async () => categoryButtons()[0]!.click());
-    expect(range().min).toBe('0');
-    expect(range().max).toBe('7680');
-    expect(range().step).toBe('any');
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
-        range(),
-        '345'
-      );
-      range().dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    expect(field().value).toBe('345');
+    expect(range()).toBeNull();
+    const stepper = host.querySelector<HTMLButtonElement>('button[aria-label$=" increase"]')!;
+    act(() => stepper.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+    expect(field().value).toBe('121');
     expect(change).not.toHaveBeenCalled();
-    await act(async () => range().dispatchEvent(new Event('pointerup', { bubbles: true })));
-    expect(change).toHaveBeenCalledExactlyOnceWith({ ...block, minHeight: 345 }, null);
+    act(() => window.dispatchEvent(new MouseEvent('pointerup')));
+    expect(change).toHaveBeenCalledExactlyOnceWith({ ...block, minHeight: 121 }, null);
     const reset = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
       (b) => b.textContent === 'Automatic height'
     )!;

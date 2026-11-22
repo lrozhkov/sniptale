@@ -61,11 +61,17 @@ async function renderFields(
   await act(async () => root.render(<Harness />));
   return props;
 }
-function range(index = 1) {
-  return host.querySelectorAll<HTMLInputElement>('input[type="range"]')[index]!;
+function stepper(index = 1) {
+  return host.querySelectorAll<HTMLButtonElement>('button[aria-label$=" increase"]')[index]!;
 }
 function key(type: string, value: string, index = 1) {
-  act(() => range(index).dispatchEvent(new KeyboardEvent(type, { key: value, bubbles: true })));
+  act(() => {
+    if (value === 'Escape')
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: value, cancelable: true }));
+    else if (type === 'keydown')
+      stepper(index).dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    else window.dispatchEvent(new MouseEvent('pointerup'));
+  });
 }
 it('previews a scalar against accepted data, cancels Escape, and commits the next gesture once', async () => {
   const props = await renderFields(MotionPerspectiveFields);
@@ -98,9 +104,8 @@ it('clears an unaccepted draft when its fields unmount', async () => {
 });
 it('cancels pointer loss without applying a command', async () => {
   await renderFields(MotionPerspectiveFields);
-  act(() => range().dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
   key('keydown', 'ArrowRight');
-  act(() => range().dispatchEvent(new MouseEvent('pointercancel', { bubbles: true })));
+  act(() => window.dispatchEvent(new MouseEvent('pointercancel')));
   key('keyup', 'ArrowRight');
   expect(commit).not.toHaveBeenCalled();
   expect(observe.mock.lastCall?.[0]).toBeNull();
@@ -151,11 +156,26 @@ it('constrains reference edges and resets only the independent spatial reference
     MotionSpatialReferenceFields,
     createMotionPanelProps({ spatialReference: { x: 0.1, y: 0.2, width: 0.6, height: 0.7 } })
   );
-  const inputs = [...host.querySelectorAll<HTMLInputElement>('input[type="range"]')];
-  expect(inputs.map((input) => Number(input.max))).toEqual([40, 30.000000000000004, 90, 80]);
+  expect(host.querySelector('input[type="range"]')).toBeNull();
+  const inputs = [...host.querySelectorAll<HTMLInputElement>('input[type="text"]')];
+  expect(inputs.map((input) => Number(input.value))).toEqual([10, 20, 60, 70]);
+  for (const [index, maximum] of [40, 30, 90, 80].entries()) {
+    const input = inputs[index]!;
+    act(() => {
+      input.focus();
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '999');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    const axis = (['x', 'y', 'width', 'height'] as const)[index]!;
+    expect(commit).toHaveBeenLastCalledWith(props.selectedMotionRegion!.id, {
+      spatialEdit: { kind: 'reference', [axis]: expect.closeTo(maximum / 100, 8) },
+    });
+  }
   const reset = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
     (button) => button.textContent === label('videoEditor.sidebar.spatialReferenceReset')
   )!;
+  commit.mockClear();
   act(() => reset.click());
   expect(commit).toHaveBeenCalledExactlyOnceWith(props.selectedMotionRegion!.id, {
     spatialEdit: { kind: 'reference', reset: true },

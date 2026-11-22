@@ -24,10 +24,102 @@ import { restoreMediaHubBackupV6 } from '../../../../apps/extension/src/workflow
 import { mediaLibraryRootPublisher } from '../../../../apps/extension/src/workflows/media-hub-backup/v6/root-publication/media';
 import { digestBackupObject } from '../../../../apps/extension/src/workflows/media-hub-backup/v6/shared-objects';
 import type { ArchiveRestoreStrategy } from '../../../../apps/extension/src/composition/persistence/assets/contracts';
+import { saveScreenshotMediaAsset } from '../../../../apps/extension/src/composition/persistence/media-library/index.screenshots';
+import {
+  commitImagePresentation,
+  commitImageWorkspace,
+  readImageAggregateOriginalDocument,
+} from '../../../../apps/extension/src/composition/persistence/image-aggregates';
+import { readImageOriginalSource } from '../../../../apps/extension/src/composition/persistence/image-workspaces';
+import {
+  createEditorSnapshotHistory,
+  pushEditorSnapshotHistory,
+  captureEditorHistoryCheckpoint,
+} from '../../../../apps/extension/src/editor/controller/history';
 
 const ids = ['native-image-one', 'native-image-two'];
 const png =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0H8AAAAASUVORK5CYII=';
+
+/** Creates an edited Library image through the native source and workspace writers. */
+export async function seedEditableImageLifetime() {
+  const id = 'gallery-history-lifetime';
+  const filename = 'Lifetime history.png';
+  const canvas = new OffscreenCanvas(160, 90);
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Missing Image fixture canvas');
+  context.fillStyle = '#4879b8';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  const blob = await canvas.convertToBlob({ type: 'image/png' });
+  await saveScreenshotMediaAsset({
+    id,
+    filename,
+    blob,
+    storageClass: 'library',
+  });
+  const original = await readImageAggregateOriginalDocument(id);
+  if (!original) throw new Error('Missing original Image document');
+  const edited = { ...original, displayName: 'Retained edit' };
+  const stack = createEditorSnapshotHistory(original);
+  pushEditorSnapshotHistory({ history: stack, muted: false, exportDocument: () => edited });
+  const history = captureEditorHistoryCheckpoint(stack);
+  if (!history) throw new Error('Missing retained Image history');
+  const observed = await readImageOriginalSource(id, { includeBlob: false });
+  const saved = await commitImageWorkspace({
+    aggregateId: id,
+    document: edited,
+    history,
+    imageContentState: 'edited',
+    expectedRevision: 0,
+    expectedGeneration: observed.sourceGeneration,
+    requireExistingRoot: true,
+  });
+  await commitImagePresentation({
+    aggregateId: id,
+    expectedWorkspaceRevision: saved.revision,
+    expectedGeneration: saved.sourceGeneration ?? null,
+    previewBlob: blob,
+    thumbnailBlob: blob,
+  });
+  return { id, filename, state: await inspectImageLifetime(id) };
+}
+
+export async function inspectImageLifetime(id: string) {
+  const db = await initDB();
+  const [raw, observed] = await Promise.all([
+    db.get('image_workspaces', id),
+    readImageOriginalSource(id, { includeBlob: false }),
+  ]);
+  const workspace = parseImageWorkspaceEntry(raw);
+  if (!workspace || !observed.asset) throw new Error('Missing native Image lifetime');
+  return {
+    generation: observed.sourceGeneration,
+    workspace,
+    imageContentState: observed.asset.imageContentState ?? 'original',
+  };
+}
+
+/** Replaces the selected Image through the real portable inventory, ZIP and restore owner. */
+export async function replaceImageLifetimeFromArchive(id: string) {
+  const plan = await buildMediaHubBackupExportPlanFromLibraryV6({
+    scope: 'selected',
+    selected: { mediaAssetIds: [id], videoProjectIds: [], scenarioProjectIds: [] },
+    includeDrafts: true,
+    includeSourceMetadata: true,
+    includeTelemetry: false,
+    includeWebSnapshots: false,
+  });
+  const sink = createArchiveMemorySink();
+  await exportMediaHubBackupV6({ plan, sink: sink.sink });
+  const file = sink.blob();
+  const { session } = await createMediaHubRestoreSession({ file, strategy: 'replace' });
+  await restoreMediaHubBackupV6({
+    file,
+    operationId: session.operationId,
+    publishers: [mediaLibraryRootPublisher],
+  });
+  return inspectImageLifetime(id);
+}
 
 async function seed() {
   const bytes = Uint8Array.from(atob(png), (character) => character.charCodeAt(0));

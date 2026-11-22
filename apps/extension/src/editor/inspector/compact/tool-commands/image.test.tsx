@@ -38,6 +38,8 @@ it('builds image layer controls and routes slider previews through image setting
     'image-stroke-opacity',
   ]);
   expect(renderToStaticMarkup(<>{commands[0]!.trigger}</>)).toContain('span');
+  expect(commands[0]!.value).toBeUndefined();
+  expect(commands[6]!.value).toBeUndefined();
   expect(renderToStaticMarkup(<>{commands[1]!.trigger}</>)).toContain('span');
   expect(renderToStaticMarkup(<>{commands[4]!.content}</>)).toContain(
     'shared.ui.compact-inspector.select-field'

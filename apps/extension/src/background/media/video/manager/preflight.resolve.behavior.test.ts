@@ -65,7 +65,9 @@ async function verifyScreenCaptureCancellation(): Promise<void> {
   await expect(resolveScreenCaptureSource(deps)).resolves.toBeNull();
 
   expect(localize).toHaveBeenCalledWith('background.runtime.sourceSelectionCancelled');
-  expect(notifyStartFailed).toHaveBeenCalledWith('selection cancelled');
+  expect(notifyStartFailed).toHaveBeenCalledWith('selection cancelled', {
+    diagnosticCode: 'cancelled',
+  });
 }
 
 function resolveScreenCaptureSource(deps: ResolveCaptureSourceDeps) {
@@ -170,7 +172,9 @@ function registerTabCropCancellationTest() {
     ).resolves.toBeNull();
 
     expect(localize).toHaveBeenCalledWith('background.runtime.areaSelectionCancelled');
-    expect(notifyStartFailed).toHaveBeenCalledWith('area selection cancelled');
+    expect(notifyStartFailed).toHaveBeenCalledWith('area selection cancelled', {
+      diagnosticCode: 'cancelled',
+    });
     expect(deps.getCaptureSource).not.toHaveBeenCalled();
   });
 }

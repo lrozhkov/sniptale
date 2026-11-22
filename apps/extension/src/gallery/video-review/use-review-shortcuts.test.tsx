@@ -1,8 +1,54 @@
 // @vitest-environment jsdom
+import { createReviewCommandFixture } from './editor-fixture.test-support';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { useReviewEditorShortcuts } from './use-review-shortcuts';
+
+it('navigates from the live clock without a periodic editor render', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  host.dataset['ui'] = 'gallery.videoReview.dialog';
+  host.tabIndex = -1;
+  document.body.append(host);
+  host.focus();
+  const root = createRoot(host);
+  const seek = vi.fn();
+  let clock = 2;
+  function Harness() {
+    useReviewEditorShortcuts({
+      commands: createReviewCommandFixture(() => ({ duration: 10, time: clock })),
+      time: clock,
+      navigation: { start: 0, end: 10 },
+      seek,
+      play: vi.fn(),
+      composerAnnotation: null,
+      busy: false,
+      exporterPhase: 'idle',
+      exporterAvailable: true,
+      boundaries: undefined,
+      run: async (action) => action(),
+      undo: async () => {},
+      redo: async () => {},
+      cancelDrawing: vi.fn(),
+      pointTool: vi.fn(),
+      remove: vi.fn(),
+      addComment: vi.fn(),
+      toggleCut: vi.fn(),
+    });
+    return null;
+  }
+  try {
+    act(() => root.render(<Harness />));
+    clock = 6;
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+    expect(seek).toHaveBeenCalledWith(6.1);
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});
 
 it('uses physical shortcut keys across layouts and leaves text editing alone', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -20,6 +66,7 @@ it('uses physical shortcut keys across layouts and leaves text editing alone', (
   const seek = vi.fn();
   function Harness() {
     useReviewEditorShortcuts({
+      commands: createReviewCommandFixture(() => ({ duration: 10, time: 0 })),
       time: 0,
       navigation: { start: 2, end: 8 },
       seek,
@@ -235,6 +282,7 @@ it('blocks repeats, IME, outside focus and mutations during busy/export states',
     phase?: 'idle' | 'exporting' | 'publishing';
   }) {
     useReviewEditorShortcuts({
+      commands: createReviewCommandFixture(() => ({ duration: 10, time: 5 })),
       time: 5,
       navigation: { start: 0, end: 10 },
       seek,

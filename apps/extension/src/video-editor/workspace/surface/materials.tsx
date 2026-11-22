@@ -1,3 +1,5 @@
+import { ProductInput } from '@sniptale/ui/product-form-controls';
+import { SearchField } from '../../../ui/compact-inspector-controls/row-controls';
 import { useCommandPress } from '@sniptale/ui/control-language/press';
 import { InspectorFieldClear } from '../../../ui/compact-inspector-controls/text-field';
 import { useMaterialDrag } from '../../chrome/material-drag';
@@ -208,44 +210,26 @@ function MaterialsFilters(props: {
     >
       {searchOpen ? (
         <div className="flex min-w-0 flex-1 items-center gap-1">
-          <Search
-            size={14}
-            aria-hidden
-            className="shrink-0 text-[var(--sniptale-color-text-muted)]"
+          <SearchField
+            className="flex-1"
+            inputRef={searchRef}
+            label={translate('videoEditor.sidebar.materialsSearch')}
+            placeholder={translate('videoEditor.sidebar.materialsSearch')}
+            value={props.query}
+            onChange={props.onQueryChange}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.stopPropagation();
+                props.onQueryChange('');
+                setSearchOpen(false);
+                requestAnimationFrame(() =>
+                  filterRef.current
+                    ?.querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.search"]')
+                    ?.focus()
+                );
+              }
+            }}
           />
-          <div className="relative min-w-0 flex-1 pr-6">
-            <input
-              ref={searchRef}
-              value={props.query}
-              onChange={(event) => props.onQueryChange(event.target.value)}
-              aria-label={translate('videoEditor.sidebar.materialsSearch')}
-              placeholder={translate('videoEditor.sidebar.materialsSearch')}
-              className={[
-                'h-8 w-full min-w-0 bg-transparent text-[13px] leading-[18px] font-medium outline-none',
-                'placeholder:text-[var(--sniptale-color-text-muted)] focus:placeholder:text-transparent',
-              ].join(' ')}
-              onKeyDown={(event) => {
-                if (event.key === 'Escape') {
-                  event.stopPropagation();
-                  props.onQueryChange('');
-                  setSearchOpen(false);
-                  requestAnimationFrame(() =>
-                    filterRef.current
-                      ?.querySelector<HTMLButtonElement>(
-                        '[data-ui="video-editor.materials.search"]'
-                      )
-                      ?.focus()
-                  );
-                }
-              }}
-            />
-            {props.query ? (
-              <InspectorFieldClear
-                label={translate('videoEditor.sidebar.materialsSearch')}
-                target={searchRef}
-              />
-            ) : null}
-          </div>
           <ProductActionButton
             className={'sniptale-dismiss-button'}
             compact
@@ -696,8 +680,8 @@ function MaterialName(props: {
     <div ref={nameRef} className="flex min-h-12 min-w-0 flex-1 items-center gap-1">
       <div className="min-w-0 flex-1">
         {draft !== null ? (
-          <div className="relative">
-            <input
+          <div className="sniptale-text-value" data-framed>
+            <ProductInput
               ref={inputRef}
               autoFocus
               aria-label={translate('videoEditor.app.materialsRename')}
@@ -714,11 +698,6 @@ function MaterialName(props: {
                   ?.querySelector<HTMLButtonElement>('[data-material-rename]')
                   ?.focus();
               }}
-              className={[
-                'h-8 w-full min-w-0 rounded-[var(--sniptale-radius-sm)] border',
-                'border-[var(--sniptale-color-accent)] bg-transparent pl-2 pr-8 text-[13px]',
-                'leading-[18px] font-medium outline-none',
-              ].join(' ')}
             />
             {draft ? (
               <InspectorFieldClear

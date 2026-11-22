@@ -120,3 +120,19 @@ it('keeps annotation clearance above the source header instead of inside its sel
     rectangles.mockRestore();
   }
 });
+
+it('does not remeasure track geometry when only playback text changes inside a lane', async () => {
+  const { host } = renderTimeline();
+  const source = host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')!;
+  const label = document.createElement('span');
+  label.textContent = '0:01.00';
+  source.append(label);
+  await act(async () => {});
+  const measure = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
+  measure.mockClear();
+  await act(async () => {
+    label.textContent = '0:01.10';
+  });
+  expect(measure).not.toHaveBeenCalled();
+  measure.mockRestore();
+});

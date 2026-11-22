@@ -1,6 +1,7 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { expect, test } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { startHostServer } from '../support/host-server';
 import { chooseInspectorValue } from '../support/inspector-utilities';
 import { addReviewFocus, seedReviewVideo } from '../support/quick-editor-media-fixture';
@@ -283,16 +284,17 @@ for (const theme of ['light', 'dark'] as const) {
             );
         }
         const musicInspector = dialog.locator('[data-ui="gallery.videoReview.audioInspector"]');
-        const level = musicInspector.getByRole('textbox', {
-          name: label('gallery.videoReview.audioClipVolume'),
-          exact: true,
-        });
-        await level.fill('75');
+        const level = numericControl(musicInspector, label('gallery.videoReview.audioClipVolume'));
+        await (
+          await openNumericControl(musicInspector, label('gallery.videoReview.audioClipVolume'))
+        ).fill('75');
         await level.press('Enter');
         await expect
           .poll(async () => (await persistedReviewContent(page))?.audio.music[0]?.volume)
           .toBe(0.75);
-        await level.fill('150');
+        await (
+          await openNumericControl(musicInspector, label('gallery.videoReview.audioClipVolume'))
+        ).fill('150');
         await level.press('Escape');
         await expect(level).toHaveValue('75');
         const miniMute = page

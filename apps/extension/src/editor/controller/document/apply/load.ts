@@ -18,6 +18,7 @@ import { restoreCanonicalEditorDrawingObjects } from '../../../drawing/object/ca
 import { readEditorDrawingObject } from '../../../drawing/object/metadata';
 import { normalizeScenarioAnnotationsInCanvasJson } from '../../../document/scenario-annotation-import';
 import { EditorCanvas } from '../../../document/canvas-surface/render-region';
+import { loadEditorCanvasWithSourceReuse } from './reuse-source';
 
 export async function loadPreparedDocumentOnCanvas(
   options: LoadPreparedDocumentOptions & AppliedDocumentCanvasLoadCallbacks
@@ -30,7 +31,11 @@ export async function loadPreparedDocumentOnCanvas(
     canvasJson,
     options.prepared.normalizedDocument.vectorDefinitions
   );
-  await options.canvas.loadFromJSON(vectorLoad.canvasJson);
+  await loadEditorCanvasWithSourceReuse(
+    options.canvas,
+    vectorLoad.canvasJson,
+    options.preserveViewport === true
+  );
   await bindEditorVectorCanvas(options.canvas, vectorLoad.definitions);
   const canvasPrepareOptions: Parameters<typeof prepareCanvasForDocumentLoad>[0] = {
     canvas: options.canvas,

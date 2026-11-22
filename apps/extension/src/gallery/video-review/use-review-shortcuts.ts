@@ -1,6 +1,7 @@
 import type { ReviewBeforeAction } from './note-transitions';
 import { useEffect, useRef } from 'react';
 import type { ReviewAnnotation } from '../../features/video/review/types';
+import { reviewCommandSourceTime, type ReviewCommandPort } from './command-context';
 
 import {
   reviewKeyboardTarget,
@@ -25,11 +26,10 @@ function handleBoundaryShortcut(
 }
 
 function useReviewKeys({
-  time,
+  step,
   seek,
   play,
   cancelDrawing,
-  boundaries,
   navigation,
   undo,
   redo,
@@ -37,8 +37,7 @@ function useReviewKeys({
   add,
   tool,
 }: {
-  time: number;
-  boundaries?: readonly number[];
+  step(direction: -1 | 1, large: boolean): void;
   navigation: { start: number; end: number };
   seek(value: number, snap?: boolean): void;
   play(): void;
@@ -124,12 +123,7 @@ function useReviewKeys({
         if (reviewOwnsNavigation(target)) return;
         event.preventDefault();
         const direction = event.key === 'ArrowLeft' ? -1 : 1;
-        const next = boundaries
-          ? direction > 0
-            ? boundaries.find((value) => value > time)
-            : [...boundaries].reverse().find((value) => value < time)
-          : time + direction * (event.shiftKey ? 1 : 0.1);
-        seek(next ?? time);
+        step(direction, event.shiftKey);
       }
     };
     window.addEventListener('keydown', onPlaybackKeyDown, true);
@@ -147,6 +141,7 @@ function useReviewKeys({
 
 /** Gates every shortcut behind comment editing and exporter phases. */
 export function useReviewEditorShortcuts(args: {
+  commands: ReviewCommandPort;
   time: number;
   navigation: { start: number; end: number };
   seek(value: number, snap?: boolean): void;
@@ -170,7 +165,21 @@ export function useReviewEditorShortcuts(args: {
   const exportBlocked = args.exporterPhase !== 'idle';
   const admit = args.beforeAction ?? ((action: () => void) => action());
   useReviewKeys({
-    time: args.time,
+    step: (direction, large) => {
+      if (args.busy || exportBlocked) return;
+      const context = args.commands.capture();
+      if (!context) return;
+      args.commands.admit(context, (accepted) => {
+        const time = reviewCommandSourceTime(accepted);
+        if (time === null) return;
+        const next = args.boundaries
+          ? direction > 0
+            ? args.boundaries.find((value) => value > time)
+            : [...args.boundaries].reverse().find((value) => value < time)
+          : time + direction * (large ? 1 : 0.1);
+        args.seek(next ?? time);
+      });
+    },
     navigation: args.navigation,
     seek: (...values) => {
       if (!args.busy && !exportBlocked) admit(() => args.seek(...values));
@@ -189,16 +198,13 @@ export function useReviewEditorShortcuts(args: {
       if (!editingBlocked && !args.busy && !exportBlocked) admit(args.remove);
     },
     add: () => {
-      if (!editingBlocked && !args.busy && !exportBlocked) admit(args.addComment);
+      if (!editingBlocked && !args.busy && !exportBlocked) args.addComment();
     },
     tool: (key) => {
       if (!editingBlocked && !args.busy && !exportBlocked) {
-        admit(() => {
-          if (key === 'v') args.pointTool();
-          else if (args.exporterAvailable) args.toggleCut();
-        });
+        if (key === 'v') admit(args.pointTool);
+        else if (args.exporterAvailable) args.toggleCut();
       }
     },
-    ...(args.boundaries ? { boundaries: args.boundaries } : {}),
   });
 }

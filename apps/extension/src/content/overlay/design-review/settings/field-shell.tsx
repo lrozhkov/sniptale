@@ -31,7 +31,6 @@ export function Field(props: {
             <FieldResetButton label={props.label} onReset={props.onReset} />
           ) : undefined
         }
-        valueMinimum={160}
         {...(props.stacked === undefined ? {} : { stacked: props.stacked })}
       >
         <div className="flex min-w-0 items-center gap-1">
