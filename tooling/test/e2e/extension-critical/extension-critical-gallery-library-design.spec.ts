@@ -595,7 +595,7 @@ for (const [theme, viewport] of [
     if ((await facet.getAttribute('open')) === null) await facet.locator('summary').click();
     const facetText = `${t('gallery.app.facetSearch')} ${t('gallery.app.facetTitle.tags')}`;
     const query = facet.getByLabel(facetText, { exact: true });
-    const option = facet.getByRole('checkbox', { name: new RegExp(tag) });
+    const option = facet.getByRole('checkbox', { name: tag });
     await expect(option).toBeAttached();
     await query.fill('not-a-tag-anywhere');
     await expect(facet.getByText(t('gallery.app.facetNoMatches'))).toBeVisible();
@@ -620,7 +620,10 @@ for (const [theme, viewport] of [
       .locator('../..')
       .getByRole('button', { name: t('gallery.app.savedViewConfirm'), exact: true });
     await draft.fill('Discard draft');
-    await draft.locator('..').getByRole('button').click();
+    const clearDraft = draft.locator('..').getByRole('button');
+    await draft.press('Tab');
+    await expect(clearDraft).toBeFocused();
+    await clearDraft.press('Space');
     await expect(draft).toBeFocused();
     await expect(draft).toHaveValue('');
     await expect(save).toBeDisabled();
