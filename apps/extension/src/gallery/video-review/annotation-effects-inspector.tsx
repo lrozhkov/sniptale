@@ -62,12 +62,19 @@ type Editor = ReturnType<typeof useReviewAnnotationEffects>;
 type Patch = Partial<Omit<ReviewAnnotationEffect, 'id' | 'snapshotId' | 'order'>>;
 
 // These shipped templates declare sliders for dimensions that need exact pixel steps.
-const outlineDimensions = new Map<string, readonly string[]>([
-  ['sniptale-frame', ['stroke', 'radius']],
-  ['sniptale-corners', ['stroke']],
-  ['sniptale-arrow', ['stroke']],
-  ['sniptale-leader-labels', ['lineWidth']],
-]);
+function isOutlineDimension(templateId: string, controlId: string): boolean {
+  switch (templateId) {
+    case 'sniptale-frame':
+      return controlId === 'stroke' || controlId === 'radius';
+    case 'sniptale-corners':
+    case 'sniptale-arrow':
+      return controlId === 'stroke';
+    case 'sniptale-leader-labels':
+      return controlId === 'lineWidth';
+    default:
+      return false;
+  }
+}
 
 type Props = {
   editor: Editor;
@@ -582,7 +589,7 @@ function AnnotationControl(props: AnnotationControlProps) {
   if (control.kind === 'number') {
     const value = typeof props.value === 'number' ? props.value : control.defaultValue;
     const outlineDimension =
-      outlineDimensions.get(props.document.id)?.includes(control.id) &&
+      isOutlineDimension(props.document.id, control.id) &&
       control.unit === 'px' &&
       control.min !== undefined &&
       control.max !== undefined &&

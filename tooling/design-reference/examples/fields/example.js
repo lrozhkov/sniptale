@@ -109,8 +109,14 @@ export function render(root, { manifest }) {
   const prompt = TextField({
     label: 'Запрос',
     multiline: true,
-    value:
-      'Сделай фон светлее.\nСохрани содержимое кадра.\nИспользуй мягкие тени.\nНе добавляй подписи.\nОставь поля по краям.\nСохрани пропорции изображения.',
+    value: [
+      'Сделай фон светлее.',
+      'Сохрани содержимое кадра.',
+      'Используй мягкие тени.',
+      'Не добавляй подписи.',
+      'Оставь поля по краям.',
+      'Сохрани пропорции изображения.',
+    ].join('\n'),
   });
   prompt.element.classList.add('text-field--dictation');
   prompt.element.append(DictationSampleButton(prompt.input, 'ru'));

@@ -1321,7 +1321,11 @@ function styledExportCells(canvas: HTMLCanvasElement) {
 function prepareStyledTextWitness(columns: number) {
   const witness = document.createElement('section');
   witness.dataset['styledTitleWitness'] = '';
-  witness.style.cssText = `position:fixed; inset:0; z-index:10000; padding:16px; background:#191b20; color:white; display:grid; grid-template-columns:repeat(${columns},minmax(0,1fr)); align-content:start; gap:12px`;
+  witness.style.cssText = [
+    'position:fixed; inset:0; z-index:10000; padding:16px',
+    'background:#191b20; color:white; display:grid',
+    `grid-template-columns:repeat(${columns},minmax(0,1fr)); align-content:start; gap:12px`,
+  ].join('; ');
   document.body.append(witness);
 }
 

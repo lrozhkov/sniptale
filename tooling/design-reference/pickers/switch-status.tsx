@@ -54,7 +54,9 @@ export function SwitchStatus({ locale }: { locale: AppLocale }) {
   const [offset, setOffset] = useState(12);
   const [radius, setRadius] = useState(16);
   const offsetY = direction === 'center' ? 0 : direction === 'up' ? -offset : offset;
-  const shadow = `${type === 'inner' ? 'inset ' : ''}0 ${offsetY}px ${blur}px rgba(24, 27, 35, ${(opacityDraft ?? opacity) / 100})`;
+  const inset = type === 'inner' ? 'inset ' : '';
+  const alpha = (opacityDraft ?? opacity) / 100;
+  const shadow = `${inset}0 ${offsetY}px ${blur}px rgba(24, 27, 35, ${alpha})`;
   return (
     <InspectorSurface className="reference-switch-inspector">
       <div

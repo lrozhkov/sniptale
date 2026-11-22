@@ -686,7 +686,9 @@ for (const variant of [
           lane: { top: box.top, bottom: box.bottom },
           layout: [
             ...button.ownerDocument.querySelectorAll<HTMLElement>(
-              '[data-ui="gallery.videoReview.timelinePanes"], [data-ui="gallery.videoReview.timeline"], [data-ui="gallery.videoReview.toolbar"], [data-ui="gallery.videoReview.trackListViewport"]'
+              ['timelinePanes', 'timeline', 'toolbar', 'trackListViewport']
+                .map((name) => `[data-ui="gallery.videoReview.${name}"]`)
+                .join(', ')
             ),
           ].map((node) => ({
             name: node.dataset.ui,
