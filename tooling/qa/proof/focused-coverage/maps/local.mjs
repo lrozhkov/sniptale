@@ -482,6 +482,23 @@ purged-root refusal and recovery validation.`,
     ],
   },
   {
+    owner: 'sync-native-cache-release',
+    productionFile: 'apps/extension/src/workflows/sync-transfer/native-cache.ts',
+    reason:
+      'Cache release fixtures verify native bytes and preserve history resources reserved for ZIP preparation.',
+    testFiles: [
+      'apps/extension/src/workflows/sync-transfer/native-residency.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project-history.test.ts',
+    ],
+  },
+  {
+    owner: 'sync-native-cache-policy',
+    productionFile: 'apps/extension/src/workflows/sync-transfer/native-cache-policy.ts',
+    reason:
+      'Native residency fixtures drive budget trim, pinned roots and pending capture protection.',
+    testFiles: ['apps/extension/src/workflows/sync-transfer/native-residency.test.ts'],
+  },
+  {
     owner: 'sync-prepared-root-native-consumers',
     productionFile: 'apps/extension/src/workflows/sync-transfer/prepared-root.ts',
     reason:

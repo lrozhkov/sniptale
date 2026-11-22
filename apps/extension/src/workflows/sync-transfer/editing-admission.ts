@@ -71,10 +71,21 @@ export async function ensureNativeBackupRootAvailable(
   root: SyncNativeEditingRoot,
   signal?: AbortSignal
 ): Promise<void> {
+  return ensureNativeBackupResources(root, 'backup', signal);
+}
+
+async function ensureNativeBackupResources(
+  root: SyncNativeEditingRoot,
+  purpose: 'backup' | 'cache',
+  signal?: AbortSignal
+): Promise<void> {
   signal?.throwIfAborted();
-  if (!(await needsNativeEditingPreparation(root, 'backup'))) return;
+  if (!(await needsNativeEditingPreparation(root, purpose))) return;
   const client = createSyncProductClient();
-  const accepted = await client.prepareNativeBackup(root);
+  const accepted =
+    purpose === 'backup' && root.rootKind === 'video-project'
+      ? await client.prepareNativeBackup(root, true)
+      : await client.prepareNativeBackup(root);
   if (accepted.kind !== 'accepted') throw new Error('Native backup preparation refused.');
   await withPreparationCancellation(
     client,
@@ -90,7 +101,7 @@ export async function ensureNativeBackupRootAvailable(
         result.completion?.kind !== 'native' ||
         result.completion.root.rootKind !== root.rootKind ||
         result.completion.root.rootId !== root.rootId ||
-        !(await isNativeEditingRootReady(root, 'backup'))
+        !(await isNativeEditingRootReady(root, purpose))
       )
         throw new Error('Native backup resources are unavailable.');
     }
@@ -140,8 +151,8 @@ export async function runWithNativePublicationResources<T>(
     for (const root of roots) {
       const key = JSON.stringify([root.rootKind, root.rootId]);
       if (prepared.has(key)) continue;
-      // Capture publication uses the archive closure, including retained exports.
-      await ensureNativeBackupRootAvailable(root);
+      // Publication needs the current resources and retained exports.
+      await ensureNativeBackupResources(root, 'cache');
       prepared.add(key);
     }
     return operation();

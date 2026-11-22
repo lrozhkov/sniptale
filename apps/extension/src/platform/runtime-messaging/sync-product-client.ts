@@ -300,7 +300,12 @@ export function createSyncProductClient() {
         throw new Error('Library backup selection is invalid.');
       return command(work);
     },
-    prepareNativeBackup: (root: SyncNativeEditingRoot) => command({ kind: 'backup-prepare', root }),
+    prepareNativeBackup: (root: SyncNativeEditingRoot, includeMontageHistory?: true) =>
+      command({
+        kind: 'backup-prepare',
+        root,
+        ...(includeMontageHistory ? { includeMontageHistory } : {}),
+      }),
     prepareNative: (root: SyncNativeEditingRoot) => command({ kind: 'native-prepare', root }),
     prepareScenarioExport: (
       target: Omit<Extract<SyncProductWork, { kind: 'scenario-export-prepare' }>, 'kind'>

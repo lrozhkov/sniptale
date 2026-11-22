@@ -162,7 +162,7 @@ async function commitIntent(
       const checkpoint = await readCheckpointInTransaction(tx, copy.remote.binding, capture);
       if (!checkpoint || !same(checkpoint, capture))
         throw new Error('Asset residency pending enrollment changed.');
-      const resources = await collectNativeEditingResources(tx, checkpoint, 'backup');
+      const resources = await collectNativeEditingResources(tx, checkpoint, 'cache');
       if (
         target.kind === 'opfs'
           ? resources.refs.some((ref) => ref.assetId === target.ref.assetId)
@@ -218,7 +218,7 @@ async function commitIntent(
           (root.rootKind === 'video-review' &&
             (await tx.objectStore(stores.MEDIA_LIBRARY_STORE).get(root.rootId)) !== undefined);
         if (!present) continue;
-        const resources = await collectNativeEditingResources(tx, root, 'backup');
+        const resources = await collectNativeEditingResources(tx, root, 'cache');
         if (
           target.kind === 'opfs'
             ? resources.refs.some((value) => value.assetId === target.ref.assetId)

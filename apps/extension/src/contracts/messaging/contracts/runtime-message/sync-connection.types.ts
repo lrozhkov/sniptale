@@ -277,7 +277,7 @@ export type SyncProductWork =
       expected: SyncConnectionIdentity;
       options: SyncLibraryBackupOptions;
     }
-  | { kind: 'backup-prepare'; root: SyncNativeEditingRoot }
+  | { kind: 'backup-prepare'; root: SyncNativeEditingRoot; includeMontageHistory?: true }
   | { kind: 'native-release'; root: SyncNativeEditingRoot }
   | { kind: 'cache-trim' }
   | { kind: 'native-prepare'; root: SyncNativeEditingRoot }

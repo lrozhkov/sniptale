@@ -1,3 +1,11 @@
+import { isSha256Digest } from '@sniptale/platform/security/digest';
+import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
+import {
+  VIDEO_PROJECT_HISTORY_OWNER_KIND,
+  type PersistedVideoProjectHistory,
+  videoProjectHistoryAssetBindings,
+  videoProjectHistoryChangeRefs,
+} from '../projects/history-contracts';
 import { imageWorkspaceAssetBindings } from '../image-workspaces/assets';
 import type { IDBPTransaction } from 'idb';
 import type { AssetRef } from './contracts';
@@ -66,11 +74,11 @@ function requireResource(condition: unknown): asserts condition {
   if (!condition) throw new Error('Native editing resources are unavailable.');
 }
 
-/** Project current native editing dependencies without reading original bytes or changing rows. */
+/** Project native dependencies for the requested operation without reading original bytes. */
 export async function collectNativeEditingResources(
   tx: ReadTransaction,
   root: NativeEditingRoot,
-  purpose: 'editing' | 'backup' = 'editing'
+  purpose: 'editing' | 'backup' | 'cache' = 'editing'
 ): Promise<NativeEditingResources> {
   const projection = new EditingResourceProjection(tx);
   switch (root.rootKind) {
@@ -84,13 +92,13 @@ export async function collectNativeEditingResources(
       await projection.review(root.rootId);
       break;
     case 'video-project':
-      await projection.project(root.rootId);
+      await projection.project(root.rootId, purpose === 'backup');
       break;
     case 'scenario-project':
       await projection.scenario(root.rootId);
       break;
   }
-  if (purpose === 'backup') await projection.backup(root);
+  if (purpose !== 'editing') await projection.archiveArtifacts(root);
   return projection.result();
 }
 
@@ -337,7 +345,7 @@ class EditingResourceProjection {
     await this.optionalReview(id, ref, sourceId);
   }
 
-  async project(id: string) {
+  async project(id: string, includeHistory: boolean) {
     const entry = parseVideoProjectEntry(
       await this.tx.objectStore(stores.VIDEO_PROJECTS_STORE).get(id)
     );
@@ -368,9 +376,44 @@ class EditingResourceProjection {
             sameReviewVideoContainer(asset.metadata.mimeType, binding.mimeType))
       );
     }
+    if (includeHistory && entry.history) await this.projectHistory(id, entry.history);
   }
 
-  async backup(root: NativeEditingRoot): Promise<void> {
+  private async projectHistory(id: string, history: PersistedVideoProjectHistory) {
+    for (const { role, assetId } of videoProjectHistoryAssetBindings(history)) {
+      await this.owner(VIDEO_PROJECT_HISTORY_OWNER_KIND, id, role, assetId);
+      const ref = await this.ref(assetId);
+      requireResource(
+        ref.mimeType === 'application/json' && isSha256Digest(`sha256:${ref.sha256}`)
+      );
+    }
+    let bytes = 0;
+    for (const { assetId } of videoProjectHistoryChangeRefs(history)) {
+      bytes += this.refs.get(assetId)!.size;
+      requireResource(bytes <= EDITOR_HISTORY_LIMITS.maxBytes);
+    }
+    for (const source of history.sources) {
+      switch (source.kind) {
+        case 'recording':
+          await this.media(`recording:${source.id}`);
+          break;
+        case 'library-asset':
+          await this.media(source.id);
+          break;
+        case 'project-asset':
+          await this.asset(source.id);
+          break;
+        case 'scenario-asset':
+          await this.scenarioAsset(source.id);
+          break;
+        case 'scenario-project':
+          // This identifier links project metadata. Physical children have their own references.
+          break;
+      }
+    }
+  }
+
+  async archiveArtifacts(root: NativeEditingRoot): Promise<void> {
     if (root.rootKind === 'video-project') {
       for (const raw of await this.tx
         .objectStore(stores.PROJECT_EXPORTS_STORE)

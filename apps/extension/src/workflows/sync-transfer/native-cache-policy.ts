@@ -50,7 +50,7 @@ async function exists(db: Database, root: NativeEditingRoot) {
 }
 async function rootResources(db: Database, root: NativeEditingRoot) {
   const tx = db.transaction([...NATIVE_EDITING_RESOURCE_STORES], 'readonly');
-  const result = await collectNativeEditingResources(tx, root, 'backup');
+  const result = await collectNativeEditingResources(tx, root, 'cache');
   await tx.done;
   return [
     ...result.refs.map((ref) => assetResidencyCopyId({ kind: 'opfs', ref })),

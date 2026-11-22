@@ -795,26 +795,30 @@ it.each(['native-release', 'cache-trim'] as const)(
   }
 );
 
-it('prepares a native backup closure without catalog refresh or replica replacement', async () => {
-  const root = { rootKind: 'video-project' as const, rootId: 'project' };
-  const execution = createSyncProductExecution(
-    {
-      ...scopeBinding(),
-      work: { kind: 'backup-prepare', root },
-      signal: new AbortController().signal,
-    },
-    async () => true
-  );
-  await expect(execution.run()).resolves.toMatchObject({
-    state: 'ready',
-    completion: { kind: 'native', root },
-  });
-  expect(mocks.prepareEditing).toHaveBeenCalledWith(
-    expect.objectContaining({ root, purpose: 'backup' })
-  );
-  expect(mocks.refresh).not.toHaveBeenCalled();
-  expect(mocks.receive).not.toHaveBeenCalled();
-});
+it.each([
+  { options: {}, purpose: 'cache' },
+  { options: { includeMontageHistory: true as const }, purpose: 'backup' },
+])(
+  'prepares the native $purpose closure without catalog refresh or replica replacement',
+  async ({ options, purpose }) => {
+    const root = { rootKind: 'video-project' as const, rootId: 'project' };
+    const execution = createSyncProductExecution(
+      {
+        ...scopeBinding(),
+        work: { kind: 'backup-prepare', root, ...options },
+        signal: new AbortController().signal,
+      },
+      async () => true
+    );
+    await expect(execution.run()).resolves.toMatchObject({
+      state: 'ready',
+      completion: { kind: 'native', root },
+    });
+    expect(mocks.prepareEditing).toHaveBeenCalledWith(expect.objectContaining({ root, purpose }));
+    expect(mocks.refresh).not.toHaveBeenCalled();
+    expect(mocks.receive).not.toHaveBeenCalled();
+  }
+);
 
 it('logs fixed start and terminal outcomes without provider or source content', async () => {
   const execution = createSyncProductExecution(

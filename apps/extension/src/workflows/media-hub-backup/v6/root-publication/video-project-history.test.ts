@@ -1,4 +1,5 @@
 import '../../../../composition/persistence/infrastructure/indexed-db/fake-indexed-db.test-support';
+import { createHash } from 'node:crypto';
 import { openDB, deleteDB, type IDBPDatabase } from 'idb';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
@@ -27,7 +28,7 @@ import {
 import { collectVideoProjectHistorySources } from '../../../../features/video/project/history-capture';
 import { getVideoProjectWorkspace } from '../../../../composition/persistence/projects';
 import type { AssetRef, ArchiveRestoreSession } from '../../../../composition/persistence/assets';
-import type { ArchivePathAllocator } from '../../../../composition/archive-transfer';
+import type { ArchivePathAllocator, ExportSink } from '../../../../composition/archive-transfer';
 import { buildVideoProjectRootInventory } from '../inventory/video-projects';
 import { createMediaHubBackupExportOptions } from '../options';
 import { assertArchiveRootObjectInventory } from '../root-codecs/object-inventory';
@@ -40,6 +41,30 @@ import { assertMetadataJson } from '../codec';
 import { parseBoundedJson } from '../codec';
 import { buildMediaHubBackupExportPlanV6, exportMediaHubBackupV6 } from '../export';
 import { inspectMediaHubBackupV6 } from '../inspect';
+import { exportMediaHubBackup } from '../public';
+import { moveLibraryItemsToTrash, restoreLibraryTrashItems } from '../../../media-hub/trash';
+import { releaseNativeEditingRoot } from '../../../sync-transfer/native-cache';
+import type { SyncRemoteStore } from '../../../sync-transfer/remote-store';
+import { captureRootKey } from '../../../../composition/persistence/sync-capture/contracts';
+import {
+  needsNativeEditingPreparation,
+  prepareNativeEditingRoot,
+} from '../../../sync-transfer/native-residency';
+import { hashSyncText } from '../../../sync-transfer/wire-record';
+import { parseAssetRef } from '../../../../composition/persistence/assets/guards';
+import {
+  assetResidencyCopyId,
+  type AssetResidencyCopy,
+} from '../../../../composition/persistence/assets/residency-records';
+import {
+  ASSET_ROOT_DIRECTORY_NAME,
+  readAssetFile as readNativeAssetFile,
+} from '../../../../composition/persistence/assets/opfs-store';
+import {
+  createHarness,
+  MemoryDirectoryHandle,
+} from '../../../../composition/persistence/assets/opfs-store.test-support';
+import type { NativeEditingRoot } from '../../../../composition/persistence/assets/editing-resources';
 import { parseBackupRootEnvelope } from '../shared-object-envelope';
 import { decodeBackupMetadata } from '../metadata-transport';
 import { MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT } from '../layout';
@@ -56,6 +81,8 @@ const io = vi.hoisted(() => ({
   write: vi.fn(),
   read: vi.fn(),
   discard: vi.fn(),
+  backupSink: vi.fn<() => Promise<ExportSink>>(),
+  prepareBackup: vi.fn<(root: NativeEditingRoot, includeMontageHistory?: true) => Promise<void>>(),
   failReceipt: false,
 }));
 vi.mock('../../../../composition/persistence/infrastructure/indexed-db/core', async (original) => ({
@@ -99,6 +126,31 @@ vi.mock('../../../../composition/persistence/assets', async (original) => {
   };
 });
 
+vi.mock('../../../../composition/archive-transfer', async (original) => ({
+  ...(await original<typeof import('../../../../composition/archive-transfer')>()),
+  createDirectFileSink: io.backupSink,
+}));
+vi.mock(import('../../../../composition/persistence/gallery-saved-views'), async (original) => ({
+  ...(await original()),
+  listGallerySavedViews: async () => [],
+}));
+vi.mock('../../../../platform/runtime-messaging/sync-product-client', () => ({
+  createSyncProductClient: () => {
+    let root: NativeEditingRoot;
+    return {
+      prepareNativeBackup: async (requested: NativeEditingRoot, includeMontageHistory?: true) => {
+        root = requested;
+        await io.prepareBackup(root, includeMontageHistory);
+        return { kind: 'accepted', requestId: 'backup-history' };
+      },
+      waitForOperation: async () => ({
+        job: { state: 'ready' },
+        completion: { kind: 'native', root },
+      }),
+    };
+  },
+}));
+
 let db: IDBPDatabase;
 let databaseName: string;
 async function writeAsset(blob: Blob) {
@@ -122,6 +174,7 @@ beforeEach(async () => {
     asset_operations: 'operationId',
     video_project_revisions: 'projectId',
     sync_capture: 'key',
+    sync_connection: 'key',
     thumbnails: 'assetId',
     aggregate_presentations: ['aggregateKind', 'aggregateId'],
     video_workspaces: 'aggregateId',
@@ -145,6 +198,8 @@ beforeEach(async () => {
   io.db = db;
   io.files.clear();
   io.failReceipt = false;
+  io.backupSink.mockReset();
+  io.prepareBackup.mockReset();
   io.write.mockReset().mockImplementation(writeAsset);
   io.read.mockReset().mockImplementation(async (ref: AssetRef, name: string) => {
     const blob = io.files.get(ref.assetId);
@@ -156,6 +211,7 @@ beforeEach(async () => {
   });
 });
 afterEach(async () => {
+  vi.unstubAllGlobals();
   io.db = null;
   db.close();
   await deleteDB(databaseName);
@@ -257,7 +313,7 @@ async function exportedFixture(
     if (!object.blob) throw new Error('Expected retained archive bytes');
     staged.push({ ...(await io.write(object.blob)), objectId: object.ref.objectId });
   }
-  return { entry, envelope, staged, root };
+  return { entry, envelope, staged, root, history: history.history, privateAsset: privateBody.ref };
 }
 
 async function restoreSession(
@@ -576,6 +632,251 @@ it.each(['Draft', 'data:example', 'blob:example'])(
     }
   }
 );
+
+async function remoteBackupFixture(ref: AssetRef, bytes: Blob) {
+  const binding = {
+    provider: 'webdav' as const,
+    rootUrl: 'https://dav.example.test/root/',
+    accountId: 'backup',
+    spaceId: 'archive-space',
+    connectionGeneration: 1,
+    profileCreatedAt: 1,
+  };
+  const authorization = { incarnation: '22222222-2222-4222-8222-222222222222', revision: 1 };
+  await db.put('sync_capture', {
+    version: 1,
+    kind: 'profile',
+    key: 'profile',
+    enabled: true,
+    createdAt: binding.profileCreatedAt,
+    spaceId: binding.spaceId,
+    connectionGeneration: binding.connectionGeneration,
+  });
+  await db.put('sync_connection', {
+    version: 1,
+    kind: 'sync-connection',
+    key: 'connection',
+    binding,
+    identity: authorization,
+    phase: 'active',
+    credentialId: '33333333-3333-4333-8333-333333333333',
+    updateNonce: null,
+  });
+  const target = { kind: 'opfs' as const, ref };
+  const copy: AssetResidencyCopy = {
+    version: 1,
+    kind: 'copy',
+    id: assetResidencyCopyId(target),
+    revision: 2,
+    operationId: 'backup-history-unload',
+    phase: 'unloaded',
+    target,
+    lastUsedAt: 1,
+    remote: {
+      binding,
+      key: `Files/${hashSyncText(binding.spaceId)}/11111111-1111-4111-8111-111111111111/original/history`,
+      sha256: createHash('sha256')
+        .update(new Uint8Array(await bytes.arrayBuffer()))
+        .digest('hex'),
+    },
+  };
+  await db.put('asset_residency', copy);
+
+  const harness = createHarness();
+  const assets = new MemoryDirectoryHandle();
+  harness.root.entriesByName.set(ASSET_ROOT_DIRECTORY_NAME, assets);
+  assets.entriesByName.set('objects', new MemoryDirectoryHandle());
+  vi.stubGlobal('navigator', {
+    storage: { getDirectory: harness.options.getOriginRoot },
+    locks: {
+      request: async (_name: string, _options: unknown, operation: (lock: object) => unknown) =>
+        operation({}),
+    },
+  });
+  const remote = {
+    list: vi.fn<SyncRemoteStore['list']>(),
+    stat: vi.fn<SyncRemoteStore['stat']>(),
+    read: vi.fn<SyncRemoteStore['read']>().mockImplementation(async () => bytes.stream()),
+    write: vi.fn<SyncRemoteStore['write']>(),
+  };
+  const signal = new AbortController().signal;
+  return { binding, authorization, copy, remote, signal };
+}
+
+it('moves Montage to Trash and restores it with history media unavailable', async () => {
+  const fixture = await exportedFixture(false);
+  io.files.delete(fixture.privateAsset.assetId);
+  io.prepareBackup.mockRejectedValue(new Error('Remote unavailable'));
+  const target = { kind: 'video-project' as const, id: fixture.entry.id };
+
+  await moveLibraryItemsToTrash([target]);
+  expect(await db.get('video_projects', target.id)).toMatchObject({
+    lifecycle: { trashedAt: expect.any(Number) },
+  });
+  await restoreLibraryTrashItems([target]);
+  expect((await db.get('video_projects', target.id))?.lifecycle?.trashedAt).toBeUndefined();
+  expect(io.prepareBackup).not.toHaveBeenCalled();
+});
+
+it.each([
+  { missing: 'media', historyFormat: 2 },
+  { missing: 'inverse', historyFormat: 1 },
+] as const)(
+  'prepares evicted Montage history $missing through the public ZIP export',
+  async ({ missing, historyFormat }) => {
+    const fixture = await exportedFixture(false, undefined, historyFormat);
+    const projectId = fixture.entry.id;
+    const inverseId = fixture.history.version === 1 ? fixture.history.past[0]?.assetId : undefined;
+    const assetId = missing === 'media' ? fixture.privateAsset.assetId : inverseId;
+    if (!assetId) throw new Error('Missing history fixture asset identity');
+    const evicted = io.files.get(assetId);
+    const source = io.files.get(fixture.privateAsset.assetId);
+    if (!evicted || !source) throw new Error('Missing history fixture files');
+    const ref = parseAssetRef(await db.get('asset_refs', assetId));
+    if (!ref) throw new Error('Missing history fixture reference');
+    const remote = await remoteBackupFixture(ref, evicted);
+    io.files.delete(assetId);
+    io.read.mockImplementation(async (target: AssetRef, name: string) => {
+      const blob = io.files.get(target.assetId);
+      return blob ? new File([blob], name, { type: blob.type }) : readNativeAssetFile(target, name);
+    });
+    io.prepareBackup.mockImplementation(async (root, includeMontageHistory) => {
+      await expect(
+        prepareNativeEditingRoot({
+          root,
+          purpose: includeMontageHistory ? 'backup' : 'cache',
+          binding: remote.binding,
+          authorization: remote.authorization,
+          remote: remote.remote,
+          signal: remote.signal,
+        })
+      ).resolves.toEqual({ downloaded: 1 });
+    });
+    const root = { rootKind: 'video-project' as const, rootId: projectId };
+    await expect(needsNativeEditingPreparation(root, 'editing')).resolves.toBe(false);
+    const refused = createArchiveMemorySink();
+    const output = createArchiveMemorySink();
+    io.backupSink.mockResolvedValueOnce(refused.sink).mockResolvedValueOnce(output.sink);
+    const options = { scope: 'all' as const, includeDrafts: true };
+    const filename = 'montage.zip';
+    await expect(
+      exportMediaHubBackup(options, { filename, requirePreparedNative: true })
+    ).rejects.toThrow('Native backup resources are unavailable.');
+    expect(refused.aborted).toBe(true);
+    expect(refused.blob().size).toBe(0);
+    expect(io.prepareBackup).not.toHaveBeenCalled();
+
+    await exportMediaHubBackup(options, { filename });
+
+    expect(io.prepareBackup).toHaveBeenCalledExactlyOnceWith(root, true);
+    expect(remote.remote.read).toHaveBeenCalledExactlyOnceWith(
+      remote.copy.remote.key,
+      remote.signal
+    );
+    expect(await db.get('asset_residency', remote.copy.id)).toMatchObject({
+      phase: 'resident',
+      target: { ref },
+    });
+    expect(await db.get('asset_refs', ref.assetId)).toEqual(ref);
+    expect(await (await readNativeAssetFile(ref, 'history')).arrayBuffer()).toEqual(
+      await evicted.arrayBuffer()
+    );
+    const file = new File([output.blob()], 'montage.zip', { type: 'application/zip' });
+    const { manifest, rootKeys } = await inspectMediaHubBackupV6(file);
+    expect(rootKeys).toEqual([`video-project:${projectId}`]);
+    const reader = await openArchiveReader(file);
+    try {
+      const metadataEntry = reader.entry(fixture.root.descriptor.metadataPath);
+      if (!metadataEntry) throw new Error('Missing archived Montage project');
+      const encoded = parseBackupRootEnvelope(
+        parseBoundedJson(await metadataEntry.text()),
+        manifest
+      );
+      const { envelope } = await decodeBackupMetadata(reader, encoded.envelope);
+      const metadata = parsePortableVideoProjectMetadata(envelope.metadata);
+      expect(metadata.entry.project.assets).toEqual([]);
+      expect(metadata.history?.past).toHaveLength(1);
+      expect(metadata.history?.future).toHaveLength(1);
+      const staged = await stageArchiveRootObjects({ envelope, reader });
+      const mediaObject = metadata.projectAssets.find(
+        (item) => item.entry.id === 'project-asset-1'
+      );
+      const stagedMedia = staged.find((item) => item.objectId === mediaObject?.objectId);
+      expect(await io.files.get(stagedMedia?.ref.assetId ?? '')?.arrayBuffer()).toEqual(
+        await source.arrayBuffer()
+      );
+      if (missing === 'inverse') {
+        const inverse = metadata.history?.version === 1 ? metadata.history.past[0] : undefined;
+        const stagedInverse = staged.find((item) => item.objectId === inverse?.objectId);
+        expect(await io.files.get(stagedInverse?.ref.assetId ?? '')?.text()).toBe(
+          await evicted.text()
+        );
+      }
+    } finally {
+      await reader.close();
+    }
+  }
+);
+
+it('keeps history-only files local after a native cache release', async () => {
+  const fixture = await exportedFixture(false, undefined, 1);
+  const root = { rootKind: 'video-project' as const, rootId: fixture.entry.id };
+  const spaceId = 'archive-space';
+  const operationId = 'applied';
+  const rootKey = captureRootKey(spaceId, root.rootKind, root.rootId);
+  await db.put('sync_capture', {
+    version: 1,
+    kind: 'profile',
+    key: 'profile',
+    createdAt: 1,
+    enabled: true,
+    spaceId,
+    connectionGeneration: 1,
+  });
+  await db.put('sync_capture', {
+    version: 1,
+    kind: 'root-state',
+    key: JSON.stringify(['root-state', rootKey]),
+    createdAt: 1,
+    spaceId,
+    ...root,
+    rootKey,
+    generation: 1,
+    basis: [operationId],
+  });
+  const remote: SyncRemoteStore = {
+    list: vi.fn(),
+    stat: vi.fn(),
+    read: vi.fn(),
+    write: vi.fn(),
+  };
+  io.read.mockClear();
+
+  await expect(
+    releaseNativeEditingRoot({
+      root,
+      binding: {
+        spaceId,
+        connectionGeneration: 1,
+        profileCreatedAt: 1,
+        provider: 'webdav',
+        rootUrl: 'https://example.test/dav',
+        accountId: 'account',
+      },
+      authorization: { incarnation: 'connection', revision: 1 },
+      index: { spaceId, operations: new Map([[operationId, root]]), copies: new Map() },
+      remote,
+      signal: new AbortController().signal,
+    })
+  ).resolves.toMatchObject({ released: 0, unavailable: 0 });
+  expect(io.read).not.toHaveBeenCalled();
+  expect(remote.read).not.toHaveBeenCalled();
+  expect(await getVideoProjectWorkspace(root.rootId)).toMatchObject({
+    status: 'ready',
+    history: { status: 'ready' },
+  });
+  expect(io.files.has(fixture.privateAsset.assetId)).toBe(true);
+});
 
 it('retains history backing in the native sync capture created by an archive restore', async () => {
   const f = await exportedFixture();

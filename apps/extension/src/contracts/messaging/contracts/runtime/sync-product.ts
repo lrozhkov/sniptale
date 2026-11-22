@@ -199,6 +199,15 @@ export function parseSyncProductWork(value: unknown): SyncProductWork | null {
       exportId: value['exportId'],
     };
   if (
+    value['kind'] === 'backup-prepare' &&
+    exact(value, ['kind', 'root', 'includeMontageHistory'])
+  ) {
+    const root = nativeRoot(value['root']);
+    return root?.rootKind === 'video-project' && value['includeMontageHistory'] === true
+      ? { kind: 'backup-prepare', root, includeMontageHistory: true }
+      : null;
+  }
+  if (
     (value['kind'] === 'native-prepare' ||
       value['kind'] === 'native-release' ||
       value['kind'] === 'backup-prepare') &&

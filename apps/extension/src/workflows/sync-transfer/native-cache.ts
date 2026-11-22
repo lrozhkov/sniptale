@@ -139,7 +139,7 @@ export async function setNativeCacheRootPinned(
   return runWithIndexedDbMutation(async (db, permit) => {
     const tx = db.transaction(READ_STORES, 'readwrite');
     try {
-      await collectNativeEditingResources(tx, root, 'backup');
+      await collectNativeEditingResources(tx, root, 'cache');
       const intent = await setAssetResidencyRootPinnedInTransaction(
         tx,
         root.rootKind,
@@ -193,7 +193,7 @@ export async function setNativeCacheBudget(budgetBytes: number, revision: number
 
 async function candidates(db: Database, root: NativeEditingRoot): Promise<Candidate[]> {
   const tx = db.transaction(READ_STORES, 'readonly');
-  const resources = await collectNativeEditingResources(tx, root, 'backup');
+  const resources = await collectNativeEditingResources(tx, root, 'cache');
   await tx.done;
   return [
     ...resources.refs.map((ref): Candidate => ({ kind: 'opfs', ref })),

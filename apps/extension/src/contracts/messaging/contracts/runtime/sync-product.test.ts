@@ -587,6 +587,19 @@ it('keeps backup preparation root-only without accepting selected native file re
   ).toBeNull();
 });
 
+it('admits history only for an explicit Montage backup command', () => {
+  const root = { rootKind: 'video-project', rootId: 'selected' };
+  const command = { kind: 'backup-prepare', root, includeMontageHistory: true };
+  expect(parseSyncProductRequest({ ...envelope, command })).toEqual({ ...envelope, command });
+  for (const invalid of [
+    { ...command, includeMontageHistory: false },
+    { ...command, root: { ...root, rootKind: 'media' } },
+    { ...command, kind: 'native-prepare' },
+    { ...command, refs: [] },
+  ])
+    expect(parseSyncProductRequest({ ...envelope, command: invalid })).toBeNull();
+});
+
 it('accepts only an exact expected identity restriction for Settings local-only retirement', () => {
   const expected = { incarnation: id, revision: 2 };
   const command = { kind: 'connection-local-only', expected };
