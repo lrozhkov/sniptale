@@ -93,26 +93,39 @@ describe('editor-inspector-sidebar shared dimension input', () => {
     const input = getDimensionInput('Width');
     act(() => input.focus());
     act(() => setInputValue(input, '4'));
-    const down = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 1 });
+    const down = new WheelEvent('wheel', {
+      altKey: true,
+      bubbles: true,
+      cancelable: true,
+      deltaY: 1,
+    });
     act(() => input.dispatchEvent(down));
     expect(input.value).toBe('2');
     expect(onChange).toHaveBeenLastCalledWith(2);
     expect(down.defaultPrevented).toBe(true);
     act(() => {
-      input.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -1 }));
-      input.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -1 }));
+      input.dispatchEvent(
+        new WheelEvent('wheel', { altKey: true, bubbles: true, cancelable: true, deltaY: -1 })
+      );
+      input.dispatchEvent(
+        new WheelEvent('wheel', { altKey: true, bubbles: true, cancelable: true, deltaY: -1 })
+      );
     });
     expect(input.value).toBe('8');
     expect(document.activeElement).toBe(input);
     act(() => setInputValue(input, ''));
     act(() =>
-      input.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -1 }))
+      input.dispatchEvent(
+        new WheelEvent('wheel', { altKey: true, bubbles: true, cancelable: true, deltaY: -1 })
+      )
     );
     expect(input.value).toBe('11');
     act(() => container?.querySelector<HTMLButtonElement>('[data-external-dimension]')?.click());
     expect(input.value).toBe('30');
     act(() =>
-      input.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 1 }))
+      input.dispatchEvent(
+        new WheelEvent('wheel', { altKey: true, bubbles: true, cancelable: true, deltaY: 1 })
+      )
     );
     expect(input.value).toBe('27');
   });

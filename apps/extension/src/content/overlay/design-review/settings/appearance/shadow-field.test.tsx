@@ -71,7 +71,12 @@ it('steps focused shadow offsets through serialization without clamping negative
     `input[aria-label="${translate('content.designReview.shadowOffsetX')}"]`
   )!;
   input.focus();
-  const wheel = new WheelEvent('wheel', { deltaY: 20, bubbles: true, cancelable: true });
+  const wheel = new WheelEvent('wheel', {
+    altKey: true,
+    deltaY: 20,
+    bubbles: true,
+    cancelable: true,
+  });
   act(() => input.dispatchEvent(wheel));
   expect(wheel.defaultPrevented).toBe(true);
   expect(onChange).toHaveBeenCalledWith('-1px 8px 18px 0px rgba(0, 0, 0, 0.2)');
@@ -87,6 +92,7 @@ it('retains the shadow parser numeric domain when stepping exponential offsets',
   act(() =>
     input.dispatchEvent(
       new WheelEvent('wheel', {
+        altKey: true,
         deltaY: -20,
         bubbles: true,
         cancelable: true,

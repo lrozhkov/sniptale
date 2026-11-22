@@ -439,11 +439,21 @@ it.each([
     )
   );
   const input = container.querySelector<HTMLInputElement>('input')!;
-  const ignored = new WheelEvent('wheel', { deltaY: -20, bubbles: true, cancelable: true });
+  const ignored = new WheelEvent('wheel', {
+    altKey: true,
+    deltaY: -20,
+    bubbles: true,
+    cancelable: true,
+  });
   input.dispatchEvent(ignored);
   expect(onChange).not.toHaveBeenCalled();
   input.focus();
-  const wheel = new WheelEvent('wheel', { deltaY: -20, bubbles: true, cancelable: true });
+  const wheel = new WheelEvent('wheel', {
+    altKey: true,
+    deltaY: -20,
+    bubbles: true,
+    cancelable: true,
+  });
   act(() => input.dispatchEvent(wheel));
   expect(wheel.defaultPrevented).toBe(true);
   expect(onChange).toHaveBeenCalledWith(expected);

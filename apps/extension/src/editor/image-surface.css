@@ -138,15 +138,7 @@ textarea[data-ui='editor.ai.prompt'] {
   display: none;
 }
 [data-ui='editor.ai.prompt']::-webkit-resizer {
-  background: linear-gradient(
-      to top left,
-      transparent 2px,
-      var(--sniptale-color-text-muted) 2px 3px,
-      transparent 3px 5px,
-      var(--sniptale-color-text-muted) 5px 6px,
-      transparent 6px
-    )
-    right bottom / 8px 8px no-repeat;
+  background: var(--sniptale-textarea-resize-grip);
 }
 
 .sniptale-image-workspace canvas.upper-canvas[tabindex='-1']:focus {

@@ -48,7 +48,12 @@ it.each(['number', 'manual', 'letter'] as const)(
       act(() => root.render(<Host />));
       const input = host.querySelector('input')!;
       act(() => input.focus());
-      const wheel = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -1 });
+      const wheel = new WheelEvent('wheel', {
+        altKey: true,
+        bubbles: true,
+        cancelable: true,
+        deltaY: -1,
+      });
       act(() => input.dispatchEvent(wheel));
       expect(wheel.defaultPrevented).toBe(type === 'number');
       if (type === 'number') {
@@ -57,10 +62,10 @@ it.each(['number', 'manual', 'letter'] as const)(
         expect(commit).not.toHaveBeenCalled();
         act(() => {
           input.dispatchEvent(
-            new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 1 })
+            new WheelEvent('wheel', { altKey: true, bubbles: true, cancelable: true, deltaY: 1 })
           );
           input.dispatchEvent(
-            new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 1 })
+            new WheelEvent('wheel', { altKey: true, bubbles: true, cancelable: true, deltaY: 1 })
           );
         });
         expect(input.value).toBe('97');

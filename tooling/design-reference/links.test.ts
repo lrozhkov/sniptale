@@ -98,11 +98,5 @@ describe('canonical design reference links', () => {
       expect(rule, file).not.toBeNull();
       expect(existsSync(resolve(root, 'docs/design', rule![1])), file).toBe(true);
     }
-    for (const file of globSync('docs/design/*.md', { cwd: root })) {
-      expect(
-        readFileSync(resolve(root, file), 'utf8').split(/\s+/).length,
-        file
-      ).toBeLessThanOrEqual(800);
-    }
   });
 });

@@ -695,7 +695,7 @@ it('shows one section heading in sections mode and moves object actions into it'
   expect(host.querySelectorAll('.guide-inspector-group')).toHaveLength(4);
 });
 
-it('uses the exact shared stepper for tour camera numbers', async () => {
+it('uses exact steppers for camera timing and a range with exact zoom entry', async () => {
   presentation = 'sections';
   draw();
   await click('Actions');
@@ -703,16 +703,21 @@ it('uses the exact shared stepper for tour camera numbers', async () => {
   await click('Back to slide settings');
   await click('Camera');
   const rows = [...host.querySelectorAll('[data-ui="shared.ui.compact-inspector.numeric-row"]')];
-  expect(rows.length).toBeGreaterThan(0);
-  for (const row of rows) {
+  const timingRows = rows.filter((row) => row.querySelector('button[aria-label$=" increase"]'));
+  expect(timingRows).toHaveLength(2);
+  for (const row of timingRows) {
     expect(row.getAttribute('data-appearance')).toBe('plain');
     const field = row.querySelector('[data-ui="shared.ui.compact-inspector.numeric-value-field"]')!;
     expect(field.getAttribute('data-focus-appearance')).toBe('accent-box');
     expect(row.querySelector('input[type=range]')).toBeNull();
-    expect(row.querySelector('button[aria-label$=" increase"]')).not.toBeNull();
   }
+  expect(host.querySelector('input[type="range"][aria-label="Zoom"]')).not.toBeNull();
+  await click('Zoom');
+  expect(host.querySelector('input[role="spinbutton"][aria-label="Zoom"]')).not.toBeNull();
   await fill('Zoom', '250');
-  expect(host.querySelector<HTMLInputElement>('input[aria-label="Zoom"]')!.value).toBe('250');
+  expect(
+    host.querySelector<HTMLInputElement>('input[type="range"][aria-label="Zoom"]')?.value
+  ).toBe('250');
 });
 
 it('preserves image categories through All and object drill-down without editing the tour', async () => {

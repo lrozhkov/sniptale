@@ -2,6 +2,18 @@
 @import './select.css';
 @import './segments.css';
 
+.sniptale-textarea {
+  --sniptale-textarea-resize-grip: linear-gradient(
+      to top left,
+      transparent 2px,
+      var(--sniptale-color-text-muted) 2px 3px,
+      transparent 3px 5px,
+      var(--sniptale-color-text-muted) 5px 6px,
+      transparent 6px
+    )
+    right bottom / 8px 8px no-repeat;
+}
+
 .sniptale-input,
 .sniptale-textarea {
   cursor: text;

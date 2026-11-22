@@ -141,8 +141,8 @@ it('searches by user-facing name and key and bulk-selects only matches', () => {
   const input = container.querySelector<HTMLInputElement>(
     '[aria-label="settings.settingsTransfer.searchLabel"]'
   );
-  expect(input?.className).toContain('focus:placeholder:opacity-0');
-  expect(input?.parentElement?.parentElement?.classList.contains('flex')).toBe(true);
+  expect(input?.type).toBe('search');
+  expect(input?.closest('.sniptale-inspector-search')).not.toBeNull();
   act(() => {
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
     setter?.call(input, 'glass');

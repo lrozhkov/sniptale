@@ -11,6 +11,7 @@ function createRepository() {
   fs.mkdirSync(path.join(root, 'tasks'));
   fs.mkdirSync(path.join(root, 'source'));
   fs.writeFileSync(path.join(root, 'source/original.ts'), 'export const value = 1;\n');
+  fs.chmodSync(path.join(root, 'source/original.ts'), 0o644);
   execFileSync('git', ['init'], { cwd: root });
   execFileSync('git', ['config', 'user.email', 'qa@example.test'], { cwd: root });
   execFileSync('git', ['config', 'user.name', 'QA'], { cwd: root });
@@ -78,6 +79,7 @@ it('accepts declared generated targets outside the selected move root', () => {
   const manifest = createManifest(root);
   fs.mkdirSync(path.join(root, 'platform'));
   fs.writeFileSync(path.join(root, 'platform/codec.ts'), 'export {};\n');
+  fs.chmodSync(path.join(root, 'platform/codec.ts'), 0o644);
   manifest.generatedEntries.push({ targetPath: 'platform/codec.ts', mode: '644' } as never);
   writeManifest(root, manifest);
   expect(collectTaskTopologySourceByTarget({ root }).get('source/moved.ts')).toBe(

@@ -7,14 +7,18 @@
   max-width: 220px;
 }
 
+.sniptale-compact-workspace .sniptale-select,
 .sniptale-select {
   --sniptale-field-height: 32px;
-  --sniptale-field-padding-block: 6px;
   --sniptale-field-padding-inline-start: 8px;
   --sniptale-field-padding-inline-end: 28px;
   --sniptale-field-gap: 6px;
   --sniptale-field-radius: 4px;
   --sniptale-field-font-size: 13px;
+}
+
+.sniptale-select {
+  --sniptale-field-padding-block: 6px;
   --sniptale-field-bg-idle: var(--sniptale-color-field);
   --sniptale-field-border-idle: var(--sniptale-color-field-border);
   --sniptale-field-shadow-idle: none;
@@ -274,13 +278,7 @@
 
 /* Adopted surfaces retain canonical geometry through portaled selection menus. */
 .sniptale-compact-workspace .sniptale-select {
-  --sniptale-field-height: 32px;
   --sniptale-field-padding-block: 5px;
-  --sniptale-field-padding-inline-start: 8px;
-  --sniptale-field-padding-inline-end: 28px;
-  --sniptale-field-gap: 6px;
-  --sniptale-field-radius: 4px;
-  --sniptale-field-font-size: 13px;
   font: 400 13px / 18px var(--sniptale-font-interface);
 }
 .sniptale-compact-workspace .sniptale-select-chevron-edge {

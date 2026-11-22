@@ -1,3 +1,11 @@
+.inspector-hex-editor,
+.alpha-value {
+  font: var(--font-control-weight, 400)
+    var(--font-control-size, 13px)/var(--font-control-line, 18px)
+    var(--font-ui, var(--sniptale-font-interface));
+  font-variant-numeric: tabular-nums;
+}
+
 .inspector-hex-editor {
   position: relative;
   min-width: 0;
@@ -5,10 +13,6 @@
   padding-inline: var(--color-hex-padding, 8px);
   text-align: start;
   color: var(--text, var(--sniptale-color-text-primary));
-  font: var(--font-control-weight, 400)
-    var(--font-control-size, 13px)/var(--font-control-line, 18px)
-    var(--font-ui, var(--sniptale-font-interface));
-  font-variant-numeric: tabular-nums;
   text-transform: uppercase;
 }
 .inspector-hex-trigger {
@@ -60,10 +64,6 @@
   position: relative;
   min-width: 0;
   border-inline-start: 1px solid var(--sniptale-color-field-border);
-  font: var(--font-control-weight, 400)
-    var(--font-control-size, 13px)/var(--font-control-line, 18px)
-    var(--font-ui, var(--sniptale-font-interface));
-  font-variant-numeric: tabular-nums;
 }
 .alpha-value .numeric-editor {
   display: flex;

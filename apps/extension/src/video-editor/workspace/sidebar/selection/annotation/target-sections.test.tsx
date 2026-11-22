@@ -60,8 +60,10 @@ function verifyPointerLabelFields(): void {
   expect(markup).toContain('videoEditor.sidebar.annotationTargetPointYLabel');
   expect(markup).toContain('videoEditor.sidebar.annotationLeaderLineStyleLabel');
   expect(markup).toContain('videoEditor.sidebar.annotationMarkerKindLabel');
-  expect(markup).toContain('videoEditor.sidebar.annotationTargetPointXLabel range');
-  expect(markup).toContain('videoEditor.sidebar.annotationLeaderLineThicknessLabel range');
+  expect(markup).toContain('aria-label="videoEditor.sidebar.annotationTargetPointXLabel increase"');
+  expect(markup).toContain(
+    'aria-label="videoEditor.sidebar.annotationLeaderLineThicknessLabel increase"'
+  );
 }
 
 function verifyRectSizingFields(): void {

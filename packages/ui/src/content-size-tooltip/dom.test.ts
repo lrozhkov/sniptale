@@ -241,7 +241,12 @@ describe('content-size-tooltip.dom', () => {
     tooltip.widthInput.addEventListener('input', () => events.push('input'));
     tooltip.widthInput.addEventListener('change', () => events.push('change'));
     tooltip.widthInput.focus();
-    const wheel = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -120 });
+    const wheel = new WheelEvent('wheel', {
+      altKey: true,
+      bubbles: true,
+      cancelable: true,
+      deltaY: -120,
+    });
     tooltip.widthInput.dispatchEvent(wheel);
     expect(wheel.defaultPrevented).toBe(true);
     expect(tooltip.widthInput.value).toBe('322');
@@ -249,7 +254,12 @@ describe('content-size-tooltip.dom', () => {
     expect(document.activeElement).toBe(tooltip.widthInput);
 
     tooltip.widthInput.value = '800';
-    const boundary = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -120 });
+    const boundary = new WheelEvent('wheel', {
+      altKey: true,
+      bubbles: true,
+      cancelable: true,
+      deltaY: -120,
+    });
     tooltip.widthInput.dispatchEvent(boundary);
     expect(boundary.defaultPrevented).toBe(true);
     expect(tooltip.widthInput.value).toBe('800');

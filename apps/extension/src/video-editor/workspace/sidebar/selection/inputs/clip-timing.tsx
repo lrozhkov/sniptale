@@ -90,40 +90,38 @@ export function ClipFadeFields(props: {
   locked: boolean;
   onUpdateClipFades: WorkspaceSidebarSelectionPanelProps['onUpdateClipFades'];
 }) {
+  const fields = [
+    {
+      key: 'fadeInMs',
+      label: props.audio
+        ? 'videoEditor.sidebar.inspectorAudioFadeIn'
+        : 'videoEditor.sidebar.fadeInLabel',
+    },
+    {
+      key: 'fadeOutMs',
+      label: props.audio
+        ? 'videoEditor.sidebar.inspectorAudioFadeOut'
+        : 'videoEditor.sidebar.fadeOutLabel',
+    },
+  ] as const;
+  const max = props.audio ? getAudioFadeLimitSeconds(props.duration) : Math.min(5, props.duration);
   return (
     <div className="sniptale-parameter-stack space-y-3">
-      <NumberInput
-        label={translate(
-          props.audio
-            ? 'videoEditor.sidebar.inspectorAudioFadeIn'
-            : 'videoEditor.sidebar.fadeInLabel'
-        )}
-        value={props.fadeInMs / 1000}
-        min={0}
-        max={props.audio ? getAudioFadeLimitSeconds(props.duration) : Math.min(5, props.duration)}
-        step={0.05}
-        disabled={props.locked}
-        unit="s"
-        onChange={(value) =>
-          props.onUpdateClipFades(props.clipId, { fadeInMs: Math.round(value * 1000) })
-        }
-      />
-      <NumberInput
-        label={translate(
-          props.audio
-            ? 'videoEditor.sidebar.inspectorAudioFadeOut'
-            : 'videoEditor.sidebar.fadeOutLabel'
-        )}
-        value={props.fadeOutMs / 1000}
-        min={0}
-        max={props.audio ? getAudioFadeLimitSeconds(props.duration) : Math.min(5, props.duration)}
-        step={0.05}
-        disabled={props.locked}
-        unit="s"
-        onChange={(value) =>
-          props.onUpdateClipFades(props.clipId, { fadeOutMs: Math.round(value * 1000) })
-        }
-      />
+      {fields.map(({ key, label }) => (
+        <NumberInput
+          key={key}
+          label={translate(label)}
+          value={props[key] / 1000}
+          min={0}
+          max={max}
+          step={0.05}
+          disabled={props.locked}
+          unit="s"
+          onChange={(value) =>
+            props.onUpdateClipFades(props.clipId, { [key]: Math.round(value * 1000) })
+          }
+        />
+      ))}
     </div>
   );
 }

@@ -4,21 +4,21 @@
   "description": "Complete exact-finding jscpd tool-noise baseline after repository-wide triage and justified consolidation.",
   "allowances": [
     {
-      "id": "0209593cf8454908da9e8e94ba6e1745edede1a8692f2e07e07cadb5fce73c5b",
+      "id": "00d067f76c44f6860a9f73cfb2227e8aaae0b4ed2b3eec1ce7d289a2c3d6015a",
       "classification": "tool-noise",
-      "owner": "editor AI prompt <-> scenario editor voice field",
-      "reason": "The match contains field, latest value, insertion and caret refs and the shared-session callback opening. Image prompting owns operation-change cancellation, trimmed dictated text, a 4000-character limit and separators beside any non-whitespace text. Scenario fields own disabled-only cancellation, configurable limits, single-line newline normalization, punctuation-sensitive separators and preserved dictated whitespace. composition/voice-input/session already owns transport and session lifecycle; extracting refs would create a state bag without unifying placement policy.",
-      "removalCondition": "Remove when this exact pair disappears or an accepted common field-placement contract replaces both consumers.",
-      "reviewBy": "2027-05-14",
+      "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/product-form-controls",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
       "firstFile": {
-        "path": "apps/extension/src/editor/ai/prompt.tsx",
-        "start": 16,
-        "end": 23
+        "path": "packages/ui/src/styles/content-popover/index.css",
+        "start": 83,
+        "end": 89
       },
       "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/voice-field.tsx",
-        "start": 29,
-        "end": 36
+        "path": "packages/ui/src/styles/product-form-controls/select.css",
+        "start": 212,
+        "end": 218
       }
     },
     {
@@ -37,6 +37,24 @@
         "path": "apps/extension/src/composition/persistence/scenario/resource-sessions.ts",
         "start": 20,
         "end": 31
+      }
+    },
+    {
+      "id": "02b4bcb754d3fb4ddb842a718abf2877bbaf674af1d90cdded482dfa055a276f",
+      "classification": "tool-noise",
+      "owner": "features/video/project/motion and features/video/review/advanced",
+      "reason": "The endpoints return a rectangle record after different validators. Project crop permits positive values viazero check; review webcam requires Number.EPSILON and owns its own boundary. Both check normalized extents.",
+      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/project/motion/spatial.ts",
+        "start": 377,
+        "end": 383
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/review/advanced/webcam.ts",
+        "start": 84,
+        "end": 90
       }
     },
     {
@@ -76,39 +94,21 @@
       }
     },
     {
-      "id": "2090eb0a42acbcbb21dfdf8a76c5b84079a3ca25683a1256e2d55e0ad64fa06c",
+      "id": "03cd47a02541974beab9581564f7b5b1a7dc914d169473f3c5fe998eeffb1177",
       "classification": "tool-noise",
-      "owner": "composition/persistence/infrastructure/indexed-db",
-      "reason": "These ranges import canonical store identifiers for separate schema-description and native-upgrade consumers. The match contains no duplicate executable algorithm or store definition.",
-      "removalCondition": "Remove when this exact detector pair disappears or either consumer no longer needs these imports.",
-      "reviewBy": "2027-05-02",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.ts",
-        "start": 4,
-        "end": 42
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
-        "start": 6,
-        "end": 44
-      }
-    },
-    {
-      "id": "9cf48fca99c4906d47033e5129d4111a45fed2bf57b72149b8be220a12dcb79e",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/library/sidebar/folder-list.tsx",
-      "reason": "Existing saved-view row calls belong to visible-folder and hidden-folder eligibility/layout branches.",
-      "removalCondition": "Remove when either branch disappears or saved-view composition changes.",
+      "owner": "packages/ui/src/styles/overlays/ai-modal-overrides <-> packages/ui/src/styles/toolbar",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
       "reviewBy": "2027-09-01",
       "firstFile": {
-        "path": "apps/extension/src/gallery/library/sidebar/folder-list.tsx",
-        "start": 208,
-        "end": 217
+        "path": "packages/ui/src/styles/overlays/ai-modal-overrides/surface.css",
+        "start": 174,
+        "end": 181
       },
       "secondFile": {
-        "path": "apps/extension/src/gallery/library/sidebar/folder-list.tsx",
-        "start": 96,
-        "end": 101
+        "path": "packages/ui/src/styles/toolbar/menu-items.css",
+        "start": 161,
+        "end": 168
       }
     },
     {
@@ -127,24 +127,6 @@
         "path": "apps/extension/src/features/video/project/cursor-motion/apple/hand2.svg",
         "start": 10,
         "end": 16
-      }
-    },
-    {
-      "id": "04fedfa75986e5a0b1ceb9c8f7c4975e114ed313250e374d21368ff91c75452e",
-      "classification": "tool-noise",
-      "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/product-form-controls",
-      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
-      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "packages/ui/src/styles/content-popover/index.css",
-        "start": 83,
-        "end": 89
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/product-form-controls/select.css",
-        "start": 226,
-        "end": 232
       }
     },
     {
@@ -253,24 +235,6 @@
         "path": "packages/ui/src/styles/toolbar-shell/vertical.css",
         "start": 233,
         "end": 239
-      }
-    },
-    {
-      "id": "110cb5fba984caefe1da5e8400e35234ce0b7efeca89b24162f2f2c30e88a3d3",
-      "classification": "tool-noise",
-      "owner": "scenario-editor page-shell workspace chrome",
-      "reason": "The base transition set includes voice controls. The hover set excludes voice controls and adds disabled/pressed predicates. Their different membership and declarations prevent one merged control contract.",
-      "removalCondition": "Remove this finding if voice and structural controls acquire the same hover contract.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 1842,
-        "end": 1851
-      },
-      "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 1856,
-        "end": 1865
       }
     },
     {
@@ -418,6 +382,42 @@
       }
     },
     {
+      "id": "2072387373a0a3d7ddf2bebb87d350b01380c7eb9d0ffa9f33caff61b0581346",
+      "classification": "tool-noise",
+      "owner": "workflows/video-review freeze frame timing <-> source metadata inspection",
+      "reason": "The match contains six lines that open a decoder and attach abort disposal. Freeze reads and validates an original frame interval. Source inspection validates metadata and provenance. Each operation closes its own input in finally. Shared setup syntax does not unify decoder work or admission.",
+      "removalCondition": "Remove when this exact pair disappears or an accepted common decoder operation owns both lifetimes.",
+      "reviewBy": "2027-05-15",
+      "firstFile": {
+        "path": "apps/extension/src/workflows/video-review/freeze-frame.ts",
+        "start": 12,
+        "end": 17
+      },
+      "secondFile": {
+        "path": "apps/extension/src/workflows/video-review/source.ts",
+        "start": 108,
+        "end": 113
+      }
+    },
+    {
+      "id": "2090eb0a42acbcbb21dfdf8a76c5b84079a3ca25683a1256e2d55e0ad64fa06c",
+      "classification": "tool-noise",
+      "owner": "composition/persistence/infrastructure/indexed-db",
+      "reason": "These ranges import canonical store identifiers for separate schema-description and native-upgrade consumers. The match contains no duplicate executable algorithm or store definition.",
+      "removalCondition": "Remove when this exact detector pair disappears or either consumer no longer needs these imports.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.ts",
+        "start": 4,
+        "end": 42
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
+        "start": 6,
+        "end": 44
+      }
+    },
+    {
       "id": "20badf6c7ad5c562992c6e48d54b4eb9f2e2062f74a5f716fb57c3d328c0e09e",
       "classification": "tool-noise",
       "owner": "apps/extension/src/video-editor/timeline/project/tracks/list.tsx",
@@ -433,24 +433,6 @@
         "path": "apps/extension/src/video-editor/timeline/project/tracks/list.tsx",
         "start": 39,
         "end": 49
-      }
-    },
-    {
-      "id": "20bd034a396805073eb75a61167c8ee9e24a5835a92c2d0fd4e2411f968e6757",
-      "classification": "tool-noise",
-      "owner": "packages/ui popup and product form select surfaces",
-      "reason": "Only idle token names and transparent/none values match. Popup geometry is 32px/12px with panel 98% hover. Product form geometry is 44px/14px with input 86% hover. The matched endpoint includes different font sizes and different hover operands.",
-      "removalCondition": "Remove this finding if both surfaces adopt one explicitly shared geometry and hover contract.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "packages/ui/src/styles/popup-shell/select.css",
-        "start": 13,
-        "end": 19
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/product-form-controls/select.css",
-        "start": 17,
-        "end": 23
       }
     },
     {
@@ -505,42 +487,6 @@
         "path": "packages/ui/src/styles/toolbar-shell/button.css",
         "start": 253,
         "end": 264
-      }
-    },
-    {
-      "id": "237d399db8fe9e32f5a9b109d533806062c366aeafdfb653ad9cc96d7c1d31c1",
-      "classification": "tool-noise",
-      "owner": "scenario-editor page-shell workspace chrome",
-      "reason": "The base control set receives transition properties. Its focus-visible state receives an outline and outline offset. Matching selector tokens do not duplicate the state-specific declarations.",
-      "removalCondition": "Remove this finding if the keyboard focus state or base transition rule disappears.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 1842,
-        "end": 1853
-      },
-      "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 1882,
-        "end": 1893
-      }
-    },
-    {
-      "id": "57e36042f3045c6ae4b79f857834f7f5084dc47a6d9f1cbb321d47c5451298a2",
-      "classification": "tool-noise",
-      "owner": "Gallery and Native camera appearance controls",
-      "reason": "The four camera shape labels are shared enum metadata. Gallery performs its own shape admission/update while Native calls its camera appearance patch owner and applies disabled policy. Both reuse their existing select control; shape geometry is not copied.",
-      "removalCondition": "Remove this record if camera silhouette/crop computation is duplicated in the inspectors.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/webcam-inspector.tsx",
-        "start": 426,
-        "end": 433
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-appearance.tsx",
-        "start": 71,
-        "end": 78
       }
     },
     {
@@ -634,6 +580,24 @@
       }
     },
     {
+      "id": "2ae8deed45bed715c4335e95b0958b03048a934f146df42dd48c25289e2cdb2c",
+      "classification": "tool-noise",
+      "owner": "Gallery and Native text inspector",
+      "reason": "Both declare document/cards view controls using SegmentedRow. Each owns its own editor typing session and local view state. The match is shared UI options and typing-boundary wiring, not text editing or projection logic.",
+      "removalCondition": "Remove this record if document/card rendering or typing-session implementation is copied.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/text-panel.tsx",
+        "start": 143,
+        "end": 151
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text.tsx",
+        "start": 174,
+        "end": 182
+      }
+    },
+    {
       "id": "2c15769854615f4ec75bbd88fe1cec5640a41a64ffc222ae6f058ec042f1146d",
       "classification": "tool-noise",
       "owner": "apps/extension/src/scenario-editor/page-shell/print.tsx",
@@ -688,21 +652,21 @@
       }
     },
     {
-      "id": "319855547214e011bf4310e7f2d0c2ce8fb085d9431e111d12fb2e65e6427ce5",
+      "id": "31eb842c474d8e6bc98d41d1570562ff92826d200cc10bfebb4ff2f1fc07b72a",
       "classification": "tool-noise",
-      "owner": "highlighter preset color-source inspectors",
-      "reason": "The match is a PropertyField/fieldset/CompactColorSelector presentation. Callout resolves colors from CalloutFrameColors and three sources; StepBadge resolves visual-role colors and optionally adds surface as a fourth outline source. The existing color selector owns picker behavior; source policy and automation attributes differ.",
-      "removalCondition": "Remove this record if source resolution or picker lifecycle is duplicated beyond this declarative composition.",
+      "owner": "packages/ui design tokens",
+      "reason": "The base rule declares font, geometry, and motion tokens on all theme hosts. The second repeats those hosts inside prefers-reduced-motion and assigns zero-duration/ease motion tokens.",
+      "removalCondition": "Remove this finding if theme host selectors or the reduced-motion override change enough that these exact ranges no longer match.",
       "reviewBy": "2027-04-15",
       "firstFile": {
-        "path": "apps/extension/src/ui/highlighter-preset-editor/callout/inspector-fields.tsx",
-        "start": 95,
-        "end": 113
+        "path": "packages/ui/src/styles/design-tokens.css",
+        "start": 1,
+        "end": 8
       },
       "secondFile": {
-        "path": "apps/extension/src/ui/highlighter-preset-editor/step-badge/inspector.tsx",
-        "start": 81,
-        "end": 99
+        "path": "packages/ui/src/styles/design-tokens.css",
+        "start": 208,
+        "end": 215
       }
     },
     {
@@ -832,21 +796,21 @@
       }
     },
     {
-      "id": "3631130708073fb0b8384e1489029d3fc92e22bfc1837fc7a990dcd8919dd7d8",
+      "id": "368ee19fde3161cb97d6a71a786e39cfa270f4e0a0802d2ce6156ce4d4be4e94",
       "classification": "tool-noise",
-      "owner": "composition WebGL backend adapters",
-      "reason": "The fragment configures standard WebGL texture filtering and edge clamping. Spatial WebGL1 owns multiple texture units and replacement. Export WebGL2 owns one source texture and separate upload state. Sharing this API tail would couple independent texture owners.",
-      "removalCondition": "Remove if this exact match disappears or an established common texture initialization owner serves both backends.",
-      "reviewBy": "2026-12-09",
+      "owner": "packages/ui/src/styles/overlays/ai-modal-overrides/surface.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
       "firstFile": {
-        "path": "apps/extension/src/features/video/composition/canvas/spatial-textures.ts",
-        "start": 253,
-        "end": 258
+        "path": "packages/ui/src/styles/overlays/ai-modal-overrides/surface.css",
+        "start": 227,
+        "end": 242
       },
       "secondFile": {
-        "path": "apps/extension/src/features/video/composition/export-enhancement/bicubic.ts",
-        "start": 103,
-        "end": 108
+        "path": "packages/ui/src/styles/overlays/ai-modal-overrides/surface.css",
+        "start": 98,
+        "end": 113
       }
     },
     {
@@ -901,24 +865,6 @@
         "path": "apps/extension/src/settings/sections/styles/annotations/numbering/panel.tsx",
         "start": 115,
         "end": 127
-      }
-    },
-    {
-      "id": "388d47db092d5cb895cde03cde4a9a655a0e88d54ac8cfab57ca4d3ffa3bd8dc",
-      "classification": "tool-noise",
-      "owner": "keyboard and pointer feedback controls",
-      "reason": "Both adapters admit a selected option by finding it in their own option array. Their layout policies differ (keyboard up to three columns, pointer up to five), and their typed option domains and mixed-value behavior differ. This short boundary adapter does not duplicate feedback evaluation.",
-      "removalCondition": "Remove this record if shared option validation gains an existing reusable owner or feedback evaluation is copied.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/ui/keyboard-feedback/fields.tsx",
-        "start": 213,
-        "end": 219
-      },
-      "secondFile": {
-        "path": "apps/extension/src/ui/pointer-feedback/fields.tsx",
-        "start": 125,
-        "end": 131
       }
     },
     {
@@ -1048,24 +994,6 @@
       }
     },
     {
-      "id": "54a4bdb3b6bed78fed798048e058150343d220ad65f9a50cd9f3158deed4a390",
-      "classification": "tool-noise",
-      "owner": "ui/compact-inspector-controls switch presentation",
-      "reason": "Checked-state selector repetition colors the switch track pseudo-element in one rule and translates its thumb descendant 16px in the other. These rules target different boxes and properties.",
-      "removalCondition": "Remove this finding if switch markup replaces the pseudo-element/descendant split.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
-        "start": 638,
-        "end": 645
-      },
-      "secondFile": {
-        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
-        "start": 665,
-        "end": 673
-      }
-    },
-    {
       "id": "47d29325d2c4f87c5a5476ac2e043e0dc203de0ae6037da601093ab04c5864e6",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/ai-modal/shell.css",
@@ -1192,24 +1120,6 @@
       }
     },
     {
-      "id": "8d23b8ea60f0f70d0a95ca207d83ea821a4e5621d3d707d695da66b74568ffeb",
-      "classification": "tool-noise",
-      "owner": "content/public/preparation-surface scrollbar effects",
-      "reason": "The repeated surface list targets the scrollbar box in one rule and its thumb in the other. Width/height 8px differ from thumb background, border, radius, and hover paint. The match crosses a previous declaration tail.",
-      "removalCondition": "Remove this finding if these surfaces no longer need native scrollbar and thumb rules.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/content/public/preparation-surface/effects.css",
-        "start": 180,
-        "end": 193
-      },
-      "secondFile": {
-        "path": "apps/extension/src/content/public/preparation-surface/effects.css",
-        "start": 195,
-        "end": 208
-      }
-    },
-    {
       "id": "51fe6476657aed0d9da486e15b8762026edb359d885cf1ab62c750cc5e42b6bc",
       "classification": "tool-noise",
       "owner": "features/image-filters GPU renderer <-> video composition mip renderer",
@@ -1282,7 +1192,25 @@
       }
     },
     {
-      "id": "569d58662a7c1eb83efad20d69749fd731aed4027ab386d57929860458e6fa1b",
+      "id": "559a6c0356606a358ce27966d67ea44b003951eea1991c4d3d5f08aa8817cbaa",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/overlays/ai-modal-overrides/surface.css <-> packages/ui/src/styles/overlays/menu-surfaces.css",
+      "reason": "AI modal soft-divider and dropdown-divider independently scope the same decorative gradient. AI modal additionally owns margin and modal root containment; shared token values do not establish one selector owner.",
+      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/overlays/ai-modal-overrides/surface.css",
+        "start": 175,
+        "end": 181
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/overlays/menu-surfaces.css",
+        "start": 87,
+        "end": 93
+      }
+    },
+    {
+      "id": "57604d81646a8e33bbb90bcb316780b3b4758c43a735bfd6f37d2271f3412947",
       "classification": "tool-noise",
       "owner": "scenario-editor page-shell workspace chrome",
       "reason": "The repeated guide control selector assigns transition policy to controls in the first rule and 14px sizing to direct SVG descendants in the second rule. The subjects and declarations differ.",
@@ -1290,31 +1218,13 @@
       "reviewBy": "2027-04-15",
       "firstFile": {
         "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 1842,
-        "end": 1853
+        "start": 1826,
+        "end": 1837
       },
       "secondFile": {
         "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 1895,
-        "end": 1906
-      }
-    },
-    {
-      "id": "5a7bc6618eb1747f55fa8869f6388f34224d719f345944e5a1fb13f5cc933d35",
-      "classification": "tool-noise",
-      "owner": "packages/ui/src/styles/overlays/ai-modal-overrides/surface.css",
-      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
-      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "packages/ui/src/styles/overlays/ai-modal-overrides/surface.css",
-        "start": 108,
-        "end": 123
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/overlays/ai-modal-overrides/surface.css",
-        "start": 293,
-        "end": 308
+        "start": 1879,
+        "end": 1890
       }
     },
     {
@@ -1354,24 +1264,6 @@
       }
     },
     {
-      "id": "5ba2884fd52bf2f0e5bbfc3a95220acae5fc0146ca66b78a8ed01065f71432aa",
-      "classification": "tool-noise",
-      "owner": "Gallery and Native background inspector adapters",
-      "reason": "The fragment declares background motion enum labels and configures the existing SegmentedRow. Gallery submits a patch. Native commits scene settings and resets its preview. Selection behavior already belongs to the shared control.",
-      "removalCondition": "Remove if this exact match disappears or both hosts acquire the same settings update and preview lifecycle contract.",
-      "reviewBy": "2026-12-09",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/background-inspector.tsx",
-        "start": 135,
-        "end": 149
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/scene-background/fields.tsx",
-        "start": 109,
-        "end": 123
-      }
-    },
-    {
       "id": "5c204a1042de13985995f4b3426df5a63e84d090931600047df5db985c235e28",
       "classification": "tool-noise",
       "owner": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
@@ -1408,6 +1300,24 @@
       }
     },
     {
+      "id": "5e90071080b11bdd12ba7f0d47d9f997e77cf6f4e924fffd0f2df44dc9f421b2",
+      "classification": "tool-noise",
+      "owner": "highlighter preset color-source inspectors",
+      "reason": "The match is a PropertyField/fieldset/CompactColorSelector presentation. Callout resolves colors from CalloutFrameColors and three sources; StepBadge resolves visual-role colors and optionally adds surface as a fourth outline source. The existing color selector owns picker behavior; source policy and automation attributes differ.",
+      "removalCondition": "Remove this record if source resolution or picker lifecycle is duplicated beyond this declarative composition.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/ui/highlighter-preset-editor/callout/inspector-fields.tsx",
+        "start": 95,
+        "end": 113
+      },
+      "secondFile": {
+        "path": "apps/extension/src/ui/highlighter-preset-editor/step-badge/inspector.tsx",
+        "start": 81,
+        "end": 99
+      }
+    },
+    {
       "id": "5ec5d10b74fa99875aad952c6fee3348251d51fd7cd307bc4dc817cf96d7b885",
       "classification": "tool-noise",
       "owner": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels",
@@ -1426,21 +1336,21 @@
       }
     },
     {
-      "id": "618bedd8995d2a67ee95051972826c1a5fd1b1d439a6524b4266a624d9c7614d",
+      "id": "6074e5c7c314df3c4102a0a17181102ba528aacb05a0786a3917cc6fb04eac66",
       "classification": "tool-noise",
-      "owner": "composition canvas GPU pipelines",
-      "reason": "The fragment sets a pipeline and starts a standard bind-group descriptor. Filter and compositor use different remaining bindings, texture kinds, coverage, and draw contracts. A shared descriptor wrapper would not unify rendering ownership.",
-      "removalCondition": "Remove if this exact match disappears or both passes acquire the same shader bindings and draw contract.",
-      "reviewBy": "2026-12-09",
+      "owner": "Gallery and Native camera-follow inspectors",
+      "reason": "The matched fields project CameraFollowSettings into host adapters. Numeric edits use the shared DraftNumericRow owner. Gallery supplies explicit precision and a value-based toggle. Native uses a checked-based toggle. Reset and inheritance policies remain local.",
+      "removalCondition": "Remove this record if shared field behavior can be reused directly without generic renderer-slot infrastructure or changing precision.",
+      "reviewBy": "2027-04-15",
       "firstFile": {
-        "path": "apps/extension/src/features/video/composition/canvas/gpu-preview-filter.ts",
-        "start": 216,
-        "end": 225
+        "path": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
+        "start": 387,
+        "end": 399
       },
       "secondFile": {
-        "path": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
-        "start": 1073,
-        "end": 1082
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
+        "start": 441,
+        "end": 453
       }
     },
     {
@@ -1462,21 +1372,21 @@
       }
     },
     {
-      "id": "64e8ba1c36709f209de6ec96a207d5f6496a022eec4a078ded0e283288e70948",
+      "id": "64f871fb9786ed1834101a7ffdc43c6c43bac0d729941e0ee3aeeff06571d782",
       "classification": "tool-noise",
-      "owner": "composition canvas filter resource owners",
-      "reason": "The fragment ends independent render-filter and compute-filter cache lifecycles. Entry destruction, byte accounting, prepared identity, and GPU resources differ. A shared disposal tail would add a lifecycle abstraction without a common resource owner.",
-      "removalCondition": "Remove if this exact match disappears or one concrete resource and cache owner replaces both implementations.",
-      "reviewBy": "2026-12-09",
+      "owner": "ui/compact-inspector-controls switch presentation",
+      "reason": "Checked-state selector repetition colors the switch track pseudo-element in one rule and translates its thumb descendant 16px in the other. These rules target different boxes and properties.",
+      "removalCondition": "Remove this finding if switch markup replaces the pseudo-element/descendant split.",
+      "reviewBy": "2027-04-15",
       "firstFile": {
-        "path": "apps/extension/src/features/video/composition/canvas/gpu-preview-css-filter.ts",
-        "start": 332,
-        "end": 341
+        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+        "start": 721,
+        "end": 728
       },
       "secondFile": {
-        "path": "apps/extension/src/features/video/composition/canvas/gpu-preview-filter.ts",
-        "start": 242,
-        "end": 251
+        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+        "start": 748,
+        "end": 756
       }
     },
     {
@@ -1696,24 +1606,6 @@
       }
     },
     {
-      "id": "825e7f3dd099f9352cfc7bdc193cf5c3a310ecf076a4ebe8fb9d2e0857930c90",
-      "classification": "tool-noise",
-      "owner": "project and review camera adapters",
-      "reason": "The fragment publishes a success result and bounds a four-entry cache. Project and review adapters own different conflict records, keys, contexts, and observation inputs. A shared cache wrapper would not unify those contracts.",
-      "removalCondition": "Remove if this exact match disappears or an accepted common camera result and cache owner replaces both adapters.",
-      "reviewBy": "2026-12-09",
-      "firstFile": {
-        "path": "apps/extension/src/features/video/composition/motion/project-follow.ts",
-        "start": 712,
-        "end": 719
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/video/review/advanced/scene.ts",
-        "start": 367,
-        "end": 373
-      }
-    },
-    {
       "id": "72ae2b63fae1cc078d1d728ac790d368a978f3dd6b45a8c109775b5f96f87f6d",
       "classification": "tool-noise",
       "owner": "frame annotation composition",
@@ -1729,6 +1621,24 @@
         "path": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
         "start": 127,
         "end": 148
+      }
+    },
+    {
+      "id": "740fb0f14e002fecdfc291efc4591cd8b55c8f08a1271397ea7be6ee61f93c67",
+      "classification": "tool-noise",
+      "owner": "Gallery and Native camera appearance controls",
+      "reason": "The four camera shape labels are shared enum metadata. Gallery performs its own shape admission/update while Native calls its camera appearance patch owner and applies disabled policy. Both reuse their existing select control; shape geometry is not copied.",
+      "removalCondition": "Remove this record if camera silhouette/crop computation is duplicated in the inspectors.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/webcam-inspector.tsx",
+        "start": 433,
+        "end": 440
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-appearance.tsx",
+        "start": 72,
+        "end": 79
       }
     },
     {
@@ -1768,21 +1678,21 @@
       }
     },
     {
+      "id": "77822120cbe23cb5e3668c87b85b93313b10f6940a7414c88a3c79dbd0aaab84",
       "classification": "tool-noise",
-      "owner": "ui/sync-cache-feedback",
-      "reason": "The exact match destructures feedback from the single useSyncCacheFeedback owner and declares caller-local observation references. Shared cancellation and feedback rendering now have one implementation. Gallery retains root-bound status revision and an operation-kind ticket. Settings retains budget input and a trim request ID. This match is consumer wiring, not another cancellation or cache state machine.",
-      "removalCondition": "Remove when either caller wiring changes or when both observation contracts converge.",
+      "owner": "content/public/preparation-surface scrollbar effects",
+      "reason": "The root surface selector receives standard scrollbar-color/width. The repeated surface selector targets ::-webkit-scrollbar dimensions. Native engine-specific pseudo-element declarations differ from standards properties on the scroll owner.",
+      "removalCondition": "Remove this finding if supported engines no longer need the WebKit pseudo-element rule.",
       "reviewBy": "2027-04-15",
-      "id": "90d485978dab0fd4751aff8dd73d24bc4c3de91766439a54ec016ac6e04544db",
       "firstFile": {
-        "path": "apps/extension/src/gallery/library/preview/native-cache-actions.tsx",
-        "start": 38,
-        "end": 56
+        "path": "apps/extension/src/content/public/preparation-surface/effects.css",
+        "start": 169,
+        "end": 178
       },
       "secondFile": {
-        "path": "apps/extension/src/settings/sections/capture/saving/sync-cache.tsx",
-        "start": 19,
-        "end": 37
+        "path": "apps/extension/src/content/public/preparation-surface/effects.css",
+        "start": 183,
+        "end": 192
       }
     },
     {
@@ -1822,24 +1732,6 @@
       }
     },
     {
-      "id": "79fee99b537268e7a057172b1246e62f439b82a3543f5db158709c1de5f198fc",
-      "classification": "tool-noise",
-      "owner": "packages/ui/src/styles/ai-modal-content/fields.css",
-      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
-      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "packages/ui/src/styles/ai-modal-content/fields.css",
-        "start": 155,
-        "end": 162
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/ai-modal-content/fields.css",
-        "start": 45,
-        "end": 52
-      }
-    },
-    {
       "id": "7af778b79393a93ec88deca56ff9f78e0bb887285d22a1a307c915a452f7dd40",
       "classification": "tool-noise",
       "owner": "features/video/composition/motion/window-camera-geometry",
@@ -1873,6 +1765,42 @@
         "path": "packages/ui/src/styles/foundation.css",
         "start": 66,
         "end": 72
+      }
+    },
+    {
+      "id": "813f48804da3d2868cc69f29f6b1b7b597ebb9aa819ffd824d3ec9cecba5f042",
+      "classification": "tool-noise",
+      "owner": "video composition mip renderer <-> video composition scene renderer",
+      "reason": "The match contains WebGPU pipeline and bind-group setup. Mip rendering binds its input level. Scene composition additionally binds optional masks and operation clips, then applies scissor and blend policy. The shared syntax does not define one render operation.",
+      "removalCondition": "Remove when this exact pair disappears or both render operations adopt one accepted binding and draw contract.",
+      "reviewBy": "2027-05-15",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/composition/canvas/gpu-preview-filter.ts",
+        "start": 250,
+        "end": 259
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/composition/canvas/gpu-preview-slot.ts",
+        "start": 397,
+        "end": 406
+      }
+    },
+    {
+      "id": "825e7f3dd099f9352cfc7bdc193cf5c3a310ecf076a4ebe8fb9d2e0857930c90",
+      "classification": "tool-noise",
+      "owner": "project and review camera adapters",
+      "reason": "The fragment publishes a success result and bounds a four-entry cache. Project and review adapters own different conflict records, keys, contexts, and observation inputs. A shared cache wrapper would not unify those contracts.",
+      "removalCondition": "Remove if this exact match disappears or an accepted common camera result and cache owner replaces both adapters.",
+      "reviewBy": "2026-12-09",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/composition/motion/project-follow.ts",
+        "start": 712,
+        "end": 719
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/review/advanced/scene.ts",
+        "start": 367,
+        "end": 373
       }
     },
     {
@@ -1927,6 +1855,24 @@
         "path": "apps/extension/src/features/video/project/cursor-motion/apple/crosshair.svg",
         "start": 49,
         "end": 58
+      }
+    },
+    {
+      "id": "85186763477bc764e711efd98acbb12c91b8e36896a728a56dc636cde75fc83b",
+      "classification": "tool-noise",
+      "owner": "Gallery and Native camera layout controls",
+      "reason": "The optional legacy item and shrink/shift/overlay choices project the same compatibility contract. Gallery writes editor.setScreenBehavior; Native issues an exact clip camera-position edit. They retain different mutation authorities.",
+      "removalCondition": "Remove this record if screen-layout geometry or mutation authority is duplicated.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/webcam-inspector.tsx",
+        "start": 242,
+        "end": 255
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-layout.tsx",
+        "start": 183,
+        "end": 196
       }
     },
     {
@@ -2020,6 +1966,24 @@
       }
     },
     {
+      "id": "8d23b8ea60f0f70d0a95ca207d83ea821a4e5621d3d707d695da66b74568ffeb",
+      "classification": "tool-noise",
+      "owner": "content/public/preparation-surface scrollbar effects",
+      "reason": "The repeated surface list targets the scrollbar box in one rule and its thumb in the other. Width/height 8px differ from thumb background, border, radius, and hover paint. The match crosses a previous declaration tail.",
+      "removalCondition": "Remove this finding if these surfaces no longer need native scrollbar and thumb rules.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/content/public/preparation-surface/effects.css",
+        "start": 180,
+        "end": 193
+      },
+      "secondFile": {
+        "path": "apps/extension/src/content/public/preparation-surface/effects.css",
+        "start": 195,
+        "end": 208
+      }
+    },
+    {
       "id": "8f53c761010ad74d4895603d7a8f1b591f59170edd7250d47d11e76f4dc7c6ae",
       "classification": "tool-noise",
       "owner": "simplify-engine-components",
@@ -2035,6 +1999,24 @@
         "path": "apps/extension/src/features/simplify/engine/structure-topology.mjs",
         "start": 343,
         "end": 351
+      }
+    },
+    {
+      "classification": "tool-noise",
+      "owner": "ui/sync-cache-feedback",
+      "reason": "The exact match destructures feedback from the single useSyncCacheFeedback owner and declares caller-local observation references. Shared cancellation and feedback rendering now have one implementation. Gallery retains root-bound status revision and an operation-kind ticket. Settings retains budget input and a trim request ID. This match is consumer wiring, not another cancellation or cache state machine.",
+      "removalCondition": "Remove when either caller wiring changes or when both observation contracts converge.",
+      "reviewBy": "2027-04-15",
+      "id": "90d485978dab0fd4751aff8dd73d24bc4c3de91766439a54ec016ac6e04544db",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/library/preview/native-cache-actions.tsx",
+        "start": 38,
+        "end": 56
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/capture/saving/sync-cache.tsx",
+        "start": 19,
+        "end": 37
       }
     },
     {
@@ -2089,6 +2071,42 @@
         "path": "packages/ui/src/styles/glass/popover-controls.css",
         "start": 169,
         "end": 179
+      }
+    },
+    {
+      "id": "92b126d9b1d17270de082876163246f14b0e21729e75d4ce03d7d4d2145ee991",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/product-glass-controls/buttons.tsx",
+      "reason": "Existing command-press hook serves switch thumb/on semantics versus bold-button property activation/content wrapping.",
+      "removalCondition": "Remove when public control contracts converge or exact pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/product-glass-controls/buttons.tsx",
+        "start": 100,
+        "end": 109
+      },
+      "secondFile": {
+        "path": "packages/ui/src/product-glass-controls/buttons.tsx",
+        "start": 173,
+        "end": 182
+      }
+    },
+    {
+      "id": "931f66f6f8fbdcd54cfd69a48ce1ec7714a00e6f2bee19e508b1ed9f468113de",
+      "classification": "tool-noise",
+      "owner": "Gallery video-review inspector and shared compact inspector",
+      "reason": "The matched range includes unrelated preceding declaration tails, an identical explanatory comment, and @layer utilities. Subsequent selectors target Gallery row action buttons versus shared select/color field construction. No complete CSS rule or behavior matches.",
+      "removalCondition": "Remove this finding when comment/token changes make these exact lexical endpoints disappear.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/inspector.css",
+        "start": 127,
+        "end": 132
+      },
+      "secondFile": {
+        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+        "start": 256,
+        "end": 261
       }
     },
     {
@@ -2182,42 +2200,6 @@
       }
     },
     {
-      "id": "813f48804da3d2868cc69f29f6b1b7b597ebb9aa819ffd824d3ec9cecba5f042",
-      "classification": "tool-noise",
-      "owner": "video composition mip renderer <-> video composition scene renderer",
-      "reason": "The match contains WebGPU pipeline and bind-group setup. Mip rendering binds its input level. Scene composition additionally binds optional masks and operation clips, then applies scissor and blend policy. The shared syntax does not define one render operation.",
-      "removalCondition": "Remove when this exact pair disappears or both render operations adopt one accepted binding and draw contract.",
-      "reviewBy": "2027-05-15",
-      "firstFile": {
-        "path": "apps/extension/src/features/video/composition/canvas/gpu-preview-filter.ts",
-        "start": 250,
-        "end": 259
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/video/composition/canvas/gpu-preview-slot.ts",
-        "start": 397,
-        "end": 406
-      }
-    },
-    {
-      "id": "95937012c3fe874152d41a49570f7989c92916e38ce11413ed8e17d3bd3f92c7",
-      "classification": "tool-noise",
-      "owner": "packages/ui/src/styles/overlays/ai-modal-overrides/surface.css <-> packages/ui/src/styles/overlays/menu-surfaces.css",
-      "reason": "AI modal soft-divider and dropdown-divider independently scope the same decorative gradient. AI modal additionally owns margin and modal root containment; shared token values do not establish one selector owner.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "packages/ui/src/styles/overlays/ai-modal-overrides/surface.css",
-        "start": 187,
-        "end": 193
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/overlays/menu-surfaces.css",
-        "start": 87,
-        "end": 93
-      }
-    },
-    {
       "id": "95967b1e6f64bea02314c18afa800a6c4cb16a1bda0d4e0d84a62cfcdf3d357c",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/glass/popover-controls.css",
@@ -2233,42 +2215,6 @@
         "path": "packages/ui/src/styles/glass/popover-controls.css",
         "start": 62,
         "end": 73
-      }
-    },
-    {
-      "id": "967d7a0c6589649515e958b57016bb01ab262b3cec089c7e71bcdab35b37f1a4",
-      "classification": "tool-noise",
-      "owner": "packages/ui/src/styles/overlays/ai-modal-overrides <-> packages/ui/src/styles/toolbar",
-      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
-      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "packages/ui/src/styles/overlays/ai-modal-overrides/surface.css",
-        "start": 186,
-        "end": 193
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/toolbar/menu-items.css",
-        "start": 161,
-        "end": 168
-      }
-    },
-    {
-      "id": "97e7572dd6f68940fa08412ccf9db36f9e35b5be63d4fdbbda766c3f3e538a6a",
-      "classification": "tool-noise",
-      "owner": "Gallery and Native text inspector",
-      "reason": "Both declare document/cards view controls using SegmentedRow. Each owns its own editor typing session and local view state. The match is shared UI options and typing-boundary wiring, not text editing or projection logic.",
-      "removalCondition": "Remove this record if document/card rendering or typing-session implementation is copied.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/text-panel.tsx",
-        "start": 143,
-        "end": 151
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text.tsx",
-        "start": 174,
-        "end": 182
       }
     },
     {
@@ -2380,24 +2326,6 @@
       }
     },
     {
-      "id": "9c22d0595ab4de301f055725bc187bd87d63e58231f099570cb702c16c60f7dc",
-      "classification": "tool-noise",
-      "owner": "Gallery video-review inspector and shared compact inspector",
-      "reason": "The matched range includes unrelated preceding declaration tails, an identical explanatory comment, and @layer utilities. Subsequent selectors target Gallery row action buttons versus shared select/color field construction. No complete CSS rule or behavior matches.",
-      "removalCondition": "Remove this finding when comment/token changes make these exact lexical endpoints disappear.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/inspector.css",
-        "start": 75,
-        "end": 80
-      },
-      "secondFile": {
-        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
-        "start": 242,
-        "end": 247
-      }
-    },
-    {
       "id": "9cab0b82a006fe804bd2ca38a30572e9e63b4d9290fdc7fb505462bb14d670a1",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/content-popover/index.css",
@@ -2416,6 +2344,24 @@
       }
     },
     {
+      "id": "9cf48fca99c4906d47033e5129d4111a45fed2bf57b72149b8be220a12dcb79e",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/library/sidebar/folder-list.tsx",
+      "reason": "Existing saved-view row calls belong to visible-folder and hidden-folder eligibility/layout branches.",
+      "removalCondition": "Remove when either branch disappears or saved-view composition changes.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/library/sidebar/folder-list.tsx",
+        "start": 208,
+        "end": 217
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/library/sidebar/folder-list.tsx",
+        "start": 96,
+        "end": 101
+      }
+    },
+    {
       "id": "9d1631557b6a24265e2f262667c4516a8f70e9cd7cd20ba5b8899cd67d44d0e2",
       "classification": "tool-noise",
       "owner": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
@@ -2431,24 +2377,6 @@
         "path": "apps/extension/src/video-editor/preview/stage/point-overlay/cursor-path.tsx",
         "start": 375,
         "end": 392
-      }
-    },
-    {
-      "id": "02182fb20a7856a80cca3c84abe450ebd35eae01eb7c75be34073421ee63c57d",
-      "classification": "tool-noise",
-      "owner": "Gallery and Native camera layout controls",
-      "reason": "The optional legacy item and shrink/shift/overlay choices project the same compatibility contract. Gallery writes editor.setScreenBehavior; Native issues an exact clip camera-position edit. They retain different mutation authorities.",
-      "removalCondition": "Remove this record if screen-layout geometry or mutation authority is duplicated.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/webcam-inspector.tsx",
-        "start": 249,
-        "end": 262
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-layout.tsx",
-        "start": 183,
-        "end": 196
       }
     },
     {
@@ -2488,6 +2416,24 @@
       }
     },
     {
+      "id": "9f831f67a0f03de526c133d132bd759bbf0b1e7a1d64e73b7ffa97a540d13f92",
+      "classification": "tool-noise",
+      "owner": "ColorSelector alpha editor and compact numeric fields",
+      "reason": "The shared numeric input owner consumes the wheel gesture and handles exact entry keys. The remaining listener setup belongs to different edit lifetimes and attachment surfaces. Alpha binds to its paint frame only during an active draft. Opacity and strength bind within the mounted numeric editor. Combining the listener sites would make a shared component own those local DOM boundaries.",
+      "removalCondition": "Remove when the exact pair disappears or both controls use the same numeric editor surface and lifetime.",
+      "reviewBy": "2027-02-20",
+      "firstFile": {
+        "path": "apps/extension/src/ui/color-selector/inspector-alpha-value.tsx",
+        "start": 99,
+        "end": 105
+      },
+      "secondFile": {
+        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-numeric-fields.tsx",
+        "start": 158,
+        "end": 164
+      }
+    },
+    {
       "id": "9fe7019a722f43f130071d84d9a1fc00bab58779e5fbc05df752c4fe3ee14d67",
       "classification": "tool-noise",
       "owner": "simplify-engine-components",
@@ -2503,6 +2449,42 @@
         "path": "apps/extension/src/features/simplify/engine/media-components.mjs",
         "start": 333,
         "end": 340
+      }
+    },
+    {
+      "id": "a1a15b41ac2becfa51413f3548d393ee6f771480df4820f7ee78ee2035c210cc",
+      "classification": "tool-noise",
+      "owner": "ui/compact-inspector-controls switch accessibility",
+      "reason": "The base thumb rule positions and animates thumbs. The same thumb selector inside prefers-reduced-motion disables transition. Sharing selector tokens does not duplicate a motion policy.",
+      "removalCondition": "Remove this finding if switch animation disappears or the reduced-motion policy moves to an existing owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+        "start": 731,
+        "end": 737
+      },
+      "secondFile": {
+        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+        "start": 760,
+        "end": 766
+      }
+    },
+    {
+      "id": "a1c2bf4441ba45832b11ae2226989a0f20e1b4a8fb7b868ae75258fd31d4cd04",
+      "classification": "tool-noise",
+      "owner": "scenario-editor page-shell workspace chrome",
+      "reason": "The base control set receives transition properties. Its focus-visible state receives an outline and outline offset. Matching selector tokens do not duplicate the state-specific declarations.",
+      "removalCondition": "Remove this finding if the keyboard focus state or base transition rule disappears.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1826,
+        "end": 1837
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1866,
+        "end": 1877
       }
     },
     {
@@ -2596,24 +2578,6 @@
       }
     },
     {
-      "id": "dc9609fe50783d439077048c508751237a7087104c60f870fb05a24f9bae3c0b",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/video-review/use-recognition.ts",
-      "reason": "Recognition owns Apply state and one accepted transcript. Speech owns multiple takes, completion and propagation. Equal controller setup does not define one publication lifetime.",
-      "removalCondition": "Remove when this exact match disappears or an accepted common owner replaces the stated contract distinction.",
-      "reviewBy": "2027-04-28",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/use-recognition.ts",
-        "start": 108,
-        "end": 118
-      },
-      "secondFile": {
-        "path": "apps/extension/src/gallery/video-review/use-text-voice.ts",
-        "start": 135,
-        "end": 145
-      }
-    },
-    {
       "id": "a7c4be7d00b0066ba82208d735cc3cddc574e367b8b45d7f37d116461b8a015e",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/glass/toolbar-form-layout.css",
@@ -2647,6 +2611,42 @@
         "path": "apps/extension/src/features/video/audio/source-envelope.ts",
         "start": 44,
         "end": 53
+      }
+    },
+    {
+      "id": "aaf49c33c09cecb4f2ef51edff2573b6b648706998771039ac7d06534eb021ea",
+      "classification": "tool-noise",
+      "owner": "Gallery and Native camera-follow inspectors",
+      "reason": "The matched fields describe CameraFollowSettings and its scalar conversions. Both hosts use DraftNumericRow. Gallery sets explicit precision and resets through onReset. Native clears inherited values through onChange(undefined). Zone and movement interactions already share their control owners.",
+      "removalCondition": "Remove this record if a common fine-tune component can represent both interactions without renderer slots or changing precision/reset behavior.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
+        "start": 361,
+        "end": 380
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
+        "start": 416,
+        "end": 435
+      }
+    },
+    {
+      "id": "ab936d8333bbdb859af21441e1e4009358c46de244c8d890e2225d07b2e4ad4a",
+      "classification": "tool-noise",
+      "owner": "editor AI prompt <-> scenario editor voice field",
+      "reason": "The match contains latest value, insertion and caret refs and the shared-session callback opening. Image prompting owns operation-change cancellation, trimmed dictated text, a 4000-character limit and separators beside any non-whitespace text. Scenario fields own disabled-only cancellation, configurable limits, single-line newline normalization, punctuation-sensitive separators and preserved dictated whitespace. composition/voice-input/session already owns transport and session lifecycle; extracting refs would create a state bag without unifying placement policy.",
+      "removalCondition": "Remove when this exact pair disappears or an accepted common field-placement contract replaces both consumers.",
+      "reviewBy": "2027-05-14",
+      "firstFile": {
+        "path": "apps/extension/src/editor/ai/prompt.tsx",
+        "start": 18,
+        "end": 25
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/voice-field.tsx",
+        "start": 29,
+        "end": 36
       }
     },
     {
@@ -2701,6 +2701,24 @@
         "path": "apps/extension/src/features/video/composition/canvas/gpu-preview-filter.ts",
         "start": 106,
         "end": 113
+      }
+    },
+    {
+      "id": "b06d1d4ae26983ad4ba033294ddf466b698c83a1c8683729ff8fe470a75c0c48",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/library/sidebar/types.ts",
+      "reason": "Sidebar and shell callback ports differ in required and optional facets and surrounding responsibilities. The narrow matching declarations do not establish a shared state owner.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/library/sidebar/types.ts",
+        "start": 51,
+        "end": 56
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/shell/app-shell/types.ts",
+        "start": 86,
+        "end": 91
       }
     },
     {
@@ -2848,60 +2866,6 @@
       }
     },
     {
-      "id": "b73f1d121149a4b3e460533967418085d2b95643269b904ce4b8947f383c936a",
-      "classification": "tool-noise",
-      "owner": "scenario-editor page-shell workspace paper chrome",
-      "reason": "The base rule declares paper-derived variables, geometry, border, text, background, and shadow. The narrower nonhover/nonactive/nonexpanded/nonpressed rule reapplies its background against competing state rules. Selector repetition preserves a separate resting-state cascade contract.",
-      "removalCondition": "Remove this finding if competing state paint disappears and the resting override becomes provably redundant.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 1986,
-        "end": 1996
-      },
-      "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 2010,
-        "end": 2020
-      }
-    },
-    {
-      "id": "6b053befd97b073f1b9c8559bd9d983cbfd8079f1f0c37f68638e5642ca94f28",
-      "classification": "tool-noise",
-      "owner": "Gallery and Native camera appearance controls",
-      "reason": "The classic/angle/center/nearest-edge labels and icons are declarative enum metadata for the camera shadow contract. Gallery writes camera state; Native adds disabled policy and writes clip edits. No shadow direction calculation or rendering is duplicated.",
-      "removalCondition": "Remove this record if shadow vector or geometry calculation appears in either inspector.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/webcam-inspector.tsx",
-        "start": 466,
-        "end": 479
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-appearance.tsx",
-        "start": 148,
-        "end": 161
-      }
-    },
-    {
-      "id": "b06d1d4ae26983ad4ba033294ddf466b698c83a1c8683729ff8fe470a75c0c48",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/library/sidebar/types.ts",
-      "reason": "Sidebar and shell callback ports differ in required and optional facets and surrounding responsibilities. The narrow matching declarations do not establish a shared state owner.",
-      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/library/sidebar/types.ts",
-        "start": 51,
-        "end": 56
-      },
-      "secondFile": {
-        "path": "apps/extension/src/gallery/shell/app-shell/types.ts",
-        "start": 86,
-        "end": 91
-      }
-    },
-    {
       "id": "b895025f3e831efa9b4f51ae3b79227301ae9a92810ac27a51e3668b65e6e94a",
       "classification": "tool-noise",
       "owner": "background-design-review-session and background-page-recovery",
@@ -2920,21 +2884,21 @@
       }
     },
     {
-      "id": "77822120cbe23cb5e3668c87b85b93313b10f6940a7414c88a3c79dbd0aaab84",
+      "id": "baf0e633cebc27088f5a82bf862648befa220dedb8ac94a71dceec23e55a7a62",
       "classification": "tool-noise",
-      "owner": "content/public/preparation-surface scrollbar effects",
-      "reason": "The root surface selector receives standard scrollbar-color/width. The repeated surface selector targets ::-webkit-scrollbar dimensions. Native engine-specific pseudo-element declarations differ from standards properties on the scroll owner.",
-      "removalCondition": "Remove this finding if supported engines no longer need the WebKit pseudo-element rule.",
+      "owner": "scenario-editor page-shell workspace paper chrome",
+      "reason": "The base rule declares paper-derived variables, geometry, border, text, background, and shadow. The narrower nonhover/nonactive/nonexpanded/nonpressed rule reapplies its background against competing state rules. Selector repetition preserves a separate resting-state cascade contract.",
+      "removalCondition": "Remove this finding if competing state paint disappears and the resting override becomes provably redundant.",
       "reviewBy": "2027-04-15",
       "firstFile": {
-        "path": "apps/extension/src/content/public/preparation-surface/effects.css",
-        "start": 169,
-        "end": 178
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1970,
+        "end": 1980
       },
       "secondFile": {
-        "path": "apps/extension/src/content/public/preparation-surface/effects.css",
-        "start": 183,
-        "end": 192
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1994,
+        "end": 2004
       }
     },
     {
@@ -3028,24 +2992,6 @@
       }
     },
     {
-      "id": "c0a4fd02f32fb6fc787186287a5c73ad7fe69fbcb1a185a74b0bfbd4991b3860",
-      "classification": "tool-noise",
-      "owner": "packages/ui design tokens",
-      "reason": "The base rule declares font, geometry, and motion tokens on all theme hosts. The second repeats those hosts inside prefers-reduced-motion and assigns zero-duration/ease motion tokens.",
-      "removalCondition": "Remove this finding if theme host selectors or the reduced-motion override change enough that these exact ranges no longer match.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "packages/ui/src/styles/design-tokens.css",
-        "start": 1,
-        "end": 8
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/design-tokens.css",
-        "start": 198,
-        "end": 205
-      }
-    },
-    {
       "id": "c22dcbbf9e37361cb97195c154487e392d3525049ef8b66d2bbd2a35b7d62622",
       "classification": "tool-noise",
       "owner": "background-design-review-session and background-page-recovery",
@@ -3064,42 +3010,6 @@
       }
     },
     {
-      "id": "c9611737577d6d831e1416854264928f3e591fb9002916e1512a5bc967af568c",
-      "classification": "tool-noise",
-      "owner": "Gallery and Native camera-follow inspectors",
-      "reason": "The matched field names, ranges, and conversions describe CameraFollowSettings. Both hosts use DraftNumericRow for zone size. Gallery resets through onReset. Native clears inherited values through onChange(undefined). The fragment adds no rendering or source authority.",
-      "removalCondition": "Remove this record if a directly reusable existing fine-tune control can replace both without renderer factories.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
-        "start": 427,
-        "end": 449
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
-        "start": 484,
-        "end": 506
-      }
-    },
-    {
-      "id": "1d8ed41766752c546a43d569b94ed17cc8a59cc52315dfa835cb9576e3c81d33",
-      "classification": "tool-noise",
-      "owner": "Gallery and Native camera-follow inspectors",
-      "reason": "The matched fields describe CameraFollowSettings and its scalar conversions. Both hosts use DraftNumericRow. Gallery sets explicit precision and resets through onReset. Native clears inherited values through onChange(undefined). Zone and movement interactions already share their control owners.",
-      "removalCondition": "Remove this record if a common fine-tune component can represent both interactions without renderer slots or changing precision/reset behavior.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
-        "start": 359,
-        "end": 378
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
-        "start": 415,
-        "end": 434
-      }
-    },
-    {
       "id": "c4e80d896081c6b42238717acab8cfbd8b64500eb96667bd6345028ee88f68a0",
       "classification": "tool-noise",
       "owner": "tooling/design-reference example entry pages",
@@ -3115,6 +3025,24 @@
         "path": "tooling/design-reference/examples/collections/index.html",
         "start": 2,
         "end": 13
+      }
+    },
+    {
+      "id": "c643afa1b617676931b7b000cdca46809025981c237f46cb5eddeaa8bacc7f54",
+      "classification": "tool-noise",
+      "owner": "Scenario Tour Player range thumb styles",
+      "reason": "The same thumb paint is declared on separate Chromium and Gecko pseudo-elements. A selector list combining those unsupported pseudo-elements would invalidate the rule in each engine. The thumb geometry also differs by engine and the paint has one local owner.",
+      "removalCondition": "Remove when this exact pair disappears or both engines use the same supported thumb selector.",
+      "reviewBy": "2027-02-20",
+      "firstFile": {
+        "path": "apps/extension/src/features/scenario/tour-player/player.css",
+        "start": 545,
+        "end": 551
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/scenario/tour-player/player.css",
+        "start": 563,
+        "end": 569
       }
     },
     {
@@ -3190,6 +3118,24 @@
       }
     },
     {
+      "id": "ca94a2c588b3781efc46f58fd6edaccc47bbe65dee230b7123721d4e87b772cf",
+      "classification": "tool-noise",
+      "owner": "scenario-editor page-shell workspace chrome",
+      "reason": "The base transition set includes voice controls. The hover set excludes voice controls and adds disabled/pressed predicates. Their different membership and declarations prevent one merged control contract.",
+      "removalCondition": "Remove this finding if voice and structural controls acquire the same hover contract.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1826,
+        "end": 1835
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1840,
+        "end": 1849
+      }
+    },
+    {
       "id": "cb706ceb56eb7256898bccd3a6bccbce9df622bb9aede26a6fc2317f8b02617b",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/glass/input-controls.css",
@@ -3223,24 +3169,6 @@
         "path": "apps/extension/src/settings/sections/styles/annotations/numbering/panel.tsx",
         "start": 26,
         "end": 37
-      }
-    },
-    {
-      "id": "293d4141acd6ab99b0dcd00ac58f48d2d91721bfc5a2364630d9789fefc407d1",
-      "classification": "tool-noise",
-      "owner": "Gallery and Native camera-follow inspectors",
-      "reason": "The matched fields project CameraFollowSettings into host adapters. Numeric edits use the shared DraftNumericRow owner. Gallery supplies explicit precision and a value-based toggle. Native uses a checked-based toggle. Reset and inheritance policies remain local.",
-      "removalCondition": "Remove this record if shared field behavior can be reused directly without generic renderer-slot infrastructure or changing precision.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
-        "start": 385,
-        "end": 397
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
-        "start": 440,
-        "end": 452
       }
     },
     {
@@ -3334,6 +3262,24 @@
       }
     },
     {
+      "id": "d379f9ec0b1e6be3fe697a1dce28eeab417c829fa049b23f07e61b14ae8b87fa",
+      "classification": "tool-noise",
+      "owner": "Gallery and Native background inspector adapters",
+      "reason": "The fragment declares background motion enum labels and configures the existing SegmentedRow. Gallery submits a patch. Native commits scene settings and resets its preview. Selection behavior already belongs to the shared control.",
+      "removalCondition": "Remove if this exact match disappears or both hosts acquire the same settings update and preview lifecycle contract.",
+      "reviewBy": "2026-12-09",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/background-inspector.tsx",
+        "start": 134,
+        "end": 148
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/scene-background/fields.tsx",
+        "start": 114,
+        "end": 128
+      }
+    },
+    {
       "id": "d56557725388ed977e4bb43469700c17d221bf37453120cc477ccd41ed12fa22",
       "classification": "tool-noise",
       "owner": "packages/ui glass popover and content toolbar active controls",
@@ -3385,24 +3331,6 @@
         "path": "apps/extension/src/content/overlay/toolbar/mode-controller/types.ts",
         "start": 11,
         "end": 22
-      }
-    },
-    {
-      "id": "a7fe001d1001e7113c1336c9a641aa26f51f477899954c4197f314451192447d",
-      "classification": "tool-noise",
-      "owner": "ui/compact-inspector-controls switch accessibility",
-      "reason": "The base thumb rule positions and animates thumbs. The same thumb selector inside prefers-reduced-motion disables transition. Sharing selector tokens does not duplicate a motion policy.",
-      "removalCondition": "Remove this finding if switch animation disappears or the reduced-motion policy moves to an existing owner.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
-        "start": 648,
-        "end": 654
-      },
-      "secondFile": {
-        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
-        "start": 677,
-        "end": 683
       }
     },
     {
@@ -3478,6 +3406,24 @@
       }
     },
     {
+      "id": "dc9609fe50783d439077048c508751237a7087104c60f870fb05a24f9bae3c0b",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/use-recognition.ts",
+      "reason": "Recognition owns Apply state and one accepted transcript. Speech owns multiple takes, completion and propagation. Equal controller setup does not define one publication lifetime.",
+      "removalCondition": "Remove when this exact match disappears or an accepted common owner replaces the stated contract distinction.",
+      "reviewBy": "2027-04-28",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/use-recognition.ts",
+        "start": 108,
+        "end": 118
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/video-review/use-text-voice.ts",
+        "start": 135,
+        "end": 145
+      }
+    },
+    {
       "id": "dd9542be2f90aec659d19c9f36f56ab1c018634a70d76989b71db80743fe3866",
       "classification": "tool-noise",
       "owner": "video composition preview sampling <-> video review export source planning",
@@ -3514,21 +3460,21 @@
       }
     },
     {
-      "id": "92b126d9b1d17270de082876163246f14b0e21729e75d4ce03d7d4d2145ee991",
+      "id": "e27b71f3dee0e6b71d84cf0e34e9cc98b4ceb3fb05911495979de94a63794713",
       "classification": "tool-noise",
-      "owner": "packages/ui/src/product-glass-controls/buttons.tsx",
-      "reason": "Existing command-press hook serves switch thumb/on semantics versus bold-button property activation/content wrapping.",
-      "removalCondition": "Remove when public control contracts converge or exact pair disappears.",
-      "reviewBy": "2027-09-01",
+      "owner": "keyboard and pointer feedback controls",
+      "reason": "Both adapters admit a selected option by finding it in their own option array. Their layout policies differ (keyboard up to three columns, pointer up to five), and their typed option domains and mixed-value behavior differ. This short boundary adapter does not duplicate feedback evaluation.",
+      "removalCondition": "Remove this record if shared option validation gains an existing reusable owner or feedback evaluation is copied.",
+      "reviewBy": "2027-04-15",
       "firstFile": {
-        "path": "packages/ui/src/product-glass-controls/buttons.tsx",
-        "start": 100,
-        "end": 109
+        "path": "apps/extension/src/ui/keyboard-feedback/fields.tsx",
+        "start": 204,
+        "end": 210
       },
       "secondFile": {
-        "path": "packages/ui/src/product-glass-controls/buttons.tsx",
-        "start": 173,
-        "end": 182
+        "path": "apps/extension/src/ui/pointer-feedback/fields.tsx",
+        "start": 121,
+        "end": 127
       }
     },
     {
@@ -3586,6 +3532,24 @@
       }
     },
     {
+      "id": "ebe42b4d28d3a4af60b328b23019d63e352427aca2f479e09d3c2a80224a681e",
+      "classification": "tool-noise",
+      "owner": "Gallery and Native camera appearance controls",
+      "reason": "The classic/angle/center/nearest-edge labels and icons are declarative enum metadata for the camera shadow contract. Gallery writes camera state; Native adds disabled policy and writes clip edits. No shadow direction calculation or rendering is duplicated.",
+      "removalCondition": "Remove this record if shadow vector or geometry calculation appears in either inspector.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/webcam-inspector.tsx",
+        "start": 491,
+        "end": 504
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-appearance.tsx",
+        "start": 141,
+        "end": 154
+      }
+    },
+    {
       "id": "eccc05b76d9a646252c9ddce0032d1566ed4934612199cf75326add498f742d8",
       "classification": "tool-noise",
       "owner": "simplify-engine-components",
@@ -3601,6 +3565,42 @@
         "path": "apps/extension/src/features/simplify/engine/media-components.mjs",
         "start": 137,
         "end": 146
+      }
+    },
+    {
+      "id": "eeeaa6b01b374619b826d808d33ab28ac89c5b2cd3ce905322b82c7cd1afdc49",
+      "classification": "tool-noise",
+      "owner": "Gallery and Native camera-follow inspectors",
+      "reason": "The matched field names, ranges, and conversions describe CameraFollowSettings. Both hosts use DraftNumericRow for zone size. Gallery resets through onReset. Native clears inherited values through onChange(undefined). The fragment adds no rendering or source authority.",
+      "removalCondition": "Remove this record if a directly reusable existing fine-tune control can replace both without renderer factories.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
+        "start": 429,
+        "end": 451
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
+        "start": 485,
+        "end": 507
+      }
+    },
+    {
+      "id": "f33d1c6e71b2c85d2348a53f155db1b26480465e695ca56399c89972cd54e4bb",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/speech-panel.tsx",
+      "reason": "Gallery uses SelectField and its recognition command. Montage uses OptionButtonsField and inspector callbacks. Shared option literals do not unify field controls.",
+      "removalCondition": "Remove when this exact match disappears or an accepted common owner replaces the stated contract distinction.",
+      "reviewBy": "2027-04-28",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/speech-panel.tsx",
+        "start": 622,
+        "end": 629
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/recognition.tsx",
+        "start": 215,
+        "end": 222
       }
     },
     {
@@ -3640,42 +3640,6 @@
       }
     },
     {
-      "id": "f6e5bd1c467db6ef01514ee76074687ca7edebf072cd09b7a75295e8d9e78ccf",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/persistence",
-      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
-      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/image-workspaces/read.ts",
-        "start": 13,
-        "end": 21
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/scenario/editor-documents/index.ts",
-        "start": 25,
-        "end": 31
-      }
-    },
-    {
-      "id": "f949dae32051c67cd2d9c24a096277be789dbb73f97d5a9a59e5a35a9fe424ce",
-      "classification": "tool-noise",
-      "owner": "packages/ui/src/styles/ai-modal-content/fields.css",
-      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
-      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "packages/ui/src/styles/ai-modal-content/fields.css",
-        "start": 144,
-        "end": 154
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/ai-modal-content/fields.css",
-        "start": 29,
-        "end": 39
-      }
-    },
-    {
       "id": "fa554f439de1215e8f023db733a8f86e47c50aaa9fb00ff355608f5c11337491",
       "classification": "tool-noise",
       "owner": "packages/ui content toolbar split-control styling",
@@ -3694,60 +3658,6 @@
       }
     },
     {
-      "id": "2072387373a0a3d7ddf2bebb87d350b01380c7eb9d0ffa9f33caff61b0581346",
-      "classification": "tool-noise",
-      "owner": "workflows/video-review freeze frame timing <-> source metadata inspection",
-      "reason": "The match contains six lines that open a decoder and attach abort disposal. Freeze reads and validates an original frame interval. Source inspection validates metadata and provenance. Each operation closes its own input in finally. Shared setup syntax does not unify decoder work or admission.",
-      "removalCondition": "Remove when this exact pair disappears or an accepted common decoder operation owns both lifetimes.",
-      "reviewBy": "2027-05-15",
-      "firstFile": {
-        "path": "apps/extension/src/workflows/video-review/freeze-frame.ts",
-        "start": 12,
-        "end": 17
-      },
-      "secondFile": {
-        "path": "apps/extension/src/workflows/video-review/source.ts",
-        "start": 108,
-        "end": 113
-      }
-    },
-    {
-      "id": "4ccbce8490d0b5b29aa9bdda6eb082b87746d5d82e8f6ba7853e7a18a40735ca",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/video-review/speech-panel.tsx",
-      "reason": "Gallery uses SelectField and its recognition command. Montage uses OptionButtonsField and inspector callbacks. Shared option literals do not unify field controls.",
-      "removalCondition": "Remove when this exact match disappears or an accepted common owner replaces the stated contract distinction.",
-      "reviewBy": "2027-04-28",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/speech-panel.tsx",
-        "start": 612,
-        "end": 619
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/recognition.tsx",
-        "start": 215,
-        "end": 222
-      }
-    },
-    {
-      "id": "02b4bcb754d3fb4ddb842a718abf2877bbaf674af1d90cdded482dfa055a276f",
-      "classification": "tool-noise",
-      "owner": "features/video/project/motion and features/video/review/advanced",
-      "reason": "The endpoints return a rectangle record after different validators. Project crop permits positive values viazero check; review webcam requires Number.EPSILON and owns its own boundary. Both check normalized extents.",
-      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/features/video/project/motion/spatial.ts",
-        "start": 377,
-        "end": 383
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/video/review/advanced/webcam.ts",
-        "start": 84,
-        "end": 90
-      }
-    },
-    {
       "id": "fc3fe7e007849645023b4779929d1accbe0c84ffe40d19358686a68240006584",
       "classification": "tool-noise",
       "owner": "Native selection-panel projections",
@@ -3763,6 +3673,24 @@
         "path": "apps/extension/src/video-editor/workspace/sidebar/panel-content/selection-panel.tsx",
         "start": 78,
         "end": 84
+      }
+    },
+    {
+      "id": "fd611d8dc78895db0746bae5922ae46612b2144b06cac74df764ce91483241b7",
+      "classification": "tool-noise",
+      "owner": "Gallery annotation font faces",
+      "reason": "The Latin subset descriptors for JetBrains Mono and Literata share a Unicode range. Each font face requires its own family, weight range, and asset URL. CSS font-face descriptors cannot use a shared declaration or a custom property for unicode-range.",
+      "removalCondition": "Remove when this exact pair of face definitions disappears or the font owner generates the declarations from a shared subset inventory.",
+      "reviewBy": "2027-02-20",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/annotation-text-fonts.css",
+        "start": 15,
+        "end": 22
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/video-review/annotation-text-fonts.css",
+        "start": 35,
+        "end": 42
       }
     },
     {

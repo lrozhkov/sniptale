@@ -124,13 +124,5 @@ textarea.sniptale-compact-text-scroll::-webkit-scrollbar-thumb:hover {
   background-color: color-mix(in srgb, var(--sniptale-color-text-secondary) 45%, transparent);
 }
 textarea.sniptale-compact-text-scroll::-webkit-resizer {
-  background: linear-gradient(
-      to top left,
-      transparent 2px,
-      var(--sniptale-color-text-muted) 2px 3px,
-      transparent 3px 5px,
-      var(--sniptale-color-text-muted) 5px 6px,
-      transparent 6px
-    )
-    right bottom / 8px 8px no-repeat;
+  background: var(--sniptale-textarea-resize-grip);
 }

@@ -441,7 +441,7 @@ it('groups spotlight appearance and Native phases without dormant camera control
   expect(container?.textContent).not.toContain('gallery.videoReview.borderHold');
   expect(container?.textContent).not.toContain('gallery.videoReview.motionBlur');
   expect(
-    container?.querySelectorAll('[aria-label="gallery.videoReview.focusReveal"]')
+    container?.querySelectorAll('[aria-label="gallery.videoReview.spotlightRevealLabel"]')
   ).toHaveLength(2);
 });
 

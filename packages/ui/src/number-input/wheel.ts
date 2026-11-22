@@ -1,5 +1,23 @@
 export type NumericStepDirection = 1 | -1;
 
+/** Consume the shared Alt+wheel gesture after the receiving control checks focus. */
+export function consumeNumericWheelStep(event: WheelEvent): NumericStepDirection | null {
+  if (
+    event.defaultPrevented ||
+    !event.cancelable ||
+    !event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.shiftKey ||
+    event.deltaY === 0 ||
+    Math.abs(event.deltaX) >= Math.abs(event.deltaY)
+  )
+    return null;
+  event.preventDefault();
+  event.stopPropagation();
+  return event.deltaY < 0 ? 1 : -1;
+}
+
 /** Bind only an owned numeric control, before ancestor wheel containment. */
 export function attachNumericInputWheel(
   input: HTMLInputElement,
@@ -13,21 +31,12 @@ export function attachNumericInputWheel(
       root.activeElement !== input ||
       event.target !== input ||
       input.disabled ||
-      input.readOnly ||
-      event.defaultPrevented ||
-      !event.cancelable ||
-      event.ctrlKey ||
-      event.metaKey ||
-      !event.altKey ||
-      event.shiftKey ||
-      event.deltaY === 0 ||
-      Math.abs(event.deltaX) >= Math.abs(event.deltaY)
+      input.readOnly
     )
       return;
 
-    event.preventDefault();
-    event.stopPropagation();
-    onStep(event.deltaY < 0 ? 1 : -1);
+    const step = consumeNumericWheelStep(event);
+    if (step !== null) onStep(step);
   };
   input.addEventListener('wheel', handleWheel, { passive: false });
   return () => input.removeEventListener('wheel', handleWheel);

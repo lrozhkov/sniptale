@@ -56,7 +56,12 @@ it('steps the real focused DOM field while preserving even paired dimensions and
   sync();
   const input = control.widthInput;
   act(() => input.focus());
-  const wheel = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -120 });
+  const wheel = new WheelEvent('wheel', {
+    altKey: true,
+    bubbles: true,
+    cancelable: true,
+    deltaY: -120,
+  });
   act(() => input.dispatchEvent(wheel));
   expect(wheel.defaultPrevented).toBe(true);
   expect(input.step).toBe('2');

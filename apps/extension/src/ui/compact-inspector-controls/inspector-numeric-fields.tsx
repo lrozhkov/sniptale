@@ -1,4 +1,5 @@
 import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
+import { consumeNumericWheelStep, handleNumericEditorKeyDown } from '@sniptale/ui/number-input';
 import { Check, Pencil } from 'lucide-react';
 import {
   useContext,
@@ -156,21 +157,9 @@ function NumberEditor({
     onClick: () => editor.commit(true),
   });
   const handleWheel = useEffectEvent((event: WheelEvent) => {
-    if (
-      !editor.valid ||
-      !inputRef.current?.matches(':focus') ||
-      event.defaultPrevented ||
-      !event.cancelable ||
-      !event.altKey ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.shiftKey ||
-      Math.abs(event.deltaX) >= Math.abs(event.deltaY)
-    )
-      return;
-    event.preventDefault();
-    event.stopPropagation();
-    editor.step(event.deltaY < 0 ? 1 : -1);
+    if (!editor.valid || !inputRef.current?.matches(':focus')) return;
+    const step = consumeNumericWheelStep(event);
+    if (step !== null) editor.step(step);
   });
   useEffect(() => {
     const surface = inputRef.current?.closest<HTMLElement>('.compound-field, .color-frame');
@@ -203,28 +192,7 @@ function NumberEditor({
           autoComplete="off"
           value={editor.draft ?? ''}
           onInput={(event) => editor.update(event.currentTarget.value)}
-          onKeyDown={(event) => {
-            if (event.nativeEvent.isComposing) return;
-            if (
-              (event.key === 'ArrowUp' || event.key === 'ArrowDown') &&
-              !event.altKey &&
-              !event.ctrlKey &&
-              !event.metaKey &&
-              !event.shiftKey
-            ) {
-              event.preventDefault();
-              editor.step(event.key === 'ArrowUp' ? 1 : -1);
-            }
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              editor.commit(true);
-            }
-            if (event.key === 'Escape') {
-              event.preventDefault();
-              event.stopPropagation();
-              editor.close(true);
-            }
-          }}
+          onKeyDown={(event) => handleNumericEditorKeyDown(event, editor, true)}
         />
         <span id={hintId} hidden>
           {editor.stepHint}

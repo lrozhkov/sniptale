@@ -214,7 +214,12 @@ it('steps a focused linked side once through the linked update callback', () => 
   const { onChange, onChangeMany } = renderSides(createState(values));
   const input = container.querySelector<HTMLInputElement>('input')!;
   input.focus();
-  const wheel = new WheelEvent('wheel', { deltaY: 20, bubbles: true, cancelable: true });
+  const wheel = new WheelEvent('wheel', {
+    altKey: true,
+    deltaY: 20,
+    bubbles: true,
+    cancelable: true,
+  });
   act(() => input.dispatchEvent(wheel));
   expect(wheel.defaultPrevented).toBe(true);
   expect(onChangeMany).toHaveBeenCalledExactlyOnceWith(
@@ -234,7 +239,12 @@ it.each(['text', 'length'] as const)(
     );
     const input = container.querySelector<HTMLInputElement>('input')!;
     input.focus();
-    const wheel = new WheelEvent('wheel', { deltaY: -20, bubbles: true, cancelable: true });
+    const wheel = new WheelEvent('wheel', {
+      altKey: true,
+      deltaY: -20,
+      bubbles: true,
+      cancelable: true,
+    });
     act(() => input.dispatchEvent(wheel));
     expect(wheel.defaultPrevented).toBe(false);
     expect(onChange).not.toHaveBeenCalled();

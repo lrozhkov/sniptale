@@ -305,12 +305,12 @@ it.each(['mouse', 'keyboard', 'typing'] as const)(
           width: 0.01,
           height: 0.01,
         });
-        const range = host.querySelector<HTMLInputElement>(
-          'input[aria-label="gallery.videoReview.gestureArea_x range"]'
+        const horizontal = host.querySelector<HTMLInputElement>(
+          'input[aria-label="gallery.videoReview.gestureArea_x"]'
         )!;
-        expect(range.closest('details')?.open).toBe(false);
-        expect(range.max).toBe('99');
+        expect(horizontal.closest('details')?.open).toBe(false);
         for (const [axis, value] of [
+          ['x', '100'],
           ['x', '10'],
           ['y', '20'],
           ['width', '30'],
@@ -331,6 +331,9 @@ it.each(['mouse', 'keyboard', 'typing'] as const)(
             input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }))
           );
           accept();
+          if (value === '100') {
+            expect(project.actionFeedback![0]!.gestureStyles![0]!.gestureArea?.x).toBe(0.99);
+          }
         }
         expect(project.actionFeedback![0]!.gestureStyles![0]!.gestureArea).toEqual({
           x: 0.1,

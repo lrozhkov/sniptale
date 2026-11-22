@@ -72,7 +72,12 @@ it('changes the focused size draft by wheel and retains blur commit authority', 
   const input = getInput('Width');
   if (!input) throw new Error('Width input did not mount');
   act(() => input.focus());
-  const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -120 });
+  const event = new WheelEvent('wheel', {
+    altKey: true,
+    bubbles: true,
+    cancelable: true,
+    deltaY: -120,
+  });
   act(() => input.dispatchEvent(event));
   expect(event.defaultPrevented).toBe(true);
   expect(input.value).toBe('321');

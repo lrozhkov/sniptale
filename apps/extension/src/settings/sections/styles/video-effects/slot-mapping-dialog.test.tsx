@@ -157,7 +157,12 @@ it('steps optional bound drafts while preserving invalid and empty text and save
   )!;
   input.focus();
   const wheel = () => {
-    const event = new WheelEvent('wheel', { deltaY: -20, bubbles: true, cancelable: true });
+    const event = new WheelEvent('wheel', {
+      altKey: true,
+      deltaY: -20,
+      bubbles: true,
+      cancelable: true,
+    });
     act(() => input.dispatchEvent(event));
     expect(event.defaultPrevented).toBe(true);
   };
@@ -179,6 +184,7 @@ it('steps optional bound drafts while preserving invalid and empty text and save
   act(() =>
     minimum.dispatchEvent(
       new WheelEvent('wheel', {
+        altKey: true,
         deltaY: 20,
         bubbles: true,
         cancelable: true,
@@ -190,7 +196,9 @@ it('steps optional bound drafts while preserving invalid and empty text and save
   expect(onSave).not.toHaveBeenCalled();
   await render(true);
   act(() =>
-    input.dispatchEvent(new WheelEvent('wheel', { deltaY: -20, bubbles: true, cancelable: true }))
+    input.dispatchEvent(
+      new WheelEvent('wheel', { altKey: true, deltaY: -20, bubbles: true, cancelable: true })
+    )
   );
   expect(input.value).toBe('1.25');
 });
